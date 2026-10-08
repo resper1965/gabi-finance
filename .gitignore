@@ -7,3 +7,4 @@ painel/dist/
 *.db
 *.db-wal
 *.db-shm
+gabi/painel/

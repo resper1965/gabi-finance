@@ -15,6 +15,7 @@ from gabi.db import conectar, migrar
 from gabi.identidade import Identidade, exigir, normalizar_login
 
 AQUI = Path(__file__).resolve().parent
+PAINEL = AQUI / "painel"
 MIGRACOES = AQUI.parent / "migrations"
 
 
@@ -147,7 +148,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
     @app.get("/")
     def raiz(_: Identidade = Depends(exigir("terceiros"))):
-        return FileResponse(AQUI / "static" / "index.html")
+        # painel React compilado (painel/ → gabi/painel); sem build, cai na página de verificação da Fase 0
+        return FileResponse(PAINEL / "index.html" if (PAINEL / "index.html").exists() else AQUI / "static" / "index.html")
 
     from gabi.rotas.dinheiro import router as rotas_dinheiro
     app.include_router(rotas_dinheiro)
@@ -156,6 +158,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
     from gabi.rotas.cadastros import router as rotas_cadastros
     app.include_router(rotas_cadastros)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
+    if (PAINEL / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")
     return app
 
 

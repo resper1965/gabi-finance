@@ -103,7 +103,10 @@ def test_revogar_tudo_ok_revoga_e_registra_decisao(cli, banco):
     assert d["quem"] == "boss@x.com" and "revogar" in d["o_que"].lower()
 
 
-def test_raiz_serve_html_com_design_do_sistema(cli):
+def test_raiz_serve_html_com_design_do_sistema(banco, monkeypatch, tmp_path):
+    import gabi.api as api
+    monkeypatch.setattr(api, "PAINEL", tmp_path / "sem-build")  # sem build do painel: página de verificação da Fase 0
+    cli = TestClient(criar_app(banco, permite_tcp_local=True), client=("127.0.0.1", 50000))
     r = cli.get("/", headers=BOSS)
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     assert 'href="/static/industry.css"' in r.text and "blueprint" in r.text and 'class="table"' in r.text
@@ -163,3 +166,15 @@ def test_falha_no_log_nao_troca_a_resposta(banco, monkeypatch):
     monkeypatch.setattr(api, "_gravar_chamada", lambda *a, **k: (_ for _ in ()).throw(OSError("log indisponível")))
     c = TestClient(criar_app(banco, permite_tcp_local=True), client=("127.0.0.1", 50000))
     assert c.get("/api/eu", headers=BOSS).status_code == 200
+
+
+def test_raiz_serve_o_painel_compilado_quando_existe(banco, monkeypatch, tmp_path):
+    import gabi.api as api
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "index.html").write_text("<html>PAINEL-REACT</html>")
+    (tmp_path / "assets" / "a.js").write_text("console.log(1)")
+    monkeypatch.setattr(api, "PAINEL", tmp_path)
+    c = TestClient(criar_app(banco, permite_tcp_local=True), client=("127.0.0.1", 50000))
+    assert "PAINEL-REACT" in c.get("/", headers=BOSS).text
+    assert c.get("/assets/a.js").status_code == 200
+    assert c.get("/").status_code == 401
