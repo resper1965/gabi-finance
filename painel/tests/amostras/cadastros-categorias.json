@@ -1,0 +1,45 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "excluido_em": null,
+    "id": 4,
+    "nome": "Assinaturas",
+    "pai_id": null
+   },
+   {
+    "excluido_em": null,
+    "id": 5,
+    "nome": "Casa",
+    "pai_id": null
+   },
+   {
+    "excluido_em": null,
+    "id": 1,
+    "nome": "Mercado",
+    "pai_id": null
+   },
+   {
+    "excluido_em": null,
+    "id": 3,
+    "nome": "Receita",
+    "pai_id": null
+   },
+   {
+    "excluido_em": null,
+    "id": 2,
+    "nome": "Transporte",
+    "pai_id": null
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

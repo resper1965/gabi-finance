@@ -1,0 +1,95 @@
+{
+ "dados": {
+  "atencao": [
+   {
+    "quantidade": 1,
+    "rota": "/caixa/a-pagar",
+    "texto": "1 conta atrasada",
+    "tipo": "atrasadas"
+   },
+   {
+    "quantidade": 1,
+    "rota": "/regras",
+    "texto": "1 sugestão da Gabi para você revisar",
+    "tipo": "sugestoes_pendentes"
+   }
+  ],
+  "detalhe": {
+   "a_pagar_contas": 3,
+   "a_pagar_vencidas": 1,
+   "assinaturas_a_conferir": 1,
+   "assinaturas_ativas": 1,
+   "cartoes_abertos": 1,
+   "proxima_fatura": "2026-10-20",
+   "saldo_por_conta": [
+    {
+     "apelido": "C6 PJ",
+     "saldo": "12345.60"
+    }
+   ]
+  },
+  "kpis": {
+   "a_pagar_7_dias": "5729.90",
+   "a_receber": null,
+   "assinaturas_mes": "55.90",
+   "faturas_abertas": "475.90",
+   "saldo": "12345.60"
+  },
+  "serie_saldo": [
+   {
+    "data": "2026-10-01",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-02",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-03",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-04",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-05",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-06",
+    "projecao": false,
+    "valor": "10000.00"
+   },
+   {
+    "data": "2026-10-07",
+    "projecao": false,
+    "valor": "11000.00"
+   },
+   {
+    "data": "2026-10-08",
+    "projecao": false,
+    "valor": "12345.60"
+   },
+   {
+    "data": "2026-10-20",
+    "projecao": true,
+    "valor": "11869.70"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

@@ -91,23 +91,34 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
         agenda = cp.contas_a_pagar(con, hoje)
         a_pagar = sum(i["valor_centavos"] or 0 for g in ("atrasadas", "hoje", "proximas") for i in agenda[g])
         fonte = repositorio.FonteAnalise(con)
-        assinaturas = sum(r["valor_medio"] for r in analise.recorrentes(fonte, "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600)
+        recorrentes = [r for r in analise.recorrentes(fonte, "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
+        assinaturas = sum(r["valor_medio"] for r in recorrentes)
+        status_ass = {a["estabelecimento"]: a["status"] for a in con.execute("select estabelecimento, status from assinatura")}
+        a_conferir = sum(1 for r in recorrentes if status_ass.get(r.get("chave") or r.get("descricao"), "a_conferir") == "a_conferir")
+        abertas = con.execute(
+            "select f.vencimento from fatura f join conta c on c.id=f.conta_id where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null "
+            "and upper(coalesce(f.pagamento_status,''))<>'PAID' order by f.vencimento").fetchall()
         serie = _serie_saldo(con, hoje, PERIODOS[periodo], conta)
         prev = analise.previsao(fonte, 14, None, hoje)
         delta = cx.saldo_centavos - para_centavos(prev["saldo_inicial"])  # projeção parte do saldo do caixa único
         serie += [{"data": e["data"], "valor": formatar(para_centavos(e["saldo"]) + delta), "projecao": True} for e in prev["eventos"]]
         atencao = []
-        for tipo, qtd, texto, rota in [
-                ("atrasadas", len(agenda["atrasadas"]), "contas atrasadas", "/caixa/a-pagar"),
-                ("a_conferir", len(agenda["a_conferir"]), "contas a conferir", "/caixa/a-pagar"),
-                ("contas_a_decidir", con.execute("select count(*) from conta where estado='a_decidir' and excluido_em is null").fetchone()[0],
+        n_decidir = con.execute("select count(*) from conta where estado='a_decidir' and excluido_em is null").fetchone()[0]
+        n_sug = con.execute("select count(*) from sugestao where estado='pendente'").fetchone()[0]
+        for tipo, qtd, um, varios, rota in [
+                ("atrasadas", len(agenda["atrasadas"]), "conta atrasada", "contas atrasadas", "/caixa/a-pagar"),
+                ("a_conferir", len(agenda["a_conferir"]), "conta a conferir", "contas a conferir", "/caixa/a-pagar"),
+                ("contas_a_decidir", n_decidir, "conta nova esperando você decidir se entra no caixa único",
                  "contas novas esperando você decidir se entram no caixa único", "/cadastros/contas"),
-                ("sugestoes_pendentes", con.execute("select count(*) from sugestao where estado='pendente'").fetchone()[0],
-                 "sugestões da Gabi para você revisar", "/regras")]:
+                ("sugestoes_pendentes", n_sug, "sugestão da Gabi para você revisar", "sugestões da Gabi para você revisar", "/regras")]:
             if qtd:
-                atencao.append({"tipo": tipo, "quantidade": qtd, "texto": f"{qtd} {texto}", "rota": rota})
+                atencao.append({"tipo": tipo, "quantidade": qtd, "texto": f"{qtd} {um if qtd == 1 else varios}", "rota": rota})
         dados = {"kpis": {"saldo": formatar(saldo), "a_pagar_7_dias": formatar(a_pagar), "a_receber": None,
                           "faturas_abertas": formatar(cx.faturas_abertas_centavos), "assinaturas_mes": formatar(para_centavos(round(assinaturas, 2)))},
+                 "detalhe": {"saldo_por_conta": [{"apelido": c["apelido"], "saldo": formatar(c["saldo_centavos"])} for c in contas],
+                             "a_pagar_contas": sum(len(agenda[g]) for g in ("atrasadas", "hoje", "proximas")), "a_pagar_vencidas": len(agenda["atrasadas"]),
+                             "cartoes_abertos": len(abertas), "proxima_fatura": abertas[0][0] if abertas else None,
+                             "assinaturas_ativas": len(recorrentes), "assinaturas_a_conferir": a_conferir},
                  "serie_saldo": serie, "atencao": atencao}
         return envelope(con, dados, agora=_agora(request))
     finally:
@@ -333,7 +344,8 @@ def regras(request: Request):
     """Regras de classificação."""
     con = _con(request)
     try:
-        return envelope(con, {"itens": [_regra(r) for r in con.execute("select * from regra order by id")]}, agora=_agora(request))
+        itens = [{**_regra(r), "casam": rg.contar_casados(con, r["padrao"])} for r in con.execute("select * from regra order by id")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
     finally:
         con.close()
 

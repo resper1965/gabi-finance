@@ -806,6 +806,55 @@
     "summary": "Destino"
    }
   },
+  "/api/v1/destino/agrupado": {
+   "get": {
+    "description": "Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa).",
+    "operationId": "destino_agrupado_api_v1_destino_agrupado_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "periodo",
+      "required": false,
+      "schema": {
+       "default": "mes",
+       "title": "Periodo",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "por",
+      "required": false,
+      "schema": {
+       "default": "categoria",
+       "title": "Por",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Destino Agrupado"
+   }
+  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",

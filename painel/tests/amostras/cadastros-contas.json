@@ -1,0 +1,43 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "apelido": "C6 PJ",
+    "estado": "sim",
+    "excluido_em": null,
+    "externo_id": "b1",
+    "id": 1,
+    "instituicao": "C6",
+    "limite": null,
+    "nibo_account_id": null,
+    "origem": "open_finance",
+    "pj": false,
+    "tipo": "BANK",
+    "titular": null
+   },
+   {
+    "apelido": "Itaú Visa",
+    "estado": "sim",
+    "excluido_em": null,
+    "externo_id": "c1",
+    "id": 2,
+    "instituicao": "Itau",
+    "limite": "5000.00",
+    "nibo_account_id": null,
+    "origem": "open_finance",
+    "pj": false,
+    "tipo": "CREDIT",
+    "titular": null
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

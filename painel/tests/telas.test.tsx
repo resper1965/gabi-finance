@@ -1,0 +1,105 @@
+import { vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { ToastProvider } from "../src/lib/toast";
+import { FiltrosProvider } from "../src/lib/filtros";
+import { Lancamentos } from "../src/telas/Gastos/Lancamentos";
+import { Semanas } from "../src/telas/Caixa/Semanas";
+import { Regras } from "../src/telas/Regras";
+import { ParaOndeVai } from "../src/telas/Gastos/ParaOndeVai";
+import { Resumo } from "../src/telas/Caixa/Resumo";
+import { APagar } from "../src/telas/Caixa/APagar";
+import { Assinaturas } from "../src/telas/Gastos/Assinaturas";
+import { amostra, apiFalsa } from "./apiFalsa";
+
+const montar = (ui: React.ReactElement) => render(<ToastProvider><FiltrosProvider>{ui}</FiltrosProvider></ToastProvider>);
+function celular(ativo: boolean) {
+  window.matchMedia = ((q: string) => ({ matches: ativo && q.includes("759"), media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+}
+beforeEach(() => { localStorage.clear(); celular(false); });
+afterEach(() => { vi.unstubAllGlobals(); });
+
+test("Lancamentos chip muda para quem e chama PATCH", async () => {
+  const chamadas = apiFalsa();
+  montar(<Lancamentos />);
+  const grupo = await screen.findByRole("group", { name: /Para quem: FARMACIA/ });
+  fireEvent.click(within(grupo).getByRole("button", { name: "Helena" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "PATCH" && /\/lancamentos\/5$/.test(c.url))).toBe(true));
+  const c = chamadas.find((x) => x.metodo === "PATCH")!;
+  expect(c.corpo).toEqual({ beneficiario_id: "p-hel" });
+});
+
+test("Lancamentos sugestao tem borda tracejada e origem", async () => {
+  apiFalsa({
+    sugestoes: { ...amostra("sugestoes"), dados: { itens: [{ id: 9, tipo: "para_quem", lancamento_id: 5, payload: { para_quem_id: "p-lia" }, estado: "pendente", motivo: "você classificou assim os outros", criado_em: "x", decidida_em: null, impacto: null }] } },
+  });
+  montar(<Lancamentos />);
+  const grupo = await screen.findByRole("group", { name: /Para quem: FARMACIA/ });
+  const lia = within(grupo).getByRole("button", { name: "Lia" });
+  expect(lia.style.border).toContain("dashed");
+  expect(await screen.findByText(/Gabi sugere: Lia/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "confirmar" })).toBeInTheDocument();
+});
+
+test("Semanas futuras tem opacidade 04", async () => {
+  apiFalsa();
+  const { container } = montar(<Semanas />);
+  await screen.findByText("Entradas e saídas por semana");
+  const futura = container.querySelector('g[data-projecao="true"] rect') as SVGRectElement;
+  const real = container.querySelector('g[data-projecao="false"] rect') as SVGRectElement;
+  expect(futura.style.fillOpacity).toBe("0.4");
+  expect(futura.style.strokeDasharray).toBe("3 2");
+  expect(real.style.fillOpacity).toBe("1");
+});
+
+test("Regras chave liga desliga chama PATCH", async () => {
+  const chamadas = apiFalsa();
+  montar(<Regras />);
+  const chave = await screen.findByRole("switch", { name: /Regra UBER ligada/ });
+  expect(chave).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(chave);
+  await waitFor(() => expect(chamadas.find((c) => c.metodo === "PATCH")?.corpo).toEqual({ ativa: false }));
+  expect(chamadas.find((c) => c.metodo === "PATCH")!.url).toBe("/api/v1/regras/1");
+});
+
+test("ParaOndeVai celular abre em Fornecedores", async () => {
+  celular(true);
+  apiFalsa();
+  montar(<ParaOndeVai />);
+  const aba = await screen.findByRole("button", { name: "Fornecedores" });
+  expect(aba).toHaveAttribute("aria-pressed", "true");
+  expect(await screen.findByText("maiores fornecedores do período")).toBeInTheDocument();
+});
+
+test("ParaOndeVai desktop abre em Sankey", async () => {
+  apiFalsa();
+  montar(<ParaOndeVai />);
+  expect(await screen.findByRole("button", { name: "Sankey" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Resumo mostra os 5 instrumentos e a atencao leva a tela certa", async () => {
+  apiFalsa();
+  montar(<Resumo />);
+  for (const r of ["Saldo do caixa único", "A pagar em 7 dias", "A receber das empresas", "Fatura aberta · cartões", "Assinaturas por mês"]) expect((await screen.findAllByText(r)).length).toBeGreaterThan(0);
+  expect(screen.getByText("1 conta atrasada")).toBeInTheDocument(); // singular correto
+});
+
+test("APagar: ja paguei chama POST e mostra pagas conciliadas", async () => {
+  const chamadas = apiFalsa();
+  montar(<APagar />);
+  fireEvent.click((await screen.findAllByRole("button", { name: "Já paguei" }))[0]);
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /\/contas-pagar\/aluguel%3A2026-10\/paga$/.test(c.url))).toBe(true));
+  expect(screen.getByText(/conciliadas com o extrato/)).toBeInTheDocument();
+});
+
+test("Assinaturas troca status por PATCH", async () => {
+  const chamadas = apiFalsa();
+  montar(<Assinaturas />);
+  fireEvent.change(await screen.findByRole("combobox", { name: "Status de NETFLIX" }), { target: { value: "cancelar" } });
+  await waitFor(() => expect(chamadas.find((c) => c.metodo === "PATCH")?.corpo).toEqual({ status: "cancelar" }));
+});
+
+test("erro de API mostra o estado de erro com os ultimos dados bons guardados", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ erro: "erro", mensagem: "falhou" }) }) as Response));
+  montar(<Regras />);
+  expect(await screen.findByText(/continuam guardados/)).toBeInTheDocument();
+});

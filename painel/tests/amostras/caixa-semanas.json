@@ -1,0 +1,147 @@
+{
+ "dados": {
+  "semanas": [
+   {
+    "entradas": [],
+    "fim": "2026-08-16",
+    "inicio": "2026-08-10",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-08-23",
+    "inicio": "2026-08-17",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-08-30",
+    "inicio": "2026-08-24",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-09-06",
+    "inicio": "2026-08-31",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-09-13",
+    "inicio": "2026-09-07",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-09-20",
+    "inicio": "2026-09-14",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-09-27",
+    "inicio": "2026-09-21",
+    "projecao": false,
+    "saidas": [],
+    "saldo": null
+   },
+   {
+    "entradas": [],
+    "fim": "2026-10-04",
+    "inicio": "2026-09-28",
+    "projecao": false,
+    "saidas": [
+     {
+      "categoria": "Mercado",
+      "valor": "-100.00"
+     }
+    ],
+    "saldo": "10000.00"
+   },
+   {
+    "entradas": [
+     {
+      "categoria": "Receita",
+      "valor": "8000.00"
+     }
+    ],
+    "fim": "2026-10-11",
+    "inicio": "2026-10-05",
+    "projecao": false,
+    "saidas": [
+     {
+      "categoria": "sem categoria",
+      "valor": "-87.90"
+     },
+     {
+      "categoria": "Mercado",
+      "valor": "-35.50"
+     },
+     {
+      "categoria": "Transporte",
+      "valor": "-22.50"
+     }
+    ],
+    "saldo": "12345.60"
+   },
+   {
+    "entradas": [],
+    "fim": "2026-10-18",
+    "inicio": "2026-10-12",
+    "projecao": true,
+    "saidas": [],
+    "saldo": "12345.60"
+   },
+   {
+    "entradas": [],
+    "fim": "2026-10-25",
+    "inicio": "2026-10-19",
+    "projecao": true,
+    "saidas": [
+     {
+      "categoria": "fatura",
+      "valor": "-475.90"
+     }
+    ],
+    "saldo": "11869.70"
+   },
+   {
+    "entradas": [],
+    "fim": "2026-11-01",
+    "inicio": "2026-10-26",
+    "projecao": true,
+    "saidas": [],
+    "saldo": "11869.70"
+   },
+   {
+    "entradas": [],
+    "fim": "2026-11-08",
+    "inicio": "2026-11-02",
+    "projecao": true,
+    "saidas": [],
+    "saldo": "11869.70"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

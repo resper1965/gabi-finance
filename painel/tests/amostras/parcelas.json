@@ -1,0 +1,55 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "conta": "Itaú Visa",
+    "descricao": "TV PARCELADA",
+    "parcela": 3,
+    "parcelas": 10,
+    "restante": 7,
+    "termina_em": "2027-05",
+    "termina_neste_mes": false,
+    "valor_parcela": "300.00"
+   }
+  ],
+  "por_mes": [
+   {
+    "mes": "2026-11",
+    "total": "300.00"
+   },
+   {
+    "mes": "2026-12",
+    "total": "300.00"
+   },
+   {
+    "mes": "2027-01",
+    "total": "300.00"
+   },
+   {
+    "mes": "2027-02",
+    "total": "300.00"
+   },
+   {
+    "mes": "2027-03",
+    "total": "300.00"
+   },
+   {
+    "mes": "2027-04",
+    "total": "300.00"
+   },
+   {
+    "mes": "2027-05",
+    "total": "300.00"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "nome": "(sem pessoa)",
+    "pct": 100.0,
+    "valor": "621.80",
+    "variacao": "265.90"
+   }
+  ],
+  "periodo": {
+   "ate": "2026-10-08",
+   "de": "2026-10-01"
+  },
+  "por": "pessoa",
+  "total": "621.80"
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

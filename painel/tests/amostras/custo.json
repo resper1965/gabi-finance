@@ -1,0 +1,18 @@
+{
+ "dados": {
+  "alerta": null,
+  "dia_usd": 0,
+  "mes_usd": 0,
+  "teto_dia_usd": 0.7,
+  "teto_mes_usd": 17.5
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

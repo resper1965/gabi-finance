@@ -25,7 +25,6 @@ from gabi.rotas.dinheiro import _item_pagar
 log = logging.getLogger("gabi.mcp")
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
-POR = {"categoria": "cat", "pessoa": "pessoa", "fornecedor": "fornecedor"}
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin"}
 
@@ -134,24 +133,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None):
     def financeiro_para_onde_vai(periodo: str = "mes", por: str = "categoria") -> dict:
         """Para onde foi o dinheiro: periodo = mes | semana | 12m; por = categoria | pessoa | fornecedor. Traz % do total e variação contra o período anterior."""
         def f(con, agora):
-            if periodo not in ("mes", "semana", "12m"):
-                raise ValueError("periodo deve ser mes, semana ou 12m")
-            if por not in POR:
-                raise ValueError("por deve ser categoria, pessoa ou fornecedor")
-            ini, fim, a_ini, a_fim = consultas.janelas(periodo, agora.date())
-            chave = POR[por]
-
-            def somar(de, ate):
-                s = {}
-                for r in consultas.custos(con, de, ate):
-                    k = r[chave] or ("(sem pessoa)" if por == "pessoa" else "(sem nome)")
-                    s[k] = s.get(k, 0) + r["gasto"]
-                return s
-            atual, antes = somar(ini, fim), somar(a_ini, a_fim)
-            total = sum(atual.values())
-            itens = [{"nome": k, "valor": formatar(v), "pct": round(v / total * 100, 1) if total else 0.0, "variacao": formatar(v - antes.get(k, 0))}
-                     for k, v in sorted(atual.items(), key=lambda kv: (-kv[1], kv[0])) if v]
-            return {"periodo": {"de": ini.isoformat(), "ate": fim.isoformat()}, "por": por, "itens": itens, "total": formatar(total)}
+            return consultas.agrupar(con, periodo, por, agora.date())
         return executar("financeiro_para_onde_vai", f)
 
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))

@@ -87,6 +87,14 @@ def test_resumo_saldo_so_das_contas_liberadas_e_dinheiro_como_string(cli):
     assert d["kpis"]["a_pagar_7_dias"] == "1530.50"  # atrasada (500) + hoje (800) + 12/10 (230,50); "a conferir" e "previsto" fora
 
 
+def test_resumo_traz_o_detalhe_que_o_painel_mostra_sob_cada_kpi(cli):
+    d = get(cli, "/api/v1/caixa/resumo").json()["dados"]["detalhe"]
+    assert d["saldo_por_conta"] == [{"apelido": "C6 PJ", "saldo": "12345.60"}]
+    assert (d["a_pagar_contas"], d["a_pagar_vencidas"]) == (3, 1)
+    assert d["cartoes_abertos"] == 0 and d["proxima_fatura"] is None
+    assert {"assinaturas_ativas", "assinaturas_a_conferir"} <= set(d)
+
+
 def test_resumo_serie_de_saldo_tem_passado_e_projecao(cli):
     s = get(cli, "/api/v1/caixa/resumo").json()["dados"]["serie_saldo"]
     assert s and all({"data", "valor", "projecao"} <= set(p) for p in s)
@@ -236,6 +244,7 @@ def test_regras_lista_e_liga_desliga(cli, banco):
     c.close()
     r = get(cli, "/api/v1/regras").json()["dados"]["itens"]
     assert r[0]["ativa"] is False and r[0]["acao"] == {"categoria_id": 2}
+    assert r[0]["casam"] == 2  # lançamentos que o padrão pega (a Gabi mostra "N lançamentos" ao lado da regra)
     assert patch(cli, "/api/v1/regras/1", {"ativa": True}).status_code == 200
     assert conectar(banco).execute("select count(*) from lancamento where categoria_id=2").fetchone()[0] == 2  # ligar aplica ao passado
     assert patch(cli, "/api/v1/regras/1", {"ativa": "sim"}).status_code == 400

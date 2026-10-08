@@ -28,6 +28,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/contas-pagar/{id_compromisso}/paga` | Baixa manual de um compromisso (vale só se não houver lançamento no extrato). |
 | GET | `/api/v1/custo` | Custo do modelo (OpenRouter) no dia e no mês contra o teto. |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
+| GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/lancamentos` | Lançamentos paginados, com filtros e a origem de cada classificação. |
 | POST | `/api/v1/lancamentos/lote` | Muda vários lançamentos de uma vez; criar_regra cria uma regra por estabelecimento. |

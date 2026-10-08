@@ -1,0 +1,91 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "apelido": "Itaú Visa",
+    "fatura_aberta": {
+     "id": "f1",
+     "percentual_limite": 9.5,
+     "status": "OPEN",
+     "total": "475.90",
+     "vencimento": "2026-10-20"
+    },
+    "id": 2,
+    "limite": "5000.00",
+    "por_categoria": [
+     {
+      "categoria": "Casa",
+      "valor": "300.00"
+     },
+     {
+      "categoria": "Mercado",
+      "valor": "120.00"
+     },
+     {
+      "categoria": "Assinaturas",
+      "valor": "55.90"
+     }
+    ],
+    "serie_12m": [
+     {
+      "mes": "2025-11",
+      "total": "0.00"
+     },
+     {
+      "mes": "2025-12",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-01",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-02",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-03",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-04",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-05",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-06",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-07",
+      "total": "55.90"
+     },
+     {
+      "mes": "2026-08",
+      "total": "355.90"
+     },
+     {
+      "mes": "2026-09",
+      "total": "355.90"
+     },
+     {
+      "mes": "2026-10",
+      "total": "475.90"
+     }
+    ]
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

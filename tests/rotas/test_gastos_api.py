@@ -176,6 +176,13 @@ def test_assinaturas_lista_com_total_e_status_inicial(cli):
     assert isinstance(n["id"], int) and n["sinais"] == {"nova": False, "reajustou": None, "cobrada_depois_de_cancelar": False}
 
 
+def test_assinatura_traz_historico_de_12_meses_desde_e_ultimo(cli):
+    n = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]
+    assert [m["mes"] for m in n["serie_12m"]][-4:] == ["2026-07", "2026-08", "2026-09", "2026-10"] and len(n["serie_12m"]) == 12
+    assert [m["total"] for m in n["serie_12m"]][-4:] == ["55.90"] * 4 and n["serie_12m"][0]["total"] == "0.00"
+    assert (n["desde"], n["ultimo"], n["total_12m"]) == ("2026-07-03", "2026-10-03", "223.60")
+
+
 def test_assinatura_patch_muda_status_e_registra_quando(cli, banco):
     aid = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["id"]
     r = patch(cli, f"/api/v1/assinaturas/{aid}", {"status": "cancelar", "lembrar_ate_cancelar": True})
@@ -256,3 +263,21 @@ def test_cancelamento_marcado_depois_da_ultima_cobranca_nao_dispara_alerta(cli, 
     c.close()
     d = get(cli, "/api/v1/assinaturas").json()["dados"]
     assert d["itens"][0]["sinais"]["cobrada_depois_de_cancelar"] is False and d["alerta_forte"] is False
+
+
+# ---------------- destino agrupado (abas Fornecedores / Por pessoa) ----------------
+def test_destino_agrupado_por_fornecedor_e_pessoa(cli):
+    j = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=fornecedor").json()
+    assert {"dados_ate", "fontes"} <= set(j)
+    d = j["dados"]
+    assert d["por"] == "fornecedor" and d["total"] == "533.90"
+    assert d["itens"][0]["nome"] == "TV" and d["itens"][0]["valor"] == "300.00"
+    assert {"nome", "valor", "pct", "variacao"} <= set(d["itens"][0])
+    p = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=pessoa").json()["dados"]
+    assert p["itens"][0]["nome"] == "(sem pessoa)"
+
+
+def test_destino_agrupado_valida_entrada_e_exige_boss(cli):
+    assert get(cli, "/api/v1/destino/agrupado?por=xis").status_code == 400
+    assert get(cli, "/api/v1/destino/agrupado?periodo=ano").status_code == 400
+    assert get(cli, "/api/v1/destino/agrupado", VIP).status_code == 403

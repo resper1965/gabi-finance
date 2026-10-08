@@ -1,0 +1,408 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "categoria": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "conta": "C6 PJ",
+    "data": "2026-10-08",
+    "descricao": "FARMACIA SAO JOAO",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "FARMACIA",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 5,
+    "natureza": "caixa+custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-87.90"
+   },
+   {
+    "categoria": {
+     "id": 1,
+     "nome": "Mercado",
+     "origem": "voce"
+    },
+    "conta": "C6 PJ",
+    "data": "2026-10-07",
+    "descricao": "PADARIA BOM PAO",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "PADARIA",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 1,
+    "natureza": "caixa+custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-35.50"
+   },
+   {
+    "categoria": {
+     "id": 2,
+     "nome": "Transporte",
+     "origem": "regra"
+    },
+    "conta": "C6 PJ",
+    "data": "2026-10-06",
+    "descricao": "UBER TRIP",
+    "empresa": {
+     "id": "e1",
+     "nome": "Ness",
+     "origem": "voce"
+    },
+    "estabelecimento": "UBER",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 2,
+    "natureza": "caixa+custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-22.50"
+   },
+   {
+    "categoria": {
+     "id": 3,
+     "nome": "Receita",
+     "origem": "banco"
+    },
+    "conta": "C6 PJ",
+    "data": "2026-10-05",
+    "descricao": "SALARIO EMPRESA",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "SALARIO",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 3,
+    "natureza": "caixa",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "8000.00"
+   },
+   {
+    "categoria": {
+     "id": 1,
+     "nome": "Mercado",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-10-04",
+    "descricao": "LOJA X",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "LOJA",
+    "fatura_id": "f1",
+    "forma": null,
+    "frente_id": null,
+    "id": 13,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-120.00"
+   },
+   {
+    "categoria": {
+     "id": 4,
+     "nome": "Assinaturas",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-10-03",
+    "descricao": "NETFLIX",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "NETFLIX",
+    "fatura_id": "f1",
+    "forma": null,
+    "frente_id": null,
+    "id": 6,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-55.90"
+   },
+   {
+    "categoria": {
+     "id": 5,
+     "nome": "Casa",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-10-02",
+    "descricao": "TV PARCELADA",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "TV",
+    "fatura_id": "f1",
+    "forma": null,
+    "frente_id": null,
+    "id": 10,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": 3,
+    "parcelas": 10,
+    "status": "posted",
+    "valor": "-300.00"
+   },
+   {
+    "categoria": {
+     "id": 1,
+     "nome": "Mercado",
+     "origem": "voce"
+    },
+    "conta": "C6 PJ",
+    "data": "2026-09-28",
+    "descricao": "MERCADO CENTRAL",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "MERCADO",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 4,
+    "natureza": "caixa+custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-100.00"
+   },
+   {
+    "categoria": {
+     "id": 4,
+     "nome": "Assinaturas",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-09-03",
+    "descricao": "NETFLIX",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "NETFLIX",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 7,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-55.90"
+   },
+   {
+    "categoria": {
+     "id": 5,
+     "nome": "Casa",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-09-02",
+    "descricao": "TV PARCELADA",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "TV",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 11,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": 2,
+    "parcelas": 10,
+    "status": "posted",
+    "valor": "-300.00"
+   },
+   {
+    "categoria": {
+     "id": 4,
+     "nome": "Assinaturas",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-08-03",
+    "descricao": "NETFLIX",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "NETFLIX",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 8,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-55.90"
+   },
+   {
+    "categoria": {
+     "id": 5,
+     "nome": "Casa",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-08-02",
+    "descricao": "TV PARCELADA",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "TV",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 12,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": 1,
+    "parcelas": 10,
+    "status": "posted",
+    "valor": "-300.00"
+   },
+   {
+    "categoria": {
+     "id": 4,
+     "nome": "Assinaturas",
+     "origem": "voce"
+    },
+    "conta": "Itaú Visa",
+    "data": "2026-07-03",
+    "descricao": "NETFLIX",
+    "empresa": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "estabelecimento": "NETFLIX",
+    "fatura_id": null,
+    "forma": null,
+    "frente_id": null,
+    "id": 9,
+    "natureza": "custo",
+    "para_quem": {
+     "id": null,
+     "nome": null,
+     "origem": null
+    },
+    "parcela": null,
+    "parcelas": null,
+    "status": "posted",
+    "valor": "-55.90"
+   }
+  ],
+  "limite": 100,
+  "offset": 0,
+  "total": 13
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

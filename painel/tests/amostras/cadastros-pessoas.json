@@ -1,0 +1,60 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "dados": {},
+    "excluido_em": null,
+    "id": "p-bia",
+    "nome": "Bia",
+    "origem": "demo",
+    "papel": null,
+    "telefone": null
+   },
+   {
+    "dados": {},
+    "excluido_em": null,
+    "id": "p-casa",
+    "nome": "Casa",
+    "origem": "demo",
+    "papel": null,
+    "telefone": null
+   },
+   {
+    "dados": {},
+    "excluido_em": null,
+    "id": "p-hel",
+    "nome": "Helena",
+    "origem": "demo",
+    "papel": null,
+    "telefone": null
+   },
+   {
+    "dados": {},
+    "excluido_em": null,
+    "id": "p-lia",
+    "nome": "Lia",
+    "origem": "demo",
+    "papel": null,
+    "telefone": null
+   },
+   {
+    "dados": {},
+    "excluido_em": null,
+    "id": "p-ric",
+    "nome": "Ricardo",
+    "origem": "demo",
+    "papel": null,
+    "telefone": null
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

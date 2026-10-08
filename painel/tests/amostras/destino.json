@@ -1,0 +1,147 @@
+{
+ "dados": {
+  "comparacao": [
+   {
+    "anterior": "0.00",
+    "atual": "155.50",
+    "categoria": "Mercado",
+    "variacao": "155.50"
+   },
+   {
+    "anterior": "0.00",
+    "atual": "87.90",
+    "categoria": "sem categoria",
+    "variacao": "87.90"
+   },
+   {
+    "anterior": "0.00",
+    "atual": "22.50",
+    "categoria": "Transporte",
+    "variacao": "22.50"
+   },
+   {
+    "anterior": "55.90",
+    "atual": "55.90",
+    "categoria": "Assinaturas",
+    "variacao": "0.00"
+   },
+   {
+    "anterior": "300.00",
+    "atual": "300.00",
+    "categoria": "Casa",
+    "variacao": "0.00"
+   }
+  ],
+  "fluxos": [
+   {
+    "de": "Casa",
+    "para": "Consumo pessoal",
+    "valor": "300.00"
+   },
+   {
+    "de": "Itaú Visa",
+    "para": "Casa",
+    "valor": "300.00"
+   },
+   {
+    "de": "Mercado",
+    "para": "Consumo pessoal",
+    "valor": "155.50"
+   },
+   {
+    "de": "Itaú Visa",
+    "para": "Mercado",
+    "valor": "120.00"
+   },
+   {
+    "de": "C6 PJ",
+    "para": "sem categoria",
+    "valor": "87.90"
+   },
+   {
+    "de": "sem categoria",
+    "para": "Consumo pessoal",
+    "valor": "87.90"
+   },
+   {
+    "de": "Assinaturas",
+    "para": "Consumo pessoal",
+    "valor": "55.90"
+   },
+   {
+    "de": "Itaú Visa",
+    "para": "Assinaturas",
+    "valor": "55.90"
+   },
+   {
+    "de": "C6 PJ",
+    "para": "Mercado",
+    "valor": "35.50"
+   },
+   {
+    "de": "C6 PJ",
+    "para": "Transporte",
+    "valor": "22.50"
+   },
+   {
+    "de": "Transporte",
+    "para": "A receber: Ness",
+    "valor": "22.50"
+   }
+  ],
+  "nos": [
+   {
+    "nome": "C6 PJ",
+    "tipo": "origem"
+   },
+   {
+    "nome": "Mercado",
+    "tipo": "categoria"
+   },
+   {
+    "nome": "Transporte",
+    "tipo": "categoria"
+   },
+   {
+    "nome": "sem categoria",
+    "tipo": "categoria"
+   },
+   {
+    "nome": "Itaú Visa",
+    "tipo": "origem"
+   },
+   {
+    "nome": "Assinaturas",
+    "tipo": "categoria"
+   },
+   {
+    "nome": "Casa",
+    "tipo": "categoria"
+   },
+   {
+    "nome": "Consumo pessoal",
+    "tipo": "destino"
+   },
+   {
+    "nome": "A receber: Ness",
+    "tipo": "destino"
+   }
+  ],
+  "periodo": {
+   "anterior_ate": "2026-09-08",
+   "anterior_de": "2026-09-01",
+   "ate": "2026-10-08",
+   "de": "2026-10-01"
+  },
+  "total": "621.80"
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

@@ -43,3 +43,23 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 - Cada chamada fica em `chamada_mcp` (token, ferramenta, escopo, status `ok|sem_escopo|erro|nao_autenticado`). Para ver: `sqlite3 $BANCO "select quando, ferramenta, status from chamada_mcp order by id desc limit 20"`.
 - Só existem ferramentas de **leitura** (`docs/api.md#mcp`). Não há como enviar, pagar, apagar, aprovar nem ligar regra por MCP (R13).
 - Se um agente receber `sem_escopo`, o token não tem o escopo da ferramenta: emita outro com o escopo certo (não amplie o de outro agente).
+
+## Telas de dinheiro (Fase 1) {#telas-dinheiro}
+O painel é `painel/` (React + Vite); `npm run build` gera `gabi/painel/` e a API serve em `/`. Comandos e regras: `painel/README.md`. Cada tela responde uma pergunta:
+
+| Tela | Pergunta | De onde vem |
+|---|---|---|
+| Caixa · Resumo | Tenho caixa? | `GET /caixa/resumo` (saldos do caixa único, faturas, assinaturas, atenção) |
+| Caixa · Semanas | Como o caixa anda, semana a semana? | `GET /caixa/semanas` + `GET /lancamentos` da semana clicada |
+| Caixa · A pagar | O que vence, e quando? | `GET /contas-pagar`; "Já paguei" = `POST /contas-pagar/{id}/paga` |
+| Gastos · Lançamentos | De quem é cada gasto? | `GET /lancamentos?pendente=para_quem`, `PATCH /lancamentos/{id}`, sugestões |
+| Gastos · Para onde vai | Para onde vai o dinheiro? | `GET /destino`, `GET /destino/agrupado` |
+| Gastos · Cartões | Quanto já foi no cartão? | `GET /cartoes` + lançamentos, edição em lote `POST /lancamentos/lote` |
+| Gastos · Parcelas | Quanto já está comprometido? | `GET /parcelas` |
+| Gastos · Assinaturas | O que é assinatura esquecida? | `GET /assinaturas`, `PATCH /assinaturas/{id}` |
+| Regras | O que a Gabi sugere classificar? | `GET /regras`, `GET /sugestoes`, aprovar/rejeitar/ligar |
+| Cadastros · Contas | Quais contas entram no caixa único? | `GET/PATCH /cadastros/contas` |
+
+**Ver sem dados reais:** `python -m tools.demo 8099` sobe a API com banco sintético (relógio fixo em 08/10/2026) e o painel compilado; mande o cabeçalho `Tailscale-User-Login: boss@x.com`.
+**Comparar com o protótipo (G14):** `python -m tools.capturas` grava `docs/design/<tela>-{prototipo,app}-{claro,escuro,celular}.png` (precisa do demo em :8099, do protótipo servido por `python -m http.server 8098` em `prototipo/` e de `playwright install chromium`).
+**Testes das telas** usam respostas reais da API (`painel/tests/amostras`, geradas por `python -m tools.gerar_amostras`); `tests/test_amostras_painel.py` falha se a API mudar e as amostras não.

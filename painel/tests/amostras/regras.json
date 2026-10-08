@@ -1,0 +1,37 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "acao": {
+     "categoria_id": 2
+    },
+    "ativa": true,
+    "casam": 1,
+    "criada_por": "boss@x.com",
+    "criado_em": "2026-10-01T10:00:00",
+    "id": 1,
+    "padrao": "UBER"
+   },
+   {
+    "acao": {
+     "categoria_id": 1
+    },
+    "ativa": false,
+    "casam": 1,
+    "criada_por": "boss@x.com",
+    "criado_em": "2026-10-02T10:00:00",
+    "id": 2,
+    "padrao": "PADARIA"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

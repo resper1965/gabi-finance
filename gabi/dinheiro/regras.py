@@ -77,6 +77,15 @@ def contar_afetados(con, padrao: str, acao: dict, hoje: dt.date) -> dict:
     return {"passado": passado, "futuro_estimado": round(recentes / HISTORICO_MESES, 1)}  # média por mês, 1 casa
 
 
+def contar_casados(con, padrao: str) -> int:
+    """Quantos lançamentos o padrão pega hoje (com a ação já aplicada ou não)."""
+    try:
+        rx = re.compile(padrao, re.I)
+    except re.error:
+        return 0
+    return sum(1 for r in con.execute("select descricao_original, estabelecimento from lancamento") if casa(rx, r["descricao_original"], r["estabelecimento"]))
+
+
 def criar_sugestao(con, tipo: str, lancamento_id: int | None, payload: dict, motivo: str) -> int:
     return con.execute("insert into sugestao(tipo, lancamento_id, payload, motivo, criado_em) values (?,?,?,?,?)",
                        (tipo, lancamento_id, json.dumps(payload, ensure_ascii=False), motivo, _agora())).lastrowid

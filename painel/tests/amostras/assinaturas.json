@@ -1,0 +1,84 @@
+{
+ "dados": {
+  "alerta_forte": false,
+  "itens": [
+   {
+    "anual": "670.80",
+    "desde": "2026-07-03",
+    "id": 1,
+    "lembrar_ate_cancelar": false,
+    "mensal": "55.90",
+    "meses_vistos": 4,
+    "nome": "NETFLIX",
+    "serie_12m": [
+     {
+      "mes": "2025-11",
+      "total": "0.00"
+     },
+     {
+      "mes": "2025-12",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-01",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-02",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-03",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-04",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-05",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-06",
+      "total": "0.00"
+     },
+     {
+      "mes": "2026-07",
+      "total": "55.90"
+     },
+     {
+      "mes": "2026-08",
+      "total": "55.90"
+     },
+     {
+      "mes": "2026-09",
+      "total": "55.90"
+     },
+     {
+      "mes": "2026-10",
+      "total": "55.90"
+     }
+    ],
+    "sinais": {
+     "cobrada_depois_de_cancelar": false,
+     "nova": false,
+     "reajustou": null
+    },
+    "status": "a_conferir",
+    "total_12m": "223.60",
+    "ultimo": "2026-10-03"
+   }
+  ],
+  "total_mensal": "55.90"
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

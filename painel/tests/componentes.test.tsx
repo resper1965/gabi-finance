@@ -23,16 +23,17 @@ test("Valor oculta quando ligado", () => {
 });
 
 test("Faixa fica amarela com desatualizado e aponta a fonte", () => {
-  render(<Faixa dadosAte="2026-10-05T07:00:00" desatualizado fonte="c6-extrato" />);
+  render(<Faixa dadosAte="2026-10-05T10:00:00Z" desatualizado fonte="c6-extrato" />);
   const f = screen.getByRole("status");
   expect(f).toHaveAttribute("data-estado", "desatualizado");
-  expect(f).toHaveTextContent("dados até 05/10 07:00");
+  expect(f).toHaveTextContent("05/10 07:00"); // sempre horário de Brasília
   expect(f).toHaveTextContent("c6-extrato parou");
 });
 
 test("Faixa em dia nao e amarela", () => {
-  render(<Faixa dadosAte="2026-10-08T07:00:00" />);
+  render(<Faixa dadosAte="2026-10-08T10:00:00Z" />);
   expect(screen.getByRole("status")).toHaveAttribute("data-estado", "ok");
+  expect(screen.getByRole("status")).toHaveTextContent("dados até 08/10 07:00");
 });
 
 test("Etiqueta sempre tem simbolo e texto", () => {

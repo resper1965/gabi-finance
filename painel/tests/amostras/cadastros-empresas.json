@@ -1,0 +1,23 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "cnpj": null,
+    "dados": {},
+    "excluido_em": null,
+    "id": "e1",
+    "nome": "Ness",
+    "origem": null
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

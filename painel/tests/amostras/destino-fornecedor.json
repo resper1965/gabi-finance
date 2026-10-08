@@ -1,0 +1,57 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "nome": "TV",
+    "pct": 48.2,
+    "valor": "300.00",
+    "variacao": "0.00"
+   },
+   {
+    "nome": "LOJA",
+    "pct": 19.3,
+    "valor": "120.00",
+    "variacao": "120.00"
+   },
+   {
+    "nome": "FARMACIA",
+    "pct": 14.1,
+    "valor": "87.90",
+    "variacao": "87.90"
+   },
+   {
+    "nome": "NETFLIX",
+    "pct": 9.0,
+    "valor": "55.90",
+    "variacao": "0.00"
+   },
+   {
+    "nome": "PADARIA",
+    "pct": 5.7,
+    "valor": "35.50",
+    "variacao": "35.50"
+   },
+   {
+    "nome": "UBER",
+    "pct": 3.6,
+    "valor": "22.50",
+    "variacao": "22.50"
+   }
+  ],
+  "periodo": {
+   "ate": "2026-10-08",
+   "de": "2026-10-01"
+  },
+  "por": "fornecedor",
+  "total": "621.80"
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

@@ -79,3 +79,29 @@ def custos(con, de: dt.date, ate: dt.date):
         "coalesce(l.estabelecimento, l.descricao_original) as fornecedor from lancamento l join conta c on c.id=l.conta_id "
         "left join categoria cat on cat.id=l.categoria_id left join empresa e on e.id=l.empresa_id left join pessoa p on p.id=l.para_quem_id "
         "where l.natureza like '%custo%' and l.data>=? and l.data<=?", (de.isoformat(), ate.isoformat())).fetchall()
+
+
+POR = {"categoria": "cat", "pessoa": "pessoa", "fornecedor": "fornecedor"}
+
+
+def agrupar(con, periodo: str, por: str, hoje: dt.date) -> dict:
+    """Para onde foi o dinheiro agrupado por categoria, pessoa ou fornecedor, com % do total e variação contra o período anterior.
+    ValueError em entrada inválida (a rota e o MCP traduzem)."""
+    if periodo not in ("mes", "semana", "12m"):
+        raise ValueError("periodo deve ser mes, semana ou 12m")
+    if por not in POR:
+        raise ValueError("por deve ser categoria, pessoa ou fornecedor")
+    ini, fim, a_ini, a_fim = janelas(periodo, hoje)
+    chave = POR[por]
+
+    def somar(de, ate):
+        s = {}
+        for r in custos(con, de, ate):
+            k = r[chave] or ("(sem pessoa)" if por == "pessoa" else "(sem nome)")
+            s[k] = s.get(k, 0) + r["gasto"]
+        return s
+    atual, antes = somar(ini, fim), somar(a_ini, a_fim)
+    total = sum(atual.values())
+    itens = [{"nome": k, "valor": formatar(v), "pct": round(v / total * 100, 1) if total else 0.0, "variacao": formatar(v - antes.get(k, 0))}
+             for k, v in sorted(atual.items(), key=lambda kv: (-kv[1], kv[0])) if v]
+    return {"periodo": {"de": ini.isoformat(), "ate": fim.isoformat()}, "por": por, "itens": itens, "total": formatar(total)}

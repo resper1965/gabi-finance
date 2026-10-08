@@ -1,0 +1,85 @@
+{
+ "dados": {
+  "a_conferir": [],
+  "adiante": [
+   {
+    "estado": "aberto",
+    "forma": "pix",
+    "id": "seguro:2026-10",
+    "motivo": null,
+    "nome": "Seguro do carro",
+    "valor": "450.00",
+    "valor_fonte": "planilha",
+    "vencimento": "2026-10-25",
+    "vencimento_util": "2026-10-25"
+   }
+  ],
+  "atrasadas": [
+   {
+    "dias_atraso": 3,
+    "estado": "atrasado",
+    "forma": "pix",
+    "id": "aluguel:2026-10",
+    "motivo": null,
+    "nome": "Aluguel",
+    "valor": "3500.00",
+    "valor_fonte": "planilha",
+    "vencimento": "2026-10-05",
+    "vencimento_util": "2026-10-05"
+   }
+  ],
+  "debito_automatico": [],
+  "hoje": [
+   {
+    "estado": "aberto",
+    "forma": "pix",
+    "id": "internet:2026-10",
+    "motivo": null,
+    "nome": "Internet",
+    "valor": "129.90",
+    "valor_fonte": "planilha",
+    "vencimento": "2026-10-08",
+    "vencimento_util": "2026-10-08"
+   }
+  ],
+  "pagas": [
+   {
+    "diferenca": "0.00",
+    "estado": "pago",
+    "forma": "pix",
+    "id": "luz:2026-10",
+    "metodo": "extrato",
+    "motivo": null,
+    "nome": "Luz",
+    "pago_em": "2026-10-03",
+    "tx_id": null,
+    "valor": "287.50",
+    "valor_fonte": "planilha",
+    "vencimento": "2026-10-03",
+    "vencimento_util": "2026-10-03"
+   }
+  ],
+  "proximas": [
+   {
+    "estado": "aberto",
+    "forma": "pix",
+    "id": "escola:2026-10",
+    "motivo": null,
+    "nome": "Escola",
+    "valor": "2100.00",
+    "valor_fonte": "planilha",
+    "vencimento": "2026-10-10",
+    "vencimento_util": "2026-10-10"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}

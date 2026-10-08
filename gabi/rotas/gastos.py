@@ -127,6 +127,20 @@ def destino(request: Request, periodo: str = "mes"):
         con.close()
 
 
+@router.get("/destino/agrupado")
+def destino_agrupado(request: Request, periodo: str = "mes", por: str = "categoria"):
+    """Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa)."""
+    con = _con(request)
+    try:
+        try:
+            dados = consultas.agrupar(con, periodo, por, _agora(request).date())
+        except ValueError as e:
+            raise erro(400, "requisicao_invalida", str(e))
+        return envelope(con, dados, agora=_agora(request))
+    finally:
+        con.close()
+
+
 # ---------------- cartões ----------------
 def _meses(hoje: dt.date, n: int) -> list[str]:
     saida, a, m = [], hoje.year, hoje.month
@@ -208,11 +222,19 @@ def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
     if a["status"] == "cancelar" and a["status_em"]:
         cobrada = con.execute("select 1 from lancamento where natureza like '%custo%' and data>? and (estabelecimento=? or descricao_original like ?) limit 1",
                               (a["status_em"][:10], chave, f"{chave}%")).fetchone() is not None
+    ini12 = _soma_meses(hoje.strftime("%Y-%m"), -11) + "-01"
+    deb = con.execute("select data, valor_centavos from lancamento where natureza like '%custo%' and (estabelecimento=? or descricao_original like ?) and data>=? order by data",
+                      (chave, f"{chave}%", ini12)).fetchall()
+    por_mes = {}
+    for d in deb:
+        por_mes[d["data"][:7]] = por_mes.get(d["data"][:7], 0) - d["valor_centavos"]
+    serie = [{"mes": m, "total": formatar(por_mes.get(m, 0))} for m in _meses(hoje, 12)]
     reaj = None
     if r["mediana_anterior"] and r["ultimo"] > r["mediana_anterior"] * 1.10:
         reaj = {"antes": formatar(para_centavos(r["mediana_anterior"])), "agora": formatar(para_centavos(r["ultimo"]))}
     return {"id": a["id"], "nome": nome, "mensal": formatar(para_centavos(r["valor_medio"])), "anual": formatar(para_centavos(round(r["valor_medio"] * 12, 2))),
             "meses_vistos": r["meses"], "status": a["status"], "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
+            "serie_12m": serie, "desde": deb[0]["data"] if deb else None, "ultimo": deb[-1]["data"] if deb else None, "total_12m": formatar(sum(por_mes.values())),
             "sinais": {"nova": r["meses"] == 3, "reajustou": reaj, "cobrada_depois_de_cancelar": cobrada}}
 
 

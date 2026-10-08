@@ -1,0 +1,28 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "criado_em": "2026-10-08T12:00:00",
+    "decidida_em": null,
+    "estado": "pendente",
+    "id": 1,
+    "impacto": null,
+    "lancamento_id": 5,
+    "motivo": "estabelecimento parecido com Mercado",
+    "payload": {
+     "categoria_id": 1
+    },
+    "tipo": "categoria"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ]
+}
