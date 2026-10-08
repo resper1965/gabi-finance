@@ -1,7 +1,9 @@
 """API do gabi.brain (Fase 0): identidade, saúde, segurança e revogação. Toda chamada /api/* é registrada (R4)."""
+import datetime as dt
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -53,11 +55,12 @@ def _guarda_csrf(request: Request) -> JSONResponse | None:
     return None
 
 
-def criar_app(banco: Path, permite_tcp_local: bool = False) -> FastAPI:
+def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> FastAPI:
     """permite_tcp_local=False é o padrão de produção: só o socket Unix do serviço é origem confiável."""
     app = FastAPI(title="gabi.brain", docs_url=None, redoc_url=None)
     app.state.banco = Path(banco)
     app.state.permite_tcp_local = permite_tcp_local
+    app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)
     async def erro_http(_request: Request, exc: HTTPException):
@@ -142,6 +145,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False) -> FastAPI:
     def raiz(_: Identidade = Depends(exigir("terceiros"))):
         return FileResponse(AQUI / "static" / "index.html")
 
+    from gabi.rotas.dinheiro import router as rotas_dinheiro
+    app.include_router(rotas_dinheiro)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     return app
 

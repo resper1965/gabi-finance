@@ -132,7 +132,7 @@ def test_contar_afetados_passado_e_futuro(con):
     _l(con, 10, "UBER Z", "UBER", data="2026-09-20", categoria_id=1, categoria_origem="voce")  # decidido por você: não muda
     _l(con, 11, "PADARIA", "PADARIA")
     r = contar_afetados(con, "UBER", {"categoria_id": 2}, HOJE)
-    assert r["passado"] == 6 and r["futuro_estimado"] == 1  # 7 casam nos 6 meses, 1 já é seu: afeta 6; ~1 por mês daqui para frente
+    assert r["passado"] == 6 and r["futuro_estimado"] == 1.0  # afeta 6 (1 já é seu); nos últimos 180 dias casam 6 (o de 10/04 fica 1 dia fora): 6/6 = 1,0 por mês
 
 
 def test_contar_afetados_regex_invalido_levanta(con):

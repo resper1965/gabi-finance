@@ -14,6 +14,10 @@ _TABELA = {"categoria_id": ("categoria", "id"), "para_quem_id": ("pessoa", "id")
 HISTORICO_MESES = 6
 
 
+class ConflitoDeEstado(ValueError):
+    """A sugestão já foi decidida (a API responde 409, não 400)."""
+
+
 def _agora() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
@@ -64,13 +68,13 @@ def _aplicar(con, rx, acao) -> int:
 
 
 def contar_afetados(con, padrao: str, acao: dict, hoje: dt.date) -> dict:
-    """Quantos lançamentos a regra mudaria no passado e quantos por mês ela deve pegar daqui para a frente."""
+    """Quantos lançamentos a regra mudaria no passado e a média MENSAL que ela deve pegar daqui para a frente (últimos 6 meses)."""
     rx, acao = _validar(con, padrao, acao)
     passado = sum(1 for _ in _linhas_afetadas(con, rx, acao))
     desde = (hoje - dt.timedelta(days=30 * HISTORICO_MESES)).isoformat()
     recentes = sum(1 for r in con.execute("select descricao_original, estabelecimento from lancamento where data>=?", (desde,))
                    if casa(rx, r["descricao_original"], r["estabelecimento"]))
-    return {"passado": passado, "futuro_estimado": round(recentes / HISTORICO_MESES)}
+    return {"passado": passado, "futuro_estimado": round(recentes / HISTORICO_MESES, 1)}  # média por mês, 1 casa
 
 
 def criar_sugestao(con, tipo: str, lancamento_id: int | None, payload: dict, motivo: str) -> int:
@@ -94,7 +98,7 @@ def _pendente(con, sugestao_id: int):
     if s is None:
         raise LookupError(f"sugestão {sugestao_id} não existe")
     if s["estado"] != "pendente":
-        raise ValueError(f"sugestão {sugestao_id} já foi {s['estado']}")
+        raise ConflitoDeEstado(f"sugestão {sugestao_id} já foi {s['estado']}")
     return s
 
 
