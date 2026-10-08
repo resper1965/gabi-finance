@@ -98,7 +98,8 @@ def test_migrar_concorrente_nao_reaplica_nem_quebra(tmp_path):
     [t.start() for t in ts]
     [t.join() for t in ts]
     assert erros == []
-    assert sorted(len(r) for r in resultados) == [0, 0, 0, 2]  # exatamente um aplicou
+    aplicadas = [nome for r in resultados for nome in r]
+    assert sorted(aplicadas) == ["0001_a.sql", "0002_b.sql"]  # cada migração aplicada exatamente uma vez, por quem for
     assert conectar(banco).execute("select count(*) from schema_versao").fetchone()[0] == 2
 
 
