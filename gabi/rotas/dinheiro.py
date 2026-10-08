@@ -79,6 +79,7 @@ def _serie_saldo(con, hoje: dt.date, dias: int, conta: str | None):
 
 @router.get("/caixa/resumo")
 def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = None):
+    """KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção."""
     if periodo not in PERIODOS:
         raise erro(400, "requisicao_invalida", f"periodo deve ser um de {sorted(PERIODOS)}")
     con = _con(request)
@@ -124,6 +125,7 @@ def _item_pagar(i: dict) -> dict:
 
 @router.get("/contas-pagar")
 def contas_pagar(request: Request, ate: str | None = None):
+    """Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas."""
     con = _con(request)
     try:
         grupos = cp.contas_a_pagar(con, _agora(request).date(), _data(ate, "ate"))
@@ -134,6 +136,7 @@ def contas_pagar(request: Request, ate: str | None = None):
 
 @router.post("/contas-pagar/{id_compromisso:path}/paga")
 def marcar_paga(id_compromisso: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Baixa manual de um compromisso (vale só se não houver lançamento no extrato)."""
     con = _con(request)
     try:
         hoje = _agora(request).date()
@@ -159,6 +162,7 @@ _lanc = consultas.lancamento_dict
 def lancamentos(request: Request, pendente: str | None = None, de: str | None = None, ate: str | None = None, conta: str | None = None,
                 categoria: int | None = None, para_quem: str | None = None, empresa: str | None = None, texto: str | None = None,
                 limite: int = 50, offset: int = 0):
+    """Lançamentos paginados, com filtros e a origem de cada classificação."""
     con = _con(request)
     try:
         try:
@@ -204,6 +208,7 @@ def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
 
 @router.patch("/lancamentos/{lid}")
 async def lancamento_patch(lid: int, request: Request):
+    """Muda categoria, para quem, empresa ou frente de um lançamento (a origem vira 'voce')."""
     corpo = _corpo(await _json(request))
     con = _con(request)
     try:
@@ -224,6 +229,7 @@ async def lancamento_patch(lid: int, request: Request):
 
 @router.post("/lancamentos/lote")
 async def lancamentos_lote(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Muda vários lançamentos de uma vez; criar_regra cria uma regra por estabelecimento."""
     corpo = _corpo(await _json(request))
     ids = corpo.get("ids")
     if not isinstance(ids, list) or not ids or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
@@ -273,6 +279,7 @@ def _sug(con, r, hoje) -> dict:
 
 @router.get("/sugestoes")
 def sugestoes(request: Request, estado: str = "pendente"):
+    """Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra."""
     if estado not in ("pendente", "aprovada", "rejeitada"):
         raise erro(400, "requisicao_invalida", "estado inválido")
     con = _con(request)
@@ -301,6 +308,7 @@ def _decidir(request: Request, fn):
 
 @router.post("/sugestoes/{sid}/aprovar")
 async def sugestao_aprovar(sid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado."""
     corpo = await _json(request)
     edicao = corpo.get("edicao") if isinstance(corpo, dict) else None
     return _decidir(request, lambda con: envelope(con, {"regra_id": rg.aprovar(con, sid, edicao, ident.login)}, agora=_agora(request)))
@@ -308,6 +316,7 @@ async def sugestao_aprovar(sid: int, request: Request, ident: Identidade = Depen
 
 @router.post("/sugestoes/{sid}/rejeitar")
 def sugestao_rejeitar(sid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Rejeita uma sugestão (nada é criado)."""
     def fazer(con):
         rg.rejeitar(con, sid, ident.login)
         return {"id": sid, "estado": "rejeitada"}
@@ -321,6 +330,7 @@ def _regra(r) -> dict:
 
 @router.get("/regras")
 def regras(request: Request):
+    """Regras de classificação."""
     con = _con(request)
     try:
         return envelope(con, {"itens": [_regra(r) for r in con.execute("select * from regra order by id")]}, agora=_agora(request))
@@ -330,6 +340,7 @@ def regras(request: Request):
 
 @router.patch("/regras/{rid}")
 async def regra_patch(rid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Liga ou desliga uma regra; ligar aplica ao passado."""
     corpo = _corpo(await _json(request))
     if not isinstance(corpo.get("ativa"), bool):
         raise erro(400, "requisicao_invalida", "ativa deve ser true ou false")
@@ -343,6 +354,7 @@ async def regra_patch(rid: int, request: Request, ident: Identidade = Depends(ex
 # ---------------- fontes e rodadas ----------------
 @router.get("/fontes")
 def fontes(request: Request):
+    """Estado de cada fonte: ok, nao_conferida, erro ou parada."""
     con = _con(request)
     try:
         e = envelope(con, None, agora=_agora(request))
@@ -354,6 +366,7 @@ def fontes(request: Request):
 
 @router.get("/rodadas")
 def rodadas(request: Request, limite: int = 50):
+    """Últimas rodadas de ingestão e se foram conferidas."""
     con = _con(request)
     try:
         itens = [{"id": r["id"], "fonte": r["fonte"], "inicio": r["inicio"], "fim": r["fim"], "status": r["status"], "lidos": r["lidos"],

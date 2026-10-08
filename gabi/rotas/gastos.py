@@ -42,6 +42,7 @@ def _saldo_ate(con, ids: list[int], dia: dt.date):
 # ---------------- semanas ----------------
 @router.get("/caixa/semanas")
 def semanas(request: Request, passadas: int = 8, futuras: int = 4):
+    """Semanas (passado real e projeção): entradas e saídas por categoria e saldo."""
     passadas, futuras = min(max(passadas, 0), 52), min(max(futuras, 0), 12)
     con = _con(request)
     try:
@@ -89,6 +90,7 @@ def semanas(request: Request, passadas: int = 8, futuras: int = 4):
 # ---------------- para onde vai ----------------
 @router.get("/destino")
 def destino(request: Request, periodo: str = "mes"):
+    """Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior."""
     if periodo not in ("mes", "semana", "12m"):
         raise erro(400, "requisicao_invalida", "periodo deve ser mes, semana ou 12m")
     con = _con(request)
@@ -138,6 +140,7 @@ def _meses(hoje: dt.date, n: int) -> list[str]:
 
 @router.get("/cartoes")
 def cartoes(request: Request):
+    """Cartões: fatura aberta, % do limite, série de 12 meses e categorias."""
     con = _con(request)
     try:
         hoje = _agora(request).date()
@@ -171,6 +174,7 @@ def _soma_meses(mes: str, n: int) -> str:
 
 @router.get("/parcelas")
 def parcelas(request: Request):
+    """Parcelas: comprometido por mês e andamento de cada compra parcelada."""
     con = _con(request)
     try:
         hoje = _agora(request).date()
@@ -214,6 +218,7 @@ def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
 
 @router.get("/assinaturas")
 def assinaturas(request: Request):
+    """Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar."""
     con = _con(request)
     try:
         hoje = _agora(request).date()
@@ -234,6 +239,7 @@ def assinaturas(request: Request):
 
 @router.patch("/assinaturas/{aid}")
 async def assinatura_patch(aid: int, request: Request):
+    """Muda o status da assinatura e o lembrete até cancelar."""
     corpo = _corpo(await _json(request))
     if not corpo or set(corpo) - {"status", "lembrar_ate_cancelar"}:
         raise erro(400, "requisicao_invalida", "informe status e/ou lembrar_ate_cancelar")
@@ -262,6 +268,7 @@ TETO_DIA_USD, TETO_MES_USD = 0.7, 17.5  # ≈ R$ 4/dia e R$ 100/mês (spec); aju
 
 @router.get("/custo")
 def custo(request: Request):
+    """Custo do modelo (OpenRouter) no dia e no mês contra o teto."""
     con = _con(request)
     try:
         hoje = _agora(request).date()

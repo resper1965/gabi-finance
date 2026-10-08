@@ -85,10 +85,12 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
     @app.get("/api/eu")
     def eu(i: Identidade = Depends(exigir("terceiros"))):
+        """Quem sou eu: login, pessoa e nível de acesso."""
         return {"login": i.login, "pessoa_id": i.pessoa_id, "nivel": i.nivel}
 
     @app.get("/api/saude")
     def saude(request: Request, _: Identidade = Depends(exigir("boss"))):
+        """Saúde do banco, versão do esquema, última rodada e contagem de cada tabela."""
         con = _con(request)
         try:
             tabelas = [r[0] for r in con.execute(
@@ -107,6 +109,7 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
     @app.get("/api/seguranca")
     def seguranca(request: Request, _: Identidade = Depends(exigir("boss"))):
+        """Acessos, tokens de agentes ativos, chamadas em 24 h e último backup."""
         con = _con(request)
         try:
             desde = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
@@ -125,6 +128,7 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
     @app.post("/api/revogar-tudo")
     async def revogar_tudo(request: Request, i: Identidade = Depends(exigir("boss"))):
+        """Revoga todos os tokens de agentes. Exige o corpo {"confirmo": true}."""
         try:
             corpo = await request.json()
         except Exception:

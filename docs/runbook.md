@@ -35,3 +35,11 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 
 ## Verificação dos comandos (08/10/2026, banco temporário)
 `importar` 2× → 18 novas, depois 0 · `acesso adicionar/listar` ok (login normalizado em minúsculas) · `backup --testar` → arquivo 600 e contagens iguais às da origem · 2º backup no mesmo dia → "FALHOU", código 1 · rodadas `importacao-staging` e `backup` gravadas. Os comandos de `systemctl`, `ss` e `tailscale` só são verificados após a implantação (T0.8).
+
+## Servidor MCP e tokens de agentes (Fase 1)
+- O MCP escuta **só em 127.0.0.1:8081** (`gabi-brain-mcp.service`), Streamable HTTP em `/mcp`, e exige `Authorization: Bearer <token>`. Para agentes fora da VPS (Claude Code no seu Windows): `sudo tailscale serve --bg --https=8443 http://127.0.0.1:8081` (TLS na rede privada; o token continua obrigatório).
+- Emitir (o token aparece **uma vez**; o banco guarda só o hash): `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens emitir hermes fin` (escopos: `fin,docs,trabalho,pedidos,propostas,sensivel`). Você cola o token no agente; eu não o vejo.
+- Listar: `... -m gabi.mcp.tokens listar` · Revogar um: `... revogar <id>` · Revogar todos: `POST /api/revogar-tudo` (ver acima).
+- Cada chamada fica em `chamada_mcp` (token, ferramenta, escopo, status `ok|sem_escopo|erro|nao_autenticado`). Para ver: `sqlite3 $BANCO "select quando, ferramenta, status from chamada_mcp order by id desc limit 20"`.
+- Só existem ferramentas de **leitura** (`docs/api.md#mcp`). Não há como enviar, pagar, apagar, aprovar nem ligar regra por MCP (R13).
+- Se um agente receber `sem_escopo`, o token não tem o escopo da ferramenta: emita outro com o escopo certo (não amplie o de outro agente).

@@ -66,7 +66,7 @@ def test_instalar_exige_confirmacao_do_gate_g1():
 def test_instalar_usa_dependencias_fixas_e_nao_instala_o_projeto():
     assert "requirements.lock" in INSTALAR and "pip install /opt/gabi-brain" not in INSTALAR
     lock = (DEPLOY.parent / "requirements.lock").read_text()
-    for pacote in ("fastapi", "uvicorn", "starlette", "pydantic"):
+    for pacote in ("fastapi", "uvicorn", "starlette", "pydantic", "mcp"):
         assert re.search(rf"^{pacote}==\d", lock, re.M | re.I), pacote
 
 

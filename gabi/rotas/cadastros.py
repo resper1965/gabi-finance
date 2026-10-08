@@ -414,6 +414,7 @@ def _recalcular(con, request):
 # ---------------- equivalência de categorias (declaradas ANTES das rotas genéricas) ----------------
 @router.get("/categorias/equivalencias")
 def equivalencias(request: Request):
+    """Equivalência entre a categoria do banco (Pluggy) e a nossa."""
     con = _con(request)
     try:
         return envelope(con, {"itens": [{"origem_pluggy": r[0], "categoria_id": r[1]} for r in con.execute("select origem_pluggy, categoria_id from equivalencia_categoria order by origem_pluggy")]},
@@ -424,6 +425,7 @@ def equivalencias(request: Request):
 
 @router.put("/categorias/equivalencias")
 async def equivalencia_definir(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Cria ou troca uma equivalência de categoria."""
     corpo = _corpo(await _json(request))
     _so(corpo, {"origem_pluggy", "categoria_id"})
     origem = _texto(corpo, "origem_pluggy", True)
@@ -444,6 +446,7 @@ async def equivalencia_definir(request: Request, ident: Identidade = Depends(exi
 
 @router.delete("/categorias/equivalencias/{origem}")
 def equivalencia_excluir(origem: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Remove uma equivalência de categoria."""
     con = _con(request)
     try:
         if con.execute("select 1 from equivalencia_categoria where origem_pluggy=?", (origem,)).fetchone() is None:
@@ -461,6 +464,7 @@ def equivalencia_excluir(origem: str, request: Request, ident: Identidade = Depe
 # ---------------- CPF/documento (só mascarado; consulta auditada) ----------------
 @router.get("/pessoas/{pid}/cpf")
 def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Documentos da pessoa (sempre mascarados); a consulta fica auditada."""
     con = _con(request)
     try:
         p = con.execute("select dados from pessoa where id=? and excluido_em is null", (pid,)).fetchone()
@@ -476,6 +480,7 @@ def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("b
 # ---------------- CRUD genérico ----------------
 @router.get("/{tipo}")
 def listar(tipo: str, request: Request, busca: str | None = None, incluir_excluidos: bool = False):
+    """Lista um cadastro: empresas, contas, pessoas, compromissos ou categorias."""
     t = _tipo(tipo)
     con = _con(request)
     try:
@@ -486,6 +491,7 @@ def listar(tipo: str, request: Request, busca: str | None = None, incluir_exclui
 
 @router.get("/{tipo}/{id_}")
 def obter(tipo: str, id_: str, request: Request):
+    """Um item de cadastro."""
     t = _tipo(tipo)
     con = _con(request)
     try:
@@ -496,6 +502,7 @@ def obter(tipo: str, id_: str, request: Request):
 
 @router.post("/{tipo}", status_code=201)
 async def criar(tipo: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Cria um item de cadastro."""
     t = _tipo(tipo)
     corpo = _corpo(await _json(request))
     con = _con(request)
@@ -511,6 +518,7 @@ async def criar(tipo: str, request: Request, ident: Identidade = Depends(exigir(
 
 @router.patch("/{tipo}/{id_}")
 async def atualizar(tipo: str, id_: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Atualiza campos de um item de cadastro."""
     t = _tipo(tipo)
     corpo = _corpo(await _json(request))
     con = _con(request)
@@ -526,6 +534,7 @@ async def atualizar(tipo: str, id_: str, request: Request, ident: Identidade = D
 
 @router.delete("/{tipo}/{id_}")
 def excluir(tipo: str, id_: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Exclusão lógica de um item de cadastro (nada é apagado)."""
     t = _tipo(tipo)
     con = _con(request)
     try:
