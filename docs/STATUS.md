@@ -21,3 +21,7 @@ Não mexer em segredos (o Ricardo coloca). Nada no claude.ai. Dados nunca chumba
 
 ## Pendências conhecidas (minors)
 Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contador, custo em US$, Fase 2 em diante não iniciada).
+
+## Progresso 09/10/2026
+- G2 aprovado. Instalado (`deploy/instalar.sh`): api+mcp+backup ativos. Staging importado no banco real (/var/lib/gabi-brain/gabi.db): 6 pessoas, 50 compromissos, 88 faturas, 7.438 memórias. Cópia temporária do staging removida.
+- Próximo: G3 `sudo tailscale serve --bg --https=443 unix:/run/gabi-brain/api.sock`, cadastrar login do Ricardo como boss, ver painel real; depois G14, G4, G5.
