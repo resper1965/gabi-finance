@@ -42,3 +42,16 @@ def test_bruto_falha_no_meio_nao_deixa_arquivo_final(tmp_path):
     with pytest.raises(OSError):
         gravar_bruto(tmp_path, "f", DIA, linhas())
     assert not (tmp_path / "f/2026/10/08.jsonl.gz").exists()
+
+
+def test_bruto_com_rotulo_permite_varias_rodadas_no_mesmo_dia(tmp_path):
+    a = gravar_bruto(tmp_path, "open-finance", DIA, [{"a": 1}], rotulo="070000-abc")
+    b = gravar_bruto(tmp_path, "open-finance", DIA, [{"a": 2}], rotulo="150000-abc")
+    assert a.name == "08-070000-abc.jsonl.gz" and b.name == "08-150000-abc.jsonl.gz" and a != b
+    with pytest.raises(FileExistsError):
+        gravar_bruto(tmp_path, "open-finance", DIA, [{"a": 3}], rotulo="070000-abc")
+
+
+def test_rotulo_nao_pode_sair_da_pasta(tmp_path):
+    with pytest.raises(ValueError):
+        gravar_bruto(tmp_path, "f", DIA, [{"a": 1}], rotulo="../../x")

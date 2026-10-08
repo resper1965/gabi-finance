@@ -34,3 +34,11 @@ def test_rodada_com_erro_grava_status_erro_e_relevanta(con):
 def test_rodada_aparece_como_rodando_enquanto_executa(con):
     with registrar_rodada(con, "x"):
         assert con.execute("select status from rodada").fetchone()["status"] == "rodando"
+
+
+def test_rodada_ok_com_aviso_fica_visivel_sem_virar_erro(con):
+    with registrar_rodada(con, "open-finance") as r:
+        r.lidos = 5
+        r.aviso = "falhas: acc-1"
+    linha = con.execute("select status, erro from rodada").fetchone()
+    assert (linha["status"], linha["erro"]) == ("ok", "falhas: acc-1")
