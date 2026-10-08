@@ -1,4 +1,5 @@
 """Carrega o staging (Plano 1) no banco, de forma idempotente e numa só transação. Consome: db, rodada."""
+import datetime as dt
 import hashlib
 import json
 import sqlite3
@@ -7,11 +8,13 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from gabi.db import conectar, migrar
+from gabi.dinheiro import planilha, repositorio
 from gabi.rodada import registrar_rodada
 
 MIGRACOES = Path(__file__).resolve().parent.parent / "migrations"
 TABELAS = ("pessoa", "pet", "empresa", "compromisso_fixo", "matriz_acesso", "allowlist_vip", "compromisso",
-           "agenda_estado", "agenda_eventos", "conciliacao", "fatura", "conta_estado", "memoria")
+           "agenda_estado", "agenda_eventos", "conciliacao", "fatura", "conta_estado", "memoria",
+           "compromisso_linha", "valor_do_mes", "parametro")
 
 
 def _centavos(v) -> int | None:
@@ -43,7 +46,23 @@ def _ler(staging: Path) -> tuple[dict, dict, list[dict]]:
     return familia, fin, memoria
 
 
-def importar_staging(con: sqlite3.Connection, staging: Path) -> dict[str, int]:
+def _semear_cadastros(con, snapshot, hoje: dt.date, relatorio: dict | None) -> None:
+    """Semeia os Cadastros de compromissos a partir do snapshot da planilha, SÓ se estiverem vazios: reimportar nunca
+    sobrescreve o que o Ricardo editou no painel."""
+    vazios = con.execute("select count(*) from compromisso_linha").fetchone()[0] == 0
+    semear = bool(snapshot) and vazios
+    if relatorio is not None:
+        relatorio["cadastros_semeados"] = semear
+        relatorio["cadastros_invalidas"] = []
+    if not semear:
+        return
+    leitura = planilha.validar(snapshot["conteudo"], hoje)
+    repositorio.gravar_leitura(con, leitura)
+    if relatorio is not None:
+        relatorio["cadastros_invalidas"] = leitura["invalidas"]
+
+
+def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | None = None) -> dict[str, int]:
     staging = Path(staging)
     familia, fin, memoria = _ler(staging)  # falta de arquivo levanta ANTES de qualquer escrita
     con.execute("begin")
@@ -110,6 +129,7 @@ def importar_staging(con: sqlite3.Connection, staging: Path) -> dict[str, int]:
     except BaseException:
         con.execute("rollback")
         raise
+    _semear_cadastros(con, fin.get("planilha"), dt.date.today(), relatorio)
     return {t: con.execute(f"select count(*) from {t}").fetchone()[0] for t in TABELAS}
 
 
@@ -118,10 +138,17 @@ def main(banco: Path, staging: Path) -> int:
     migrar(con, MIGRACOES)
     with registrar_rodada(con, "importacao-staging") as r:
         antes = {t: con.execute(f"select count(*) from {t}").fetchone()[0] for t in TABELAS}
-        depois = importar_staging(con, staging)
+        rel: dict = {}
+        depois = importar_staging(con, staging, relatorio=rel)
         r.lidos = sum(depois.values())
         r.novos = sum(depois[t] - antes[t] for t in TABELAS)
     print("importado: " + ", ".join(f"{t}={n}" for t, n in depois.items()))
+    if rel.get("cadastros_semeados"):
+        print(f"cadastros de compromissos semeados; linhas rejeitadas pela validação: {len(rel['cadastros_invalidas'])}")
+        for i in rel["cadastros_invalidas"]:
+            print(f"  - {i['aba']} linha {i['linha']}: {i['motivo']}")
+    elif rel.get("cadastros_semeados") is False:
+        print("cadastros de compromissos já existem (ou o staging não traz a planilha): nada foi sobrescrito")
     return 0
 
 

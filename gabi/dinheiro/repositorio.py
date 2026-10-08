@@ -55,12 +55,16 @@ def gravar_leitura(con, leitura: dict) -> None:
 def ler_leitura(con) -> dict:
     """{'linhas', 'params', 'valores'} no formato que o gerar/conciliar esperam. Só linhas ativas e não excluídas."""
     linhas = []
-    for r in con.execute("select * from compromisso_linha where ativo=1 and excluido_em is null order by coalesce(linha_planilha, 1e9), id"):
+    # Linha/valor criados no painel não têm número de planilha: recebem um número alto e crescente (o mais recente vence,
+    # como na planilha, onde linha de baixo prevalece) — e a lógica portada ordena por esse número.
+    for r in con.execute("select rowid as rid, * from compromisso_linha where ativo=1 and excluido_em is null "
+                         "order by coalesce(linha_planilha, 1000000 + rowid), id"):
         linhas.append({"id": r["id"], "nome": r["nome"], "extrato": r["extrato"], "apelidos": json.loads(r["apelidos"]),
                        "vencimento": r["vencimento"], "ajuste_dia_util": r["ajuste_dia_util"], "valor_tipo": r["valor_tipo"],
                        "valor_padrao": _real(r["valor_padrao_centavos"]), "forma": r["forma"], "conta": r["conta"],
                        "cartao": r["cartao"], "documento": r["documento"], "pix": r["pix"], "ativo": True,
-                       "valido_de": r["valido_de"], "valido_ate": r["valido_ate"], "linha_planilha": r["linha_planilha"]})
+                       "valido_de": r["valido_de"], "valido_ate": r["valido_ate"],
+                       "linha_planilha": r["linha_planilha"] if r["linha_planilha"] is not None else 1_000_000 + r["rid"]})
     ativos = {l["id"] for l in linhas}
     params = {k: (set(v) if isinstance(v, set) else v) for k, v in planilha.PADROES.items()}
     for r in con.execute("select chave, valor from parametro"):
@@ -68,8 +72,8 @@ def ler_leitura(con) -> dict:
         params[r["chave"]] = set(v) if r["chave"] in _CONJUNTOS else v
     valores = [{"mes": r["mes"], "compromisso": r["compromisso"], "tipo": r["tipo"], "valor": _real(r["valor_centavos"]),
                 "vencimento": r["vencimento"], "data_pagamento": r["data_pagamento"], "origem": r["origem"] or "",
-                "linha_planilha": r["linha_planilha"]}
-               for r in con.execute("select * from valor_do_mes order by coalesce(linha_planilha, 1e9), id") if r["compromisso"] in ativos]
+                "linha_planilha": r["linha_planilha"] if r["linha_planilha"] is not None else 1_000_000 + r["id"]}
+               for r in con.execute("select * from valor_do_mes order by coalesce(linha_planilha, 1000000 + id), id") if r["compromisso"] in ativos]
     return {"linhas": linhas, "params": params, "valores": valores}
 
 
