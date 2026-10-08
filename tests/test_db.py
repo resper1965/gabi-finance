@@ -100,3 +100,25 @@ def test_migrar_concorrente_nao_reaplica_nem_quebra(tmp_path):
     assert erros == []
     assert sorted(len(r) for r in resultados) == [0, 0, 0, 2]  # exatamente um aplicou
     assert conectar(banco).execute("select count(*) from schema_versao").fetchone()[0] == 2
+
+
+def test_conectar_simultaneo_em_banco_novo_nao_falha_ao_ativar_wal(tmp_path):
+    """Ativar o WAL exige um lock que o SQLite não espera pelo busy_timeout: várias conexões novas ao mesmo tempo
+    (API subindo + backup + CLI) não podem derrubar umas às outras."""
+    import threading
+    erros = []
+    for rodada in range(10):
+        banco = tmp_path / f"g{rodada}.db"
+        largada = threading.Barrier(8)
+
+        def abrir():
+            largada.wait()
+            try:
+                conectar(banco).close()
+            except BaseException as e:  # noqa: BLE001
+                erros.append(e)
+
+        ts = [threading.Thread(target=abrir) for _ in range(8)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+    assert erros == []

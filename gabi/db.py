@@ -1,5 +1,6 @@
 """Conexão SQLite (WAL, FKs) e migrações numeradas. Consome: nada. Spec §12/§13.4."""
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -8,10 +9,22 @@ def conectar(caminho: Path) -> sqlite3.Connection:
     # isolation_level=None: transações explícitas (BEGIN/COMMIT) em migrar().
     con = sqlite3.connect(caminho, isolation_level=None)
     con.row_factory = sqlite3.Row
-    con.execute("pragma journal_mode=wal")
-    con.execute("pragma foreign_keys=on")
     con.execute("pragma busy_timeout=5000")
+    _ativar_wal(con)
+    con.execute("pragma foreign_keys=on")
     return con
+
+
+def _ativar_wal(con: sqlite3.Connection) -> None:
+    """O SQLite não aplica busy_timeout ao trocar o journal_mode: repete até ~5 s se outra conexão estiver no meio."""
+    for tentativa in range(100):
+        try:
+            con.execute("pragma journal_mode=wal")
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) or tentativa == 99:
+                raise
+            time.sleep(0.05)
 
 
 def migrar(con: sqlite3.Connection, pasta: Path) -> list[str]:
