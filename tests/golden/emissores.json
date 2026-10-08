@@ -1,0 +1,158 @@
+[
+ {
+  "args": [
+   "Padaria São João Ltda"
+  ],
+  "data": [],
+  "fn": "chave_extrato",
+  "saida": "PADARIA SAO JOAO LTDA"
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "chave_extrato",
+  "saida": null
+ },
+ {
+  "args": [
+   ""
+  ],
+  "data": [],
+  "fn": "chave_extrato",
+  "saida": null
+ },
+ {
+  "args": [
+   "ENEL DISTRIBUIÇÃO"
+  ],
+  "data": [],
+  "fn": "chave_extrato",
+  "saida": "ENEL DISTRIBUICAO"
+ },
+ {
+  "args": [
+   "PIX ENVIADO JOAO"
+  ],
+  "data": [],
+  "fn": "chave_extrato",
+  "saida": "JOAO"
+ },
+ {
+  "args": [
+   "BOLETO"
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": true
+ },
+ {
+  "args": [
+   "FATURA 2026"
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": false
+ },
+ {
+  "args": [
+   "11222333000181"
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": false
+ },
+ {
+  "args": [
+   "CONTA DE LUZ"
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": false
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": true
+ },
+ {
+  "args": [
+   "ENEL DISTRIBUICAO SP"
+  ],
+  "data": [],
+  "fn": "generica",
+  "saida": false
+ },
+ {
+  "args": [
+   "ENEL DISTRIBUICAO SP"
+  ],
+  "data": [],
+  "fn": "chave_forte",
+  "saida": true
+ },
+ {
+  "args": [
+   "ENEL"
+  ],
+  "data": [],
+  "fn": "chave_forte",
+  "saida": false
+ },
+ {
+  "args": [
+   "11222333000181"
+  ],
+  "data": [],
+  "fn": "chave_forte",
+  "saida": true
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "chave_forte",
+  "saida": false
+ },
+ {
+  "args": [
+   "11.222.333/0001-81",
+   "x"
+  ],
+  "data": [],
+  "fn": "chave",
+  "saida": "11222333000181"
+ },
+ {
+  "args": [
+   null,
+   "Boleto 123456"
+  ],
+  "data": [],
+  "fn": "chave",
+  "saida": null
+ },
+ {
+  "args": [
+   null,
+   "Enel Distribuição SP"
+  ],
+  "data": [],
+  "fn": "chave",
+  "saida": "ENEL DISTRIBUICAO SP"
+ },
+ {
+  "args": [
+   null,
+   "Luz"
+  ],
+  "data": [],
+  "fn": "chave",
+  "saida": null
+ }
+]

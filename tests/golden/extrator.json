@@ -1,0 +1,190 @@
+[
+ {
+  "args": [
+   "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865406123.455802BR5913FULANO DE TAL6009SAO PAULO62070503***630465DC"
+  ],
+  "data": [],
+  "fn": "pix_valido",
+  "saida": true
+ },
+ {
+  "args": [
+   "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865406123.455802BR5913FULANO DE TAL6009SAO PAULO62070503***630465D0"
+  ],
+  "data": [],
+  "fn": "pix_valido",
+  "saida": false
+ },
+ {
+  "args": [
+   "abc"
+  ],
+  "data": [],
+  "fn": "pix_valido",
+  "saida": false
+ },
+ {
+  "args": [
+   "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865406123.455802BR5913FULANO DE TAL6009SAO PAULO62070503***630465DC"
+  ],
+  "data": [],
+  "fn": "pix_valor",
+  "saida": 123.45
+ },
+ {
+  "args": [
+   "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-42661417400052040000530398654040.005802BR5913FULANO DE TAL6009SAO PAULO62070503***63044801"
+  ],
+  "data": [],
+  "fn": "pix_valor",
+  "saida": null
+ },
+ {
+  "args": [
+   "zz"
+  ],
+  "data": [],
+  "fn": "pix_valor",
+  "saida": null
+ },
+ {
+  "args": [
+   "pague aqui 00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865406123.455802BR5913FULANO DE TAL6009SAO PAULO62070503***630465DC obrigado",
+   "2026-10-08"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "achar_codigo",
+  "saida": {
+   "codigo": "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865406123.455802BR5913FULANO DE TAL6009SAO PAULO62070503***630465DC",
+   "tipo": "pix",
+   "valor": 123.45,
+   "vencimento": null
+  }
+ },
+ {
+  "args": [
+   "boleto 34191.11111 11111.111115 11111.111115 4 16050000123456 vence 20/10",
+   "2026-10-08"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "achar_codigo",
+  "saida": {
+   "codigo": "34191111111111111111511111111115416050000123456",
+   "tipo": "bancario",
+   "valor": 1234.56,
+   "vencimento": "2026-10-20"
+  }
+ },
+ {
+  "args": [
+   "nada de codigo aqui",
+   "2026-10-08"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "achar_codigo",
+  "saida": null
+ },
+ {
+  "args": [
+   "CNPJ 11.222.333/0001-81 Padaria"
+  ],
+  "data": [],
+  "fn": "achar_cnpj",
+  "saida": "11222333000181"
+ },
+ {
+  "args": [
+   "CNPJ 11.222.333/0001-00"
+  ],
+  "data": [],
+  "fn": "achar_cnpj",
+  "saida": null
+ },
+ {
+  "args": [
+   "00000000000000"
+  ],
+  "data": [],
+  "fn": "achar_cnpj",
+  "saida": null
+ },
+ {
+  "args": [
+   "Documento de Arrecadação do eSocial"
+  ],
+  "data": [],
+  "fn": "tipo_documento",
+  "saida": "dae_esocial"
+ },
+ {
+  "args": [
+   "DAE eSocial competência 09/2026"
+  ],
+  "data": [],
+  "fn": "tipo_documento",
+  "saida": "dae_esocial"
+ },
+ {
+  "args": [
+   "Comprovante de pagamento Pix"
+  ],
+  "data": [],
+  "fn": "tipo_documento",
+  "saida": "comprovante_pix"
+ },
+ {
+  "args": [
+   "texto qualquer"
+  ],
+  "data": [],
+  "fn": "tipo_documento",
+  "saida": null
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "tipo_documento",
+  "saida": null
+ },
+ {
+  "args": [
+   "Comprovante de transferência Pix\nValor: R$ 1.250,00\nData/Hora: 07/10/2026 10:15\nDados de quem pagou\nNome: Ricardo Teste\nCPF: ***.123.456-**\nBanco: C6\nDados de quem recebeu\nNome: Padaria Bom Pao Ltda\nCNPJ: 11.222.333/0001-81\nChave Pix: padaria@exemplo.com\nInstituicao: Itau\nAgencia: 1234\nConta: 56789-0\n"
+  ],
+  "data": [],
+  "fn": "ler_comprovante_pix",
+  "saida": {
+   "agencia": "1234",
+   "banco": "Itau",
+   "chave": "padaria@exemplo.com",
+   "conta": "56789-0",
+   "cpf_cnpj": "11.222.333/0001-81",
+   "data": "2026-10-07",
+   "nome": "Padaria Bom Pao Ltda",
+   "valor": 1250.0
+  }
+ },
+ {
+  "args": [
+   "Nome: A\nNome: B\nCPF: 1\nCPF: 2"
+  ],
+  "data": [],
+  "fn": "ler_comprovante_pix",
+  "saida": null
+ },
+ {
+  "args": [
+   ""
+  ],
+  "data": [],
+  "fn": "ler_comprovante_pix",
+  "saida": null
+ }
+]

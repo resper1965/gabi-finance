@@ -1,0 +1,968 @@
+[
+ {
+  "args": [
+   "PIX ENVIADO PADARIA BOM PAO 123"
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": "PADARIA BOM PAO"
+ },
+ {
+  "args": [
+   "COMPRA CARTAO MERCADO SÃO JOÃO"
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": "CARTAO MERCADO S O JO O"
+ },
+ {
+  "args": [
+   ""
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": ""
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": ""
+ },
+ {
+  "args": [
+   "TED PARA FULANO DE TAL LTDA ME"
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": "FULANO DE TAL LTDA ME"
+ },
+ {
+  "args": [
+   "DEB AUT ENEL 0123456789 PARC 2/5"
+  ],
+  "data": [],
+  "fn": "norm",
+  "saida": "AUT ENEL"
+ },
+ {
+  "args": [
+   "12,5"
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": 12.5
+ },
+ {
+  "args": [
+   "12.5"
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": 12.5
+ },
+ {
+  "args": [
+   "abc"
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": null
+ },
+ {
+  "args": [
+   null
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": null
+ },
+ {
+  "args": [
+   "1.234,56"
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": null
+ },
+ {
+  "args": [
+   ""
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": null
+ },
+ {
+  "args": [
+   7
+  ],
+  "data": [],
+  "fn": "num",
+  "saida": 7.0
+ },
+ {
+  "args": [
+   [
+    "Ricardo Esper"
+   ]
+  ],
+  "data": [],
+  "fn": "dono_tokens",
+  "saida": [
+   [
+    "ESPER",
+    "RICARDO"
+   ]
+  ]
+ },
+ {
+  "args": [
+   [
+    "João da Silva Neto",
+    "Ricardo Esper"
+   ]
+  ],
+  "data": [],
+  "fn": "dono_tokens",
+  "saida": [
+   [
+    "JOAO",
+    "NETO"
+   ],
+   [
+    "ESPER",
+    "RICARDO"
+   ]
+  ]
+ },
+ {
+  "args": [
+   []
+  ],
+  "data": [],
+  "fn": "dono_tokens",
+  "saida": []
+ },
+ {
+  "args": [
+   [
+    "Ana"
+   ]
+  ],
+  "data": [],
+  "fn": "dono_tokens",
+  "saida": [
+   [
+    "ANA"
+   ]
+  ]
+ },
+ {
+  "args": [
+   [
+    "Maria Açaí de Souza"
+   ]
+  ],
+  "data": [],
+  "fn": "dono_tokens",
+  "saida": [
+   [
+    "MARIA",
+    "SOUZA"
+   ]
+  ]
+ },
+ {
+  "args": [
+   "CREDIT",
+   "COMPRA MERCADO",
+   "Groceries",
+   -50.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "custo"
+ },
+ {
+  "args": [
+   "CREDIT",
+   "PAGAMENTO RECEBIDO",
+   "",
+   100.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "neutro"
+ },
+ {
+  "args": [
+   "CREDIT",
+   "ESTORNO LOJA",
+   "",
+   20.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "custo"
+ },
+ {
+  "args": [
+   "BANK",
+   "PAGAMENTO FATURA CARTAO",
+   "",
+   -300.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa"
+ },
+ {
+  "args": [
+   "BANK",
+   "DEB AUT CART ITAU",
+   "",
+   -100.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa"
+ },
+ {
+  "args": [
+   "BANK",
+   "PIX ENVIADO RICARDO ESPER",
+   "",
+   -100.0,
+   [
+    "Ricardo Esper"
+   ]
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "neutro"
+ },
+ {
+  "args": [
+   "BANK",
+   "PIX ENVIADO JOAO",
+   "",
+   -100.0,
+   [
+    "Ricardo Esper"
+   ]
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa+custo"
+ },
+ {
+  "args": [
+   "BANK",
+   "SALARIO",
+   "",
+   5000.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa"
+ },
+ {
+  "args": [
+   "BANK",
+   "MERCADO",
+   "Same person transfer",
+   -10.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "neutro"
+ },
+ {
+  "args": [
+   "BANK",
+   "X",
+   "Credit card payment",
+   -10.0,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa"
+ },
+ {
+  "args": [
+   "BANK",
+   "TARIFA",
+   "",
+   -9.9,
+   []
+  ],
+  "data": [],
+  "fn": "_w_natureza",
+  "saida": "caixa+custo"
+ },
+ {
+  "args": [
+   {
+    "categoria": "Transport",
+    "descricao": "UBER TRIP"
+   },
+   [
+    [
+     "UBER",
+     "Transporte",
+     "Ricardo"
+    ]
+   ]
+  ],
+  "data": [],
+  "fn": "_w_aplica",
+  "saida": [
+   "Transporte",
+   "Ricardo"
+  ]
+ },
+ {
+  "args": [
+   {
+    "categoria": "Food",
+    "descricao": "PADARIA"
+   },
+   [
+    [
+     "UBER",
+     "Transporte",
+     "Ricardo"
+    ]
+   ]
+  ],
+  "data": [],
+  "fn": "_w_aplica",
+  "saida": [
+   "Food",
+   ""
+  ]
+ },
+ {
+  "args": [
+   {
+    "categoria": "Transport",
+    "descricao": "UBER"
+   },
+   [
+    [
+     "UBER",
+     "",
+     "Bia"
+    ]
+   ]
+  ],
+  "data": [],
+  "fn": "_w_aplica",
+  "saida": [
+   "Transport",
+   "Bia"
+  ]
+ },
+ {
+  "args": [
+   {
+    "categoria": "",
+    "descricao": "X"
+   },
+   []
+  ],
+  "data": [],
+  "fn": "_w_aplica",
+  "saida": [
+   "sem categoria",
+   ""
+  ]
+ },
+ {
+  "args": [
+   0,
+   "2026-10-08"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "meses_atras",
+  "saida": "2026-10-01"
+ },
+ {
+  "args": [
+   1,
+   "2026-10-08"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "meses_atras",
+  "saida": "2026-09-01"
+ },
+ {
+  "args": [
+   10,
+   "2026-03-31"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "meses_atras",
+  "saida": "2025-05-01"
+ },
+ {
+  "args": [
+   13,
+   "2026-01-15"
+  ],
+  "data": [
+   1
+  ],
+  "fn": "meses_atras",
+  "saida": "2024-12-01"
+ },
+ {
+  "args": [
+   "341",
+   1234.56,
+   "2026-10-20",
+   "1111111111111111111111111",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_boleto",
+  "saida": {
+   "linha": "34191111111111111111511111111115416050000123456",
+   "resultado": {
+    "banco": "341 Itau",
+    "detalhe_dv": {
+     "campo1": true,
+     "campo2": true,
+     "campo3": true,
+     "geral": true
+    },
+    "digitos_ok": true,
+    "tipo": "bancario",
+    "valor": 1234.56,
+    "vencimento": "2026-10-20"
+   }
+  }
+ },
+ {
+  "args": [
+   "237",
+   99.9,
+   "2026-11-05",
+   "2222222222222222222222222",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_boleto",
+  "saida": {
+   "linha": "23792222232222222222022222222220116210000009990",
+   "resultado": {
+    "banco": "237 Bradesco",
+    "detalhe_dv": {
+     "campo1": true,
+     "campo2": true,
+     "campo3": true,
+     "geral": true
+    },
+    "digitos_ok": true,
+    "tipo": "bancario",
+    "valor": 99.9,
+    "vencimento": "2026-11-05"
+   }
+  }
+ },
+ {
+  "args": [
+   "341",
+   1234.56,
+   "2026-10-20",
+   "1111111111111111111111111",
+   "2026-10-08",
+   true
+  ],
+  "data": [],
+  "fn": "_w_boleto",
+  "saida": {
+   "linha": "34191111111111111111511111111115416050000123457",
+   "resultado": {
+    "banco": "341 Itau",
+    "detalhe_dv": {
+     "campo1": true,
+     "campo2": true,
+     "campo3": true,
+     "geral": false
+    },
+    "digitos_ok": false,
+    "tipo": "bancario",
+    "valor": 1234.57,
+    "vencimento": "2026-10-20"
+   }
+  }
+ },
+ {
+  "args": [
+   "123",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_conferir",
+  "saida": {
+   "erro": "linha digitavel deve ter 47 (boleto) ou 48 (consumo) digitos",
+   "recebidos": 3
+  }
+ },
+ {
+  "args": [
+   "811111111111111111111111111111111111111111111111",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_conferir",
+  "saida": {
+   "digitos_ok": false,
+   "tipo": "conta de consumo/tributo",
+   "valor": null
+  }
+ },
+ {
+  "args": [
+   "caixa",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_recorrentes",
+  "saida": [
+   {
+    "chave": "SALARIO EMPRESA XYZ",
+    "descricao": "SALARIO EMPRESA XYZ",
+    "dia": 1,
+    "dia_ultimo": 1,
+    "faixa": null,
+    "ja_ocorreu_este_mes": true,
+    "mediana_anterior": 8000.0,
+    "meses": 7,
+    "sentido": "entrada",
+    "tipo": "fixo",
+    "ultimo": 8000.0,
+    "valor_medio": 8000.0
+   },
+   {
+    "chave": "ALUGUEL IMOBILIARIA SUL",
+    "descricao": "ALUGUEL IMOBILIARIA SUL",
+    "dia": 5,
+    "dia_ultimo": 5,
+    "faixa": null,
+    "ja_ocorreu_este_mes": true,
+    "mediana_anterior": 2000.0,
+    "meses": 7,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 2000.0,
+    "valor_medio": 2000.0
+   },
+   {
+    "chave": "PENSAO FULANO DE TAL",
+    "descricao": "PENSAO FULANO DE TAL",
+    "dia": 20,
+    "dia_ultimo": 20,
+    "faixa": [
+     900.0,
+     null
+    ],
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 1500.0,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 1500.0,
+    "valor_medio": 1500.0
+   },
+   {
+    "chave": "ENERGIA ENEL",
+    "descricao": "ENERGIA ENEL",
+    "dia": 15,
+    "dia_ultimo": 15,
+    "faixa": null,
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 222.0,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "variavel",
+    "ultimo": 243.0,
+    "valor_medio": 225.5
+   },
+   {
+    "chave": "NETFLIX COM",
+    "descricao": "NETFLIX.COM",
+    "dia": 10,
+    "dia_ultimo": 10,
+    "faixa": null,
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 55.9,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 55.9,
+    "valor_medio": 55.9
+   }
+  ]
+ },
+ {
+  "args": [
+   "custo",
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_recorrentes",
+  "saida": [
+   {
+    "chave": "SALARIO EMPRESA XYZ",
+    "descricao": "SALARIO EMPRESA XYZ",
+    "dia": 1,
+    "dia_ultimo": 1,
+    "faixa": null,
+    "ja_ocorreu_este_mes": true,
+    "mediana_anterior": 8000.0,
+    "meses": 7,
+    "sentido": "entrada",
+    "tipo": "fixo",
+    "ultimo": 8000.0,
+    "valor_medio": 8000.0
+   },
+   {
+    "chave": "ALUGUEL IMOBILIARIA SUL",
+    "descricao": "ALUGUEL IMOBILIARIA SUL",
+    "dia": 5,
+    "dia_ultimo": 5,
+    "faixa": null,
+    "ja_ocorreu_este_mes": true,
+    "mediana_anterior": 2000.0,
+    "meses": 7,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 2000.0,
+    "valor_medio": 2000.0
+   },
+   {
+    "chave": "PENSAO FULANO DE TAL",
+    "descricao": "PENSAO FULANO DE TAL",
+    "dia": 20,
+    "dia_ultimo": 20,
+    "faixa": [
+     900.0,
+     null
+    ],
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 1500.0,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 1500.0,
+    "valor_medio": 1500.0
+   },
+   {
+    "chave": "ENERGIA ENEL",
+    "descricao": "ENERGIA ENEL",
+    "dia": 15,
+    "dia_ultimo": 15,
+    "faixa": null,
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 222.0,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "variavel",
+    "ultimo": 243.0,
+    "valor_medio": 225.5
+   },
+   {
+    "chave": "NETFLIX COM",
+    "descricao": "NETFLIX.COM",
+    "dia": 10,
+    "dia_ultimo": 10,
+    "faixa": null,
+    "ja_ocorreu_este_mes": false,
+    "mediana_anterior": 55.9,
+    "meses": 6,
+    "sentido": "saida",
+    "tipo": "fixo",
+    "ultimo": 55.9,
+    "valor_medio": 55.9
+   }
+  ]
+ },
+ {
+  "args": [
+   "2026-09-01",
+   "2026-09-30",
+   "categoria"
+  ],
+  "data": [],
+  "fn": "_w_gastos",
+  "saida": {
+   "ate": "2026-09-30",
+   "de": "2026-09-01",
+   "itens": [
+    {
+     "chave": "Groceries",
+     "valor": 310.0
+    },
+    {
+     "chave": "Transport",
+     "valor": 53.5
+    },
+    {
+     "chave": "Food",
+     "valor": 35.0
+    }
+   ],
+   "por": "categoria",
+   "total_custo": 398.5
+  }
+ },
+ {
+  "args": [
+   "2026-09-01",
+   "2026-09-30",
+   "descricao"
+  ],
+  "data": [],
+  "fn": "_w_gastos",
+  "saida": {
+   "ate": "2026-09-30",
+   "de": "2026-09-01",
+   "itens": [
+    {
+     "chave": "MERCADO",
+     "valor": 310.0
+    },
+    {
+     "chave": "UBER TRIP",
+     "valor": 53.5
+    },
+    {
+     "chave": "PADARIA BOM PAO",
+     "valor": 35.0
+    }
+   ],
+   "por": "descricao",
+   "total_custo": 398.5
+  }
+ },
+ {
+  "args": [
+   30,
+   null,
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_previsao",
+  "saida": {
+   "aviso": "recorrentes ~ sao medias; faturas abertas so entram quando o banco publica",
+   "dados_de": "2026-10-08T07:00",
+   "dia_menor_saldo": "2026-10-20",
+   "eventos": [
+    {
+     "data": "2026-10-10",
+     "descricao": "NETFLIX.COM",
+     "saldo": 4944.1,
+     "tipo": "recorrente",
+     "valor": -55.9
+    },
+    {
+     "data": "2026-10-15",
+     "descricao": "ENERGIA ENEL",
+     "saldo": 4701.1,
+     "tipo": "recorrente ~",
+     "valor": -243.0
+    },
+    {
+     "data": "2026-10-20",
+     "descricao": "PENSAO FULANO DE TAL",
+     "saldo": 3201.1,
+     "tipo": "recorrente",
+     "valor": -1500.0
+    },
+    {
+     "data": "2026-10-20",
+     "descricao": "Fatura cartao 9999",
+     "saldo": 2401.1,
+     "tipo": "fatura",
+     "valor": -800.0
+    },
+    {
+     "data": "2026-11-01",
+     "descricao": "SALARIO EMPRESA XYZ",
+     "saldo": 10401.1,
+     "tipo": "recorrente",
+     "valor": 8000.0
+    },
+    {
+     "data": "2026-11-05",
+     "descricao": "ALUGUEL IMOBILIARIA SUL",
+     "saldo": 8401.1,
+     "tipo": "recorrente",
+     "valor": -2000.0
+    }
+   ],
+   "menor_saldo": 2401.1,
+   "saldo_fim_semana": {
+    "semana_1": 4944.1,
+    "semana_2": 2401.1,
+    "semana_4": 10401.1,
+    "semana_5": 8401.1
+   },
+   "saldo_final": 8401.1,
+   "saldo_inicial": 5000.0
+  }
+ },
+ {
+  "args": [
+   30,
+   {
+    "data": "2026-10-15",
+    "descricao": "compra",
+    "valor": 500.0
+   },
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_previsao",
+  "saida": {
+   "aviso": "recorrentes ~ sao medias; faturas abertas so entram quando o banco publica",
+   "dados_de": "2026-10-08T07:00",
+   "dia_menor_saldo": "2026-10-20",
+   "eventos": [
+    {
+     "data": "2026-10-10",
+     "descricao": "NETFLIX.COM",
+     "saldo": 4944.1,
+     "tipo": "recorrente",
+     "valor": -55.9
+    },
+    {
+     "data": "2026-10-15",
+     "descricao": "ENERGIA ENEL",
+     "saldo": 4701.1,
+     "tipo": "recorrente ~",
+     "valor": -243.0
+    },
+    {
+     "data": "2026-10-15",
+     "descricao": "compra",
+     "saldo": 4201.1,
+     "tipo": "simulado",
+     "valor": -500.0
+    },
+    {
+     "data": "2026-10-20",
+     "descricao": "PENSAO FULANO DE TAL",
+     "saldo": 2701.1,
+     "tipo": "recorrente",
+     "valor": -1500.0
+    },
+    {
+     "data": "2026-10-20",
+     "descricao": "Fatura cartao 9999",
+     "saldo": 1901.1,
+     "tipo": "fatura",
+     "valor": -800.0
+    },
+    {
+     "data": "2026-11-01",
+     "descricao": "SALARIO EMPRESA XYZ",
+     "saldo": 9901.1,
+     "tipo": "recorrente",
+     "valor": 8000.0
+    },
+    {
+     "data": "2026-11-05",
+     "descricao": "ALUGUEL IMOBILIARIA SUL",
+     "saldo": 7901.1,
+     "tipo": "recorrente",
+     "valor": -2000.0
+    }
+   ],
+   "menor_saldo": 1901.1,
+   "saldo_fim_semana": {
+    "semana_1": 4944.1,
+    "semana_2": 1901.1,
+    "semana_4": 9901.1,
+    "semana_5": 7901.1
+   },
+   "saldo_final": 7901.1,
+   "saldo_inicial": 5000.0
+  }
+ },
+ {
+  "args": [
+   3,
+   "2026-10-08"
+  ],
+  "data": [],
+  "fn": "_w_vazamentos",
+  "saida": {
+   "assinaturas": [
+    {
+     "anual": 2706.0,
+     "item": "ENERGIA ENEL",
+     "mensal": 225.5,
+     "meses_vistos": 6
+    },
+    {
+     "anual": 670.8,
+     "item": "NETFLIX.COM",
+     "mensal": 55.9,
+     "meses_vistos": 6
+    }
+   ],
+   "aumentos": [],
+   "categorias_em_alta": [],
+   "periodo": [
+    "2026-07-01",
+    "2026-09-30"
+   ],
+   "possiveis_duplicidades": [
+    {
+     "contas": [
+      "1234",
+      "5555"
+     ],
+     "datas": [
+      "2026-09-09",
+      "2026-09-09"
+     ],
+     "item": "LANCHE X",
+     "valor": 40.0
+    }
+   ],
+   "tarifas_juros": [
+    {
+     "anualizado": 119.6,
+     "item": "TARIFA MANUTENCAO CONTA",
+     "no_periodo": 29.9
+    },
+    {
+     "anualizado": 48.0,
+     "item": "IOF",
+     "no_periodo": 12.0
+    }
+   ]
+  }
+ }
+]

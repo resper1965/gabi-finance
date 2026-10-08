@@ -1,0 +1,162 @@
+[
+ {
+  "args": [
+   "5du",
+   2026,
+   10
+  ],
+  "data": [],
+  "fn": "vencimento_do_mes",
+  "saida": "2026-10-07"
+ },
+ {
+  "args": [
+   "dia:31",
+   2026,
+   2
+  ],
+  "data": [],
+  "fn": "vencimento_do_mes",
+  "saida": "2026-02-28"
+ },
+ {
+  "args": [
+   "dia:15",
+   2026,
+   10
+  ],
+  "data": [],
+  "fn": "vencimento_do_mes",
+  "saida": "2026-10-15"
+ },
+ {
+  "args": [
+   "1du",
+   2026,
+   1
+  ],
+  "data": [],
+  "fn": "vencimento_do_mes",
+  "saida": "2026-01-02"
+ },
+ {
+  "args": [
+   "40du",
+   2026,
+   10
+  ],
+  "data": [],
+  "erro": "ValueError",
+  "fn": "vencimento_do_mes",
+  "mensagem": "40du fora do mes (1 a 21 dias uteis)"
+ },
+ {
+  "args": [
+   "xyz",
+   2026,
+   10
+  ],
+  "data": [],
+  "erro": "ValueError",
+  "fn": "vencimento_do_mes",
+  "mensagem": "regra de vencimento invalida: 'xyz'"
+ },
+ {
+  "args": [
+   " 5DU ",
+   2026,
+   11
+  ],
+  "data": [],
+  "fn": "vencimento_do_mes",
+  "saida": "2026-11-09"
+ },
+ {
+  "args": [
+   "2026-10-10",
+   "adia"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-13"
+ },
+ {
+  "args": [
+   "2026-10-10",
+   "antecipa"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-09"
+ },
+ {
+  "args": [
+   "2026-10-12",
+   "adia"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-13"
+ },
+ {
+  "args": [
+   "2026-10-12",
+   "antecipa"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-09"
+ },
+ {
+  "args": [
+   "2026-12-25",
+   "adia"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-12-28"
+ },
+ {
+  "args": [
+   "2026-12-25",
+   "antecipa"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-12-24"
+ },
+ {
+  "args": [
+   "2026-10-09",
+   "adia"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-09"
+ },
+ {
+  "args": [
+   "2026-10-09",
+   "antecipa"
+  ],
+  "data": [
+   0
+  ],
+  "fn": "vencimento_util",
+  "saida": "2026-10-09"
+ }
+]
