@@ -157,3 +157,50 @@ def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime) 
     except BaseException:
         con.execute("rollback")
         raise
+
+
+# ---------------- o que as análises (recorrentes, previsão, gastos, vazamentos) leem do banco ----------------
+class FonteAnalise:
+    """Entrega às análises portadas as mesmas formas de dado que o gabi-fin entregava (reais, não centavos)."""
+
+    def __init__(self, con):
+        self.con = con
+
+    def visao(self, tipo: str, de: str | None = None, ate: str | None = None) -> list[dict]:
+        """Lançamentos cuja natureza contém `tipo` ('caixa' ou 'custo'), por data. `categoria` e `pessoa` já vêm classificados."""
+        sql = ("select l.externo_id, c.externo_id as conta, c.tipo as tipo_conta, l.data, l.descricao_original, l.valor_centavos, "
+               "coalesce(cat.nome, l.categoria_banco) as categoria, coalesce(p.nome, '') as pessoa, l.parcela, l.parcelas, l.natureza "
+               "from lancamento l join conta c on c.id=l.conta_id left join categoria cat on cat.id=l.categoria_id "
+               "left join pessoa p on p.id=l.para_quem_id where l.natureza like ?")
+        args = [f"%{tipo}%"]
+        if de:
+            sql += " and l.data>=?"
+            args.append(de)
+        if ate:
+            sql += " and l.data<=?"
+            args.append(ate)
+        return [{"id": r["externo_id"], "account_id": r["conta"], "tipo_conta": r["tipo_conta"], "data": r["data"],
+                 "descricao": r["descricao_original"], "valor": _real(r["valor_centavos"]), "categoria": r["categoria"],
+                 "pessoa": r["pessoa"], "parcela": r["parcela"], "parcelas": r["parcelas"], "natureza": r["natureza"]}
+                for r in self.con.execute(sql + " order by l.data, l.externo_id", args)]
+
+    def ultimo_snapshot(self):
+        ts = self.con.execute("select max(em) from saldo").fetchone()[0]
+        if ts is None:
+            return None, []
+        rows = self.con.execute("select c.externo_id, c.tipo, c.apelido, c.instituicao, s.saldo_centavos, c.limite_centavos, "
+                                "c.disponivel_centavos, c.vencimento_fatura from saldo s join conta c on c.id=s.conta_id "
+                                "where s.em=? order by c.id", (ts,)).fetchall()
+        return ts, [{"account_id": r[0], "tipo": r[1], "nome": r[2], "banco": r[3], "saldo": _real(r[4]), "limite": _real(r[5]),
+                     "disponivel": _real(r[6]), "vencimento": r[7]} for r in rows]
+
+    def faturas(self, de: str, ate: str) -> list[dict]:
+        return [{"id": r["id"], "account_id": r["account_id"], "vencimento": r["vencimento"], "total": _real(r["total_centavos"]),
+                 "minimo": _real(r["minimo_centavos"])}
+                for r in self.con.execute("select * from fatura where vencimento>=? and vencimento<=? order by vencimento, id", (de, ate))]
+
+    def parcelas_cartao(self) -> list[dict]:
+        return [{"account_id": r[0], "descricao": r[1], "valor": _real(r[2]), "parcela": r[3], "parcelas": r[4]}
+                for r in self.con.execute("select c.externo_id, l.descricao_original, l.valor_centavos, l.parcela, l.parcelas from lancamento l "
+                                          "join conta c on c.id=l.conta_id where c.tipo='CREDIT' and l.parcelas>1 and l.parcela<l.parcelas "
+                                          "order by l.data, l.externo_id")]

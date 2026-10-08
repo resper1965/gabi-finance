@@ -85,28 +85,39 @@ def _w_recorrentes(visao, hoje):
     return f.recorrentes(_banco(f, tx=_historico()), visao, _data(hoje))
 
 
-def _w_gastos(de, ate, por):
-    f = _mod("finlib")
-    rows = [_tx(1, "2026-09-02", "PADARIA BOM PAO", -35.0, cat="Food"), _tx(2, "2026-09-03", "UBER TRIP", -22.5, cat="Transport"),
+def dados_gastos():
+    return [_tx(1, "2026-09-02", "PADARIA BOM PAO", -35.0, cat="Food"), _tx(2, "2026-09-03", "UBER TRIP", -22.5, cat="Transport"),
             _tx(3, "2026-09-10", "UBER TRIP", -31.0, cat="Transport"), _tx(4, "2026-09-12", "MERCADO", -310.0, tipo="CREDIT", natureza="custo", cat="Groceries"),
             _tx(5, "2026-09-15", "SALARIO", 5000.0, natureza="caixa")]
-    return f.gastos(_banco(f, tx=rows), de, ate, por)
 
 
-def _w_previsao(dias, extra, hoje):
+def _w_gastos(de, ate, por):
     f = _mod("finlib")
+    return f.gastos(_banco(f, tx=dados_gastos()), de, ate, por)
+
+
+def dados_previsao():
     contas = [("2026-10-08T07:00", "a1234", "BANK", "Conta", "C6", 5000.0, None, None, None),
               ("2026-10-08T07:00", "c9999", "CREDIT", "Cartao", "Itau", -800.0, 5000.0, 4200.0, "2026-10-20")]
     faturas = [("f1", "c9999", "2026-10-20", 800.0, 80.0, "{}")]
     tx = _historico() + [_tx(900, "2026-09-02", "COMPRA PARCELADA", -120.0, conta="c9999", tipo="CREDIT", natureza="custo", parcela=2, parcelas=5)]
+    return tx, contas, faturas
+
+
+def _w_previsao(dias, extra, hoje):
+    f = _mod("finlib")
+    tx, contas, faturas = dados_previsao()
     return f.previsao(_banco(f, tx=tx, contas=contas, faturas=faturas), dias, extra, _data(hoje))
+
+
+def dados_vazamentos():
+    return _historico() + [_tx(901, "2026-09-05", "TARIFA MANUTENCAO CONTA", -29.9), _tx(902, "2026-09-06", "IOF", -12.0),
+                           _tx(903, "2026-09-09", "LANCHE X", -40.0), _tx(904, "2026-09-09", "LANCHE X", -40.0, conta="b5555")]
 
 
 def _w_vazamentos(meses, hoje):
     f = _mod("finlib")
-    rows = _historico() + [_tx(901, "2026-09-05", "TARIFA MANUTENCAO CONTA", -29.9), _tx(902, "2026-09-06", "IOF", -12.0),
-                           _tx(903, "2026-09-09", "LANCHE X", -40.0), _tx(904, "2026-09-09", "LANCHE X", -40.0, conta="b5555")]
-    return f.vazamentos(_banco(f, tx=rows), meses, _data(hoje))
+    return f.vazamentos(_banco(f, tx=dados_vazamentos()), meses, _data(hoje))
 
 
 def _w_natureza(tipo, desc, cat, valor, donos):
