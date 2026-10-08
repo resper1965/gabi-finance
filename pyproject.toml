@@ -9,3 +9,4 @@ dev = ["pytest", "httpx"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_functions = ["test_*"]
