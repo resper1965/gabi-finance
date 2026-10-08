@@ -1,0 +1,734 @@
+[
+ {
+  "args": [
+   "completa"
+  ],
+  "data": [],
+  "fn": "_w_validar",
+  "saida": {
+   "bruto": {
+    "Compromissos": [
+     [
+      "id",
+      "nome",
+      "extrato",
+      "apelidos",
+      "vencimento",
+      "ajuste_dia_util",
+      "valor_tipo",
+      "valor_padrao",
+      "forma",
+      "conta",
+      "cartao",
+      "documento",
+      "pix",
+      "ativo",
+      "valido_de",
+      "valido_ate",
+      "obs"
+     ],
+     [
+      "aluguel",
+      "Aluguel",
+      "IMOBILIARIA SUL",
+      "IMOB SUL; ALUGUEL",
+      "dia:5",
+      "",
+      "fixo",
+      "2.000,00",
+      "pix",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "energia",
+      "Energia",
+      "ENEL",
+      "",
+      "dia:15",
+      "",
+      "variavel",
+      "",
+      "boleto",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "escola",
+      "Escola",
+      "COLEGIO",
+      "",
+      "5du",
+      "antecipa",
+      "fixo",
+      3000,
+      "boleto",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "velho",
+      "Antigo",
+      "ANTIGO",
+      "",
+      "dia:1",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "nao",
+      "",
+      "",
+      ""
+     ],
+     [
+      "ruim-venc",
+      "Ruim",
+      "X",
+      "",
+      "45",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "ruim-forma",
+      "Ruim",
+      "X",
+      "",
+      "dia:5",
+      "",
+      "",
+      "",
+      "cheque",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "com espaco",
+      "Ruim",
+      "X",
+      "",
+      "dia:5",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "aluguel",
+      "Duplicado",
+      "Y",
+      "",
+      "dia:6",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "sem-nome",
+      "",
+      "X",
+      "",
+      "dia:5",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "datas",
+      "Datas",
+      "X",
+      "",
+      "dia:5",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "2026-12",
+      "2026-01",
+      ""
+     ],
+     [
+      "serie",
+      "Serie",
+      "S",
+      "",
+      "dia:7",
+      "",
+      "fixo",
+      "100",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "2026-01",
+      "2026-12",
+      ""
+     ],
+     [
+      "serie-202611",
+      "Serie nova",
+      "S",
+      "",
+      "dia:7",
+      "",
+      "fixo",
+      "110",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "2026-11",
+      "",
+      ""
+     ],
+     [
+      "valor-ruim",
+      "Valor",
+      "V",
+      "",
+      "dia:9",
+      "",
+      "",
+      "abc",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    ],
+    "Parâmetros": [
+     [
+      "chave",
+      "valor"
+     ],
+     [
+      "janela_antes_dias",
+      7
+     ],
+     [
+      "tolerancia_fixo",
+      "2%"
+     ],
+     [
+      "tolerancia_valor",
+      "1,50"
+     ],
+     [
+      "horas_conta_parada",
+      "abc"
+     ],
+     [
+      "bancos_pj",
+      "C6 PJ; Inter PJ"
+     ],
+     [
+      "chave_desconhecida",
+      1
+     ]
+    ],
+    "Valores do mês": [
+     [
+      "mes",
+      "compromisso",
+      "tipo",
+      "valor",
+      "vencimento",
+      "data_pagamento",
+      "origem",
+      "registrado_em"
+     ],
+     [
+      "2026-10",
+      "energia",
+      "valor",
+      "230,50",
+      "2026-10-15",
+      "",
+      "boleto",
+      ""
+     ],
+     [
+      "2026-10",
+      "aluguel",
+      "pago",
+      "",
+      "",
+      "2026-10-03",
+      "manual",
+      ""
+     ],
+     [
+      "2026-13",
+      "energia",
+      "valor",
+      "10",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "2026-10",
+      "fantasma",
+      "valor",
+      "10",
+      "",
+      "",
+      "",
+      ""
+     ]
+    ]
+   },
+   "leitura": {
+    "da_copia": false,
+    "erro_leitura": null,
+    "invalidas": [
+     {
+      "aba": "Compromissos",
+      "linha": 6,
+      "motivo": "vencimento '45' não reconhecido"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 7,
+      "motivo": "forma 'cheque' não reconhecida"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 8,
+      "motivo": "id 'com espaco' inválido"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 9,
+      "motivo": "id 'aluguel' repetido (linha 2)"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 10,
+      "motivo": "nome vazio"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 11,
+      "motivo": "valido_de depois de valido_ate"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 12,
+      "motivo": "sobrepõe linha 13"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 13,
+      "motivo": "sobrepõe linha 12"
+     },
+     {
+      "aba": "Compromissos",
+      "linha": 14,
+      "motivo": "valor_padrao 'abc' não é número"
+     },
+     {
+      "aba": "Parâmetros",
+      "linha": 5,
+      "motivo": "horas_conta_parada 'abc' não reconhecido"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 4,
+      "motivo": "mes '2026-13' não é AAAA-MM"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 5,
+      "motivo": "compromisso 'fantasma' inexistente"
+     }
+    ],
+    "lida_em": "",
+    "linhas": [
+     {
+      "ajuste_dia_util": "adia",
+      "apelidos": [
+       "IMOB SUL",
+       "ALUGUEL"
+      ],
+      "ativo": true,
+      "cartao": "",
+      "conta": "",
+      "documento": "",
+      "extrato": "IMOBILIARIA SUL",
+      "forma": "pix",
+      "id": "aluguel",
+      "linha_planilha": 2,
+      "nome": "Aluguel",
+      "pix": "",
+      "valido_ate": null,
+      "valido_de": null,
+      "valor_padrao": 2000.0,
+      "valor_tipo": "fixo",
+      "vencimento": "dia:5"
+     },
+     {
+      "ajuste_dia_util": "adia",
+      "apelidos": [],
+      "ativo": true,
+      "cartao": "",
+      "conta": "",
+      "documento": "",
+      "extrato": "ENEL",
+      "forma": "boleto",
+      "id": "energia",
+      "linha_planilha": 3,
+      "nome": "Energia",
+      "pix": "",
+      "valido_ate": null,
+      "valido_de": null,
+      "valor_padrao": null,
+      "valor_tipo": "variavel",
+      "vencimento": "dia:15"
+     },
+     {
+      "ajuste_dia_util": "antecipa",
+      "apelidos": [],
+      "ativo": true,
+      "cartao": "",
+      "conta": "",
+      "documento": "",
+      "extrato": "COLEGIO",
+      "forma": "boleto",
+      "id": "escola",
+      "linha_planilha": 4,
+      "nome": "Escola",
+      "pix": "",
+      "valido_ate": null,
+      "valido_de": null,
+      "valor_padrao": 3000.0,
+      "valor_tipo": "fixo",
+      "vencimento": "5du"
+     }
+    ],
+    "params": {
+     "bancos_pj": [
+      "C6 PJ",
+      "Inter PJ"
+     ],
+     "dias_agenda": 7,
+     "horas_conta_parada": 24,
+     "horas_envio": [
+      15,
+      7
+     ],
+     "horas_silenciosas": [
+      23
+     ],
+     "janela_antes_dias": 7,
+     "prefixo_mensagem": "",
+     "telegram_destino": null,
+     "tolerancia_fixo": 0.02,
+     "tolerancia_juros": 0.1,
+     "tolerancia_valor": 1.5
+    },
+    "valores": [
+     {
+      "compromisso": "energia",
+      "data_pagamento": null,
+      "linha_planilha": 2,
+      "mes": "2026-10",
+      "origem": "boleto",
+      "tipo": "valor",
+      "valor": 230.5,
+      "vencimento": "2026-10-15"
+     },
+     {
+      "compromisso": "aluguel",
+      "data_pagamento": "2026-10-03",
+      "linha_planilha": 3,
+      "mes": "2026-10",
+      "origem": "manual",
+      "tipo": "pago",
+      "valor": null,
+      "vencimento": null
+     }
+    ]
+   }
+  }
+ },
+ {
+  "args": [
+   "sem_colunas"
+  ],
+  "data": [],
+  "fn": "_w_validar",
+  "saida": {
+   "bruto": {
+    "Compromissos": [
+     [
+      "id",
+      "nome"
+     ],
+     [
+      "x",
+      "Y"
+     ]
+    ],
+    "Parâmetros": [
+     [
+      "chave",
+      "valor"
+     ],
+     [
+      "janela_antes_dias",
+      7
+     ],
+     [
+      "tolerancia_fixo",
+      "2%"
+     ],
+     [
+      "tolerancia_valor",
+      "1,50"
+     ],
+     [
+      "horas_conta_parada",
+      "abc"
+     ],
+     [
+      "bancos_pj",
+      "C6 PJ; Inter PJ"
+     ],
+     [
+      "chave_desconhecida",
+      1
+     ]
+    ],
+    "Valores do mês": [
+     [
+      "mes",
+      "compromisso",
+      "tipo",
+      "valor",
+      "vencimento",
+      "data_pagamento",
+      "origem",
+      "registrado_em"
+     ],
+     [
+      "2026-10",
+      "energia",
+      "valor",
+      "230,50",
+      "2026-10-15",
+      "",
+      "boleto",
+      ""
+     ],
+     [
+      "2026-10",
+      "aluguel",
+      "pago",
+      "",
+      "",
+      "2026-10-03",
+      "manual",
+      ""
+     ],
+     [
+      "2026-13",
+      "energia",
+      "valor",
+      "10",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "2026-10",
+      "fantasma",
+      "valor",
+      "10",
+      "",
+      "",
+      "",
+      ""
+     ]
+    ]
+   },
+   "leitura": {
+    "da_copia": false,
+    "erro_leitura": null,
+    "invalidas": [
+     {
+      "aba": "Compromissos",
+      "linha": 1,
+      "motivo": "coluna(s) ausente(s): extrato, vencimento"
+     },
+     {
+      "aba": "Parâmetros",
+      "linha": 5,
+      "motivo": "horas_conta_parada 'abc' não reconhecido"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 2,
+      "motivo": "compromisso 'energia' inexistente"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 3,
+      "motivo": "compromisso 'aluguel' inexistente"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 4,
+      "motivo": "mes '2026-13' não é AAAA-MM"
+     },
+     {
+      "aba": "Valores do mês",
+      "linha": 5,
+      "motivo": "compromisso 'fantasma' inexistente"
+     }
+    ],
+    "lida_em": "",
+    "linhas": [],
+    "params": {
+     "bancos_pj": [
+      "C6 PJ",
+      "Inter PJ"
+     ],
+     "dias_agenda": 7,
+     "horas_conta_parada": 24,
+     "horas_envio": [
+      15,
+      7
+     ],
+     "horas_silenciosas": [
+      23
+     ],
+     "janela_antes_dias": 7,
+     "prefixo_mensagem": "",
+     "telegram_destino": null,
+     "tolerancia_fixo": 0.02,
+     "tolerancia_juros": 0.1,
+     "tolerancia_valor": 1.5
+    },
+    "valores": []
+   }
+  }
+ },
+ {
+  "args": [
+   "vazia"
+  ],
+  "data": [],
+  "fn": "_w_validar",
+  "saida": {
+   "bruto": {},
+   "leitura": {
+    "da_copia": false,
+    "erro_leitura": null,
+    "invalidas": [],
+    "lida_em": "",
+    "linhas": [],
+    "params": {
+     "bancos_pj": [],
+     "dias_agenda": 7,
+     "horas_conta_parada": 24,
+     "horas_envio": [
+      15,
+      7
+     ],
+     "horas_silenciosas": [
+      23
+     ],
+     "janela_antes_dias": 10,
+     "prefixo_mensagem": "",
+     "telegram_destino": null,
+     "tolerancia_fixo": 0.01,
+     "tolerancia_juros": 0.1,
+     "tolerancia_valor": 1.0
+    },
+    "valores": []
+   }
+  }
+ }
+]

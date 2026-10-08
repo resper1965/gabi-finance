@@ -275,6 +275,50 @@ def _w_cenario(nome):
     return {"entrada": e, "invalidas": invalidas, "comps": comps, "conciliacao": {"res": res, "novos": novos}}
 
 
+def _bruto_planilha():
+    cab = ["id", "nome", "extrato", "apelidos", "vencimento", "ajuste_dia_util", "valor_tipo", "valor_padrao", "forma", "conta", "cartao",
+           "documento", "pix", "ativo", "valido_de", "valido_ate", "obs"]
+
+    def linha(id_, nome="Nome", extrato="EXTRATO", venc="dia:5", ajuste="", tipo="", padrao="", forma="", ativo="", de="", ate="", apelidos=""):
+        return [id_, nome, extrato, apelidos, venc, ajuste, tipo, padrao, forma, "", "", "", "", ativo, de, ate, ""]
+
+    return {
+        "Compromissos": [cab,
+            linha("aluguel", "Aluguel", "IMOBILIARIA SUL", "dia:5", tipo="fixo", padrao="2.000,00", forma="pix", apelidos="IMOB SUL; ALUGUEL"),
+            linha("energia", "Energia", "ENEL", "dia:15", tipo="variavel", forma="boleto"),
+            linha("escola", "Escola", "COLEGIO", "5du", ajuste="antecipa", tipo="fixo", padrao=3000, forma="boleto"),
+            linha("velho", "Antigo", "ANTIGO", "dia:1", ativo="nao"),
+            linha("ruim-venc", "Ruim", "X", "45"),
+            linha("ruim-forma", "Ruim", "X", "dia:5", forma="cheque"),
+            linha("com espaco", "Ruim", "X", "dia:5"),
+            linha("aluguel", "Duplicado", "Y", "dia:6"),
+            linha("sem-nome", "", "X", "dia:5"),
+            linha("datas", "Datas", "X", "dia:5", de="2026-12", ate="2026-01"),
+            linha("serie", "Serie", "S", "dia:7", tipo="fixo", padrao="100", de="2026-01", ate="2026-12"),
+            linha("serie-202611", "Serie nova", "S", "dia:7", tipo="fixo", padrao="110", de="2026-11"),
+            linha("valor-ruim", "Valor", "V", "dia:9", padrao="abc"),
+        ],
+        "Parâmetros": [["chave", "valor"], ["janela_antes_dias", 7], ["tolerancia_fixo", "2%"], ["tolerancia_valor", "1,50"],
+                       ["horas_conta_parada", "abc"], ["bancos_pj", "C6 PJ; Inter PJ"], ["chave_desconhecida", 1]],
+        "Valores do mês": [["mes", "compromisso", "tipo", "valor", "vencimento", "data_pagamento", "origem", "registrado_em"],
+                           ["2026-10", "energia", "valor", "230,50", "2026-10-15", "", "boleto", ""],
+                           ["2026-10", "aluguel", "pago", "", "", "2026-10-03", "manual", ""],
+                           ["2026-13", "energia", "valor", "10", "", "", "", ""],
+                           ["2026-10", "fantasma", "valor", "10", "", "", "", ""]],
+    }
+
+
+def _w_validar(variante):
+    p = _mod("planilha")
+    b = _bruto_planilha()
+    if variante == "sem_colunas":
+        b["Compromissos"] = [["id", "nome"], ["x", "Y"]]
+    elif variante == "vazia":
+        b = {}
+    r = p.validar(b, _data("2026-10-08"))
+    return {"bruto": b, "leitura": r}
+
+
 def casos():
     hoje = "2026-10-08"
     cnpj = _cnpj_valido("112223330001")
@@ -337,6 +381,7 @@ def casos():
             {"fn": "ler_comprovante_pix", "args": ["Nome: A\nNome: B\nCPF: 1\nCPF: 2"]},
             {"fn": "ler_comprovante_pix", "args": [""]},
         ],
+        "planilha": [{"fn": "_w_validar", "args": [v]} for v in ("completa", "sem_colunas", "vazia")],
         "cenarios": [{"fn": "_w_cenario", "args": [n]} for n in CENARIOS],
         "emissores": [
             *[{"fn": "chave_extrato", "args": [s]} for s in ["Padaria São João Ltda", None, "", "ENEL DISTRIBUIÇÃO", "PIX ENVIADO JOAO"]],
