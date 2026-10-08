@@ -8,6 +8,8 @@ import json
 import re
 from dataclasses import dataclass
 
+from gabi.dinheiro.regras import casa
+
 CAMPOS = (("categoria", "categoria_id"), ("para_quem", "para_quem_id"), ("empresa", "empresa_id"))
 CONFIANCA = {"regra": 1.0, "banco": 0.9, "cache": 0.6}
 
@@ -71,7 +73,7 @@ def classificar(con, lancamento_id: int) -> Classificacao:
 
     # 1) regra ativa do Ricardo: a primeira que casa (por id) preenche os campos vazios
     for padrao, acao in _regras_ativas(con):
-        if padrao.search(r["descricao_original"] or ""):
+        if casa(padrao, r["descricao_original"], r["estabelecimento"]):
             for campo, col in CAMPOS:
                 if atual[col] is None and acao.get(col) is not None:
                     _preencher(con, lancamento_id, campo, col, acao[col], "regra")

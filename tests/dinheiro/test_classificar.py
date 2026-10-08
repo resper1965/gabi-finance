@@ -159,3 +159,10 @@ def test_classificar_pendentes_percorre_so_o_que_falta(con):
 def test_lancamento_inexistente_levanta_LookupError(con):
     with pytest.raises(LookupError):
         classificar(con, 9999)
+
+
+def test_regra_tambem_casa_pelo_estabelecimento_normalizado(con):
+    _regra(con, "^LOJA X$", {"categoria_id": 2})
+    lid = _lanc(con, 1, desc="LOJA (X) *123", estab="LOJA X")  # a descrição original tem pontuação; o estabelecimento é normalizado
+    classificar(con, lid)
+    assert _l(con, lid)["categoria_id"] == 2
