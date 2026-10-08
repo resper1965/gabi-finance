@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain backup diário às 03:30
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=gabi-brain-backup.service
+
+[Install]
+WantedBy=timers.target
