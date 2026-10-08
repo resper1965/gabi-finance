@@ -38,7 +38,7 @@ def test_preserva_acentos_e_aspas(con):
 
 def test_dinheiro_vira_centavos_inteiros(con):
     importar_staging(con, STAGING)
-    assert con.execute("select valor_centavos from compromisso where id=1").fetchone()[0] == 10150
+    assert con.execute("select valor_centavos from compromisso where id='aluguel:2026-10'").fetchone()[0] == 10150
     assert con.execute("select total_centavos, minimo_centavos from fatura").fetchone()[:] == (50025, 5000)
     assert con.execute("select saldo_centavos from conta_estado").fetchone()[0] == 123456
     assert con.execute("select typeof(saldo_centavos) from conta_estado").fetchone()[0] == "integer"
@@ -73,3 +73,11 @@ def test_main_registra_rodada_ok(tmp_path):
     r = con.execute("select fonte, status, lidos from rodada").fetchone()
     assert (r["fonte"], r["status"]) == ("importacao-staging", "ok") and r["lidos"] > 0
     assert con.execute("select count(*) from pessoa").fetchone()[0] == 2
+
+
+def test_id_de_compromisso_e_texto_como_no_gabi_fin(con):
+    importar_staging(con, STAGING)
+    ids = sorted(r[0] for r in con.execute("select id from compromisso"))
+    assert ids == ["aluguel:2026-10", "energia:2026-10", "iptu:2026-10"]
+    assert con.execute("select typeof(id) from compromisso limit 1").fetchone()[0] == "text"
+    assert con.execute("select compromisso_id from conciliacao").fetchone()[0] == "aluguel:2026-10"

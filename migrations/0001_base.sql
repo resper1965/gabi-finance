@@ -11,14 +11,15 @@ create table acesso(
   login text primary key, pessoa_id text,
   nivel text not null check (nivel in ('boss','familia_vip','terceiros')), criado_em text not null);
 
+-- compromisso.id é texto, ex.: 'aluguel:2026-10' (mesmo formato do gabi-fin)
 create table compromisso(
-  id integer primary key, origem text, linha_id text, nome text, vencimento text, vencimento_util text,
+  id text primary key, origem text, linha_id text, nome text, vencimento text, vencimento_util text,
   valor_centavos integer, valor_fonte text, forma text, account_id text, estado text, motivo text,
   dados text, atualizado_em text);
 create table fatura(
   id text primary key, account_id text, vencimento text, total_centavos integer, minimo_centavos integer);
 create table conciliacao(
-  tx_id text not null, compromisso_id integer not null, metodo text, diferenca_centavos integer, criado_em text,
+  tx_id text not null, compromisso_id text not null, metodo text, diferenca_centavos integer, criado_em text,
   primary key (tx_id, compromisso_id));
 create table conta_estado(
   account_id text primary key, banco text, nome text, tipo text, pj integer, ult_tx_real text,
