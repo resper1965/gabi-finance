@@ -82,7 +82,7 @@ def test_arvore_copiada_pelo_instalar_roda_sozinha(tmp_path):
               % (tmp_path / "x.db"))
     r = subprocess.run([sys.executable, "-c", codigo], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
-    assert r.stdout.strip() == "1"
+    assert r.stdout.strip() == str(len(list((DEPLOY.parent / "migrations").glob("*.sql"))))
     assert (tmp_path / "gabi" / "static" / "index.html").exists()
 
 

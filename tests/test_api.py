@@ -47,7 +47,7 @@ def test_saude_exige_boss_e_traz_estado(cli, banco):
     with registrar_rodada(con, "teste") as r:
         r.lidos = 3
     d = cli.get("/api/saude", headers=BOSS).json()
-    assert d["db"] == "ok" and d["schema"] == 1
+    assert d["db"] == "ok" and d["schema"] == len(list(MIGRACOES.glob("*.sql")))
     assert d["ultima_rodada"]["fonte"] == "teste" and d["ultima_rodada"]["status"] == "ok"
     assert d["tabelas"]["acesso"] == 2 and "memoria" in d["tabelas"]
 
