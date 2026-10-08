@@ -11,7 +11,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "$0")/.." && pwd)"
 id gabibrain >/dev/null 2>&1 || useradd --system --home-dir /var/lib/gabi-brain --shell /usr/sbin/nologin gabibrain
-install -d -o gabibrain -g gabibrain -m 700 /var/lib/gabi-brain /var/backups/gabi-brain
+install -d -o gabibrain -g gabibrain -m 700 /var/lib/gabi-brain /var/lib/gabi-brain/bruto /var/lib/gabi-brain/locks /var/backups/gabi-brain
 install -d -o root -g root -m 755 /opt/gabi-brain
 
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations
@@ -22,13 +22,16 @@ find /opt/gabi-brain -name __pycache__ -prune -exec rm -rf {} +
 /opt/gabi-brain/venv/bin/pip install --quiet --require-virtualenv -r "$AQUI/requirements.lock"
 chown -R root:root /opt/gabi-brain
 
-install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-backup.service \
-  "$AQUI"/deploy/gabi-brain-backup.timer /etc/systemd/system/
+install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-mcp.service "$AQUI"/deploy/gabi-brain-backup.service \
+  "$AQUI"/deploy/gabi-brain-backup.timer "$AQUI"/deploy/gabi-brain-saldos.service "$AQUI"/deploy/gabi-brain-saldos.timer \
+  "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now gabi-brain-api.service gabi-brain-backup.timer
+systemctl enable --now gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer
+# Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).
 
 echo "OK. Verifique:"
 echo "  systemctl is-active gabi-brain-api            (esperado: active)"
 echo "  ls -l /run/gabi-brain/api.sock                (esperado: srw------- gabibrain; pasta drwx------)"
 echo "  ss -ltn | grep 8080                           (esperado: vazio — não há porta TCP)"
 echo "Próximo passo (você): sudo tailscale serve --bg --https=443 unix:/run/gabi-brain/api.sock"
+echo "Captura (depois do G4, com MCPAI_KEY em /etc/gabi/brain.env): sudo systemctl enable --now gabi-brain-saldos.timer gabi-brain-extratos.timer"

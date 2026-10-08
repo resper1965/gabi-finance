@@ -1,4 +1,5 @@
 import importlib
+import pytest
 import re
 import subprocess
 from pathlib import Path
@@ -87,8 +88,9 @@ def test_arvore_copiada_pelo_instalar_roda_sozinha(tmp_path):
 
 
 def test_instalar_nao_toca_nas_outras_pilhas_nem_em_segredos():
+    executadas = "\n".join(l for l in INSTALAR.splitlines() if l.strip() and not l.lstrip().startswith(("#", "echo"))).lower()
     for proibido in ("openclaw", "paperless", "buzz", "/etc/gabi", "docker", "ufw", "iptables"):
-        assert proibido not in INSTALAR.lower(), proibido
+        assert proibido not in executadas, proibido  # mencionar em comentário/mensagem é ok; executar, não
 
 
 def test_instalar_nao_abre_porta_nem_roda_tailscale_serve():
@@ -139,3 +141,69 @@ def test_uvicorn_real_em_socket_unix_ignora_x_forwarded_for(tmp_path):
     finally:
         proc.terminate()
         proc.wait(timeout=10)
+
+
+# ---------------- Fase 1: servidor MCP e rodadas de captura ----------------
+def _ler(nome):
+    return (DEPLOY / nome).read_text()
+
+
+MCP = _ler("gabi-brain-mcp.service")
+SALDOS, EXTRATOS = _ler("gabi-brain-saldos.service"), _ler("gabi-brain-extratos.service")
+T_SALDOS, T_EXTRATOS = _ler("gabi-brain-saldos.timer"), _ler("gabi-brain-extratos.timer")
+
+
+def test_mcp_escuta_so_em_localhost_8081_sem_proxy_headers():
+    ex = re.search(r"^ExecStart=(.*)$", MCP, re.M).group(1)
+    assert "--factory gabi.mcp.servidor:fabrica" in ex and "--host 127.0.0.1" in ex and "--port 8081" in ex and "--no-proxy-headers" in ex
+    assert "0.0.0.0" not in MCP
+
+
+def test_mcp_so_aceita_trafego_local_e_nao_le_segredo_de_agentes():
+    assert "IPAddressDeny=any" in MCP and "IPAddressAllow=localhost" in MCP
+    assert "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" in MCP
+    assert "EnvironmentFile" not in MCP  # o MCP só usa tokens do banco; nenhuma chave de fonte externa
+
+
+def test_servicos_de_captura_podem_sair_para_a_internet_mas_com_o_resto_endurecido():
+    for u in (SALDOS, EXTRATOS):
+        assert "EnvironmentFile=-/etc/gabi/brain.env" in u            # a chave da mcp.ai (G4); '-' = opcional
+        assert "IPAddressDeny" not in u and "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" in u
+        for dur in ("User=gabibrain", "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "UMask=0077"):
+            assert dur in u, dur
+        assert "ReadWritePaths=/var/lib/gabi-brain" in u and "Type=oneshot" in u
+
+
+def test_captura_chama_os_modulos_certos():
+    assert "-m gabi.dinheiro.rodar saldos" in SALDOS
+    assert "-m gabi.dinheiro.rodar extratos --sincronizar" in EXTRATOS and "TimeoutStartSec=" in EXTRATOS
+    assert hasattr(importlib.import_module("gabi.dinheiro.rodar"), "main") and hasattr(importlib.import_module("gabi.mcp.servidor"), "fabrica")
+
+
+def test_horarios_saldos_de_hora_em_hora_e_extratos_as_07_e_15_de_brasilia():
+    assert "OnCalendar=*-*-* *:05:00" in T_SALDOS and "Persistent=true" in T_SALDOS
+    assert "OnCalendar=*-*-* 07,15:00:00 America/Sao_Paulo" in T_EXTRATOS and "Persistent=true" in T_EXTRATOS
+
+
+@pytest.mark.skipif(subprocess.run(["which", "systemd-analyze"], capture_output=True).returncode != 0, reason="sem systemd-analyze")
+def test_os_horarios_sao_aceitos_pelo_systemd():
+    for t in (T_SALDOS, T_EXTRATOS, TIMER):
+        expr = re.search(r"^OnCalendar=(.*)$", t, re.M).group(1)
+        r = subprocess.run(["systemd-analyze", "calendar", expr], capture_output=True, text=True)
+        assert r.returncode == 0, (expr, r.stderr)
+
+
+def test_instalar_liga_api_mcp_e_backup_mas_nao_a_captura():
+    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert len(ligadas) == 1 and "gabi-brain-api.service" in ligadas[0] and "gabi-brain-mcp.service" in ligadas[0] and "gabi-brain-backup.timer" in ligadas[0]
+    assert "extratos" not in ligadas[0] and "saldos" not in ligadas[0]  # só depois do G4 (chave da mcp.ai)
+    assert "gabi-brain-extratos.timer" in INSTALAR and "gabi-brain-saldos.timer" in INSTALAR  # mas instala as unidades
+
+
+def test_instalar_cria_pastas_do_bruto_e_dos_locks_privadas():
+    assert "/var/lib/gabi-brain/bruto" in INSTALAR and "/var/lib/gabi-brain/locks" in INSTALAR
+
+
+def test_nenhuma_unidade_traz_segredo():
+    for p in DEPLOY.iterdir():
+        assert not re.search(r"sk_live|sk-[a-z0-9]{10}|Bearer |gb_[A-Za-z0-9_-]{20}", p.read_text()), p.name

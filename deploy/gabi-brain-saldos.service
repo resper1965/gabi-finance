@@ -1,0 +1,27 @@
+[Unit]
+Description=gabi.brain saldos das contas (de hora em hora)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gabibrain
+Group=gabibrain
+WorkingDirectory=/opt/gabi-brain
+Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
+# MCPAI_KEY (chave do Open Finance) fica aqui, colocada por você; '-' = o serviço sobe mesmo sem o arquivo (e falha com "sem_chave").
+EnvironmentFile=-/etc/gabi/brain.env
+ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.dinheiro.rodar saldos
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-brain

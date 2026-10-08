@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain extratos às 07h e 15h (Brasília)
+
+[Timer]
+OnCalendar=*-*-* 07,15:00:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-brain-extratos.service
+
+[Install]
+WantedBy=timers.target
