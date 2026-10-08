@@ -10,13 +10,12 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gabi.db import conectar
-from gabi.dinheiro import analise, contas_pagar as cp, regras as rg, repositorio
+from gabi.dinheiro import analise, consultas, contas_pagar as cp, regras as rg, repositorio
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
-LIMITE_MAX = 200
 PERIODOS = {"semana": 7, "mes": 30, "12m": 365}
 EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id"}
 
@@ -152,47 +151,22 @@ def marcar_paga(id_compromisso: str, request: Request, ident: Identidade = Depen
 
 
 # ---------------- lançamentos ----------------
-_SQL_LANC = ("select l.*, c.apelido as conta_nome, cat.nome as cat_nome, p.nome as pessoa_nome, e.nome as empresa_nome from lancamento l "
-             "join conta c on c.id=l.conta_id left join categoria cat on cat.id=l.categoria_id left join pessoa p on p.id=l.para_quem_id "
-             "left join empresa e on e.id=l.empresa_id")
-
-
-def _lanc(r) -> dict:
-    return {"id": r["id"], "data": r["data"], "estabelecimento": r["estabelecimento"], "descricao": r["descricao_original"],
-            "valor": _m(r["valor_centavos"]), "forma": r["forma"], "status": r["status"], "natureza": r["natureza"], "conta": r["conta_nome"],
-            "categoria": {"id": r["categoria_id"], "nome": r["cat_nome"], "origem": r["categoria_origem"]},
-            "para_quem": {"id": r["para_quem_id"], "nome": r["pessoa_nome"], "origem": r["para_quem_origem"]},
-            "empresa": {"id": r["empresa_id"], "nome": r["empresa_nome"], "origem": r["empresa_origem"]},
-            "frente_id": r["frente_id"], "fatura_id": r["fatura_id"], "parcela": r["parcela"], "parcelas": r["parcelas"]}
+_SQL_LANC = consultas.SQL_LANCAMENTO
+_lanc = consultas.lancamento_dict
 
 
 @router.get("/lancamentos")
 def lancamentos(request: Request, pendente: str | None = None, de: str | None = None, ate: str | None = None, conta: str | None = None,
                 categoria: int | None = None, para_quem: str | None = None, empresa: str | None = None, texto: str | None = None,
                 limite: int = 50, offset: int = 0):
-    limite, offset = min(max(limite, 1), LIMITE_MAX), max(offset, 0)
-    onde, args = [], []
-    if pendente:
-        if pendente not in ("para_quem", "categoria", "empresa"):
-            raise erro(400, "requisicao_invalida", "pendente deve ser para_quem, categoria ou empresa")
-        onde.append(f"l.{pendente}_id is null")
-    for cond, valor in ((f"l.data>=?", _data(de, "de")), ("l.data<=?", _data(ate, "ate"))):
-        if valor:
-            onde.append(cond)
-            args.append(valor.isoformat())
-    for cond, valor in (("(c.apelido=? or c.externo_id=?)", conta), ("l.categoria_id=?", categoria), ("l.para_quem_id=?", para_quem), ("l.empresa_id=?", empresa)):
-        if valor is not None:
-            onde.append(cond)
-            args += [valor, valor] if cond.startswith("(c.") else [valor]
-    if texto:
-        onde.append("(l.descricao_original like ? or l.estabelecimento like ?)")
-        args += [f"%{texto}%", f"%{texto}%"]
-    filtro = (" where " + " and ".join(onde)) if onde else ""
     con = _con(request)
     try:
-        total = con.execute(f"select count(*) from lancamento l join conta c on c.id=l.conta_id{filtro}", args).fetchone()[0]
-        linhas = con.execute(f"{_SQL_LANC}{filtro} order by l.data desc, l.id desc limit ? offset ?", args + [limite, offset]).fetchall()
-        return envelope(con, {"itens": [_lanc(r) for r in linhas], "total": total, "limite": limite, "offset": offset}, agora=_agora(request))
+        try:
+            dados = consultas.listar_lancamentos(con, pendente=pendente, de=de, ate=ate, conta=conta, categoria=categoria, para_quem=para_quem,
+                                                 empresa=empresa, texto=texto, limite=limite, offset=offset)
+        except ValueError as e:
+            raise erro(400, "requisicao_invalida", str(e))
+        return envelope(con, dados, agora=_agora(request))
     finally:
         con.close()
 

@@ -7,7 +7,7 @@ import re
 
 from fastapi import APIRouter, Depends, Request
 
-from gabi.dinheiro import analise, contas_pagar as cp, repositorio
+from gabi.dinheiro import analise, consultas, contas_pagar as cp, repositorio
 from gabi.dinheiro.modelo import Orcamento
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -87,25 +87,6 @@ def semanas(request: Request, passadas: int = 8, futuras: int = 4):
 
 
 # ---------------- para onde vai ----------------
-def _janelas(periodo: str, hoje: dt.date):
-    if periodo == "mes":
-        ini = hoje.replace(day=1)
-        span = (hoje - ini).days
-        ant_ini = (ini - dt.timedelta(days=1)).replace(day=1)
-        return ini, hoje, ant_ini, ant_ini + dt.timedelta(days=span)
-    dias = {"semana": 7, "12m": 365}[periodo]
-    ini = hoje - dt.timedelta(days=dias - 1)
-    ant_fim = ini - dt.timedelta(days=1)
-    return ini, hoje, ant_fim - dt.timedelta(days=dias - 1), ant_fim
-
-
-def _custos(con, de: dt.date, ate: dt.date):
-    return con.execute(
-        f"select -l.valor_centavos as gasto, c.apelido as conta, {CATEGORIA} as cat, e.nome as empresa from lancamento l join conta c on c.id=l.conta_id "
-        "left join categoria cat on cat.id=l.categoria_id left join empresa e on e.id=l.empresa_id "
-        "where l.natureza like '%custo%' and l.data>=? and l.data<=?", (de.isoformat(), ate.isoformat())).fetchall()
-
-
 @router.get("/destino")
 def destino(request: Request, periodo: str = "mes"):
     if periodo not in ("mes", "semana", "12m"):
@@ -113,16 +94,16 @@ def destino(request: Request, periodo: str = "mes"):
     con = _con(request)
     try:
         hoje = _agora(request).date()
-        ini, fim, a_ini, a_fim = _janelas(periodo, hoje)
+        ini, fim, a_ini, a_fim = consultas.janelas(periodo, hoje)
         origem_cat, cat_destino, por_cat, total = {}, {}, {}, 0
-        for r in _custos(con, ini, fim):
+        for r in consultas.custos(con, ini, fim):
             dest = f"A receber: {r['empresa']}" if r["empresa"] else "Consumo pessoal"
             origem_cat[(r["conta"], r["cat"])] = origem_cat.get((r["conta"], r["cat"]), 0) + r["gasto"]
             cat_destino[(r["cat"], dest)] = cat_destino.get((r["cat"], dest), 0) + r["gasto"]
             por_cat[r["cat"]] = por_cat.get(r["cat"], 0) + r["gasto"]
             total += r["gasto"]
         anterior = {}
-        for r in _custos(con, a_ini, a_fim):
+        for r in consultas.custos(con, a_ini, a_fim):
             anterior[r["cat"]] = anterior.get(r["cat"], 0) + r["gasto"]
         fluxos = [{"de": a, "para": b, "valor": formatar(v)} for (a, b), v in sorted({**origem_cat, **cat_destino}.items(), key=lambda kv: (-kv[1], kv[0])) if v]
         nos, vistos = [], set()
