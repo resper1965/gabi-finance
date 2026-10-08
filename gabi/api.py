@@ -147,6 +147,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
     from gabi.rotas.dinheiro import router as rotas_dinheiro
     app.include_router(rotas_dinheiro)
+    from gabi.rotas.gastos import router as rotas_gastos
+    app.include_router(rotas_gastos)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     return app
 

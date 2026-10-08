@@ -1,0 +1,294 @@
+"""Rotas /api/v1 de análise de gastos: semanas, destino (para onde vai), cartões, parcelas, assinaturas e custo do modelo.
+
+Somas em centavos inteiros; texto só na borda (R7). Consome: dinheiro.{analise,repositorio,contas_pagar,modelo}, envelope.
+"""
+import datetime as dt
+import re
+
+from fastapi import APIRouter, Depends, Request
+
+from gabi.dinheiro import analise, contas_pagar as cp, repositorio
+from gabi.dinheiro.modelo import Orcamento
+from gabi.dinheiro.valor import formatar, para_centavos
+from gabi.envelope import envelope
+from gabi.identidade import exigir
+from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, _m, erro
+
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
+SEM_CATEGORIA = "sem categoria"
+CATEGORIA = "coalesce(cat.nome, l.categoria_banco, 'sem categoria')"
+STATUS_ASSINATURA = ("a_conferir", "manter", "cancelar", "nao_assinatura", "encerrada")
+
+
+def _lista(por_categoria: dict, sinal: int) -> list[dict]:
+    """[{categoria, valor}] dos maiores para os menores; `sinal` -1 mostra saídas como negativas."""
+    itens = sorted(((k, v) for k, v in por_categoria.items() if v), key=lambda kv: (-abs(kv[1]), kv[0]))
+    return [{"categoria": k, "valor": formatar(sinal * v)} for k, v in itens]
+
+
+def _contas_liberadas(con) -> list[int]:
+    return [r[0] for r in con.execute("select id from conta where estado='sim' and tipo='BANK' and excluido_em is null")]
+
+
+def _saldo_ate(con, ids: list[int], dia: dt.date):
+    total, algum = 0, False
+    for cid in ids:
+        s = con.execute("select saldo_centavos from saldo where conta_id=? and em<=? order by em desc limit 1", (cid, f"{dia.isoformat()}T23:59:59")).fetchone()
+        if s:
+            total, algum = total + s[0], True
+    return total if algum else None
+
+
+# ---------------- semanas ----------------
+@router.get("/caixa/semanas")
+def semanas(request: Request, passadas: int = 8, futuras: int = 4):
+    passadas, futuras = min(max(passadas, 0), 52), min(max(futuras, 0), 12)
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        seg = hoje - dt.timedelta(days=hoje.weekday())
+        ini0 = seg - dt.timedelta(days=7 * passadas)
+        total = passadas + 1 + futuras
+        ids = _contas_liberadas(con)
+        cx = cp.caixa_unico(con, hoje)
+        prev = analise.previsao(repositorio.FonteAnalise(con), (ini0 + dt.timedelta(days=7 * total - 1) - hoje).days, None, hoje)
+        delta = cx.saldo_centavos - para_centavos(prev["saldo_inicial"])
+        eventos = [(dt.date.fromisoformat(e["data"]), e["tipo"], para_centavos(e["valor"]), para_centavos(e["saldo"]) + delta) for e in prev["eventos"]]
+        saida, ultimo_saldo = [], None
+        for i in range(total):
+            ini = ini0 + dt.timedelta(days=7 * i)
+            fim = ini + dt.timedelta(days=6)
+            futura = ini > hoje
+            entradas, saidas = {}, {}
+            if not futura:
+                marcas = ",".join("?" * len(ids)) or "NULL"
+                for r in con.execute(f"select l.valor_centavos, {CATEGORIA} as cat from lancamento l left join categoria cat on cat.id=l.categoria_id "
+                                     f"where l.conta_id in ({marcas}) and l.natureza like '%caixa%' and l.data>=? and l.data<=?",
+                                     [*ids, ini.isoformat(), min(fim, hoje).isoformat()]):
+                    alvo = entradas if r[0] > 0 else saidas
+                    alvo[r["cat"]] = alvo.get(r["cat"], 0) + r[0]
+                saldo = _saldo_ate(con, ids, min(fim, hoje))
+            else:
+                saldo = None
+                for d, tipo, valor, acumulado in eventos:
+                    if ini <= d <= fim:
+                        alvo = entradas if valor > 0 else saidas
+                        alvo[tipo] = alvo.get(tipo, 0) + valor
+                    if d <= fim:
+                        saldo = acumulado
+                if saldo is None:
+                    saldo = ultimo_saldo if ultimo_saldo is not None else cx.saldo_centavos
+            ultimo_saldo = saldo if saldo is not None else ultimo_saldo
+            saida.append({"inicio": ini.isoformat(), "fim": fim.isoformat(), "entradas": _lista(entradas, 1), "saidas": _lista(saidas, 1),
+                          "saldo": _m(saldo), "projecao": futura})
+        return envelope(con, {"semanas": saida}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- para onde vai ----------------
+def _janelas(periodo: str, hoje: dt.date):
+    if periodo == "mes":
+        ini = hoje.replace(day=1)
+        span = (hoje - ini).days
+        ant_ini = (ini - dt.timedelta(days=1)).replace(day=1)
+        return ini, hoje, ant_ini, ant_ini + dt.timedelta(days=span)
+    dias = {"semana": 7, "12m": 365}[periodo]
+    ini = hoje - dt.timedelta(days=dias - 1)
+    ant_fim = ini - dt.timedelta(days=1)
+    return ini, hoje, ant_fim - dt.timedelta(days=dias - 1), ant_fim
+
+
+def _custos(con, de: dt.date, ate: dt.date):
+    return con.execute(
+        f"select -l.valor_centavos as gasto, c.apelido as conta, {CATEGORIA} as cat, e.nome as empresa from lancamento l join conta c on c.id=l.conta_id "
+        "left join categoria cat on cat.id=l.categoria_id left join empresa e on e.id=l.empresa_id "
+        "where l.natureza like '%custo%' and l.data>=? and l.data<=?", (de.isoformat(), ate.isoformat())).fetchall()
+
+
+@router.get("/destino")
+def destino(request: Request, periodo: str = "mes"):
+    if periodo not in ("mes", "semana", "12m"):
+        raise erro(400, "requisicao_invalida", "periodo deve ser mes, semana ou 12m")
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        ini, fim, a_ini, a_fim = _janelas(periodo, hoje)
+        origem_cat, cat_destino, por_cat, total = {}, {}, {}, 0
+        for r in _custos(con, ini, fim):
+            dest = f"A receber: {r['empresa']}" if r["empresa"] else "Consumo pessoal"
+            origem_cat[(r["conta"], r["cat"])] = origem_cat.get((r["conta"], r["cat"]), 0) + r["gasto"]
+            cat_destino[(r["cat"], dest)] = cat_destino.get((r["cat"], dest), 0) + r["gasto"]
+            por_cat[r["cat"]] = por_cat.get(r["cat"], 0) + r["gasto"]
+            total += r["gasto"]
+        anterior = {}
+        for r in _custos(con, a_ini, a_fim):
+            anterior[r["cat"]] = anterior.get(r["cat"], 0) + r["gasto"]
+        fluxos = [{"de": a, "para": b, "valor": formatar(v)} for (a, b), v in sorted({**origem_cat, **cat_destino}.items(), key=lambda kv: (-kv[1], kv[0])) if v]
+        nos, vistos = [], set()
+        for (conta, cat) in origem_cat:
+            for nome, tipo in ((conta, "origem"), (cat, "categoria")):
+                if (nome, tipo) not in vistos:
+                    vistos.add((nome, tipo))
+                    nos.append({"nome": nome, "tipo": tipo})
+        for (_, dest) in cat_destino:
+            if (dest, "destino") not in vistos:
+                vistos.add((dest, "destino"))
+                nos.append({"nome": dest, "tipo": "destino"})
+        cats = sorted(set(por_cat) | set(anterior), key=lambda c: (-abs(por_cat.get(c, 0) - anterior.get(c, 0)), c))
+        comparacao = [{"categoria": c, "atual": formatar(por_cat.get(c, 0)), "anterior": formatar(anterior.get(c, 0)),
+                       "variacao": formatar(por_cat.get(c, 0) - anterior.get(c, 0))} for c in cats]
+        return envelope(con, {"periodo": {"de": ini.isoformat(), "ate": fim.isoformat(), "anterior_de": a_ini.isoformat(), "anterior_ate": a_fim.isoformat()},
+                              "nos": nos, "fluxos": fluxos, "total": formatar(total), "comparacao": comparacao}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- cartões ----------------
+def _meses(hoje: dt.date, n: int) -> list[str]:
+    saida, a, m = [], hoje.year, hoje.month
+    for _ in range(n):
+        saida.append(f"{a}-{m:02d}")
+        m -= 1
+        if m == 0:
+            a, m = a - 1, 12
+    return saida[::-1]
+
+
+@router.get("/cartoes")
+def cartoes(request: Request):
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        itens = []
+        for c in con.execute("select * from conta where tipo='CREDIT' and estado='sim' and excluido_em is null order by id"):
+            f = con.execute("select * from fatura where conta_id=? and upper(coalesce(pagamento_status,''))<>'PAID' order by vencimento desc limit 1", (c["id"],)).fetchone()
+            fatura = None
+            if f:
+                pct = round(f["total_centavos"] / c["limite_centavos"] * 100, 1) if c["limite_centavos"] and f["total_centavos"] is not None else None
+                fatura = {"id": f["id"], "vencimento": f["vencimento"], "total": _m(f["total_centavos"]), "status": f["pagamento_status"], "percentual_limite": pct}
+            meses = {r[0]: r[1] for r in con.execute("select substr(data,1,7), sum(-valor_centavos) from lancamento where conta_id=? and natureza like '%custo%' group by 1", (c["id"],))}
+            cats = {}
+            if f:
+                for r in con.execute(f"select {CATEGORIA} as cat, sum(-l.valor_centavos) from lancamento l left join categoria cat on cat.id=l.categoria_id "
+                                     "where l.conta_id=? and l.fatura_id=? group by 1", (c["id"], f["id"])):
+                    cats[r[0]] = r[1]
+            itens.append({"id": c["id"], "apelido": c["apelido"] or c["externo_id"], "limite": _m(c["limite_centavos"]), "fatura_aberta": fatura,
+                          "serie_12m": [{"mes": m, "total": formatar(meses.get(m, 0))} for m in _meses(hoje, 12)],
+                          "por_categoria": _lista(cats, 1)})
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- parcelas ----------------
+def _soma_meses(mes: str, n: int) -> str:
+    a, m = int(mes[:4]), int(mes[5:7])
+    t = a * 12 + (m - 1) + n
+    return f"{t // 12}-{t % 12 + 1:02d}"
+
+
+@router.get("/parcelas")
+def parcelas(request: Request):
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        atual = hoje.strftime("%Y-%m")
+        ultimas = {}
+        for r in con.execute("select l.*, c.apelido from lancamento l join conta c on c.id=l.conta_id where c.tipo='CREDIT' and l.parcelas>1 order by l.data, l.id"):
+            k = (r["conta_id"], r["descricao_original"], r["parcelas"], r["valor_centavos"])
+            if k not in ultimas or r["parcela"] >= ultimas[k]["parcela"]:
+                ultimas[k] = r
+        itens, por_mes = [], {}
+        for r in ultimas.values():
+            restante, base, valor = r["parcelas"] - r["parcela"], r["data"][:7], -r["valor_centavos"]
+            fim = _soma_meses(base, restante)
+            itens.append({"descricao": r["descricao_original"], "conta": r["apelido"], "parcela": r["parcela"], "parcelas": r["parcelas"], "restante": restante,
+                          "valor_parcela": formatar(valor), "termina_em": fim, "termina_neste_mes": fim == atual})
+            for k in range(1, restante + 1):
+                m = _soma_meses(base, k)
+                if m > atual:
+                    por_mes[m] = por_mes.get(m, 0) + valor
+        itens.sort(key=lambda i: (i["termina_em"], i["descricao"]))
+        return envelope(con, {"itens": itens, "por_mes": [{"mes": m, "total": formatar(v)} for m, v in sorted(por_mes.items())]}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- assinaturas ----------------
+def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
+    con.execute("insert or ignore into assinatura(estabelecimento) values (?)", (chave,))
+    a = con.execute("select * from assinatura where estabelecimento=?", (chave,)).fetchone()
+    cobrada = False
+    if a["status"] == "cancelar" and a["status_em"]:
+        cobrada = con.execute("select 1 from lancamento where natureza like '%custo%' and data>? and (estabelecimento=? or descricao_original like ?) limit 1",
+                              (a["status_em"][:10], chave, f"{chave}%")).fetchone() is not None
+    reaj = None
+    if r["mediana_anterior"] and r["ultimo"] > r["mediana_anterior"] * 1.10:
+        reaj = {"antes": formatar(para_centavos(r["mediana_anterior"])), "agora": formatar(para_centavos(r["ultimo"]))}
+    return {"id": a["id"], "nome": nome, "mensal": formatar(para_centavos(r["valor_medio"])), "anual": formatar(para_centavos(round(r["valor_medio"] * 12, 2))),
+            "meses_vistos": r["meses"], "status": a["status"], "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
+            "sinais": {"nova": r["meses"] == 3, "reajustou": reaj, "cobrada_depois_de_cancelar": cobrada}}
+
+
+@router.get("/assinaturas")
+def assinaturas(request: Request):
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        recs = [r for r in analise.recorrentes(repositorio.FonteAnalise(con), "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
+        con.execute("begin")
+        try:
+            itens = [_assinatura(con, r["chave"], r["descricao"], r, hoje) for r in recs]
+            con.execute("commit")
+        except BaseException:
+            con.execute("rollback")
+            raise
+        total = sum(para_centavos(r["valor_medio"]) for r in recs)
+        return envelope(con, {"itens": itens, "total_mensal": formatar(total),
+                              "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens)}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.patch("/assinaturas/{aid}")
+async def assinatura_patch(aid: int, request: Request):
+    corpo = _corpo(await _json(request))
+    if not corpo or set(corpo) - {"status", "lembrar_ate_cancelar"}:
+        raise erro(400, "requisicao_invalida", "informe status e/ou lembrar_ate_cancelar")
+    if "status" in corpo and corpo["status"] not in STATUS_ASSINATURA:
+        raise erro(400, "requisicao_invalida", f"status deve ser um de {list(STATUS_ASSINATURA)}")
+    if "lembrar_ate_cancelar" in corpo and not isinstance(corpo["lembrar_ate_cancelar"], bool):
+        raise erro(400, "requisicao_invalida", "lembrar_ate_cancelar deve ser true ou false")
+    con = _con(request)
+    try:
+        a = con.execute("select * from assinatura where id=?", (aid,)).fetchone()
+        if a is None:
+            raise erro(404, "nao_encontrado", f"assinatura {aid} não existe")
+        status = corpo.get("status", a["status"])
+        status_em = _agora(request).date().isoformat() if status == "cancelar" and a["status"] != "cancelar" else (a["status_em"] if status == "cancelar" else None)
+        con.execute("update assinatura set status=?, status_em=?, lembrar_ate_cancelar=? where id=?",
+                    (status, status_em, int(corpo.get("lembrar_ate_cancelar", bool(a["lembrar_ate_cancelar"]))), aid))
+        return envelope(con, {"id": aid, "nome": a["estabelecimento"], "status": status, "lembrar_ate_cancelar": bool(corpo.get("lembrar_ate_cancelar", a["lembrar_ate_cancelar"]))},
+                        agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- custo do modelo ----------------
+TETO_DIA_USD, TETO_MES_USD = 0.7, 17.5  # ≈ R$ 4/dia e R$ 100/mês (spec); ajustáveis em `parametro`
+
+
+@router.get("/custo")
+def custo(request: Request):
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        dia = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,10)=?", (hoje.isoformat(),)).fetchone()[0]
+        mes = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,7)=?", (hoje.strftime("%Y-%m"),)).fetchone()[0]
+        teto = {r["chave"]: float(__import__("json").loads(r["valor"])) for r in con.execute("select chave, valor from parametro where chave in ('teto_modelo_dia_usd','teto_modelo_mes_usd')")}
+        td, tm = teto.get("teto_modelo_dia_usd", TETO_DIA_USD), teto.get("teto_modelo_mes_usd", TETO_MES_USD)
+        orc = Orcamento(td, tm, gasto_dia_usd=dia, gasto_mes_usd=mes)
+        return envelope(con, {"dia_usd": round(dia, 4), "mes_usd": round(mes, 4), "teto_dia_usd": td, "teto_mes_usd": tm, "alerta": orc.alerta()}, agora=_agora(request))
+    finally:
+        con.close()
