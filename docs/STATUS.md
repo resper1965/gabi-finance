@@ -27,3 +27,4 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - Próximo: G3 `sudo tailscale serve --bg --https=443 unix:/run/gabi-brain/api.sock`, cadastrar login do Ricardo como boss, ver painel real; depois G14, G4, G5.
 - 09/10 01:05 G3 feito (https://gabi.tail985643.ts.net, login resper@bekaa.eu = boss). G4 feito (MCPAI_KEY em /etc/gabi/brain.env). Captura de saldos de teste OK: 9 contas (Santander e Itaú; **C6 PJ não apareceu**), todas a_decidir; demora ~3,5 min.
 - Próximo: G5 (escolher contas no painel > Cadastros), investigar ausência do C6 PJ, ligar timers (`sudo systemctl enable --now gabi-brain-saldos.timer gabi-brain-extratos.timer`), G14.
+- 09/10 01:10 timers de captura LIGADOS (saldos horário, extratos 07h/15h BRT). Unit saldos: TimeoutStartSec 300→900 no repo; aplicar com `sudo bash deploy/instalar.sh --confirmo-backup-exportado`.
