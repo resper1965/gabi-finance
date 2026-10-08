@@ -227,15 +227,17 @@ def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -
         existia = con.execute("select 1 from lancamento where externo_id=?", (t["id"],)).fetchone() is not None
         con.execute(
             "insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, forma, fatura_id, "
-            "parcela, parcelas, data_compra, status, natureza, operacao, bruto_ref) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "parcela, parcelas, data_compra, status, natureza, operacao, bruto_ref, categoria_banco) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "on conflict(externo_id) do update set conta_id=excluded.conta_id, data=excluded.data, valor_centavos=excluded.valor_centavos, "
             "descricao_original=excluded.descricao_original, estabelecimento=excluded.estabelecimento, forma=excluded.forma, "
             "fatura_id=excluded.fatura_id, parcela=excluded.parcela, parcelas=excluded.parcelas, data_compra=excluded.data_compra, "
-            "status=excluded.status, natureza=excluded.natureza, operacao=excluded.operacao",  # bruto_ref: onde foi visto pela 1ª vez
+            "status=excluded.status, natureza=excluded.natureza, operacao=excluded.operacao, "
+            "categoria_banco=excluded.categoria_banco",  # bruto_ref: onde foi visto pela 1ª vez
             (conta_id, t["id"], data, para_centavos(round(v, 2)), t.get("description"), caixa.norm(t.get("description")) or None,
              (t.get("paymentData") or {}).get("paymentMethod"), cc.get("billId"), cc.get("installmentNumber"),
              cc.get("totalInstallments"), (cc.get("purchaseDate") or "")[:10] or None,
-             "pending" if str(t.get("status") or "").upper() == "PENDING" else "posted", nat, t.get("operationType"), bruto_ref))
+             "pending" if str(t.get("status") or "").upper() == "PENDING" else "posted", nat, t.get("operationType"), bruto_ref,
+             t.get("category")))
         lidos += 1
         novos += 0 if existia else 1
     for f in faturas:

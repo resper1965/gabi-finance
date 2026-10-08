@@ -260,3 +260,10 @@ def test_sincronizar_reporta_erro_de_login_e_timeout():
 
 def test_hora_de_sincronizar():
     assert hora_de_sincronizar("7,11,15,19", 15) and not hora_de_sincronizar("7,11,15,19", 8) and not hora_de_sincronizar("", 7)
+
+
+def test_guarda_a_categoria_do_banco_para_a_equivalencia(con, tmp_path):
+    txs = {"acc-bank-1111": [tx("t1", "2026-10-07", "PADARIA", 35.5, category="Groceries"), tx("t2", "2026-10-07", "X", 1.0)]}
+    _rodar(con, FakeFin([BANCO], txs), tmp_path)
+    L = _lancs(con)
+    assert L["t1"]["categoria_banco"] == "Groceries" and L["t2"]["categoria_banco"] is None
