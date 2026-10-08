@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gabi.brain · Segurança</title>
+  <link rel="stylesheet" href="/static/industry.css">
+  <style>
+    /* Só layout da página; cores, tipografia e componentes vêm do sistema Industry (industry.css). */
+    main { max-width: 960px; margin: 0 auto; padding: var(--space-6) var(--space-4); }
+    section { margin-bottom: var(--space-8); }
+    .grade { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  </style>
+</head>
+<body>
+  <nav class="nav"><span class="nav-brand">gabi.brain</span><a href="/" aria-current="page">Segurança</a></nav>
+  <main>
+    <h6 class="text-muted">Quem acessa e o que está ativo?</h6>
+    <h1>Segurança</h1>
+    <p class="text-muted" id="estado">Carregando…</p>
+
+    <section class="grade">
+      <div class="blueprint card"><span class="card-kicker">Tokens de agentes ativos</span><span class="card-title" id="tokens">–</span></div>
+      <div class="blueprint card"><span class="card-kicker">Chamadas nas últimas 24 h</span><span class="card-title" id="chamadas">–</span></div>
+      <div class="blueprint card"><span class="card-kicker">Último backup</span><span class="card-title" id="backup">–</span></div>
+    </section>
+
+    <section>
+      <h3>Acessos</h3>
+      <table class="table">
+        <thead><tr><th>Login</th><th>Pessoa</th><th>Nível</th></tr></thead>
+        <tbody id="acessos"></tbody>
+      </table>
+    </section>
+  </main>
+  <script>
+    const el = (id) => document.getElementById(id);
+    const txt = (t) => document.createTextNode(String(t ?? "–"));
+    fetch("/api/seguranca").then((r) => r.ok ? r.json() : Promise.reject(r.status)).then((d) => {
+      el("estado").textContent = "";
+      el("tokens").replaceChildren(txt(d.tokens_ativos));
+      el("chamadas").replaceChildren(txt(d.chamadas_24h));
+      el("backup").replaceChildren(txt(d.ultimo_backup ? d.ultimo_backup.fim : "nenhum ainda"));
+      el("acessos").replaceChildren(...d.acessos.map((a) => {
+        const tr = document.createElement("tr");
+        [a.login, a.pessoa_id, a.nivel].forEach((v, i) => {
+          const td = document.createElement("td");
+          if (i === 2) { const s = document.createElement("span"); s.className = "tag tag-accent"; s.textContent = v; td.append(s); }
+          else td.append(txt(v));
+          tr.append(td);
+        });
+        return tr;
+      }));
+    }).catch((e) => { el("estado").textContent = "Não foi possível carregar (" + e + "). Os últimos dados bons continuam guardados."; });
+  </script>
+</body>
+</html>
