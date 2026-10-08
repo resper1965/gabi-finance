@@ -88,7 +88,7 @@ def importar_staging(con: sqlite3.Connection, staging: Path) -> dict[str, int]:
                 item=a.get("item"), emissor=a.get("emissor"), vencimento=a.get("vencimento"),
                 valor_centavos=_centavos(a.get("valor")), evento=a.get("evento"), detalhe=a.get("detalhe")))
         for c in fin["conciliacao"]:
-            _upsert(con, "conciliacao", ["tx_id", "compromisso_id"], dict(
+            _upsert(con, "conciliacao", ["tx_id"], dict(
                 tx_id=c["tx_id"], compromisso_id=c["compromisso_id"], metodo=c.get("metodo"),
                 diferenca_centavos=_centavos(c.get("diferenca")), criado_em=c.get("criado_em")))
         for f in fin["faturas"]:

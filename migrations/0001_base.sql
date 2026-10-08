@@ -20,7 +20,7 @@ create table fatura(
   id text primary key, account_id text, vencimento text, total_centavos integer, minimo_centavos integer);
 create table conciliacao(
   tx_id text not null, compromisso_id text not null, metodo text, diferenca_centavos integer, criado_em text,
-  primary key (tx_id, compromisso_id));
+  primary key (tx_id));  -- um lançamento paga um compromisso só (como no gabi-fin)
 create table conta_estado(
   account_id text primary key, banco text, nome text, tipo text, pj integer, ult_tx_real text,
   ult_sync_ok text, status_conexao text, saldo_centavos integer, atualizado_em text);
