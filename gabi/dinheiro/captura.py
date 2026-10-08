@@ -27,6 +27,7 @@ class ResumoCaptura:
     novos: int
     falhas: list[str] = field(default_factory=list)
     sync_problemas: dict = field(default_factory=dict)
+    rodada_id: int = 0
 
 
 def lista(d):
@@ -291,4 +292,15 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
         rodada.lidos, rodada.novos = lidos, novos
         if falhas:
             rodada.aviso = "falhas: " + ", ".join(sorted(falhas))
-    return ResumoCaptura(len(contas), lidos, novos, sorted(falhas), problemas)
+        rid = rodada.id
+    return ResumoCaptura(len(contas), lidos, novos, sorted(falhas), problemas, rid)
+
+
+def capturar_saldos(con, cliente, agora: dt.datetime, bancos_pj=frozenset()) -> int:
+    """Só contas e saldos (de hora em hora); não lê extrato. Fonte própria ('open-finance-saldos'): não entra no dados_ate."""
+    with registrar_rodada(con, "open-finance-saldos") as rodada:
+        contas = lista(cliente("openfinance_list_accounts", {}))
+        ids = _gravar_contas(con, contas, agora.replace(tzinfo=None).isoformat(timespec="seconds"), bancos_pj)
+        registrar_estado(con, contas, ids, None, bancos_pj, agora.date(), agora)
+        rodada.lidos = len(contas)
+    return len(contas)

@@ -1,7 +1,7 @@
 """Envelope de toda resposta de leitura: `dados_ate` vem da última rodada CONFERIDA, não da última tentativa (R4/Review 4)."""
 import datetime as dt
 
-IGNORADAS = ("backup", "importacao-staging")  # não são fontes de dado
+IGNORADAS = ("backup", "importacao-staging", "open-finance-saldos")  # não são fontes que se "confere" (saldos têm rodada própria)
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 
 
@@ -17,7 +17,7 @@ def _z(d: dt.datetime) -> str:
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     agora = agora or dt.datetime.now(dt.timezone.utc)
     fontes, ultimas, falta = [], [], False
-    nomes = [r[0] for r in con.execute("select distinct fonte from rodada where fonte not in (?, ?) order by fonte", IGNORADAS)]
+    nomes = [r[0] for r in con.execute(f"select distinct fonte from rodada where fonte not in ({','.join('?' * len(IGNORADAS))}) order by fonte", IGNORADAS)]
     for nome in nomes:
         conf = con.execute("select max(fim) from rodada where fonte=? and conferida=1", (nome,)).fetchone()[0]
         ultima = _utc(conf) if conf else None
