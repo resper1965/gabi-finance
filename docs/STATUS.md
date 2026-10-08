@@ -9,7 +9,7 @@ Atualizado: 09/10/2026. Se a máquina caiu, leia só este arquivo e `.superpower
 
 ## Esperando o Ricardo (nesta ordem)
 1. **G2** aprovar `gabi-brain-migracao/staging/RELATORIO.md`.
-2. **G1** `sudo bash gabi-brain-migracao/tools/exportar.sh` → scp para a máquina local → conferir hash → snapshot Contabo. Backup na VPS: `/var/backups/gabi-brain-migracao/2026-10-08/`.
+2. ~~**G1**~~ **FEITO 09/10/2026** (pacote gpg gerado, baixado e hash conferido, snapshot Contabo). Referência: `sudo bash gabi-brain-migracao/tools/exportar.sh` → scp para a máquina local → conferir hash → snapshot Contabo. Backup na VPS: `/var/backups/gabi-brain-migracao/2026-10-08/`.
 3. **G14** aprovar capturas `docs/design/*-{prototipo,app}-*.png`, tela a tela.
 4. **G3** login Tailscale (`boss`) + `tailscale serve`; ordem "congelar" dos timers do gabi-fin.
 5. **G4** `MCPAI_KEY` em `/etc/gabi/brain.env` → ligar timers de captura. **G5** escolher contas do caixa único.
