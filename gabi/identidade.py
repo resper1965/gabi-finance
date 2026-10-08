@@ -1,4 +1,4 @@
-"""Identidade pelo cabeçalho do `tailscale serve` (Tailscale-User-Login). R3: só vale vindo de localhost."""
+"""Identidade pelo cabeçalho do `tailscale serve` (Tailscale-User-Login). R3: só vale vindo do socket Unix do serviço."""
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,11 +34,19 @@ def resolver(con: sqlite3.Connection, login: str | None) -> Identidade | None:
     return Identidade(r["login"], r["pessoa_id"], r["nivel"]) if r else None
 
 
+def origem_confiavel(request: Request) -> bool:
+    """Produção: só conexão por socket Unix (pasta 0700; quem chega ali é o tailscaled). TCP local só em dev/teste."""
+    client, server = request.scope.get("client"), request.scope.get("server")
+    if client is None and server is not None and server[1] is None:
+        return True  # socket Unix: o ASGI não informa porta
+    permite_tcp = getattr(request.app.state, "permite_tcp_local", False)
+    return bool(permite_tcp and client is not None and client[0] in HOSTS_LOCAIS)
+
+
 def exigir(nivel_minimo: str = "terceiros"):
-    """Dependência FastAPI: 403 fora de localhost, 401 sem cabeçalho, 403 login desconhecido ou nível baixo."""
+    """Dependência FastAPI: 403 se a origem não é confiável, 401 sem cabeçalho, 403 login desconhecido ou nível baixo."""
     def dependencia(request: Request) -> Identidade:
-        host = request.client.host if request.client else None
-        if host not in HOSTS_LOCAIS:
+        if not origem_confiavel(request):
             raise HTTPException(403, detail={"erro": "nao_permitido", "mensagem": "Acesso só pelo Tailscale."})
         login = request.headers.get("Tailscale-User-Login")
         if not login or not login.strip():

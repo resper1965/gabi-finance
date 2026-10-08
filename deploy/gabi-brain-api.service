@@ -1,5 +1,5 @@
 [Unit]
-Description=gabi.brain API (escuta só em 127.0.0.1; exposta pelo tailscale serve)
+Description=gabi.brain API (socket Unix; exposta só pelo tailscale serve)
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
@@ -10,13 +10,24 @@ User=gabibrain
 Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
-ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.api:fabrica --host 127.0.0.1 --port 8080
+# Socket em pasta 0700 do serviço: nenhum outro processo da VPS alcança a API (e não pode forjar a identidade).
+# --no-proxy-headers: nunca confiar em X-Forwarded-For (o tailscale serve o envia e o uvicorn trocaria a origem).
+ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.api:fabrica --uds /run/gabi-brain/api.sock --no-proxy-headers
+RuntimeDirectory=gabi-brain
+RuntimeDirectoryMode=0700
+UMask=0077
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
 CapabilityBoundingSet=
 ReadWritePaths=/var/lib/gabi-brain
 MemoryMax=1G

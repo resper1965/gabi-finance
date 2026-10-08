@@ -27,7 +27,7 @@ def banco(tmp_path):
 
 @pytest.fixture
 def cli(banco):
-    return TestClient(criar_app(banco), client=("127.0.0.1", 50000))
+    return TestClient(criar_app(banco, permite_tcp_local=True), client=("127.0.0.1", 50000))
 
 
 def test_eu_devolve_identidade(cli):
@@ -120,3 +120,46 @@ def test_industry_css_identico_ao_do_prototipo():
     copia = (Path(__file__).parent.parent / "gabi" / "static" / "industry.css").read_text(encoding="utf-8")
     sem_import = "\n".join(l for l in orig.splitlines() if not l.lstrip().startswith("@import url("))
     assert copia.strip() == sem_import.strip()
+
+
+# ---- correções da revisão da Fase 0 ----
+def test_post_com_content_type_diferente_de_json_415(cli):
+    r = cli.post("/api/revogar-tudo", headers={**BOSS, "Content-Type": "text/plain"}, content='{"confirmo": true}')
+    assert r.status_code == 415 and r.json()["erro"] == "tipo_invalido"
+
+
+@pytest.mark.parametrize("cabecalhos", [
+    {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"}, {"Origin": "https://evil.example"},
+])
+def test_post_cross_site_recusado_e_nada_muda(cli, banco, cabecalhos):
+    con = conectar(banco)
+    con.execute("insert into token_agente(nome, escopo, hash, criado_em) values ('h','fin','h1','2026-10-08')")
+    r = cli.post("/api/revogar-tudo", headers={**BOSS, **cabecalhos}, json={"confirmo": True})
+    assert r.status_code == 403 and r.json()["erro"] == "nao_permitido"
+    assert con.execute("select count(*) from token_agente where revogado_em is null").fetchone()[0] == 1
+
+
+def test_post_same_origin_e_cliente_sem_origin_passam(cli):
+    ok1 = cli.post("/api/revogar-tudo", headers={**BOSS, "Sec-Fetch-Site": "same-origin", "Origin": "http://testserver"}, json={"confirmo": True})
+    ok2 = cli.post("/api/revogar-tudo", headers=BOSS, json={"confirmo": True})
+    assert ok1.status_code == 200 and ok2.status_code == 200
+
+
+def test_erro_500_e_registrado_no_log(banco):
+    app = criar_app(banco, permite_tcp_local=True)
+
+    @app.get("/api/boom")
+    def boom():
+        raise RuntimeError("falha interna")
+
+    c = TestClient(app, client=("127.0.0.1", 50000), raise_server_exceptions=False)
+    assert c.get("/api/boom", headers=BOSS).status_code == 500
+    r = conectar(banco).execute("select metodo, caminho, status from chamada").fetchone()
+    assert tuple(r) == ("GET", "/api/boom", 500)
+
+
+def test_falha_no_log_nao_troca_a_resposta(banco, monkeypatch):
+    import gabi.api as api
+    monkeypatch.setattr(api, "_gravar_chamada", lambda *a, **k: (_ for _ in ()).throw(OSError("log indisponível")))
+    c = TestClient(criar_app(banco, permite_tcp_local=True), client=("127.0.0.1", 50000))
+    assert c.get("/api/eu", headers=BOSS).status_code == 200

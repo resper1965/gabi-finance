@@ -15,11 +15,11 @@ fontes (mcp.ai · Nibo · Paperless · e-mail)   [Fases 1-3]
               ▼                      ▼
    painel (estático, servido pela API)   Hermes (Telegram, WhatsApp)
               ▲
-   tailscale serve (TLS + Tailscale-User-Login)  ◄── única entrada
+   tailscale serve unix:… (TLS + Tailscale-User-Login)  ◄── única entrada
 ```
 
 **Fronteira de confiança**
-- Só o Tailscale entra. O app escuta em `127.0.0.1:8080`; o cabeçalho de identidade só vale vindo de localhost; o login precisa estar em `acesso`.
+- Só o Tailscale entra. O app escuta num **socket Unix** (`/run/gabi-brain/api.sock`, pasta 0700), sem porta TCP; o cabeçalho de identidade só vale por esse socket; o login precisa estar em `acesso`. POST exige JSON e same-origin (anti-CSRF).
 - Níveis: `terceiros` < `familia_vip` < `boss`. A `matriz_acesso` define o que cada nível vê.
 - Conteúdo de terceiros (e-mail, WhatsApp, PDF) é dado, nunca instrução.
 - A Gabi sugere; o Ricardo decide. Nada paga, envia ou apaga automaticamente.

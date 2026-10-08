@@ -5,7 +5,8 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 - Status: `systemctl is-active gabi-brain-api` → `active`.
 - Reiniciar: `sudo systemctl restart gabi-brain-api`. Parar: `sudo systemctl stop gabi-brain-api`.
 - Logs: `journalctl -u gabi-brain-api -n 50 --no-pager`.
-- Porta: `ss -ltn | grep 8080` → só `127.0.0.1:8080`. Se aparecer `0.0.0.0:8080`, **pare o serviço** e investigue.
+- Socket: `ls -ld /run/gabi-brain` → `drwx------ gabibrain`; `ss -ltn | grep 8080` → **vazio** (não há porta TCP). Se aparecer qualquer `:8080`, **pare o serviço** e investigue.
+- Chamar a API à mão (como root ou `gabibrain`): `curl --unix-socket /run/gabi-brain/api.sock http://localhost/api/eu -H 'Tailscale-User-Login: <login>'`.
 
 ## Acesso (quem entra)
 - Listar: `$PY -m gabi.acesso --banco $BANCO listar`.
@@ -13,7 +14,7 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 - Remover acesso: apagar a linha de `acesso` (sqlite3) e conferir `listar`. Sem login em `acesso`, a pessoa recebe 403.
 
 ## Revogar tudo (tokens de agentes)
-- `curl -X POST http://127.0.0.1:8080/api/revogar-tudo -H 'Tailscale-User-Login: <seu-login>' -H 'Content-Type: application/json' -d '{"confirmo": true}'` → `{"revogados": N}`. Sem `confirmo: true` → 400 e nada muda.
+- `curl --unix-socket /run/gabi-brain/api.sock -X POST http://localhost/api/revogar-tudo -H 'Tailscale-User-Login: <seu-login>' -H 'Content-Type: application/json' -d '{"confirmo": true}'` → `{"revogados": N}`. Sem `confirmo: true` → 400 e nada muda.
 
 ## Carregar o staging
 - `$PY -m gabi.importar --banco $BANCO --staging /home/ricardo/gabi-brain-migracao/staging` → imprime contagens. Pode rodar de novo: não duplica. Registra uma rodada `importacao-staging`.

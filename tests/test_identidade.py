@@ -26,6 +26,7 @@ def banco(tmp_path):
 def _cliente(banco, host="127.0.0.1"):
     app = FastAPI()
     app.state.banco = banco
+    app.state.permite_tcp_local = True  # os testes usam TCP simulado; em produção só socket Unix
 
     @app.get("/qualquer")
     def qualquer(i: Identidade = Depends(exigir("terceiros"))):
@@ -98,3 +99,44 @@ def test_adicionar_nivel_invalido_levanta(banco):
     con = conectar(banco)
     with pytest.raises(ValueError):
         adicionar(con, "a@x.com", "p1", "root", por="cli")
+
+
+def _req(banco, scope_extra, permite_tcp=False, login=LOGIN):
+    from starlette.requests import Request
+    app = FastAPI()
+    app.state.banco = banco
+    app.state.permite_tcp_local = permite_tcp
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": [(b"tailscale-user-login", login.encode())],
+             "app": app, "query_string": b"", **scope_extra}
+    return Request(scope)
+
+
+def test_socket_unix_e_confiavel_mesmo_sem_tcp_local(banco):
+    r = _req(banco, {"client": None, "server": ("/run/gabi-brain/api.sock", None)})
+    assert exigir("boss")(r).login == "resper@ionic.health"
+
+
+def test_tcp_local_recusado_quando_producao(banco):
+    from fastapi import HTTPException
+    r = _req(banco, {"client": ("127.0.0.1", 5000), "server": ("127.0.0.1", 8080)}, permite_tcp=False)
+    with pytest.raises(HTTPException) as e:
+        exigir("terceiros")(r)
+    assert e.value.status_code == 403
+
+
+def test_tcp_local_aceito_so_quando_permitido(banco):
+    r = _req(banco, {"client": ("127.0.0.1", 5000), "server": ("127.0.0.1", 8080)}, permite_tcp=True)
+    assert exigir("terceiros")(r).nivel == "boss"
+
+
+def test_cliente_ausente_em_tcp_nao_e_confiavel(banco):
+    from fastapi import HTTPException
+    r = _req(banco, {"client": None, "server": ("10.0.0.1", 8080)}, permite_tcp=True)
+    with pytest.raises(HTTPException):
+        exigir("terceiros")(r)
+
+
+def test_criar_app_padrao_e_producao_recusa_tcp(banco):
+    from gabi.api import criar_app
+    c = TestClient(criar_app(banco), client=("127.0.0.1", 50000))
+    assert c.get("/api/eu", headers={"Tailscale-User-Login": LOGIN}).status_code == 403
