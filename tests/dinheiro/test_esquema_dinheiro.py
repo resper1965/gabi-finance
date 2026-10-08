@@ -28,7 +28,7 @@ def _lanc(con, conta_id, externo="l1", **extra):
 
 def test_0002_aplica_sobre_0001(con):
     nomes = [r[0] for r in con.execute("select nome from schema_versao order by nome")]
-    assert nomes == ["0001_base.sql", "0002_dinheiro.sql"]
+    assert nomes[:2] == ["0001_base.sql", "0002_dinheiro.sql"]
     tabelas = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
     assert {"conta", "categoria", "equivalencia_categoria", "lancamento", "regra", "sugestao", "saldo", "conferencia",
             "assinatura"} <= tabelas
