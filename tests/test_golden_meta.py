@@ -12,6 +12,7 @@ FUNCOES = {
     "compromissos": {"vencimento_do_mes", "vencimento_util"},
     "extrator": {"pix_valido", "pix_valor", "achar_codigo", "achar_cnpj", "tipo_documento", "ler_comprovante_pix"},
     "emissores": {"chave_extrato", "generica", "chave_forte", "chave"},
+    "cenarios": {"_w_cenario"},
 }
 
 
