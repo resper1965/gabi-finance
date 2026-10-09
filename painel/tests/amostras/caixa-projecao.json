@@ -1,0 +1,202 @@
+{
+ "dados": {
+  "aviso": "Entradas só de notas ainda não vencidas e contratos recorrentes; o Nibo é defasado, então nota vencida e não baixada fica na fila de conferência e não entra.",
+  "dias": [
+   {
+    "dia": "2026-10-08",
+    "entradas": "0.00",
+    "saidas": "3629.90",
+    "saldo": "8715.70"
+   },
+   {
+    "dia": "2026-10-09",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "8715.70"
+   },
+   {
+    "dia": "2026-10-10",
+    "entradas": "0.00",
+    "saidas": "2100.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-11",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-12",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-13",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-14",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-15",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-16",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-17",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-18",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-19",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6615.70"
+   },
+   {
+    "dia": "2026-10-20",
+    "entradas": "0.00",
+    "saidas": "475.90",
+    "saldo": "6139.80"
+   },
+   {
+    "dia": "2026-10-21",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6139.80"
+   },
+   {
+    "dia": "2026-10-22",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6139.80"
+   },
+   {
+    "dia": "2026-10-23",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6139.80"
+   },
+   {
+    "dia": "2026-10-24",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "6139.80"
+   },
+   {
+    "dia": "2026-10-25",
+    "entradas": "0.00",
+    "saidas": "450.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-26",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-27",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-28",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-29",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-30",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-10-31",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-01",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-02",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-03",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-04",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-05",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   },
+   {
+    "dia": "2026-11-06",
+    "entradas": "0.00",
+    "saidas": "0.00",
+    "saldo": "5689.80"
+   }
+  ],
+  "menor_saldo": {
+   "dia": "2026-10-25",
+   "saldo": "5689.80"
+  },
+  "saldo_inicial": "12345.60"
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

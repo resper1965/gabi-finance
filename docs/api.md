@@ -42,6 +42,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/cobrar/comprovantes` | Vínculos propostos (comprovante × lançamento, com confiança e motivo) e as despesas de empresa ainda sem comprovante (padrão: últimos 90 dias). |
 | POST | `/api/v1/cobrar/lote/montar` | Monta (ou remonta) o lote do dia para o Nibo da Bekaa e devolve o texto de confirmação gerado pelo servidor. |
 | POST | `/api/v1/cobrar/lote/{lote_id}/executar` | ÚNICA gravação externa: grava o lote no Nibo. Exige {"confirmacao": <texto exato>}; divergência = 409 e nada é gravado. |
+| GET | `/api/v1/cobrar/notas` | NFS-e autorizadas (Nibo): a vencer, vencidas a confirmar pelo extrato, antigas e as que o Nibo diz pagas (não é prova de recebimento). |
 | GET | `/api/v1/cobrar/pedidos` | Pedidos pendentes (inclui os com informação pedida) ou `decididos`. |
 | POST | `/api/v1/cobrar/pedidos/{pid}/decidir` | aprovar (exige conta_id e beneficiario_id), recusar ou pedir_info. Só o Ricardo decide, pelo painel. |
 | GET | `/api/v1/cobrar/previsao` | Previsão de entradas a partir das NFS-e: a vencer, projetado (contrato recorrente) e, à parte, vencidas a confirmar pelo extrato. |

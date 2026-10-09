@@ -1,0 +1,78 @@
+{
+ "dados": {
+  "a_confirmar": {
+   "bruto": "0.00",
+   "liquido": "0.00",
+   "notas": [],
+   "qtd": 0
+  },
+  "antigas": {
+   "bruto": "0.00",
+   "liquido": "0.00",
+   "notas": [],
+   "qtd": 0
+  },
+  "aviso": "Nibo defasado: vencida e não baixada não é prova de que não foi paga; confirmar pelo extrato.",
+  "hoje": "2026-10-08",
+  "meses": [
+   {
+    "a_vencer": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "mes": "2026-10",
+    "projetado": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "total_liquido": "0.00"
+   },
+   {
+    "a_vencer": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "mes": "2026-11",
+    "projetado": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "total_liquido": "0.00"
+   },
+   {
+    "a_vencer": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "mes": "2026-12",
+    "projetado": {
+     "bruto": "0.00",
+     "liquido": "0.00",
+     "notas": [],
+     "qtd": 0
+    },
+    "total_liquido": "0.00"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

@@ -1,0 +1,21 @@
+{
+ "dados": {
+  "itens": [],
+  "totais": {
+   "a_confirmar": "0.00",
+   "a_vencer": "0.00",
+   "antigas": "0.00",
+   "nibo_diz_pago": "0.00"
+  }
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

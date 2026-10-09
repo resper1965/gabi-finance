@@ -6,7 +6,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, Request
 
 from gabi.cobrar import cadastro, cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
-from gabi.cobrar.previsao import previsao as calcular_previsao
+from gabi.cobrar.previsao import RECENTE_DIAS, previsao as calcular_previsao
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -213,6 +213,32 @@ def previsao(request: Request, meses: int = 3):
                             "total_liquido": formatar(m["a_vencer"]["liquido_centavos"] + m["projetado"]["liquido_centavos"])} for m in r["meses"]],
                  "a_confirmar": _bloco_json(r["a_confirmar"]), "antigas": _bloco_json(r["antigas"])}
         return envelope(con, dados, agora=agora)
+    finally:
+        con.close()
+
+
+@router.get("/notas")
+def notas(request: Request, aberta: int = 0):
+    """NFS-e autorizadas (Nibo): a vencer, vencidas a confirmar pelo extrato, antigas e as que o Nibo diz pagas (não é prova de recebimento)."""
+    con = _con(request)
+    try:
+        hoje = _agora(request).date()
+        itens, totais = [], {"a_vencer": 0, "a_confirmar": 0, "antigas": 0, "nibo_diz_pago": 0}
+        for n in con.execute("select * from nota_fiscal where status='autorizada'" + (" and nibo_pago=0" if aberta else "") + " order by vencimento desc, numero desc limit 400"):
+            venc = dt.date.fromisoformat(n["vencimento"]) if n["vencimento"] else None
+            if n["nibo_pago"]:
+                sit, chave = "nibo_diz_pago", "nibo_diz_pago"
+            elif venc is None or venc >= hoje:
+                sit, chave = "a_vencer", "a_vencer"
+            elif (hoje - venc).days <= RECENTE_DIAS:
+                sit, chave = "a_confirmar", "a_confirmar"
+            else:
+                sit, chave = "antiga", "antigas"
+            totais[chave] += n["valor_liquido_centavos"] or 0
+            itens.append({"numero": n["numero"], "tomador": n["tomador_nome"], "emissao": n["emissao"], "vencimento": n["vencimento"],
+                          "bruto": formatar(n["valor_bruto_centavos"]), "liquido": formatar(n["valor_liquido_centavos"] or 0), "situacao": sit,
+                          "nibo_pago": bool(n["nibo_pago"]), "pdf": bool(n["pdf_arquivo"]), "xml": bool(n["xml_arquivo"])})
+        return envelope(con, {"itens": itens, "totais": {k: formatar(v) for k, v in totais.items()}}, agora=_agora(request))
     finally:
         con.close()
 

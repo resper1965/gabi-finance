@@ -1171,6 +1171,45 @@
     "summary": "Lote Executar"
    }
   },
+  "/api/v1/cobrar/notas": {
+   "get": {
+    "description": "NFS-e autorizadas (Nibo): a vencer, vencidas a confirmar pelo extrato, antigas e as que o Nibo diz pagas (não é prova de recebimento).",
+    "operationId": "notas_api_v1_cobrar_notas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "aberta",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Aberta",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Notas"
+   }
+  },
   "/api/v1/cobrar/pedidos": {
    "get": {
     "description": "Pedidos pendentes (inclui os com informação pedida) ou `decididos`.",

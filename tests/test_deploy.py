@@ -263,3 +263,11 @@ def test_servico_de_falha_grava_aviso_com_o_nome_da_unidade_e_sem_rede():
 def test_servico_de_avisos_so_le_e_grava_o_banco_sem_rede():
     assert "gabi.avisos" in AVISOS and "User=gabibrain" in AVISOS and "RestrictAddressFamilies=AF_UNIX" in AVISOS and "ReadWritePaths=/var/lib/gabi-brain" in AVISOS
     assert "NoNewPrivileges=yes" in AVISOS and "ProtectSystem=strict" in AVISOS
+
+
+def test_timer_de_notas_roda_todo_dia_cedo_em_horario_de_brasilia_e_esta_instalado():
+    t = _ler("gabi-brain-notas.timer")
+    assert "OnCalendar=*-*-* 06:40:00 America/Sao_Paulo" in t and "Unit=gabi-brain-notas.service" in t and "Persistent=true" in t
+    assert "gabi-brain-notas.timer" in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and "gabi-brain-notas.timer" in ligadas[0]

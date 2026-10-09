@@ -173,3 +173,24 @@ def test_previsao_de_caixa_formata_valores_e_so_o_boss_ve(banco):
     assert "Nibo defasado" in d["aviso"] and len(d["meses"]) == 2
     assert cli.get("/api/v1/cobrar/previsao", headers=VIP).status_code == 403
     assert cli.get("/api/v1/cobrar/previsao?meses=0", headers=BOSS).status_code == 400
+
+
+def test_notas_lista_so_autorizadas_em_aberto_e_formata_valores(banco):
+    _nota(banco, "IONIC", "2026-10-25", 2226122)                 # a vencer
+    _nota(banco, "BARRA", "2026-09-20", 366015)                  # vencida há 19 dias: a confirmar pelo extrato
+    _nota(banco, "ANTIGA", "2026-05-10", 100000)                 # vencida há mais de 60 dias: provável baixa que faltou no Nibo
+    _nota(banco, "PAGA", "2026-10-30", 50000, pago=1)           # o Nibo diz pago: aparece, mas não conta como a receber
+    _nota(banco, "CANC", "2026-10-26", 9999, status="cancelada")
+    _nota(banco, "NEG", "2026-10-27", 9999, status="negada")
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    r = cli.get("/api/v1/cobrar/notas", headers=BOSS)
+    assert r.status_code == 200
+    d = r.json()["dados"]
+    por = {i["tomador"]: i for i in d["itens"]}
+    assert set(por) == {"IONIC", "BARRA", "ANTIGA", "PAGA"}                               # cancelada e negada não entram
+    assert (por["IONIC"]["liquido"], por["IONIC"]["bruto"], por["IONIC"]["situacao"]) == ("22261.22", "22361.22", "a_vencer")
+    assert (por["BARRA"]["situacao"], por["ANTIGA"]["situacao"], por["PAGA"]["situacao"]) == ("a_confirmar", "antiga", "nibo_diz_pago")
+    assert d["totais"] == {"a_vencer": "22261.22", "a_confirmar": "3660.15", "antigas": "1000.00", "nibo_diz_pago": "500.00"}
+    assert [i["tomador"] for i in d["itens"]][0] == "PAGA"                                   # vencimento mais distante primeiro
+    assert [i["tomador"] for i in cli.get("/api/v1/cobrar/notas?aberta=1", headers=BOSS).json()["dados"]["itens"]] == ["IONIC", "BARRA", "ANTIGA"]
+    assert cli.get("/api/v1/cobrar/notas", headers=VIP).status_code == 403
