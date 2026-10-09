@@ -377,6 +377,26 @@
         "empresa": "ness",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "\\bATMA\\b",
+      "acao": {
+        "para_quem": "giovanna"
+      }
+    },
+    {
+      "padrao": "GOOGLE ?ONE",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "SCF STORE",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ionic-health-br"
+      }
     }
   ]
 }
