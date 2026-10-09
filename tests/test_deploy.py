@@ -271,3 +271,16 @@ def test_timer_de_notas_roda_todo_dia_cedo_em_horario_de_brasilia_e_esta_instala
     assert "gabi-brain-notas.timer" in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert ligadas and "gabi-brain-notas.timer" in ligadas[0]
+
+
+def test_timer_de_exportacao_semanal_instalado():
+    svc = (DEPLOY / "gabi-brain-exportacao.service").read_text()
+    tmr = (DEPLOY / "gabi-brain-exportacao.timer").read_text()
+    expr = re.search(r"^OnCalendar=(.*)$", tmr, re.M).group(1)
+    assert subprocess.run(["systemd-analyze", "calendar", expr], capture_output=True, text=True).returncode == 0
+    assert expr.startswith("Sun ") and "America/Sao_Paulo" in expr
+    assert "-m gabi.exportacao" in svc and "ConditionPathExists=/etc/gabi/backup.pub" in svc  # sem chave, não roda (nem exporta em claro)
+    assert "OnFailure=gabi-brain-falha@%n.service" in svc and "IPAddressDeny=any" in svc
+    assert "gabi-brain-exportacao.timer" in INSTALAR and "gabi-brain-exportacao.service" in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert "gabi-brain-exportacao.timer" in ligadas[0]

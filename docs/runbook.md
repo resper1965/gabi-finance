@@ -23,7 +23,14 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 - Diário 03:30 (`gabi-brain-backup.timer`), com teste de restauração. À mão: `$PY -m gabi.backup --banco $BANCO --destino /var/backups/gabi-brain --testar`.
 - Resultado: `gabi-brain-AAAA-MM-DD.sqlite` (600) e uma rodada `backup`. Falha de integridade → rodada `erro` e código de saída 1.
 - **Restaurar:** `sudo systemctl stop gabi-brain-api`; copiar o backup desejado para `$BANCO`; apagar `gabi.db-wal` e `gabi.db-shm`; `sudo systemctl start gabi-brain-api`; conferir `/api/saude`.
-- Cópia fora da VPS: puxar `/var/backups/gabi-brain/*.sqlite` para a máquina local com `scp` (a VPS não guarda a única cópia).
+- Cópia fora da VPS: ver "Backup fora da VPS" abaixo (a VPS não guarda a única cópia).
+
+## Backup fora da VPS {#backup-fora}
+Pacote semanal criptografado, para o Ricardo puxar; a chave privada nunca fica na VPS.
+1. **Uma vez, na sua máquina:** `gpg --quick-generate-key ricardo-gabi-backup` e `gpg --armor --export ricardo-gabi-backup > backup.pub`. Copie só a **pública** para a VPS: `sudo install -m 644 backup.pub /etc/gabi/backup.pub`. Guarde a privada (e uma cópia dela) fora da VPS.
+2. Domingo 04:00 BRT (`gabi-brain-exportacao.timer`) gera `/var/backups/gabi-brain/exportacao/gabi-brain-AAAA-MM-DD.sqlite.gpg` (600; guarda os 8 últimos) e uma rodada `exportacao`. Sem `/etc/gabi/backup.pub` a unidade nem roda; se o teste de restauração falhar, nada é exportado e o sino avisa. À mão: `sudo systemctl start gabi-brain-exportacao`.
+3. **Puxar (G17):** `scp vps:/var/backups/gabi-brain/exportacao/*.gpg ./` e conferir com `gpg --decrypt gabi-brain-AAAA-MM-DD.sqlite.gpg > teste.sqlite && sqlite3 teste.sqlite 'pragma integrity_check'` (deve dar `ok`).
+4. **Restaurar a partir do pacote:** decifrar na sua máquina, copiar para a VPS e seguir "Restaurar" acima.
 
 ## Alertas
 | Sinal | Significa | Ação |

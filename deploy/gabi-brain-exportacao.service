@@ -1,0 +1,24 @@
+[Unit]
+Description=gabi.brain exportação semanal do banco, criptografada, para fora da VPS
+OnFailure=gabi-brain-falha@%n.service
+ConditionPathExists=/etc/gabi/backup.pub
+
+[Service]
+Type=oneshot
+User=gabibrain
+Group=gabibrain
+WorkingDirectory=/opt/gabi-brain
+ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.exportacao --banco /var/lib/gabi-brain/gabi.db --destino /var/backups/gabi-brain/exportacao --chave /etc/gabi/backup.pub
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-brain /var/backups/gabi-brain

@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain exportação semanal (domingo 04:00, horário de Brasília)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-brain-exportacao.service
+
+[Install]
+WantedBy=timers.target
