@@ -125,3 +125,21 @@ def test_conta_com_apelido_repetido_recebe_o_mesmo_dono_em_todas(con, tmp_path):
     r = aplicar(con, p, "teste")
     assert r.aplicados == 2 and r.nao_encontrados == []
     assert [json.loads(x[0]) for x in con.execute("select usuarios from conta where apelido like '%xp%' collate nocase")] == [["sabrina"], ["sabrina"]]
+
+
+def test_regra_preenche_a_empresa_do_reembolso(con, tmp_path):
+    con.execute("insert into empresa(id, nome) values ('ness','NESS')")
+    con.execute("insert into categoria(nome) values ('Assinaturas')")
+    con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, status) values (1,'h','2026-09-10',-5000,'DM HOSTINGERCOMB','DM','posted')")
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"regras": [{"padrao": "HOSTINGER", "acao": {"para_quem": "sabrina", "empresa": "ness", "categoria": "Assinaturas"}}]}), encoding="utf-8")
+    r = aplicar(con, p, "teste")
+    assert r.aplicados == 1 and r.nao_encontrados == []
+    l = con.execute("select empresa_id, empresa_origem, para_quem_id, categoria_id from lancamento where externo_id='h'").fetchone()
+    assert tuple(l) == ("ness", "regra", "sabrina", 2)
+
+
+def test_regra_com_empresa_inexistente_e_reportada(con, tmp_path):
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"regras": [{"padrao": "X", "acao": {"empresa": "fantasma"}}]}), encoding="utf-8")
+    assert aplicar(con, p, "teste").nao_encontrados == ["regra X"]

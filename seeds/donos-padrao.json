@@ -184,6 +184,43 @@
       "acao": {
         "para_quem": "sabrina"
       }
+    },
+    {
+      "padrao": "LOJA SHOP CIDADE J",
+      "acao": {
+        "para_quem": "giovanna"
+      }
+    },
+    {
+      "padrao": "PENTESTTOOLS",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ionic-health-br",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "HOSTINGER",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "CONTABO",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "NABU ?CASA",
+      "acao": {
+        "para_quem": "casa",
+        "categoria": "Assinaturas e serviços digitais"
+      }
     }
   ]
 }

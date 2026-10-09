@@ -102,6 +102,8 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
         for campo, valor in regra["acao"].items():
             if campo == "para_quem" and _pessoa(con, valor):
                 acao["para_quem_id"] = valor
+            elif campo == "empresa" and con.execute("select 1 from empresa where id=? and excluido_em is null", (valor,)).fetchone():
+                acao["empresa_id"] = valor
             elif campo == "categoria":
                 linha = con.execute("select id from categoria where nome=? and excluido_em is null", (valor,)).fetchone()
                 if linha:
