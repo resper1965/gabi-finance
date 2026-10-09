@@ -16,7 +16,7 @@ MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar", "etiquetar", "campos"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
-                       "organizations", "contas", "agendamentos", "extrato", "nfse", "socios", "clientes", "categorias"}),
+                       "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
 }
 ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo}
 

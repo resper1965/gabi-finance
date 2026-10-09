@@ -38,9 +38,24 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
         raise ErroNibo(f"Nibo indisponível: {type(e).__name__}") from None
 
 
+HOST_ARQUIVOS = "https://arquivos.nibo.com.br/"
+
+
+def _http_arquivo_real(url, cabecalhos):
+    req = urllib.request.Request(url, headers=cabecalhos)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, b""
+    except OSError as e:
+        raise ErroNibo(f"Nibo indisponível: {type(e).__name__}") from None
+
+
 class Nibo:
-    def __init__(self, token: str, base: str = BASE, *, http: Http | None = None):
+    def __init__(self, token: str, base: str = BASE, *, http: Http | None = None, http_arquivo=None):
         self._token, self.base, self._http = token, base.rstrip("/"), http or _http_real
+        self._http_arquivo = http_arquivo or _http_arquivo_real
 
     def _get(self, caminho: str, consulta: dict | None = None):
         url = self.base + caminho + ("?" + urlencode(consulta, quote_via=quote) if consulta else "")
@@ -81,12 +96,26 @@ class Nibo:
             filtro += f" and type eq '{tipo}'"
         return self._paginar("/schedules", "updateDate", filtro)
 
+    def agendamentos_a_receber(self) -> list[dict]:
+        """Todos os agendamentos a receber (`/schedules/credit`): cada NFS-e aponta para um (isPaid/paidValue/openValue/value líquido)."""
+        return list(self._paginar("/schedules/credit", "dueDate"))
+
     def extrato(self, account_id: str, de: dt.date, ate: dt.date) -> list[dict]:
         resp = self._get(f"/accounts/{quote(str(account_id), safe='')}/views/statement", {"startDate": de.isoformat(), "endDate": ate.isoformat()})
         return resp.get("items", []) if isinstance(resp, dict) else list(resp)
 
     def nfse(self, desde: dt.date) -> Iterator[dict]:
-        return self._paginar("/nfse", "emissionDate", f"emissionDate ge {desde.isoformat()}")
+        """NFS-e emitidas (todas as situações) com createDate a partir de `desde`. O Nibo responde 500 a $orderby=emissionDate e a datas sem offset."""
+        return self._paginar("/nfse", "createDate", f"createDate ge {desde.isoformat()}T00:00:00Z")
+
+    def obter_arquivo(self, url: str) -> bytes:
+        """PDF/XML de uma nota (pdfFileUrl/xmlFileUrl). Só o host de arquivos do Nibo: o token nunca vai para outra URL."""
+        if not str(url).startswith(HOST_ARQUIVOS):
+            raise ErroNibo("URL de arquivo fora do host do Nibo")
+        status, corpo = self._http_arquivo(url, {"ApiToken": self._token})
+        if status >= 400:
+            raise ErroNibo(f"GET arquivo -> {status}")
+        return corpo
 
     def socios(self) -> list[dict]:
         return list(self._paginar(ROTAS_A_CONFIRMAR["socios"], "name"))

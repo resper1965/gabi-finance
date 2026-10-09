@@ -80,7 +80,7 @@ def test_erro_400_messageDetail_vira_ErroNibo_sem_o_token():
 def test_cliente_de_leitura_nao_tem_metodo_de_escrita():
     nomes = [n for n, _ in inspect.getmembers(Nibo, inspect.isfunction) if not n.startswith("_")]
     assert not [n for n in nomes if re.match(r"(criar|atualizar|editar|excluir|delete|remover|anexar|baixar|post|put|patch)", n)]
-    assert {"organizations", "contas", "agendamentos", "extrato", "nfse", "socios", "clientes", "categorias"} <= set(nomes)
+    assert {"organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"} <= set(nomes)
 
 
 def test_nenhuma_rota_de_exclusao_no_codigo():
@@ -93,3 +93,33 @@ def test_nenhuma_rota_de_exclusao_no_codigo():
             if re.search(r"(?<!router)\.delete\(|requests\.delete|[\"']DELETE[\"']|method\s*=\s*[\"']DELETE", linha) and "re.search" not in linha:
                 achados.append(f"{arq.relative_to(RAIZ)}:{i}")
     assert achados == []
+
+
+def test_nfse_ordena_por_createDate_e_filtra_com_offset():
+    # o Nibo responde 500 para $orderby=emissionDate e para data sem offset (conferido com o token real em 09/10/2026)
+    n, srv = _nibo(itens=[])
+    list(n.nfse(dt.date(2026, 1, 1)))
+    q = parse_qs(urlparse(srv.chamadas[0][1]).query)
+    assert srv.chamadas[0][1].split("?")[0].endswith("/nfse")
+    assert q["$orderby"] == ["createDate"] and unquote(q["$filter"][0]) == "createDate ge 2026-01-01T00:00:00Z"
+
+
+def test_obter_arquivo_so_do_host_de_arquivos_do_nibo():
+    chamadas = []
+
+    def http_arquivo(url, cabecalhos):
+        chamadas.append((url, cabecalhos))
+        return 200, b"%PDF-1.4"
+    n = Nibo("tok-nibo", http=NiboFalso(), http_arquivo=http_arquivo)
+    assert n.obter_arquivo("https://arquivos.nibo.com.br/download/abc") == b"%PDF-1.4"
+    assert chamadas[0][1]["ApiToken"] == "tok-nibo"
+    for ruim in ("https://evil.example/download/abc", "http://arquivos.nibo.com.br/download/abc", "https://arquivos.nibo.com.br.evil.example/x"):
+        with pytest.raises(ErroNibo):
+            n.obter_arquivo(ruim)
+    assert len(chamadas) == 1  # a URL fora do host nunca chegou à rede (o token não vaza)
+
+
+def test_obter_arquivo_status_de_erro_vira_erronibo():
+    n = Nibo("t", http=NiboFalso(), http_arquivo=lambda u, c: (404, b""))
+    with pytest.raises(ErroNibo):
+        n.obter_arquivo("https://arquivos.nibo.com.br/download/x")

@@ -25,7 +25,7 @@ chown -R root:root /opt/gabi-brain
 
 install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-mcp.service "$AQUI"/deploy/gabi-brain-fontes.service "$AQUI"/deploy/gabi-brain-backup.service \
   "$AQUI"/deploy/gabi-brain-backup.timer "$AQUI"/deploy/gabi-brain-saldos.service "$AQUI"/deploy/gabi-brain-saldos.timer \
-  "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer /etc/systemd/system/
+  "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer "$AQUI"/deploy/gabi-brain-notas.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
