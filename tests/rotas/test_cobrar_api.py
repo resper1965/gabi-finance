@@ -220,3 +220,14 @@ def test_recebimentos_propostos_sao_listados_e_confirmar_marca_a_nota_como_receb
 def test_rejeitar_recebimento_e_idempotente_a_404_para_inexistente(banco):
     cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
     assert cli.post("/api/v1/cobrar/recebimentos/999/rejeitar", headers={**BOSS, **JSON}, content="{}").status_code == 404
+
+
+def test_reembolso_abrir_respeita_a_selecao_de_itens(cli):
+    d = get(cli, "/api/v1/cobrar/reembolsos").json()["dados"]
+    ness = next(e for e in d["empresas"] if e["empresa_id"] == "ness")
+    if len(ness["itens"]) < 2:
+        pytest.skip("fixture sem 2 itens da ness")
+    escolhido = ness["itens"][0]["lancamento_id"]
+    rid = post(cli, "/api/v1/cobrar/reembolsos", {"empresa_id": "ness", "itens": [escolhido]}).json()["dados"]["id"]
+    ness = next(e for e in get(cli, "/api/v1/cobrar/reembolsos").json()["dados"]["empresas"] if e["empresa_id"] == "ness")
+    assert rid and post(cli, "/api/v1/cobrar/reembolsos", {"empresa_id": "ness", "itens": ["x"]}).status_code == 400

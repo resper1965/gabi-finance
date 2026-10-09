@@ -62,7 +62,10 @@ async def reembolso_abrir(request: Request, ident: Identidade = Depends(exigir("
     con = _con(request)
     try:
         try:
-            rid = rb.criar_reembolso(con, str(corpo.get("empresa_id", "")))
+            itens = corpo.get("itens")
+            if itens is not None and not (isinstance(itens, list) and all(isinstance(i, int) for i in itens)):
+                raise ValueError("itens deve ser uma lista de ids de lançamento")
+            rid = rb.criar_reembolso(con, str(corpo.get("empresa_id", "")), itens)
         except ValueError as e:
             raise erro(400, "requisicao_invalida", str(e))
         return envelope(con, {"id": rid}, agora=_agora(request))

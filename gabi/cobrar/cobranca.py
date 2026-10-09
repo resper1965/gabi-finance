@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from gabi.cobrar.reembolso import ItemReembolso, itens_a_reembolsar
 from gabi.cobrar import cadastro
 from gabi.db import transacao
+from gabi.cobrar.util import brl as _brl
 
 
 class NaoPermitido(Exception):
@@ -23,10 +24,6 @@ class Cobranca:
     itens: list[ItemReembolso]
     anexos: list[int]                 # paperless_id dos comprovantes confirmados
     aviso_sem_comprovante: list[int]  # lançamentos sem comprovante confirmado
-
-
-def _brl(centavos: int) -> str:
-    return f"R$ {centavos // 100:,}".replace(",", ".") + f",{centavos % 100:02d}"
 
 
 def montar(con, empresa_id: str, itens: list[int] | None, *, hoje: dt.date | None = None) -> Cobranca:

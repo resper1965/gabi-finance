@@ -9,16 +9,13 @@ import re
 import unicodedata
 
 from gabi.db import transacao
+from gabi.cobrar.util import agora as _agora
 
 JANELA_DIAS, TOLERANCIA_DATA = 90, 5
 
 
 def _norm(t: str | None) -> str:
     return " ".join("".join(c for c in unicodedata.normalize("NFD", t or "") if unicodedata.category(c) != "Mn").upper().split())
-
-
-def _agora() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
 def _confianca(nota, l) -> tuple[float, str]:

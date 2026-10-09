@@ -116,3 +116,12 @@ test("Reembolsos: marcar como cobrado abre a cobranca e a marca como cobrada", a
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /reembolsos\/5\/cobrado$/.test(c.url))).toBe(true));
   expect(chamadas.find((c) => c.metodo === "POST" && /cobrar\/reembolsos$/.test(c.url))!.corpo).toEqual({ empresa_id: "ness" });
 });
+
+test("Reembolsos: marcar como cobrado cobra so os itens selecionados", async () => {
+  const chamadas = apiFalsa({ "cobrar-reembolsos": reembolsos() }, [[/cobrar\/reembolsos$/, env("cobrar-reembolsos", { id: 6 })]]);
+  montar(<Reembolsos />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Selecionar TAXI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Marcar como cobrado (1)" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /reembolsos\/6\/cobrado$/.test(c.url))).toBe(true));
+  expect(chamadas.find((c) => c.metodo === "POST" && /cobrar\/reembolsos$/.test(c.url))!.corpo).toEqual({ empresa_id: "ness", itens: [2] });
+});

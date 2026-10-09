@@ -9,6 +9,7 @@ from typing import Callable
 from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
+from gabi.cobrar.util import agora as _agora
 
 
 class SemEscopo(Exception):
@@ -20,10 +21,6 @@ class RegistroPedido:
     pedido_id: int
     estado: str
     texto_para_responder: str
-
-
-def _agora() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
 def _pessoa_autorizada(con, solicitante: str):

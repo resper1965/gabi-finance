@@ -108,12 +108,12 @@ def _sem_acento(s):
     return "".join(unicodedata.normalize("NFD", c)[0] for c in s).upper()
 
 
-def tipo_documento(texto):
+def tipo_documento(texto, hoje=None):
     """'dae_esocial', 'comprovante_pix' (so sem linha digitavel valida) ou None."""
     t = _sem_acento(texto or "")
     if "DOCUMENTO DE ARRECADACAO DO ESOCIAL" in t or ("ESOCIAL" in t and re.search(r"\bDAE\b", t)):
         return "dae_esocial"
-    if "COMPROVANTE" in t and re.search(r"\bPIX\b", t) and not _achar_linha(texto, date.today()):
+    if "COMPROVANTE" in t and re.search(r"\bPIX\b", t) and not _achar_linha(texto, hoje or date.today()):
         return "comprovante_pix"
     return None
 

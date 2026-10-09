@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from gabi.cobrar import cadastro
 from gabi.db import transacao
+from gabi.cobrar.util import agora as _agora
 
 
 @dataclass(frozen=True)
@@ -21,10 +22,6 @@ class ItemReembolso:
 class ResultadoConciliacao:
     casados: list[int]       # lançamentos quitados por este crédito
     sobra_centavos: int      # parte do crédito que não achou item cobrado em aberto
-
-
-def _agora() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
 def _contratante(con, empresa_id: str) -> bool:
@@ -43,19 +40,23 @@ def itens_a_reembolsar(con, empresa_id: str) -> list[ItemReembolso]:
                 "order by l.data, l.id", (empresa_id,))]
 
 
-def criar_reembolso(con, empresa_id: str) -> int:
-    """Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança. Bekaa/empresa sem relação: ValueError. Tudo ou nada."""
+def criar_reembolso(con, empresa_id: str, itens: list[int] | None = None) -> int:
+    """Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança (ou só os `itens` escolhidos). Bekaa/empresa sem relação: ValueError. Tudo ou nada."""
     with transacao(con):
-        return _criar_reembolso(con, empresa_id)
+        return _criar_reembolso(con, empresa_id, itens)
 
 
-def _criar_reembolso(con, empresa_id: str) -> int:
+def _criar_reembolso(con, empresa_id: str, itens: list[int] | None = None) -> int:
     """Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança. Bekaa/empresa sem relação: ValueError."""
     if not _contratante(con, empresa_id):
         raise ValueError("a Bekaa vai pelo lote do Nibo, não por cobrança" if cadastro.relacao(con, empresa_id) == "pj_titular"
                          else "a empresa não está cadastrada como contratante")
     novos = [i for i in itens_a_reembolsar(con, empresa_id)
              if not con.execute("select 1 from reembolso_item where lancamento_id=?", (i.lancamento_id,)).fetchone()]
+    if itens is not None:
+        if not set(itens) <= {i.lancamento_id for i in novos}:
+            raise ValueError("há item selecionado que não está em aberto para esta empresa")
+        novos = [i for i in novos if i.lancamento_id in set(itens)]
     if not novos:
         raise ValueError("nada a cobrar")
     rid = con.execute("insert into reembolso(empresa_id, criado_em) values (?,?)", (empresa_id, _agora())).lastrowid

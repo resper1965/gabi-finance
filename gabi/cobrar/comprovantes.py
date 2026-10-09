@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 
 from gabi.db import transacao
+from gabi.cobrar.util import agora as _agora, brl as _brl
 
 JANELA_DIAS = 3
 BASE, BONUS_DATA_EXATA, BONUS_CNPJ = 0.5, 0.3, 0.2
@@ -18,14 +19,6 @@ class Vinculo:
     confianca: float
     motivo: str
     estado: str
-
-
-def _agora() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def _brl(centavos: int) -> str:
-    return f"R$ {centavos // 100:,}".replace(",", ".") + f",{centavos % 100:02d}"
 
 
 def registrar_comprovante(con, *, paperless_id: int, tipo: str, valor_centavos: int, data: str, cnpj: str | None = None,

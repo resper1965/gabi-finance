@@ -8,6 +8,7 @@ from typing import Callable
 
 from gabi.cobrar import cadastro
 from gabi.db import transacao
+from gabi.cobrar.util import agora as _agora, brl as _brl
 
 
 class ConfirmacaoDivergente(ValueError):
@@ -34,14 +35,6 @@ class Lote:
 class ResultadoLote:
     ok: int
     erro: int
-
-
-def _agora() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def _brl(centavos: int) -> str:
-    return f"R$ {centavos // 100:,}".replace(",", ".") + f",{centavos % 100:02d}"
 
 
 def _texto_lote(itens: list[ItemLote]) -> str:

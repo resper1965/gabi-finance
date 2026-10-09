@@ -94,3 +94,11 @@ def test_sem_comprovante_lista_so_o_que_precisa(con):
     _l(con, 5, "2026-10-06", 20000, empresa="e1")         # entrada: não precisa
     confirmar(con, propor_vinculos(con, _comp(con, pid=9, valor=7000))[0].id, "boss@x.com")
     assert [x["id"] for x in sem_comprovante(con, dt.date(2026, 10, 1))] == [1]
+
+
+def test_tipo_documento_usa_a_data_recebida_e_nao_a_do_relogio():
+    import datetime as dt
+    from gabi.cobrar import extrator
+    import inspect
+    assert list(inspect.signature(extrator.tipo_documento).parameters) == ["texto", "hoje"]
+    assert extrator.tipo_documento("Comprovante de PIX valor R$ 10,00", dt.date(2026, 10, 10)) == "comprovante_pix"

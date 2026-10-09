@@ -104,3 +104,18 @@ def test_credito_precisa_ser_entrada_em_conta_pj(con):
         conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 4000, conta=1))   # entrada em conta PF
     with pytest.raises(ValueError):
         conciliar_recebimento(con, "ness", _l(con, 10, "2026-10-10", -4000, conta=2))  # saída
+
+
+def test_cobrar_so_os_itens_selecionados(con):
+    a, b = _l(con, 1, "2026-10-01", -10000, empresa="ness"), _l(con, 2, "2026-10-02", -5000, empresa="ness")
+    rid = criar_reembolso(con, "ness", [b])
+    assert [r[0] for r in con.execute("select lancamento_id from reembolso_item where reembolso_id=?", (rid,))] == [b]
+    assert a not in [r[0] for r in con.execute("select lancamento_id from reembolso_item")]  # o outro continua em aberto para a próxima cobrança
+
+
+def test_selecao_com_item_que_nao_e_da_empresa_e_recusada_inteira(con):
+    a = _l(con, 1, "2026-10-01", -10000, empresa="ness")
+    outro = _l(con, 2, "2026-10-02", -5000)  # sem empresa
+    with pytest.raises(ValueError, match="selecionad"):
+        criar_reembolso(con, "ness", [a, outro])
+    assert con.execute("select count(*) from reembolso").fetchone()[0] == 0  # tudo ou nada

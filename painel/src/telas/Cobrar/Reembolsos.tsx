@@ -36,7 +36,7 @@ export function Reembolsos() {
   };
   const cobrado = async (empresaId: string) => {
     try {
-      const rid = (await api.post<{ id: number }>("/api/v1/cobrar/reembolsos", { empresa_id: empresaId })).dados.id;
+      const rid = (await api.post<{ id: number }>("/api/v1/cobrar/reembolsos", marcadas.length ? { empresa_id: empresaId, itens: marcadas } : { empresa_id: empresaId })).dados.id;
       await api.post(`/api/v1/cobrar/reembolsos/${rid}/cobrado`);
       avisar("Anotado: reembolso cobrado. Agora aguardo o recebimento na conta PJ.");
       leitura.recarregar();
@@ -116,7 +116,7 @@ export function Reembolsos() {
                   </div>
                 )}
                 <div><button className="btn btn-primary" disabled={(empresa?.itens ?? []).length === 0} onClick={() => preparar(atual)}>{marcadas.length ? `Preparar e-mail de reembolso (${marcadas.length})` : "Preparar e-mail com todos os itens"}</button>
-                  {" "}<button className="btn btn-secondary" disabled={(empresa?.itens ?? []).length === 0} onClick={() => cobrado(atual)}>Marcar como cobrado</button></div>
+                  {" "}<button className="btn btn-secondary" disabled={(empresa?.itens ?? []).length === 0} onClick={() => cobrado(atual)}>{marcadas.length ? `Marcar como cobrado (${marcadas.length})` : "Marcar como cobrado"}</button></div>
               </section>
             )}
             {confirmando && (
