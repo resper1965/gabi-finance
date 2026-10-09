@@ -6,11 +6,11 @@ Criada: 09/10/2026. Fonte de verdade da ordem; detalhe de cada tarefa em `/home/
 ## Pista A — o que eu faço sozinho, em ordem
 | # | Entrega | Depende de | Pronto quando |
 |---|---|---|---|
-| A1 | **T3.3** migração 0011 (caixa_email, item_email, evento, tarefa) + e-mail/agenda/tarefas | nada | testes do mestre verdes (message_id único, só cabeçalho+trecho, relevante com motivo, expurgo sem regra não apaga, conflito só propõe) |
-| A2 | **T3.4** frentes (reconhecer/confirmar/abrir, sem nome fixo) | A1 | sugestão não entra sem confirmação |
-| A3 | **T3.1** cliente Graph (servidor falso; só rascunho, sem `send`) e **T3.2** cliente Google (idem; dedupe por Message-ID entre os dois) | A1 | testes do mestre; `docs/fontes/{graph,google,caixas-de-email}.md` |
-| A4 | **T3.5** `hoje`, rotas de trabalho, MCP `hoje_resumo`/`frentes_*` | A1–A3 | Hoje < 1 s, só de tabelas prontas |
-| A5 | **T3.6** telas Hoje, Frentes, Agenda, Mensagens, Tarefas + capturas | A4 | vitest verde, capturas lado a lado geradas p/ G14 |
+| A1 ✅ | **T3.3** migração 0011 (caixa_email, item_email, evento, tarefa) + e-mail/agenda/tarefas | nada | testes do mestre verdes (message_id único, só cabeçalho+trecho, relevante com motivo, expurgo sem regra não apaga, conflito só propõe) |
+| A2 ✅ | **T3.4** frentes (reconhecer/confirmar/abrir, sem nome fixo) | A1 | sugestão não entra sem confirmação |
+| A3 ✅ | **T3.1** cliente Graph (servidor falso; só rascunho, sem `send`) e **T3.2** cliente Google (idem; dedupe por Message-ID entre os dois) | A1 | testes do mestre; `docs/fontes/{graph,google,caixas-de-email}.md` |
+| A4 ✅ | **T3.5** `hoje`, rotas de trabalho, MCP `hoje_resumo`/`frentes_*` | A1–A3 | Hoje < 1 s, só de tabelas prontas |
+| A5 ✅ | **T3.6** telas Hoje, Frentes, Agenda, Mensagens, Tarefas + capturas | A4 | vitest verde, capturas lado a lado geradas p/ G14 |
 | A6 | Fase 2: aba "Notas a receber" (NFS-e) e job de ingestão de comprovantes do Paperless | A6 precisa de documento real (G7); NFS-e precisa definir fonte | escrito contra fake; validado no aceite T2.10 |
 | A7 | Fase 4 (T4.1–T4.6): cada item abre com mini-spec aprovado | pedido do Ricardo | só por pedido |
 | A8 | **Canal TC.1–TC.6** | Fases 0–4 aceitas | por último; `--dry-run` antes de desligar o OpenClaw |
@@ -41,3 +41,6 @@ Ciclo de cada item: teste vermelho → mínimo → `pytest -q` + `npm test` → 
 
 ## Regras que valem em toda a trilha
 Não mexer em segredos (Ricardo coloca). Nada no claude.ai. Dados nunca chumbados. Esquema novo = migração **0011+** (0009 e 0010 congeladas). Nenhum envio externo automático (R2). Custo da Gabi em US$.
+
+## Andamento
+- 09/10 noite: A1–A5 feitas (código, testes, painel). Falta de A5: capturas p/ G14 e faixa "Reconectar" (dependem de G11/G12). Próximo da pista A: job de rodada do Trabalho (precisa de credencial real para validar) e A6.

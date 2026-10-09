@@ -1,0 +1,81 @@
+{
+ "dados": {
+  "agenda": [
+   {
+    "fim": "2026-10-08T17:00:00",
+    "id": 1,
+    "inicio": "2026-10-08T16:00:00",
+    "link_reuniao": "https://meet.exemplo/a",
+    "titulo": "Revisão Atlas"
+   },
+   {
+    "fim": "2026-10-08T17:30:00",
+    "id": 2,
+    "inicio": "2026-10-08T16:30:00",
+    "link_reuniao": null,
+    "titulo": "Dentista"
+   }
+  ],
+  "dinheiro": {
+   "atrasadas": {
+    "n": 1,
+    "valor": "3500.00"
+   },
+   "nibo": null,
+   "pago_hoje": "0.00",
+   "sai_hoje": "129.90",
+   "saldo": "12345.60"
+  },
+  "emails_importantes": [
+   {
+    "assunto": "Contrato Atlas para assinar",
+    "caixa": "ricardo@ness.exemplo",
+    "frente_id": null,
+    "id": 1,
+    "motivo": "palavra cadastrada: contrato",
+    "recebido_em": "2026-10-08T09:10:00Z",
+    "remetente": "joao@acme.exemplo"
+   },
+   {
+    "assunto": "Boleto vence amanhã",
+    "caixa": "ricardo@ness.exemplo",
+    "frente_id": null,
+    "id": 3,
+    "motivo": "palavra cadastrada: boleto",
+    "recebido_em": "2026-10-08T07:30:00Z",
+    "remetente": "cobranca@banco.exemplo"
+   }
+  ],
+  "filtro": "all",
+  "prioridades": [
+   {
+    "motivo": "palavra cadastrada: contrato",
+    "ref": 1,
+    "tipo": "email",
+    "titulo": "Contrato Atlas para assinar"
+   },
+   {
+    "motivo": "palavra cadastrada: boleto",
+    "ref": 3,
+    "tipo": "email",
+    "titulo": "Boleto vence amanhã"
+   },
+   {
+    "ref": 1,
+    "sugestao": "2026-10-08T17:30:00",
+    "tipo": "conflito",
+    "titulo": "Conflito na agenda"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

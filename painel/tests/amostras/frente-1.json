@@ -1,0 +1,30 @@
+{
+ "dados": {
+  "emails": [],
+  "frente": {
+   "empresa_id": "e1",
+   "id": 1,
+   "nome": "Acme",
+   "pai_id": null,
+   "tipo": "cliente"
+  },
+  "sugeridos": [
+   {
+    "assunto": "Contrato Atlas para assinar",
+    "id": 1,
+    "motivo": "domínio acme.exemplo",
+    "remetente": "joao@acme.exemplo"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

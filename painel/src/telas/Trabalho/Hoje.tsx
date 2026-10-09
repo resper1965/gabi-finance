@@ -1,0 +1,73 @@
+import { useState } from "react";
+import { Etiqueta } from "../../componentes/Etiqueta";
+import { Painel } from "../../componentes/Painel";
+import { Valor } from "../../componentes/Valor";
+import { useCelular } from "../../lib/celular";
+import { dataCurta } from "../../lib/formato";
+import { useApi } from "../../lib/useApi";
+
+interface Prioridade { tipo: string; titulo: string; motivo?: string; ref: number; sugestao?: string }
+interface Evento { id: number; inicio: string; fim: string; titulo: string | null; link_reuniao: string | null }
+interface Email { id: number; remetente: string; assunto: string | null; recebido_em: string; motivo: string | null; frente_id: number | null; caixa: string }
+interface Dinheiro { saldo: string; atrasadas: { n: number; valor: string }; sai_hoje: string; pago_hoje: string; nibo: unknown }
+interface Dados { filtro: string; prioridades: Prioridade[]; agenda: Evento[]; emails_importantes: Email[]; dinheiro: Dinheiro | null }
+interface Empresa { id: string; nome: string }
+
+const hora = (iso: string) => iso.slice(11, 16);
+const ABAS = ["Fazer", "Agenda", "Dinheiro", "E-mails"] as const;
+
+/** Hoje: o que precisa de mim. Lê só de tabelas prontas; o filtro recorta a tela inteira. */
+export function Hoje() {
+  const [filtro, setFiltro] = useState("all");
+  const [aba, setAba] = useState<(typeof ABAS)[number]>("Fazer");
+  const celular = useCelular();
+  const leitura = useApi<Dados>(`/api/v1/hoje?filtro=${encodeURIComponent(filtro)}`);
+  const empresas = useApi<{ itens: Empresa[] }>("/api/v1/cadastros/empresas").env?.dados.itens ?? [];
+  return (
+    <Painel leitura={leitura} arquivo="hoje">
+      {(d) => {
+        const frase = d.prioridades.length === 0 ? "Nada pede você agora." : `${d.prioridades.length} ${d.prioridades.length === 1 ? "coisa pede" : "coisas pedem"} você hoje.`;
+        const blocos: Record<(typeof ABAS)[number], React.ReactNode> = {
+          Fazer: <Bloco titulo="Fazer">{d.prioridades.length === 0 ? <Vazio t="Nada na fila." /> : d.prioridades.map((p, i) => (
+            <li key={i} data-prioridade><strong>{p.titulo}</strong>{p.motivo && <small> · {p.motivo}</small>}{p.sugestao && <small> · a Gabi sugere {hora(p.sugestao)}</small>}</li>))}</Bloco>,
+          Agenda: <Bloco titulo="Agenda">{d.agenda.length === 0 ? <Vazio t="Sem compromissos hoje." /> : d.agenda.map((e) => (
+            <li key={e.id}><span style={{ fontVariantNumeric: "tabular-nums" }}>{hora(e.inicio)}–{hora(e.fim)}</span> {e.titulo}{e.link_reuniao && <> · <a href={e.link_reuniao}>entrar</a></>}</li>))}</Bloco>,
+          Dinheiro: <Bloco titulo="Dinheiro">{d.dinheiro === null ? <Vazio t="O dinheiro aparece em “Tudo”." /> : <>
+            <li>Caixa agora <Valor valor={d.dinheiro.saldo} /></li>
+            <li>Em atraso: {d.dinheiro.atrasadas.n} · <Valor valor={d.dinheiro.atrasadas.valor} /></li>
+            <li>Sai hoje <Valor valor={d.dinheiro.sai_hoje} /></li><li>Já pago hoje <Valor valor={d.dinheiro.pago_hoje} /></li></>}</Bloco>,
+          "E-mails": <Bloco titulo="E-mails que importam">{d.emails_importantes.length === 0 ? <Vazio t="Nenhum e-mail pede resposta." /> : d.emails_importantes.map((m) => (
+            <li key={m.id} data-email><strong>{m.assunto}</strong> · {m.remetente} · {dataCurta(m.recebido_em.slice(0, 10))}<br /><small>{m.motivo}</small>{m.frente_id === null && <> <Etiqueta tipo="conferir" texto="sem frente" /></>}</li>))}</Bloco>,
+        };
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 22 }}>Gabi: {frase}</h3>
+            <div role="group" aria-label="Filtro" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[{ id: "all", nome: "Tudo" }, ...empresas].map((e) => (
+                <button key={e.id} aria-pressed={filtro === e.id} onClick={() => setFiltro(e.id)} style={chip(filtro === e.id)}>{e.nome}</button>))}
+            </div>
+            <div data-instrumentos style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8 }}>
+              <Celula n="Caixa agora" v={d.dinheiro?.saldo ?? "—"} /><Celula n="Em atraso" v={String(d.dinheiro?.atrasadas.n ?? "—")} />
+              <Celula n="Sai hoje" v={d.dinheiro?.sai_hoje ?? "—"} /><Celula n="Agenda" v={String(d.agenda.length)} /><Celula n="E-mails" v={String(d.emails_importantes.length)} />
+            </div>
+            {celular ? (
+              <>
+                <div role="tablist" style={{ display: "flex", gap: 6 }}>
+                  {ABAS.map((a) => <button key={a} role="tab" aria-selected={aba === a} onClick={() => setAba(a)} style={chip(aba === a)}>{a}</button>)}
+                </div>
+                {blocos[aba]}
+              </>
+            ) : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>{ABAS.map((a) => <div key={a}>{blocos[a]}</div>)}</div>}
+          </div>
+        );
+      }}
+    </Painel>
+  );
+}
+
+const chip = (ativo: boolean) => ({ height: 32, padding: "0 12px", border: "1px solid var(--line3)", background: ativo ? "var(--sel-bg, var(--raised))" : "transparent", color: "var(--color-text)", font: "600 12.5px var(--font-body)", cursor: "pointer" }) as const;
+const Celula = ({ n, v }: { n: string; v: string }) => <div style={{ border: "1px solid var(--color-divider)", padding: "8px 10px" }}><small>{n}</small><div style={{ font: "600 20px var(--font-heading)", fontVariantNumeric: "tabular-nums" }}>{v}</div></div>;
+const Vazio = ({ t }: { t: string }) => <li style={{ color: "var(--ink2)", listStyle: "none" }}>{t}</li>;
+export const Bloco = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
+  <section style={{ border: "1px solid var(--color-divider)", padding: "10px 12px" }}><h4 style={{ margin: "0 0 8px" }}>{titulo}</h4><ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 6 }}>{children}</ul></section>
+);

@@ -21,6 +21,25 @@ def _l(c, conta, ext, data, desc, v, nat, cat=None, empresa=None, parcela=None, 
               (conta, ext, data, v, desc, desc.split()[0], nat, cat, origem if cat else None, empresa, "voce" if empresa else None, parcela, parcelas, fatura))
 
 
+def _semear_trabalho(c) -> None:
+    """Dados sintéticos da Fase 3 (caixas, e-mails, agenda, tarefas, frente) só para a demonstração e as amostras do painel."""
+    from gabi.trabalho import email, frentes
+    c.execute("insert into caixa_email(id, endereco, provedor, papel, empresa_id, como_entra, estado) values (1,'ricardo@ness.exemplo','google','principal','e1','direta','sim')")
+    c.execute("insert into caixa_email(id, endereco, provedor, papel, estado) values (2,'ricardo@ionic.exemplo','graph','principal','a_decidir')")
+    c.execute("insert into parametro(chave, valor) values ('email_palavras_relevantes', ?)", (json.dumps(["contrato", "boleto"]),))
+    fid = frentes.abrir_frente(c, "Acme", "cliente", "e1", {"dominios": ["acme.exemplo"], "palavras": ["atlas"]})
+    msgs = [dict(message_id="<d1@x>", remetente="joao@acme.exemplo", assunto="Contrato Atlas para assinar", recebido_em="2026-10-08T09:10:00Z", corpo="Segue o contrato."),
+            dict(message_id="<d2@x>", remetente="newsletter@loja.exemplo", assunto="Ofertas da semana", recebido_em="2026-10-08T08:00:00Z", corpo="Promoção."),
+            dict(message_id="<d3@x>", remetente="cobranca@banco.exemplo", assunto="Boleto vence amanhã", recebido_em="2026-10-08T07:30:00Z", corpo="Vence 09/10.")]
+    email.ingerir_email(c, 1, lambda cx, cur: (msgs, None))
+    for i in c.execute("select * from item_email").fetchall():
+        frentes.sugerir(c, i)
+    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo, participantes, link_reuniao) values (1,'ev1','2026-10-08T16:00:00','2026-10-08T17:00:00','Revisão Atlas','[\"joao@acme.exemplo\"]','https://meet.exemplo/a')")
+    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo, participantes) values (1,'ev2','2026-10-08T16:30:00','2026-10-08T17:30:00','Dentista','[]')")
+    c.execute("insert into tarefa(origem, externo_id, titulo, prazo) values ('graph','L/t1','Enviar proposta à Acme','2026-10-09')")
+    c.execute("insert into tarefa(origem, externo_id, titulo, estado) values ('google','L/t2','Renovar domínio','concluida')")
+
+
 def semear(caminho: Path) -> None:
     c = conectar(caminho)
     migrar(c, RAIZ / "migrations")
@@ -61,6 +80,7 @@ def semear(caminho: Path) -> None:
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados, atualizado_em) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'planilha', 'pix', ?, ?, '2026-10-08T12:00:00')",
                   (cid, cid.split(":")[0], nome, venc, venc, valor, estado, json.dumps(dados)))
+    _semear_trabalho(c)
     c.close()
 
 
