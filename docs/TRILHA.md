@@ -11,7 +11,8 @@ Criada: 09/10/2026. Fonte de verdade da ordem; detalhe de cada tarefa em `/home/
 | A3 ✅ | **T3.1** cliente Graph (servidor falso; só rascunho, sem `send`) e **T3.2** cliente Google (idem; dedupe por Message-ID entre os dois) | A1 | testes do mestre; `docs/fontes/{graph,google,caixas-de-email}.md` |
 | A4 ✅ | **T3.5** `hoje`, rotas de trabalho, MCP `hoje_resumo`/`frentes_*` | A1–A3 | Hoje < 1 s, só de tabelas prontas |
 | A5 ✅ | **T3.6** telas Hoje, Frentes, Agenda, Mensagens, Tarefas + capturas | A4 | vitest verde, capturas lado a lado geradas p/ G14 |
-| A6 | Fase 2: aba "Notas a receber" (NFS-e) e job de ingestão de comprovantes do Paperless | A6 precisa de documento real (G7); NFS-e precisa definir fonte | escrito contra fake; validado no aceite T2.10 |
+| A6 | Fase 2: aba "Notas a receber" (NFS-e ✅ importadas do Nibo, 10/10) e job de ingestão de comprovantes do Paperless | comprovantes precisam de documento real (G18) | escrito contra fake; validado no aceite T2.10 (`docs/aceite-fase-2.md`) |
+| A9 | **Finalização do gabi.brain** (plano `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md`): donos padrão, avisos, previsão, recebimentos, exportação, `comparar_agenda` | — | tarefas 1–8, 11–14 feitas; 9 e 10 esperam G18/G19; ver `docs/STATUS.md` |
 | A7 | Fase 4 (T4.1–T4.6): cada item abre com mini-spec aprovado | pedido do Ricardo | só por pedido |
 | A8 | **Canal TC.1–TC.6** | Fases 0–4 aceitas | por último; `--dry-run` antes de desligar o OpenClaw |
 
@@ -34,7 +35,7 @@ Ciclo de cada item: teste vermelho → mínimo → `pytest -q` + `npm test` → 
 
 ## Marcos de aceite (ordem)
 1. **Fase 1** — T1.14: ≥ 7 dias conferidos (estimativa: depende de reconectar C6/XP; relógio começa na 1ª rodada `conferida=1`).
-2. **Fase 2** — T2.10: ≥ 80 % de comprovantes casados; lote Nibo 2× sem duplicar; pedido real do canal em Pedidos.
+2. **Fase 2** — T2.10: ≥ 80 % de comprovantes casados; lote Nibo 2× sem duplicar; ~~pedido real do canal em Pedidos~~ (adiado ao plano gabi-agent, decisão do Ricardo 10/10; G20).
 3. **Fase 3** — T3.7: 7 caixas com itens, zero `message_id` duplicado, Hoje < 1 s no celular.
 4. **Fase 4** — por pedido.
 5. **Canal** — Hermes estável 7 dias, só então desligar o OpenClaw.

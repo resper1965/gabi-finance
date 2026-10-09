@@ -1,5 +1,5 @@
 # gabi.brain · STATUS (retomada rápida)
-Atualizado: 09/10/2026. Se a máquina caiu, leia só este arquivo e `.superpowers/sdd/progress.md`.
+Atualizado: 10/10/2026. Se a máquina caiu, leia só este arquivo e `.superpowers/sdd/progress.md`.
 
 ## Onde estamos
 - **Código da Fase 1 pronto, commitado e instalado na VPS** (641 testes: `.venv/bin/pytest -q`). Api, mcp, backup e timers de captura ativos.
@@ -89,3 +89,10 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - **Reembolsos a cobrar:** NESS 34 itens (R$ 7,9 mil), IONIC 12 (R$ 5,9 mil); falta comprovante p/ lote do Nibo.
 - **Aceite T1.14:** rodada conferida desde 09/10; relógio de 7 dias roda até ~16/10 (precisa de 7 rodadas seguidas conferidas; XP Investimentos segue parada, issue 0001).
 
+
+## Progresso 10/10/2026 (plano de finalização)
+Plano: `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md` (execução nativa; ledger em `.superpowers/sdd/2026-10-10-gabi-brain-finalizacao/progress.md`). Suíte: 1018 pytest + 70 vitest verdes.
+- Feito: backup corrigido e chave mcp.ai trocada; extratos conferidos; NFS-e da Bekaa importadas; previsão de caixa (aba Previsão, ADR-013) e recebimentos propostos (ADR-012); donos padrão (96% classificados, ADR-010/011); avisos (sino + `OnFailure`); `tools.aceite`; exportação semanal criptografada (`gabi-brain-exportacao.timer`); `tools.comparar_agenda`; dívidas de `gabi/cobrar` (util comum, cobrar só itens selecionados, `tipo_documento(texto, hoje)`).
+- Esperando o Ricardo: **G15** exceção R2 para aviso por Telegram; **G16** XP Investimentos parada desde 12/08 (até 17/10); **G17** colocar `/etc/gabi/backup.pub` e puxar o 1º pacote (runbook "Backup fora da VPS"); **G18/G19** comprovantes reais e lote Nibo em conta real; **G20** aceitar a Fase 2 sem "pedido real pelo canal" (adiado ao gabi-agent); **G21** corte do gabi-financeiro após 7 dias de `tools.comparar_agenda` vazio (ler `/var/lib/gabi-fin/compromissos.json` exige permissão); cancelar BrandYourself; 145 lançamentos sem dono.
+- Aceite Fase 1 (T1.14): rodar `python -m tools.aceite` quando houver 7 rodadas conferidas seguidas (~16/10) e classificação ≥ 90% (hoje 86,9%).
+- Tag `v1.0-gabi-brain` só depois de G20 e dos dois aceites. Fase 3 congelada; Fase 4 por pedido; Hermes/OpenClaw só no plano gabi-agent, depois.

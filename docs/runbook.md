@@ -92,3 +92,11 @@ Despesa da **Bekaa** (`empresa.relacao='pj_titular'`) paga em conta PF vira um a
 5. **Baixa:** quando a PJ reembolsa o sócio (Pix C6 PJ → Itaú PF de valor igual), `texto_baixa` gera `Baixar no Nibo: <despesa>, R$ X, pelo Pix de DD/MM.` e `executar_baixa` só baixa com esse texto, uma vez por crédito.
 6. **Desfazer no Nibo (manual):** o app não apaga nada. Localize o agendamento pela `reference gabi:<id>` e exclua pela tela do Nibo; depois marque o item para reprocessar apagando a linha de `lote_nibo_item` correspondente.
 7. **Pré-requisitos (cadastros):** `parametro nibo_socio_id` (stakeholderId do sócio), `categoria.nibo_category_id` em cada categoria usada, `empresa.relacao`. Sem a categoria equivalente o item vira erro, nunca adivinha.
+
+## Rotina de dinheiro (donos, rodada, notas, avisos) {#rotina-dinheiro}
+- **Aplicar donos padrão** (depois de editar `seeds/donos-padrao.json`): `sudo ~/aplicar-donos.sh`. Idempotente e auditado; não sobrescreve decisão do Ricardo (`voce`) nem regra (`regra`).
+- **Rodar a rodada à mão:** `sudo systemctl start gabi-brain-extratos` (captura, conferência, classificação, compromissos e recebimentos propostos); ler com `journalctl -u gabi-brain-extratos -n 20 --no-pager -o cat`. Saldos: `gabi-brain-saldos`.
+- **Importar notas (NFS-e da Bekaa):** `sudo ~/instalar-notas.sh` (instala e roda `gabi-brain-notas`); o timer `gabi-brain-notas.timer` repete sozinho. Os recebimentos casados aparecem em Cobrar → Notas a receber para confirmar ou rejeitar.
+- **Ler avisos:** sino do painel; por linha de comando `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.avisos`. Tipos: `rodada_parada`, `conta_atrasada`, `cobrada_apos_cancelar`, `vence_hoje`, `servico_falhou` (qualquer unit com `OnFailure`).
+- **Restaurar backup:** ver "Backup e restauração" e "Backup fora da VPS".
+- **Comparar com o gabi-financeiro (G21):** `python -m tools.comparar_agenda --mes AAAA-MM`; saída vazia por 7 dias é o critério de corte.

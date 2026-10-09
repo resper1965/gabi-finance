@@ -29,3 +29,5 @@ fontes (mcp.ai · Nibo · Paperless · e-mail)   [Fases 1-3]
 **Design:** `gabi/static/industry.css` é o `styles.css` do sistema Industry do protótipo, sem alteração (teste garante). Toda tela usa as classes do sistema.
 
 **Onde ficam as coisas (após implantar):** código `/opt/gabi-brain` · banco e bruto `/var/lib/gabi-brain` · backups `/var/backups/gabi-brain` · logs `journalctl -u gabi-brain-api`.
+
+**Backup fora da VPS:** `gabi/exportacao.py` gera semanalmente um pacote `.sqlite.gpg` (chave pública em `/etc/gabi/backup.pub`) em `/var/backups/gabi-brain/exportacao`, que o Ricardo puxa (runbook "Backup fora da VPS").
