@@ -307,6 +307,12 @@
       "acao": {
         "para_quem": "louise"
       }
+    },
+    {
+      "padrao": "SUA ACADEMIA",
+      "acao": {
+        "para_quem": "sabrina"
+      }
     }
   ]
 }
