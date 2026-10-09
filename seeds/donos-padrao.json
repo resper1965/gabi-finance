@@ -78,6 +78,12 @@
       "acao": {
         "para_quem": "casa"
       }
+    },
+    {
+      "padrao": "LEROY ?MERLIN",
+      "acao": {
+        "para_quem": "casa"
+      }
     }
   ]
 }
