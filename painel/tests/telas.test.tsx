@@ -5,6 +5,7 @@ import { FiltrosProvider } from "../src/lib/filtros";
 import { Lancamentos } from "../src/telas/Gastos/Lancamentos";
 import { Semanas } from "../src/telas/Caixa/Semanas";
 import { Regras } from "../src/telas/Regras";
+import { Cartoes } from "../src/telas/Gastos/Cartoes";
 import { ParaOndeVai } from "../src/telas/Gastos/ParaOndeVai";
 import { Resumo } from "../src/telas/Caixa/Resumo";
 import { APagar } from "../src/telas/Caixa/APagar";
@@ -127,4 +128,17 @@ test("Regras: sem trocar a categoria aprova sem edicao", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Aprovar e ligar" }));
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST")).toBe(true));
   expect((chamadas.find((c) => c.metodo === "POST")!.corpo as { edicao?: unknown }).edicao).toBeUndefined();
+});
+
+test("Cartoes: filtro Tipo 'Só assinatura' mostra so lancamentos de assinaturas detectadas", async () => {
+  apiFalsa();
+  montar(<Cartoes />);
+  await screen.findByRole("combobox", { name: "Tipo" });
+  await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBeGreaterThan(0));
+  const antes = document.querySelectorAll("tbody tr").length;
+  fireEvent.change(screen.getByRole("combobox", { name: "Tipo" }), { target: { value: "assinatura" } });
+  await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBeLessThan(antes));
+  const linhas = [...document.querySelectorAll("tbody tr")].map((l) => l.textContent ?? "");
+  expect(linhas.length).toBeGreaterThan(0);
+  expect(linhas.every((t) => /NETFLIX/.test(t))).toBe(true); // a amostra tem NETFLIX como assinatura; TV e LOJA saem
 });

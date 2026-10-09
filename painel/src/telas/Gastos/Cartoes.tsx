@@ -40,6 +40,8 @@ export function Cartoes() {
   const [marcados, setMarcados] = useState<number[]>([]);
   const [bCat, setBCat] = useState(""), [bBen, setBBen] = useState(""), [bEmp, setBEmp] = useState(""), [bRegra, setBRegra] = useState(false);
   const filtros = `&limite=200${q ? `&texto=${encodeURIComponent(q)}` : ""}${fCat ? `&categoria=${fCat}` : ""}${fEmp ? `&empresa=${fEmp}` : ""}${fBen ? `&para_quem=${fBen}` : ""}`;
+  const assinaturas = useApi<{ itens: { nome: string }[] }>("/api/v1/assinaturas").env?.dados.itens ?? [];
+  const nomesAssinatura = new Set(assinaturas.map((a) => a.nome.toLowerCase()));
   const lanc = useApi<{ itens: Lanc[]; total: number }>(leitura.env ? `/api/v1/lancamentos?x=1${filtros}` : null);
 
   return (
@@ -48,7 +50,8 @@ export function Cartoes() {
         if (d.itens.length === 0) return <Bloco><p style={{ margin: 0 }}>Nenhum cartão liberado. Escolha em Cadastros quais contas entram.</p></Bloco>;
         const cartoes = sel === "todos" ? d.itens : d.itens.filter((c) => c.id === sel);
         const nomes = new Set(cartoes.map((c) => c.apelido));
-        const linhas = (lanc.env?.dados.itens ?? []).filter((l) => nomes.has(l.conta)).filter((l) => fTipo !== "parcelado" || (l.parcelas ?? 0) > 1);
+        const linhas = (lanc.env?.dados.itens ?? []).filter((l) => nomes.has(l.conta)).filter((l) => fTipo !== "parcelado" || (l.parcelas ?? 0) > 1)
+          .filter((l) => fTipo !== "assinatura" || nomesAssinatura.has(l.estabelecimento.toLowerCase()));
         const meses = d.itens[0].serie_12m.map((m) => m.mes);
         const topo = Math.max(1, ...meses.map((_, i) => cartoes.reduce((s, c) => s + num(c.serie_12m[i]?.total), 0)));
         const cats = new Map<string, number>();
@@ -140,7 +143,7 @@ export function Cartoes() {
                 <select className="input" aria-label="Categoria" value={fCat} onChange={(e) => setFCat(e.target.value)} style={{ width: "auto" }}><option value="">Todas as categorias</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
                 <select className="input" aria-label="Empresa" value={fEmp} onChange={(e) => setFEmp(e.target.value)} style={{ width: "auto" }}><option value="">Todas as empresas</option>{empresas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
                 <select className="input" aria-label="Para quem" value={fBen} onChange={(e) => setFBen(e.target.value)} style={{ width: "auto" }}><option value="">Para qualquer pessoa</option>{pessoas.map((c) => <option key={c.id} value={c.id}>Para {c.nome}</option>)}</select>
-                <select className="input" aria-label="Tipo" value={fTipo} onChange={(e) => setFTipo(e.target.value)} style={{ width: "auto" }}><option value="">À vista e parcelado</option><option value="parcelado">Só parcelado</option></select>
+                <select className="input" aria-label="Tipo" value={fTipo} onChange={(e) => setFTipo(e.target.value)} style={{ width: "auto" }}><option value="">À vista e parcelado</option><option value="parcelado">Só parcelado</option><option value="assinatura">Só assinatura</option></select>
               </div>
               <div role="group" aria-label="Edição em lote" style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", border: `1px solid ${marcados.length ? "var(--color-accent)" : "var(--color-divider)"}`, background: "var(--color-bg)" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", minHeight: 32, fontSize: 13 }}>
