@@ -80,3 +80,14 @@ def test_pessoa_inexistente_como_dono_nao_grava_nada(con, tmp_path):
 def test_o_arquivo_de_seeds_do_projeto_e_json_valido():
     d = json.loads((Path(__file__).parent.parent / "seeds" / "donos-padrao.json").read_text(encoding="utf-8"))
     assert {"coletivos", "responsaveis", "categorias", "contas", "compromissos"} <= set(d)
+
+
+def test_grava_parametros_sem_sobrescrever_o_existente(con, tmp_path):
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"parametros": {"categorias_assinatura": ["Assinaturas"], "outro": 1}}), encoding="utf-8")
+    r = aplicar(con, p, "teste")
+    assert r.aplicados == 2 and json.loads(con.execute("select valor from parametro where chave='categorias_assinatura'").fetchone()[0]) == ["Assinaturas"]
+    assert aplicar(con, p, "teste").aplicados == 0                      # idempotente
+    con.execute("update parametro set valor=? where chave='outro'", ("2",))
+    assert aplicar(con, p, "teste").conflitos == ["parametro outro"]    # o que o Ricardo mudou fica
+    assert con.execute("select valor from parametro where chave='outro'").fetchone()[0] == "2"

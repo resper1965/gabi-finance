@@ -313,3 +313,17 @@ def test_custo_com_cambio_do_parametro_devolve_o_cambio(cli, banco):
     c.execute("insert into parametro(chave, valor) values ('cambio_usd_brl', ?)", (json.dumps(5.5),))
     c.close()
     assert _custo(cli)["cambio_usd_brl"] == "5.50"
+
+
+def test_assinaturas_incluem_as_da_categoria_que_o_detector_nao_acha_e_marcam_as_que_pararam(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into parametro(chave, valor) values ('categorias_assinatura', ?)", (json.dumps(["Assinaturas"]),))
+    for i, mes in enumerate(("2026-02", "2026-03", "2026-04")):   # parou de cobrar em abril: o detector (últimos 4 meses) não vê
+        _l(c, 1, f"old{i}", f"{mes}-10", "OLDSAAS PRO", -9900, "custo", 4)
+    c.close()
+    d = get(cli, "/api/v1/assinaturas").json()["dados"]
+    por_nome = {i["nome"]: i for i in d["itens"]}
+    assert por_nome["OLDSAAS"]["ativa"] is False and por_nome["OLDSAAS"]["status"] == "a_conferir"
+    assert por_nome["NETFLIX"]["ativa"] is True
+    assert [i["nome"] for i in d["itens"]].index("NETFLIX") < [i["nome"] for i in d["itens"]].index("OLDSAAS")  # ativas primeiro
+    assert d["total_mensal"] == "55.90"   # só as ativas somam no mensal

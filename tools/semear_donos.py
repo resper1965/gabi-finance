@@ -1,5 +1,5 @@
 """Aplica `seeds/donos-padrao.json`: donos coletivos (Casa, Pets), quem responde por qual filha, dono padrão por categoria,
-quem usa cada cartão/conta e o padrão por compromisso. Dados em arquivo editável (R6). Idempotente; nunca sobrescreve o que o
+quem usa cada cartão/conta, o padrão por compromisso e parâmetros (ex.: categorias de assinatura). Dados em arquivo editável (R6). Idempotente; nunca sobrescreve o que o
 Ricardo já escolheu (vira `conflitos`). Uso: python -m tools.semear_donos [--arquivo CAMINHO] [--banco CAMINHO]."""
 import argparse
 import json
@@ -87,6 +87,14 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
                 r.aplicados += 1
             elif atual["para_quem_id"] not in (None, padrao.get("para_quem")):
                 r.conflitos.append(f"compromisso {linha_id}")
+        for chave, valor in d.get("parametros", {}).items():
+            atual = con.execute("select valor from parametro where chave=?", (chave,)).fetchone()
+            if atual is None:
+                con.execute("insert into parametro(chave, valor) values (?,?)", (chave, json.dumps(valor, ensure_ascii=False)))
+                _auditar(con, quem, "parametros", chave, "alterada")
+                r.aplicados += 1
+            elif json.loads(atual["valor"]) != valor:
+                r.conflitos.append(f"parametro {chave}")
     return r
 
 

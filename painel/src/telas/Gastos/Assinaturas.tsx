@@ -9,7 +9,7 @@ import { useToast } from "../../lib/toast";
 import { useApi } from "../../lib/useApi";
 
 interface Ass {
-  id: number; nome: string; mensal: string; anual: string; meses_vistos: number; status: string; lembrar_ate_cancelar: boolean;
+  id: number; nome: string; mensal: string; anual: string; meses_vistos: number; status: string; lembrar_ate_cancelar: boolean; ativa?: boolean;
   serie_12m: { mes: string; total: string }[]; desde: string | null; ultimo: string | null; total_12m: string;
   sinais: { nova: boolean; reajustou: { antes: string; agora: string } | null; cobrada_depois_de_cancelar: boolean };
 }
@@ -45,6 +45,7 @@ export function Assinaturas() {
         const aConferir = d.itens.filter((a) => a.status === "a_conferir").length;
         const flags = (a: Ass) => (
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+            {a.ativa === false && <Etiqueta tipo="conferir" texto="parou de cobrar" />}
             {a.sinais.nova && <Etiqueta tipo="atencao" texto="nova" />}
             {a.sinais.reajustou && <Etiqueta tipo="atencao" texto={`reajustou ${a.sinais.reajustou.antes} → ${a.sinais.reajustou.agora}`} />}
             {a.sinais.cobrada_depois_de_cancelar && <Etiqueta tipo="erro" texto="cobrada depois de cancelar" />}
@@ -64,7 +65,7 @@ export function Assinaturas() {
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,190px),1fr))", gap: 14 }}>
-              {[["Recorrente por mês", <Valor key="m" valor={d.total_mensal} />, `${d.itens.length} assinaturas ativas`], ["Em 12 meses", <Valor key="a" valor={total12} />, "débitos dos últimos 12 meses"]].map(([r, v, n]) => (
+              {[["Recorrente por mês", <Valor key="m" valor={d.total_mensal} />, `${d.itens.filter((a) => a.ativa !== false).length} assinaturas ativas`], ["Em 12 meses", <Valor key="a" valor={total12} />, "débitos dos últimos 12 meses"]].map(([r, v, n]) => (
                 <div key={String(r)} className="blueprint" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
                   <i className="corner tl" /><i className="corner tr" /><i className="corner bl" /><i className="corner br" />
                   <span style={{ font: "600 10.5px var(--font-body)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink2)" }}>{r}</span>

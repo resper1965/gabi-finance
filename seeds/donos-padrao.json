@@ -22,7 +22,9 @@
     "Moradia e contas": "casa",
     "Pets": "pets",
     "Restaurantes e delivery": "ricardo",
-    "Combustível": "ricardo"
+    "Combustível": "ricardo",
+    "Transporte por app": "louise",
+    "Assinaturas e serviços digitais": "ricardo"
   },
   "contas": {
     "PAO DE ACUCAR MC BLACK": [
@@ -44,5 +46,10 @@
     "carla-reembolso": {
       "para_quem": "giovanna"
     }
+  },
+  "parametros": {
+    "categorias_assinatura": [
+      "Assinaturas e serviços digitais"
+    ]
   }
 }

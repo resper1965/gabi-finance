@@ -4,6 +4,7 @@
   "itens": [
    {
     "anual": "670.80",
+    "ativa": true,
     "desde": "2026-07-03",
     "id": 1,
     "lembrar_ate_cancelar": false,

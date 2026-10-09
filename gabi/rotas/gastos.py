@@ -3,11 +3,12 @@
 Somas em centavos inteiros; texto só na borda (R7). Consome: dinheiro.{analise,repositorio,contas_pagar,modelo}, envelope.
 """
 import datetime as dt
+import json
 import re
 
 from fastapi import APIRouter, Depends, Request
 
-from gabi.dinheiro import analise, consultas, contas_pagar as cp, repositorio
+from gabi.dinheiro import analise, assinaturas as assinaturas_mod, consultas, contas_pagar as cp, repositorio
 from gabi.dinheiro.modelo import Orcamento
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -248,14 +249,20 @@ def assinaturas(request: Request):
     try:
         hoje = _agora(request).date()
         recs = [r for r in analise.recorrentes(repositorio.FonteAnalise(con), "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
+        # Além do detector: lojas das categorias de assinatura (parâmetro editável) com cobrança em 2+ meses; as que pararam vêm como inativas.
+        p = con.execute("select valor from parametro where chave='categorias_assinatura'").fetchone()
+        nomes = json.loads(p["valor"]) if p else []
+        extras = assinaturas_mod.candidatas_por_categoria(con, hoje, nomes, {r["chave"] for r in recs})
+        todas = [{**r, "ativa": True} for r in recs] + extras
         con.execute("begin")
         try:
-            itens = [_assinatura(con, r["chave"], r["descricao"], r, hoje) for r in recs]
+            itens = [{**_assinatura(con, r["chave"], r["descricao"], r, hoje), "ativa": r["ativa"]} for r in todas]
             con.execute("commit")
         except BaseException:
             con.execute("rollback")
             raise
-        total = sum(para_centavos(r["valor_medio"]) for r in recs)
+        itens.sort(key=lambda i: (not i["ativa"], -float(i["anual"])))
+        total = sum(para_centavos(r["valor_medio"]) for r in todas if r["ativa"])
         return envelope(con, {"itens": itens, "total_mensal": formatar(total),
                               "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens)}, agora=_agora(request))
     finally:

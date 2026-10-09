@@ -181,3 +181,14 @@ test("APagar: rodada nao conferida mostra o motivo", async () => {
   expect(within(bloco).getByText(/Itaú PF/)).toBeInTheDocument();
   expect(within(bloco).getByText(/diferença de -401663 centavos/)).toBeInTheDocument();
 });
+
+test("Assinaturas mostra 'parou de cobrar' nas inativas e conta so as ativas", async () => {
+  const base = amostra("assinaturas");
+  const ativa = { ...base.dados.itens[0], ativa: true };
+  const parou = { ...base.dados.itens[0], id: 99, nome: "SAAS ANTIGO", ativa: false };
+  apiFalsa({ assinaturas: { ...base, dados: { ...base.dados, itens: [ativa, parou] } } });
+  montar(<Assinaturas />);
+  expect(await screen.findByText("SAAS ANTIGO")).toBeTruthy();
+  expect(screen.getAllByText("parou de cobrar")).toHaveLength(1);
+  expect(screen.getByText("1 assinaturas ativas")).toBeTruthy();
+});
