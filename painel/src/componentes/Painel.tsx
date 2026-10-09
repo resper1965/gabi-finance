@@ -14,7 +14,7 @@ export function Painel<T>({ leitura, arquivo, children }: { leitura: Leitura<T>;
   const parada = env.fontes.find((f) => f.estado !== "ok");
   return (
     <>
-      <Faixa dadosAte={env.dados_ate} desatualizado={env.desatualizado} fonte={parada?.nome} />
+      <Faixa dadosAte={env.dados_ate} desatualizado={env.desatualizado} fonte={parada?.nome} proximaRodada={env.proxima_rodada} />
       {estado === "erro" && <Erro arquivo={arquivo} motivo={erro?.message ?? "erro"} />}
       {children(env.dados)}
     </>

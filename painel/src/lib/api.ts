@@ -1,6 +1,6 @@
 /** Cliente da API. Toda leitura de dinheiro vem no envelope {dados_ate, desatualizado, fontes, dados}. */
 export interface Fonte { nome: string; estado: string; ultima: string | null }
-export interface Envelope<T> { dados_ate: string | null; desatualizado: boolean; fontes: Fonte[]; dados: T }
+export interface Envelope<T> { dados_ate: string | null; desatualizado: boolean; proxima_rodada?: string | null; fontes: Fonte[]; dados: T }
 
 export class ErroApi extends Error {
   constructor(public status: number, public codigo: string, mensagem: string) { super(mensagem); }

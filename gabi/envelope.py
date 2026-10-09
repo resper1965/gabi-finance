@@ -3,6 +3,8 @@ import datetime as dt
 
 IGNORADAS = ("backup", "importacao-staging", "open-finance-saldos")  # não são fontes que se "confere" (saldos têm rodada própria)
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
+BRT = dt.timezone(dt.timedelta(hours=-3))
+HORAS_RODADAS = (7, 15)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
 
 
 def _utc(s: str) -> dt.datetime:
@@ -12,6 +14,17 @@ def _utc(s: str) -> dt.datetime:
 
 def _z(d: dt.datetime) -> str:
     return d.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def proxima_rodada(agora: dt.datetime) -> str:
+    """Próxima rodada de extratos (UTC, ISO Z), pelos horários de Brasília do timer."""
+    b = agora.astimezone(BRT)
+    for dia in (0, 1):
+        for h in HORAS_RODADAS:
+            c = (b + dt.timedelta(days=dia)).replace(hour=h, minute=0, second=0, microsecond=0)
+            if c > b:
+                return _z(c.astimezone(dt.timezone.utc))
+    raise AssertionError("inalcançável")
 
 
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
@@ -38,4 +51,4 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     dados_ate = None if (falta or not ultimas) else min(ultimas)  # a fonte mais velha manda
     return {"dados_ate": _z(dados_ate) if dados_ate else None,
             "desatualizado": dados_ate is None or agora - dados_ate > LIMITE_DESATUALIZADO,
-            "fontes": fontes, "dados": dados}
+            "proxima_rodada": proxima_rodada(agora), "fontes": fontes, "dados": dados}

@@ -36,6 +36,11 @@ test("Faixa em dia nao e amarela", () => {
   expect(screen.getByRole("status")).toHaveTextContent("dados até 08/10 07:00");
 });
 
+test("Faixa mostra a próxima rodada no horário de Brasília", () => {
+  render(<Faixa dadosAte="2026-10-08T10:00:00Z" proximaRodada="2026-10-08T18:00:00Z" />);
+  expect(screen.getByRole("status")).toHaveTextContent("próxima rodada às 15h");
+});
+
 test("Etiqueta sempre tem simbolo e texto", () => {
   const tipos: TipoEtiqueta[] = ["erro", "conferir", "ok", "atencao", "parado", "regra", "banco", "paperless", "ajuste"];
   for (const t of tipos) {

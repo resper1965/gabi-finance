@@ -1,6 +1,6 @@
 # API do gabi.brain (gerado do código; não editar à mão)
 
-Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400), `nao_autenticado` (401), `sem_escopo`/`nao_permitido` (403), `nao_encontrado` (404), `conflito`/`confirmacao_divergente` (409), `tipo_invalido` (415). Dinheiro: string decimal ("1234.56"), saída negativa. Toda leitura de dinheiro traz o envelope `{dados_ate, desatualizado, fontes, dados}` (dados_ate = última rodada CONFERIDA).
+Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400), `nao_autenticado` (401), `sem_escopo`/`nao_permitido` (403), `nao_encontrado` (404), `conflito`/`confirmacao_divergente` (409), `tipo_invalido` (415). Dinheiro: string decimal ("1234.56"), saída negativa. Toda leitura de dinheiro traz o envelope `{dados_ate, desatualizado, proxima_rodada, fontes, dados}` (dados_ate = última rodada CONFERIDA; proxima_rodada = próxima captura agendada, UTC).
 
 ## REST (`/api/...`, só por `tailscale serve`; nível `boss` salvo indicação)
 

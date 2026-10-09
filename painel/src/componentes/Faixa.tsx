@@ -5,6 +5,7 @@ export interface FaixaProps {
   dadosAte: string | null; // ISO; vem do envelope (última rodada CONFERIDA)
   desatualizado?: boolean;
   fonte?: string; // qual fonte parou
+  proximaRodada?: string | null; // ISO; próxima captura agendada
 }
 
 /** Onde a Shell quer a faixa (acima do conteúdo, fora do padding). Sem Shell, a faixa sai no lugar. */
@@ -17,8 +18,15 @@ export function formatarDadosAte(iso: string): string {
   return `${p.day}/${p.month} ${p.hour}:${p.minute}`;
 }
 
+const HORA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false });
+/** "15h" (ou "15h30") no horário de Brasília. */
+export function formatarHora(iso: string): string {
+  const [h, m] = HORA.format(new Date(iso)).split(":");
+  return m === "00" ? `${Number(h)}h` : `${Number(h)}h${m}`;
+}
+
 /** Faixa "dados até DD/MM hh:mm" no topo de todo painel; amarela e com a fonte quando desatualizado. */
-export function Faixa({ dadosAte, desatualizado, fonte }: FaixaProps) {
+export function Faixa({ dadosAte, desatualizado, fonte, proximaRodada }: FaixaProps) {
   const slot = useContext(FaixaSlot);
   const faixa = (
     <div
@@ -36,6 +44,7 @@ export function Faixa({ dadosAte, desatualizado, fonte }: FaixaProps) {
         ? <span>{desatualizado ? "Dados desatualizados · até" : "dados até"} <strong>{formatarDadosAte(dadosAte)}</strong></span>
         : <span>sem dados conferidos ainda</span>}
       {desatualizado && fonte && <span>{fonte} parou</span>}
+      {proximaRodada && <span>· próxima rodada às {formatarHora(proximaRodada)}</span>}
     </div>
   );
   return slot ? createPortal(faixa, slot) : faixa;

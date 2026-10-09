@@ -13,7 +13,7 @@ from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, criar_mcp
 RAIZ = Path(__file__).resolve().parent.parent
 FORMATO = ("Erros: `{\"erro\": <codigo>, \"mensagem\": <pt-BR>}` com `requisicao_invalida` (400), `nao_autenticado` (401), `sem_escopo`/`nao_permitido` (403), "
            "`nao_encontrado` (404), `conflito`/`confirmacao_divergente` (409), `tipo_invalido` (415). Dinheiro: string decimal (\"1234.56\"), saída negativa. "
-           "Toda leitura de dinheiro traz o envelope `{dados_ate, desatualizado, fontes, dados}` (dados_ate = última rodada CONFERIDA).")
+           "Toda leitura de dinheiro traz o envelope `{dados_ate, desatualizado, proxima_rodada, fontes, dados}` (dados_ate = última rodada CONFERIDA; proxima_rodada = próxima captura agendada, UTC).")
 
 
 def montar(banco: Path | None = None) -> tuple[str, dict]:
