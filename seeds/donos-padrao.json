@@ -397,6 +397,12 @@
         "para_quem": "ricardo",
         "empresa": "ionic-health-br"
       }
+    },
+    {
+      "padrao": "AREZZO",
+      "acao": {
+        "para_quem": "louise"
+      }
     }
   ]
 }
