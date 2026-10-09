@@ -47,12 +47,21 @@ def _texto_lote(itens: list[ItemLote]) -> str:
     return f"Lançar no Nibo da Bekaa: {len(itens)} despesas, {_brl(sum(i.valor_centavos for i in itens))}."
 
 
-def montar_lote(con, dia: dt.date) -> Lote:
-    """Despesas da Bekaa (`pj_titular`) pagas em conta PF e ainda sem agendamento ok no Nibo. Remonta o lote aberto do dia, se houver."""
-    itens = [ItemLote(r["id"], r["data"], r["descricao_original"], -r["valor_centavos"]) for r in con.execute(
+def itens_do_lote(con) -> list[ItemLote]:
+    """Despesas da Bekaa (`pj_titular`) pagas em conta PF e ainda sem agendamento ok no Nibo (não grava nada)."""
+    return [ItemLote(r["id"], r["data"], r["descricao_original"], -r["valor_centavos"]) for r in con.execute(
         "select l.id, l.data, l.descricao_original, l.valor_centavos from lancamento l join conta c on c.id=l.conta_id "
         "join empresa e on e.id=l.empresa_id where e.relacao='pj_titular' and l.valor_centavos<0 and c.pj=0 and not exists ("
         "  select 1 from lote_nibo_item i where i.lancamento_id=l.id and i.estado='ok') order by l.data, l.id")]
+
+
+def texto_do_lote(itens: list[ItemLote]) -> str:
+    return _texto_lote(itens)
+
+
+def montar_lote(con, dia: dt.date) -> Lote:
+    """Monta o lote do dia (remonta o lote aberto, se houver)."""
+    itens = itens_do_lote(con)
     texto = _texto_lote(itens)
     aberto = con.execute("select id from lote_nibo where dia=? and estado='montado'", (dia.isoformat(),)).fetchone()
     if aberto:

@@ -63,7 +63,7 @@ def _aviso(con, tipo: str, payload: dict) -> None:
 def decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None = None, beneficiario_id: str | None = None, mensagem: str | None = None) -> None:
     """aprovar | recusar | pedir_info. Aprovar exige conta e beneficiário, cria o compromisso do mês e avisa o canal."""
     p = estado(con, pedido_id)
-    if p["estado"] != "pendente":
+    if p["estado"] not in ("pendente", "info_pedida"):  # info_pedida continua aberto até o Ricardo decidir
         raise ValueError(f"pedido {pedido_id} já está {p['estado']}")
     if acao not in ("aprovar", "recusar", "pedir_info"):
         raise ValueError("ação inválida")

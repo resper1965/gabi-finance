@@ -40,7 +40,11 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
             props = (t.input_schema or {}).get("properties", {}) if hasattr(t, "input_schema") else (t.inputSchema or {}).get("properties", {})
             entrada = ", ".join(sorted(props)) or "—"
             linhas.append(f"| `{t.name}` | `{ESCOPOS_FERRAMENTAS[t.name]}` | {entrada} | {(t.description or '').strip().splitlines()[0]} |")
-        linhas += ["", "Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).", ""]
+        linhas += ["", "Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).", "",
+                   "## Pedidos {#pedidos}", "",
+                   "Receita (agente de canal): 1) `pedidos_registrar` com o remetente (`canal:identificador`) e os dados do pedido; 2) responder ao solicitante exatamente com `texto_para_responder` (nunca diga que pagou); "
+                   "3) o Ricardo decide no painel (Caixa › Pedidos): aprovar, pedir mais informação ou recusar; 4) `avisos_pendentes` traz o resultado; entregue no canal e confirme com `avisos_confirmar_entrega`; "
+                   "5) `pedidos_estado` consulta o andamento. Remetente não cadastrado ou sem permissão de pedir recebe `sem_escopo`.", ""]
         return "\n".join(linhas), openapi
 
 

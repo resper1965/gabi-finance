@@ -24,6 +24,19 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/caixa/resumo` | KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção. |
 | GET | `/api/v1/caixa/semanas` | Semanas (passado real e projeção): entradas e saídas por categoria e saldo. |
 | GET | `/api/v1/cartoes` | Cartões: fatura aberta, % do limite, série de 12 meses e categorias. |
+| GET | `/api/v1/cobrar/cobrancas` | Rascunhos de cobrança guardados (opcionalmente de uma empresa). |
+| POST | `/api/v1/cobrar/cobrancas` | Monta o RASCUNHO do e-mail de cobrança (não envia). Corpo: {"empresa_id", "itens"?: [lancamento_id]}. |
+| POST | `/api/v1/cobrar/cobrancas/{cid}/enviar` | Desabilitado (ADR-006): o app só guarda o rascunho. |
+| GET | `/api/v1/cobrar/comprovantes` | Vínculos propostos (comprovante × lançamento, com confiança e motivo) e as despesas de empresa ainda sem comprovante (padrão: últimos 90 dias). |
+| POST | `/api/v1/cobrar/lote/montar` | Monta (ou remonta) o lote do dia para o Nibo da Bekaa e devolve o texto de confirmação gerado pelo servidor. |
+| POST | `/api/v1/cobrar/lote/{lote_id}/executar` | ÚNICA gravação externa: grava o lote no Nibo. Exige {"confirmacao": <texto exato>}; divergência = 409 e nada é gravado. |
+| GET | `/api/v1/cobrar/pedidos` | Pedidos pendentes (inclui os com informação pedida) ou `decididos`. |
+| POST | `/api/v1/cobrar/pedidos/{pid}/decidir` | aprovar (exige conta_id e beneficiario_id), recusar ou pedir_info. Só o Ricardo decide, pelo painel. |
+| GET | `/api/v1/cobrar/reembolsos` | Reembolsos por empresa contratante (itens em aberto e cobranças) e a prévia do lote do Nibo da Bekaa. |
+| POST | `/api/v1/cobrar/reembolsos` | Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança da empresa contratante. |
+| POST | `/api/v1/cobrar/reembolsos/{rid}/cobrado` | Marca a cobrança como cobrada (a_cobrar → cobrado); repetir dá 409. |
+| POST | `/api/v1/cobrar/vinculos/{vid}/confirmar` | Confirma um vínculo proposto (comprovante × lançamento); só o Ricardo confirma. |
+| POST | `/api/v1/cobrar/vinculos/{vid}/rejeitar` | Rejeita um vínculo proposto; o par não volta a ser proposto como confirmado. |
 | GET | `/api/v1/contagens` | Itens que pedem decisão por área do menu (caixa, gastos, regras) e o total do sino. |
 | GET | `/api/v1/contas-pagar` | Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas. |
 | POST | `/api/v1/contas-pagar/{id_compromisso}/paga` | Baixa manual de um compromisso (vale só se não houver lançamento no extrato). |
@@ -64,3 +77,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `tarefas_propor` | `propostas` | motivo, titulo, vencimento | PROPÕE uma tarefa para o Ricardo. Cria só sugestão pendente; nada vai para a origem (Microsoft 365, Linear) sem ele aprovar. |
 
 Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).
+
+## Pedidos {#pedidos}
+
+Receita (agente de canal): 1) `pedidos_registrar` com o remetente (`canal:identificador`) e os dados do pedido; 2) responder ao solicitante exatamente com `texto_para_responder` (nunca diga que pagou); 3) o Ricardo decide no painel (Caixa › Pedidos): aprovar, pedir mais informação ou recusar; 4) `avisos_pendentes` traz o resultado; entregue no canal e confirme com `avisos_confirmar_entrega`; 5) `pedidos_estado` consulta o andamento. Remetente não cadastrado ou sem permissão de pedir recebe `sem_escopo`.

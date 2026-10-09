@@ -57,12 +57,14 @@ def _guarda_csrf(request: Request) -> JSONResponse | None:
     return None
 
 
-def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origens_confiaveis=()) -> FastAPI:
+def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origens_confiaveis=(), fontes=None) -> FastAPI:
     """permite_tcp_local=False é o padrão de produção: só o socket Unix do serviço é origem confiável."""
     app = FastAPI(title="gabi.brain", docs_url=None, redoc_url=None)
     app.state.banco = Path(banco)
     app.state.permite_tcp_local = permite_tcp_local
     app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
+    from gabi.fontes.ambiente import fontes_do_ambiente
+    app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábricas de Nibo/Paperless (injetáveis nos testes)
     app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)
@@ -161,6 +163,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_cadastros)
     from gabi.rotas.contagens import router as rotas_contagens
     app.include_router(rotas_contagens)
+    from gabi.rotas.cobrar import router as rotas_cobrar
+    app.include_router(rotas_cobrar)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")
