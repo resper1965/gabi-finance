@@ -76,9 +76,10 @@ export function Regras() {
                       <span aria-hidden="true" style={{ color: "var(--ink2)" }}>→</span>
                       {g.payload.acao?.categoria_id !== undefined && categorias.length > 0
                         ? (
-                          <select aria-label={`Categoria da sugestão ${g.payload.padrao}`} value={edicoes[g.id] ?? Number(g.payload.acao.categoria_id)}
+                          <select aria-label={`Categoria da sugestão ${g.payload.padrao}`} value={edicoes[g.id] ?? Number(g.payload.acao.categoria_id ?? 0)}
                             onChange={(e) => setEdicoes({ ...edicoes, [g.id]: Number(e.target.value) })}
                             style={{ height: 32, padding: "0 8px", border: "1px solid var(--color-divider)", background: "var(--color-surface)", color: "inherit", font: "600 14px var(--font-body)" }}>
+                            {g.payload.acao.categoria_id == null && <option value={0}>escolher…</option>}
                             {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                           </select>
                         )
@@ -87,7 +88,7 @@ export function Regras() {
                     <span style={{ fontSize: 13, color: "var(--ink2)", textWrap: "pretty" }}>{g.motivo}</span>
                     {g.impacto && <span style={{ fontSize: 13 }}>afeta <strong>{g.impacto.passado ?? 0} lançamentos passados</strong> e todos os próximos (~{g.impacto.futuro_estimado ?? 0} por mês)</span>}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="btn btn-primary" onClick={() => decidir([g.id], "aprovar")}>Aprovar e ligar</button>
+                      <button className="btn btn-primary" disabled={g.payload.acao?.categoria_id === null && !edicoes[g.id]} onClick={() => decidir([g.id], "aprovar")}>Aprovar e ligar</button>
                       <button className="btn btn-secondary" onClick={() => decidir([g.id], "rejeitar")}>Rejeitar</button>
                     </div>
                   </div>

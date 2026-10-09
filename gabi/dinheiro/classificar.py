@@ -155,7 +155,9 @@ def classificar(con, lancamento_id: int) -> Classificacao:
 
 
 def classificar_pendentes(con) -> ResumoClassificacao:
+    from gabi.dinheiro.favorecidos import sugerir_por_favorecido  # import tardio: favorecidos usa regras, que usa este módulo
     ids = [r[0] for r in con.execute("select id from lancamento where categoria_id is null or para_quem_id is null order by id")]
     antes = con.execute("select count(*) from sugestao").fetchone()[0]
     resolvidos = sum(1 for i in ids if classificar(con, i).origens)
+    sugerir_por_favorecido(con)
     return ResumoClassificacao(len(ids), resolvidos, con.execute("select count(*) from sugestao").fetchone()[0] - antes)

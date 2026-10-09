@@ -288,3 +288,15 @@ def test_rodada_traz_as_conferencias_reprovadas_so_de_contas_liberadas(cli, banc
 def test_rodada_conferida_nao_tem_reprovadas(cli):
     itens = get(cli, "/api/v1/rodadas").json()["dados"]["itens"]
     assert all(x["reprovadas"] == [] for x in itens if x["conferida"])
+
+
+def test_lista_de_sugestoes_aceita_regra_sem_categoria_e_aprovar_sem_escolher_da_400(cli, banco):
+    from gabi.dinheiro.regras import criar_sugestao
+    c = conectar(banco)
+    sid = criar_sugestao(c, "regra", None, {"padrao": "BEKAA", "acao": {"categoria_id": None}}, "3 PIX para BEKAA sem categoria; escolha a categoria")
+    c.close()
+    r = get(cli, "/api/v1/sugestoes")
+    assert r.status_code == 200
+    item = next(i for i in r.json()["dados"]["itens"] if i["id"] == sid)
+    assert item["payload"]["acao"] == {"categoria_id": None} and item["impacto"] is None   # sem categoria, não há o que contar
+    assert post(cli, f"/api/v1/sugestoes/{sid}/aprovar", {}).status_code == 400

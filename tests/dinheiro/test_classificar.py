@@ -243,3 +243,11 @@ def test_nunca_sobrescreve_o_que_o_ricardo_ja_decidiu(con):
     lid = _lanc(con, 1, para_quem_id="giovanna", para_quem_origem="voce")
     classificar(con, lid)
     assert _l(con, lid)["para_quem_id"] == "giovanna" and _l(con, lid)["para_quem_origem"] == "voce"
+
+
+def test_classificar_pendentes_gera_sugestao_de_regra_por_favorecido(con):
+    for i in range(3):
+        _lanc(con, 900 + i, desc="Pix enviado FULANO DE TAL", estab="Pix enviado FULANO DE TAL")
+    r = classificar_pendentes(con)
+    assert r.sugestoes >= 1
+    assert con.execute("select count(*) from sugestao where tipo='regra' and payload like '%FULANO%'").fetchone()[0] == 1
