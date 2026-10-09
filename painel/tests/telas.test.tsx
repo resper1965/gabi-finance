@@ -103,3 +103,28 @@ test("erro de API mostra o estado de erro com os ultimos dados bons guardados", 
   montar(<Regras />);
   expect(await screen.findByText(/continuam guardados/)).toBeInTheDocument();
 });
+
+const sugestaoDeRegra = () => {
+  const base = amostra("sugestoes");
+  return { ...base, dados: { itens: [{ id: 7, tipo: "regra", lancamento_id: null, estado: "pendente", motivo: "UBER aparece 6 vezes",
+    payload: { padrao: "UBER", acao: { categoria_id: 1 } }, impacto: { passado: 6, futuro_estimado: 2 }, criado_em: "2026-10-08T12:00:00", decidida_em: null }] } };
+};
+
+test("Regras: trocar a categoria da sugestao envia a edicao ao aprovar", async () => {
+  const chamadas = apiFalsa({ sugestoes: sugestaoDeRegra() });
+  montar(<Regras />);
+  const seletor = await screen.findByRole("combobox", { name: /Categoria da sugestão UBER/ });
+  fireEvent.change(seletor, { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar e ligar" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /\/sugestoes\/7\/aprovar$/.test(c.url))).toBe(true));
+  expect(chamadas.find((c) => c.metodo === "POST")!.corpo).toEqual({ edicao: { acao: { categoria_id: 2 } } });
+});
+
+test("Regras: sem trocar a categoria aprova sem edicao", async () => {
+  const chamadas = apiFalsa({ sugestoes: sugestaoDeRegra() });
+  montar(<Regras />);
+  await screen.findByRole("combobox", { name: /Categoria da sugestão UBER/ });
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar e ligar" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST")).toBe(true));
+  expect((chamadas.find((c) => c.metodo === "POST")!.corpo as { edicao?: unknown }).edicao).toBeUndefined();
+});

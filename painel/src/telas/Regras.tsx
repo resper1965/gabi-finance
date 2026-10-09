@@ -19,6 +19,7 @@ export function Regras() {
   const avisar = useToast();
   const [busca, setBusca] = useState("");
   const [marcadas, setMarcadas] = useState<number[]>([]);
+  const [edicoes, setEdicoes] = useState<Record<number, number>>({}); // sugestão -> categoria escolhida antes de aprovar
   const recarregar = () => { regras.recarregar(); sugestoes.recarregar(); };
   const alvo = (acao: Record<string, number | string> | undefined) => {
     if (!acao) return "?";
@@ -33,7 +34,12 @@ export function Regras() {
   };
   const decidir = async (ids: number[], acao: "aprovar" | "rejeitar") => {
     try {
-      for (const id of ids) await api.post(acao === "aprovar" ? `/api/v1/sugestoes/${id}/aprovar` : `/api/v1/sugestoes/${id}/rejeitar`);
+      for (const id of ids) {
+        const s = (sugestoes.env?.dados.itens ?? []).find((x) => x.id === id);
+        const nova = edicoes[id];
+        const edicao = acao === "aprovar" && nova !== undefined && s ? { edicao: { acao: { ...s.payload.acao, categoria_id: nova } } } : undefined;
+        await api.post(acao === "aprovar" ? `/api/v1/sugestoes/${id}/aprovar` : `/api/v1/sugestoes/${id}/rejeitar`, edicao);
+      }
       avisar(acao === "aprovar" ? `${ids.length === 1 ? "Regra criada" : `${ids.length} regras criadas`} por você.` : "Sugestão rejeitada.");
       setMarcadas([]); recarregar();
     } catch (e) { avisar((e as Error).message); }
@@ -68,7 +74,15 @@ export function Regras() {
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                       <code style={{ font: "600 13px var(--mono)", padding: "2px 6px", background: "var(--color-surface)" }}>{g.payload.padrao}</code>
                       <span aria-hidden="true" style={{ color: "var(--ink2)" }}>→</span>
-                      <span style={{ fontWeight: 600 }}>{alvo(g.payload.acao)}</span>
+                      {g.payload.acao?.categoria_id !== undefined && categorias.length > 0
+                        ? (
+                          <select aria-label={`Categoria da sugestão ${g.payload.padrao}`} value={edicoes[g.id] ?? Number(g.payload.acao.categoria_id)}
+                            onChange={(e) => setEdicoes({ ...edicoes, [g.id]: Number(e.target.value) })}
+                            style={{ height: 32, padding: "0 8px", border: "1px solid var(--color-divider)", background: "var(--color-surface)", color: "inherit", font: "600 14px var(--font-body)" }}>
+                            {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                          </select>
+                        )
+                        : <span style={{ fontWeight: 600 }}>{alvo(g.payload.acao)}</span>}
                     </div>
                     <span style={{ fontSize: 13, color: "var(--ink2)", textWrap: "pretty" }}>{g.motivo}</span>
                     {g.impacto && <span style={{ fontSize: 13 }}>afeta <strong>{g.impacto.passado ?? 0} lançamentos passados</strong> e todos os próximos (~{g.impacto.futuro_estimado ?? 0} por mês)</span>}
