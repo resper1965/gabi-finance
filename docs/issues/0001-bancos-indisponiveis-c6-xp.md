@@ -1,6 +1,6 @@
 # Issue 0001 — Bancos indisponíveis na captura (C6 Bank Empresas e XP Investimentos)
 
-Aberta: 09/10/2026 · Estado: **aberta** · Natureza: dado/seed (conexão no provedor), **não é bug de código**.
+Aberta: 09/10/2026 · Estado: **aberta (em espera; Ricardo decidiu tratá-la como issue a resolver depois)** · Natureza: dado/seed (conexão no provedor), **não é bug de código**.
 
 ## O que acontece
 O mcp.ai (Open Finance) devolve `status_conexao` com erro para duas instituições; a captura do gabi.brain registra e segue.
@@ -18,6 +18,11 @@ O mcp.ai (Open Finance) devolve `status_conexao` com erro para duas instituiçõ
 ## Ação (fora do código)
 1. Reconectar/renovar o consentimento de C6 Bank Empresas e XP Investimentos no mcp.ai (ação do Ricardo).
 2. Depois: rodar `sudo systemctl start gabi-brain-extratos` e conferir `rodada.conferida=1` e `conta_estado.status_conexao`.
+
+## Atualização 09/10/2026 (noite)
+- Uma causa separada foi resolvida: a `MCPAI_KEY` do brain tinha sido recusada (401 desde 17:05); chave nova instalada em `/etc/gabi/brain.env`, saldos e extratos voltaram a autenticar.
+- Ricardo viu o mcp.ai indicando todos os bancos funcionais, mas as rodadas seguintes seguiram com `conferida=False`: Santander, Itaú, C6 Bank Empresas e XP Banking com "última atualização 09/10 18:00 UTC" e XP Investimentos desde 12/08 (a sincronização forçada não obteve dados novos dentro da janela de 5 min). Ou seja, o problema não é só C6/XP: nenhum banco publicou lançamentos novos depois das 18:00 UTC.
+- Uma rodada de extratos com `--sincronizar` demora vários minutos (até 5 min por banco; limite da unit 15 min), o que não é falha.
 
 ## Decisões
 - Tratado como **seed**, não desenvolvimento: não bloqueia o app (foco em painel/Fase 1). (Ricardo, 09/10)
