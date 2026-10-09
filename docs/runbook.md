@@ -71,3 +71,13 @@ Despesa paga no PF para uma **empresa contratante** (ness, IONIC; `empresa.relac
 2. `marcar_cobrado` quando o Ricardo cobra (o e-mail é só rascunho, ADR-006).
 3. `conciliar_recebimento(con, empresa_id, credito_id)`: entrada em conta PJ baixa os itens **já cobrados**, do mais antigo ao mais novo; a sobra volta no resultado; o mesmo crédito não baixa duas vezes (`reembolso_baixa`).
 4. Para a Gabi propor o vínculo de um comprovante ao item, ver `#comprovantes`.
+
+## Lote do Nibo {#lote-nibo}
+Despesa da **Bekaa** (`empresa.relacao='pj_titular'`) paga em conta PF vira um agendamento a pagar ao sócio no Nibo. É a **única gravação externa** do app.
+1. `montar_lote(con, dia)` lista as despesas ainda sem agendamento ok e gera o texto `Lançar no Nibo da Bekaa: N despesas, R$ X.` (N e X calculados no servidor). Montar de novo no mesmo dia refaz o lote aberto.
+2. O Ricardo confirma **com esse texto exato**; texto diferente (um centavo) = 409 `confirmacao_divergente` e nada é gravado.
+3. `executar_lote` cria, por item, o agendamento com `reference gabi:<lancamento_id>` (antes consulta a `reference`: se já existe, pula) e anexa o comprovante confirmado (Paperless). Erro num item não desfaz os outros.
+4. **Reprocessar:** o item fica `erro` (veja `lote_nibo_item.erro`); o próximo `montar_lote` o inclui de novo. Se o agendamento já foi criado mas o anexo falhou, o reprocesso só anexa. Repetir é seguro: nunca duplica.
+5. **Baixa:** quando a PJ reembolsa o sócio (Pix C6 PJ → Itaú PF de valor igual), `texto_baixa` gera `Baixar no Nibo: <despesa>, R$ X, pelo Pix de DD/MM.` e `executar_baixa` só baixa com esse texto, uma vez por crédito.
+6. **Desfazer no Nibo (manual):** o app não apaga nada. Localize o agendamento pela `reference gabi:<id>` e exclua pela tela do Nibo; depois marque o item para reprocessar apagando a linha de `lote_nibo_item` correspondente.
+7. **Pré-requisitos (cadastros):** `parametro nibo_socio_id` (stakeholderId do sócio), `categoria.nibo_category_id` em cada categoria usada, `empresa.relacao`. Sem a categoria equivalente o item vira erro, nunca adivinha.

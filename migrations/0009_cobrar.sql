@@ -36,3 +36,18 @@ create table reembolso_item(
 create table reembolso_baixa(  -- um crédito baixa uma vez só
   credito_lancamento_id integer primary key references lancamento(id),
   empresa_id text not null references empresa(id), valor_centavos integer not null, criado_em text not null);
+
+-- Lote diário "Lançar na PJ" (única gravação externa; Nibo da Bekaa). Despesa da Bekaa paga no PF vira agendamento a pagar ao sócio.
+alter table categoria add column nibo_category_id text;  -- categoria equivalente no Nibo (cadastro; sem ela o item vira erro, nunca adivinha)
+create table lote_nibo(
+  id integer primary key,
+  dia text not null,
+  estado text not null default 'montado' check (estado in ('montado','confirmado','executado')),
+  texto_confirmacao text not null, criado_em text not null);
+create table lote_nibo_item(
+  lote_id integer not null references lote_nibo(id),
+  lancamento_id integer not null references lancamento(id),
+  estado text not null default 'pendente' check (estado in ('pendente','ok','erro')),
+  schedule_id text, erro text, baixa_credito_id integer references lancamento(id),
+  primary key (lote_id, lancamento_id));
+create index lote_nibo_item_lancamento on lote_nibo_item(lancamento_id, estado);
