@@ -273,13 +273,27 @@
       "padrao": "REGISTRO ?BR",
       "acao": {
         "para_quem": "ricardo",
-        "empresa": "ness"
+        "empresa": "bekaa"
       }
     },
     {
       "padrao": "ZENKLUB",
       "acao": {
         "para_quem": "giovanna"
+      }
+    },
+    {
+      "padrao": "ZA A INSTITU",
+      "acao": {
+        "para_quem": "sabrina"
+      }
+    },
+    {
+      "padrao": "BRAND ?-?YOURSELF",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "bekaa",
+        "categoria": "Assinaturas e serviços digitais"
       }
     }
   ]
