@@ -6,6 +6,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, Request
 
 from gabi.cobrar import cadastro, cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
+from gabi.cobrar import recebimentos as rec
 from gabi.cobrar.previsao import RECENTE_DIAS, previsao as calcular_previsao
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.valor import formatar
@@ -223,10 +224,13 @@ def notas(request: Request, aberta: int = 0):
     con = _con(request)
     try:
         hoje = _agora(request).date()
-        itens, totais = [], {"a_vencer": 0, "a_confirmar": 0, "antigas": 0, "nibo_diz_pago": 0}
+        itens, totais = [], {"a_vencer": 0, "a_confirmar": 0, "antigas": 0, "nibo_diz_pago": 0, "recebidas": 0}
+        recebidas = {r[0] for r in con.execute("select nota_id from recebimento_nota where estado='confirmado'")}
         for n in con.execute("select * from nota_fiscal where status='autorizada'" + (" and nibo_pago=0" if aberta else "") + " order by vencimento desc, numero desc limit 400"):
             venc = dt.date.fromisoformat(n["vencimento"]) if n["vencimento"] else None
-            if n["nibo_pago"]:
+            if n["id"] in recebidas:
+                sit, chave = "recebida", "recebidas"
+            elif n["nibo_pago"]:
                 sit, chave = "nibo_diz_pago", "nibo_diz_pago"
             elif venc is None or venc >= hoje:
                 sit, chave = "a_vencer", "a_vencer"
@@ -241,6 +245,49 @@ def notas(request: Request, aberta: int = 0):
         return envelope(con, {"itens": itens, "totais": {k: formatar(v) for k, v in totais.items()}}, agora=_agora(request))
     finally:
         con.close()
+
+
+@router.get("/recebimentos")
+def recebimentos(request: Request):
+    """Créditos do extrato que a Gabi propõe como recebimento de uma NFS-e (valor líquido igual); só o Ricardo confirma."""
+    con = _con(request)
+    try:
+        itens = [{"id": r["id"], "confianca": r["confianca"], "motivo": r["motivo"],
+                  "nota": {"numero": r["numero"], "tomador": r["tomador_nome"], "vencimento": r["vencimento"], "liquido": formatar(r["valor_liquido_centavos"] or 0)},
+                  "lancamento": {"id": r["lid"], "data": r["data"], "descricao": r["descricao_original"], "valor": formatar(r["valor_centavos"])}}
+                 for r in con.execute(
+                     "select rn.id, rn.confianca, rn.motivo, n.numero, n.tomador_nome, n.vencimento, n.valor_liquido_centavos, l.id as lid, l.data, l.descricao_original, l.valor_centavos "
+                     "from recebimento_nota rn join nota_fiscal n on n.id=rn.nota_id join lancamento l on l.id=rn.lancamento_id where rn.estado='proposto' "
+                     "order by rn.confianca desc, rn.id")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+def _decidir_recebimento(request: Request, rid: int, acao, ident: Identidade):
+    con = _con(request)
+    try:
+        try:
+            acao(con, rid, ident.login)
+        except LookupError as e:
+            raise erro(404, "nao_encontrado", str(e))
+        except ValueError as e:
+            raise erro(409, "conflito", str(e))
+        return envelope(con, {"id": rid, "ok": True}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/recebimentos/{rid}/confirmar")
+async def recebimento_confirmar(rid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Confirma o recebimento proposto (a nota deixa de ser prevista; as outras propostas da nota e do crédito caem)."""
+    return _decidir_recebimento(request, rid, rec.confirmar_recebimento, ident)
+
+
+@router.post("/recebimentos/{rid}/rejeitar")
+async def recebimento_rejeitar(rid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Rejeita o recebimento proposto (o mesmo par nota-crédito não volta a ser proposto)."""
+    return _decidir_recebimento(request, rid, rec.rejeitar_recebimento, ident)
 
 
 @router.get("/cobrancas")

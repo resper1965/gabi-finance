@@ -38,7 +38,8 @@ def _bloco(notas: list[dict]) -> dict:
 
 def previsao(con, hoje: dt.date, meses: int = 3, projetar: bool = True) -> dict:
     abertas = [l for l in con.execute(
-        "select * from nota_fiscal where status='autorizada' and nibo_pago=0 and vencimento is not null order by vencimento, numero")]
+        "select * from nota_fiscal n where n.status='autorizada' and n.nibo_pago=0 and n.vencimento is not null "
+        "and not exists (select 1 from recebimento_nota r where r.nota_id=n.id and r.estado='confirmado') order by n.vencimento, n.numero")]
     inicio = hoje.replace(day=1)
     alvos = [_soma_mes(inicio, k) for k in range(meses)]
     por_mes = {_mes(a): {"mes": _mes(a), "a_vencer": [], "projetado": []} for a in alvos}

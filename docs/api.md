@@ -46,6 +46,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/cobrar/pedidos` | Pedidos pendentes (inclui os com informação pedida) ou `decididos`. |
 | POST | `/api/v1/cobrar/pedidos/{pid}/decidir` | aprovar (exige conta_id e beneficiario_id), recusar ou pedir_info. Só o Ricardo decide, pelo painel. |
 | GET | `/api/v1/cobrar/previsao` | Previsão de entradas a partir das NFS-e: a vencer, projetado (contrato recorrente) e, à parte, vencidas a confirmar pelo extrato. |
+| GET | `/api/v1/cobrar/recebimentos` | Créditos do extrato que a Gabi propõe como recebimento de uma NFS-e (valor líquido igual); só o Ricardo confirma. |
+| POST | `/api/v1/cobrar/recebimentos/{rid}/confirmar` | Confirma o recebimento proposto (a nota deixa de ser prevista; as outras propostas da nota e do crédito caem). |
+| POST | `/api/v1/cobrar/recebimentos/{rid}/rejeitar` | Rejeita o recebimento proposto (o mesmo par nota-crédito não volta a ser proposto). |
 | GET | `/api/v1/cobrar/reembolsos` | Reembolsos por empresa contratante (itens em aberto e cobranças) e a prévia do lote do Nibo da Bekaa. |
 | POST | `/api/v1/cobrar/reembolsos` | Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança da empresa contratante. |
 | POST | `/api/v1/cobrar/reembolsos/conciliar` | Baixa um crédito (entrada em conta PJ classificada como da empresa) contra os itens já cobrados, do mais antigo ao mais novo. |

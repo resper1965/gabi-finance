@@ -169,3 +169,14 @@ def test_saldos_com_erro_registra_rodada_erro_e_relevanta(con, tmp_path):
     with pytest.raises(RuntimeError):
         rodar_saldos(con, Quebra(), AGORA, tmp_path / "locks")
     assert con.execute("select status from rodada").fetchone()[0] == "erro"
+
+
+def test_extratos_propoe_recebimento_de_nota_para_credito_em_conta_pj(con, tmp_path):
+    _liberada(con)
+    con.execute("insert into nota_fiscal(id, numero, emissao, status, valor_bruto_centavos, tomador_nome, vencimento, valor_liquido_centavos, importado_em, atualizado_em) "
+                "values ('n1','7','2026-09-20','autorizada',110000,'CLIENTE X','2026-10-08',100000,'x','x')")
+    historia = _boa_historia()
+    historia["acc-bank-1111"].append(tx("cred1", (HOJE - dt.timedelta(days=1)).isoformat(), "Pix recebido CLIENTE X", 1000.0, tipo="CREDIT"))
+    _rodar_ext(con, FakeFin([BANCO], historia), tmp_path, bancos_pj={"C6 Bank"})     # o banco PJ define conta.pj na captura
+    assert con.execute("select pj from conta").fetchone()[0] == 1
+    assert con.execute("select nota_id, estado from recebimento_nota").fetchall()[0][:] == ("n1", "proposto")

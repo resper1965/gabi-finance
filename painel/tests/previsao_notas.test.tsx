@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { ToastProvider } from "../src/lib/toast";
 import { FiltrosProvider } from "../src/lib/filtros";
 import { Projecao } from "../src/telas/Caixa/Projecao";
@@ -37,7 +37,7 @@ test("Previsao mostra o saldo por dia (so os dias com movimento) e separa a fila
 });
 
 const nota = (n: string, tomador: string, venc: string, liquido: string, situacao: string) => ({ numero: n, tomador, emissao: "2026-10-01", vencimento: venc, bruto: liquido, liquido, situacao, nibo_pago: situacao === "nibo_diz_pago", pdf: true, xml: true });
-const notas = () => env({ totais: { a_vencer: "22261.22", a_confirmar: "3660.15", antigas: "1000.00", nibo_diz_pago: "500.00" }, itens: [
+const notas = () => env({ totais: { a_vencer: "22261.22", a_confirmar: "3660.15", antigas: "1000.00", nibo_diz_pago: "500.00", recebidas: "0.00" }, itens: [
   nota("201", "IONIC HEALTH", "2026-10-25", "22261.22", "a_vencer"), nota("150", "BARRA DO PARA", "2026-09-20", "3660.15", "a_confirmar"),
   nota("90", "ANTIGA LTDA", "2026-05-10", "1000.00", "antiga"), nota("205", "JA PAGA SA", "2026-10-30", "500.00", "nibo_diz_pago")] });
 
@@ -50,4 +50,21 @@ test("Notas a receber marca 'Nibo diz pago' sem trata-lo como recebido e agrupa 
   expect(screen.getByRole("region", { name: "A receber" })).toHaveTextContent("22.261,22");        // total a vencer não inclui a "paga"
   expect(screen.getByRole("region", { name: "A receber" })).not.toHaveTextContent("500,00");
   expect(screen.getByText(/confirmar pelo extrato/i)).toBeInTheDocument();
+});
+
+
+const proposta = () => env({ itens: [{ id: 5, confianca: 1, motivo: "valor igual ao líquido da nota, tomador no descritivo",
+  nota: { numero: "150", tomador: "BARRA DO PARA", vencimento: "2026-10-15", liquido: "3660.15" },
+  lancamento: { id: 9, data: "2026-10-16", descricao: "Pix recebido BARRA DO PARA", valor: "3660.15" } }] });
+
+test("Notas a receber lista recebimentos propostos e confirma ou rejeita so por clique do Ricardo", async () => {
+  const chamadas = apiFalsa({ "cobrar-notas": notas(), "cobrar-recebimentos": proposta() });
+  montar(<NotasAReceber />);
+  const caixa = await screen.findByRole("region", { name: "Recebimentos propostos" });
+  expect(within(caixa).getByText(/Pix recebido BARRA DO PARA/)).toBeInTheDocument();
+  expect(within(caixa).getByText(/valor igual ao líquido/)).toBeInTheDocument();
+  fireEvent.click(within(caixa).getByRole("button", { name: "Confirmar recebimento da nota 150" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /recebimentos\/5\/confirmar$/.test(c.url))).toBe(true));
+  fireEvent.click(within(caixa).getByRole("button", { name: "Rejeitar recebimento da nota 150" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /recebimentos\/5\/rejeitar$/.test(c.url))).toBe(true));
 });

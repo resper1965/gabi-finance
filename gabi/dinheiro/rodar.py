@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from gabi.cobrar.recebimentos import propor_recebimentos
 from gabi.db import conectar, migrar
 from gabi.dinheiro import repositorio
 from gabi.dinheiro.captura import ResumoCaptura, capturar, capturar_saldos
@@ -58,7 +59,9 @@ def rodar_extratos(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: 
         for (cid,) in con.execute("select id from conta where excluido_em is null order by id").fetchall():
             conferir(con, captura.rodada_id, cid, hoje)
         conferida = marcar_conferida(con, captura.rodada_id)
-        return ResultadoExtratos(captura, conferida, classificar_pendentes(con), atualizar_compromissos(con, hoje, agora))
+        resultado = ResultadoExtratos(captura, conferida, classificar_pendentes(con), atualizar_compromissos(con, hoje, agora))
+        propor_recebimentos(con)  # crédito em conta PJ x NFS-e autorizada: só PROPÕE (R1)
+        return resultado
 
 
 def rodar_saldos(con, cliente, agora: dt.datetime, pasta_locks: Path, bancos_pj=None) -> int:

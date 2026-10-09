@@ -190,7 +190,34 @@ def test_notas_lista_so_autorizadas_em_aberto_e_formata_valores(banco):
     assert set(por) == {"IONIC", "BARRA", "ANTIGA", "PAGA"}                               # cancelada e negada não entram
     assert (por["IONIC"]["liquido"], por["IONIC"]["bruto"], por["IONIC"]["situacao"]) == ("22261.22", "22361.22", "a_vencer")
     assert (por["BARRA"]["situacao"], por["ANTIGA"]["situacao"], por["PAGA"]["situacao"]) == ("a_confirmar", "antiga", "nibo_diz_pago")
-    assert d["totais"] == {"a_vencer": "22261.22", "a_confirmar": "3660.15", "antigas": "1000.00", "nibo_diz_pago": "500.00"}
+    assert d["totais"] == {"a_vencer": "22261.22", "a_confirmar": "3660.15", "antigas": "1000.00", "nibo_diz_pago": "500.00", "recebidas": "0.00"}
     assert [i["tomador"] for i in d["itens"]][0] == "PAGA"                                   # vencimento mais distante primeiro
     assert [i["tomador"] for i in cli.get("/api/v1/cobrar/notas?aberta=1", headers=BOSS).json()["dados"]["itens"]] == ["IONIC", "BARRA", "ANTIGA"]
     assert cli.get("/api/v1/cobrar/notas", headers=VIP).status_code == 403
+
+
+def test_recebimentos_propostos_sao_listados_e_confirmar_marca_a_nota_como_recebida(banco):
+    _nota(banco, "BARRA", "2026-10-15", 366015)
+    c = conectar(banco)
+    c.execute("update conta set pj=1 where id=2")
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (2,'cred1','2026-10-16',366015,'Pix recebido BARRA','posted')")
+    from gabi.cobrar.recebimentos import propor_recebimentos
+    assert propor_recebimentos(c) == 1
+    c.close()
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    r = cli.get("/api/v1/cobrar/recebimentos", headers=BOSS)
+    assert r.status_code == 200
+    it = r.json()["dados"]["itens"][0]
+    assert it["nota"]["tomador"] == "BARRA" and it["nota"]["liquido"] == "3660.15" and it["lancamento"]["valor"] == "3660.15" and it["confianca"] >= 0.8 and "valor igual" in it["motivo"]
+    ok = cli.post(f"/api/v1/cobrar/recebimentos/{it['id']}/confirmar", headers={**BOSS, **JSON}, content="{}")
+    assert ok.status_code == 200
+    assert cli.post(f"/api/v1/cobrar/recebimentos/{it['id']}/confirmar", headers={**BOSS, **JSON}, content="{}").status_code == 409     # já decidido
+    notas = cli.get("/api/v1/cobrar/notas", headers=BOSS).json()["dados"]
+    assert notas["itens"][0]["situacao"] == "recebida" and notas["totais"]["recebidas"] == "3660.15" and notas["totais"]["a_vencer"] == "0.00"
+    assert cli.get("/api/v1/cobrar/recebimentos", headers=BOSS).json()["dados"]["itens"] == []
+    assert cli.post(f"/api/v1/cobrar/recebimentos/{it['id']}/confirmar", headers={**VIP, **JSON}, content="{}").status_code == 403
+
+
+def test_rejeitar_recebimento_e_idempotente_a_404_para_inexistente(banco):
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    assert cli.post("/api/v1/cobrar/recebimentos/999/rejeitar", headers={**BOSS, **JSON}, content="{}").status_code == 404

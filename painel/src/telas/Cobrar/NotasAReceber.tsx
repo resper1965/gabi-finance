@@ -2,26 +2,55 @@ import { Bloco } from "../../componentes/Bloco";
 import { Etiqueta } from "../../componentes/Etiqueta";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
+import { api } from "../../lib/api";
 import { dataCurta } from "../../lib/formato";
+import { useToast } from "../../lib/toast";
 import { useApi } from "../../lib/useApi";
 
 interface Nota { numero: string; tomador: string; emissao: string; vencimento: string | null; bruto: string; liquido: string; situacao: string; nibo_pago: boolean; pdf: boolean; xml: boolean }
-interface Totais { a_vencer: string; a_confirmar: string; antigas: string; nibo_diz_pago: string }
+interface Proposta { id: number; confianca: number; motivo: string; nota: { numero: string; tomador: string; vencimento: string | null; liquido: string }; lancamento: { id: number; data: string; descricao: string | null; valor: string } }
+interface Totais { a_vencer: string; a_confirmar: string; antigas: string; nibo_diz_pago: string; recebidas: string }
 
 const GRUPOS: [string, string, keyof Totais][] = [
   ["a_vencer", "A receber (notas a vencer)", "a_vencer"],
   ["a_confirmar", "Vencidas: confirmar pelo extrato", "a_confirmar"],
   ["antiga", "Antigas (mais de 60 dias, provável baixa que faltou no Nibo)", "antigas"],
   ["nibo_diz_pago", "O Nibo diz pago (não é prova de recebimento)", "nibo_diz_pago"],
+  ["recebida", "Recebidas (confirmadas por você no extrato)", "recebidas"],
 ];
 
 /** Cobrar › Notas a receber: as NFS-e do Nibo. O Nibo é defasado: "pago" lá não vira "recebido" aqui; o recebimento real é o crédito no extrato. */
 export function NotasAReceber() {
   const leitura = useApi<{ itens: Nota[]; totais: Totais }>("/api/v1/cobrar/notas");
+  const propostas = useApi<{ itens: Proposta[] }>("/api/v1/cobrar/recebimentos");
+  const avisar = useToast();
+  const decidir = async (p: Proposta, acao: "confirmar" | "rejeitar") => {
+    try {
+      await api.post(acao === "confirmar" ? `/api/v1/cobrar/recebimentos/${p.id}/confirmar` : `/api/v1/cobrar/recebimentos/${p.id}/rejeitar`, {});
+      avisar(acao === "confirmar" ? `Recebimento da nota ${p.nota.numero} confirmado por você.` : `Proposta da nota ${p.nota.numero} rejeitada.`);
+      propostas.recarregar(); leitura.recarregar();
+    } catch (e) { avisar((e as Error).message); }
+  };
+  const lista = propostas.env?.dados.itens ?? [];
   return (
     <Painel leitura={leitura} arquivo="notas a receber">
       {(d) => (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {lista.length > 0 && (
+            <section role="region" aria-label="Recebimentos propostos" style={{ border: "1px solid var(--color-divider)", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+              <strong>Recebimentos propostos · {lista.length}</strong>
+              {lista.map((p) => (
+                <div key={p.id} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line2)", paddingTop: 8 }}>
+                  <span>Nota {p.nota.numero} · {p.nota.tomador} · líquido <Valor valor={p.nota.liquido} /> ↔ {p.lancamento.descricao} em {dataCurta(p.lancamento.data)} (<Valor valor={p.lancamento.valor} />)
+                    <small style={{ display: "block", color: "var(--ink2)" }}>{p.motivo} · confiança {Math.round(p.confianca * 100)}%</small></span>
+                  <span style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-primary" aria-label={`Confirmar recebimento da nota ${p.nota.numero}`} onClick={() => decidir(p, "confirmar")}>Confirmar</button>
+                    <button className="btn btn-secondary" aria-label={`Rejeitar recebimento da nota ${p.nota.numero}`} onClick={() => decidir(p, "rejeitar")}>Rejeitar</button>
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
           {GRUPOS.map(([sit, titulo, chave]) => {
             const itens = d.itens.filter((n) => n.situacao === sit);
             if (itens.length === 0) return null;
