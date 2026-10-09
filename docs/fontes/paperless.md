@@ -1,0 +1,11 @@
+# Fonte: Paperless-ngx
+
+- **Base URL:** `http://127.0.0.1:8000` (Paperless local na VPS, `/opt/paperless`). Variável: `PAPERLESS_URL`.
+- **Autenticação:** `Authorization: Token <token>`; token do usuário `gabi` em `PAPERLESS_TOKEN` (arquivo de ambiente, root 600; nunca no banco, no log ou em erro). O token de **administrador** é usado uma única vez (G7) por `Paperless.preparar_usuario(token_admin)` e descartado.
+- **Rotas usadas:** `GET /api/documents/` (paginado, `page_size=100`), `GET /api/documents/{id}/`, `GET /api/documents/{id}/download/`, `PATCH /api/documents/{id}/` (só `tags`), `GET/POST /api/tags/`, `GET/POST /api/custom_fields/`, `POST /api/users/`, `POST /api/token/` (estas três só em `preparar_usuario`).
+- **Campos personalizados lidos:** `CPF`, `valor`, `vencimento`, `pessoa` (criados por `preparar_usuario`).
+- **Etiquetas:** o app só acrescenta `gabi:*` (ex.: `gabi:empresa:ness`, `gabi:reembolso`, `gabi:pessoa:lia`); nunca remove nem troca etiquetas existentes.
+- **Usuário `gabi`:** permissões `view_*`/`add_*`/`change_*` necessárias; **nenhuma `delete_*`**; não é staff nem superusuário.
+- **PROIBIDO (R2/R10):** qualquer exclusão (documento, etiqueta, campo), mover documento, alterar conteúdo. A classe `Paperless` não tem método de exclusão e o módulo não monta chamada `DELETE` (testes `test_cliente_nao_expoe_metodo_de_exclusao`, `test_o_codigo_nunca_emite_delete`).
+- **Erros conhecidos:** `ErroPaperless("Paperless indisponível")` em falha de rede; status ≥ 400 vira `ErroPaperless("<método> <rota> -> <status>")` sem corpo nem token.
+- **Extração de texto:** `gabi/cobrar/extrator.py` (porte do gabi-fin): linha digitável/Pix (válidos), CNPJ com dígitos verificadores, DAE do eSocial e comprovante Pix.
