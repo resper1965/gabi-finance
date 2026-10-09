@@ -15,6 +15,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura e o lembrete até cancelar. |
 | GET | `/api/v1/cadastros/categorias/equivalencias` | Equivalência entre a categoria do banco (Pluggy) e a nossa. |
 | PUT | `/api/v1/cadastros/categorias/equivalencias` | Cria ou troca uma equivalência de categoria. |
+| GET | `/api/v1/cadastros/categorias/equivalencias/pendentes` | Categorias do banco que aparecem nos lançamentos e ainda não têm equivalência, as de maior volume primeiro. |
 | DELETE | `/api/v1/cadastros/categorias/equivalencias/{origem}` | Remove uma equivalência de categoria. |
 | GET | `/api/v1/cadastros/liberacoes` | Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente). |
 | POST | `/api/v1/cadastros/liberacoes` | Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada. |

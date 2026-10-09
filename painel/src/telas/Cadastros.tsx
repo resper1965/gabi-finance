@@ -6,6 +6,7 @@ import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
 import { CadastrosCobranca } from "./CadastrosCobranca";
 import { CadastrosCaixas } from "./CadastrosCaixas";
+import { CadastrosEquivalencias } from "./CadastrosEquivalencias";
 
 interface Conta { id: number; apelido: string; instituicao: string; tipo: string; estado: string; limite: string | null }
 
@@ -34,6 +35,7 @@ export function Cadastros() {
             </div>
           ))}
         </Bloco>
+        <CadastrosEquivalencias />
         <CadastrosCobranca />
         <CadastrosCaixas />
         </div>

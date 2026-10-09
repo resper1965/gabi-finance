@@ -1,0 +1,24 @@
+categoria;grupo;equivale_nibo;origens_banco
+Restaurantes e delivery;Pessoal;;Eating out|Food delivery|Food and drinks
+Mercado;Pessoal;;Groceries
+Transporte por app;Pessoal;;Taxi and ride-hailing
+Veículo;Pessoal;;Gas stations|Parking|Tolls and in vehicle payment|Vehicle maintenance|Vehicle ownership taxes and fees|Car rental|Bicycle
+Compras;Pessoal;;Shopping|Online shopping|Clothing|Houseware|Electronics|Sports goods|Kids and toys|Bookstore|Optometry
+Saúde;Pessoal;;Pharmacy|Healthcare|Dentist|Hospital clinics and labs|Health insurance
+Bem-estar e esporte;Pessoal;;Wellness and fitness|Sports practice
+Educação;Pessoal;;School|Education
+Seguros;Pessoal;;Insurance
+Assinaturas e serviços digitais;Pessoal;Serviços contratados;Digital services|Video streaming|Music streaming
+Telefonia e internet;Pessoal;Telefonia e Internet;Telecommunications|Internet
+Moradia e contas;Pessoal;;Housing|Electricity|Gas|Utilities|Real estate financing
+Viagens;Pessoal;;Airport and airlines|Accomodation|Travel|Mileage programs|Tickets
+Lazer;Pessoal;;Stadiums and arenas|Cinema, theater and concerts|Leisure|Gambling
+Pets;Pessoal;;Pet supplies and vet
+Impostos;Pessoal;Taxas e contribuições;Taxes|Income taxes|Tax on financial operations|Taxes on investments
+Tarifas e juros;Pessoal;Despesas financeiras;Credit card fees|Bank fees|Account fees|Late payment and overdraft costs|Interests charged
+Investimentos;Pessoal;;Investments|Automatic investment|Mutual funds|Margin
+Rendimentos e recebimentos;Pessoal;;Proceeds interests and dividends|Cashback|Income|Non-recurring income|Entrepreneurial activities
+Empréstimos;Pessoal;;Loans and financing
+Doações;Pessoal;;Donations
+Serviços diversos;Pessoal;;Services|Transportation|Office supplies
+Movimentação interna (não é gasto);Pessoal;;Credit card payment|Transfer - Internal|Same person transfer

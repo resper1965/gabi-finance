@@ -237,3 +237,16 @@ def test_serie_de_compromisso_com_validades_sobrepostas_e_recusada(cli):
     # fechando a antiga em outubro, a nova passa
     assert req(cli, "PATCH", "/api/v1/cadastros/compromissos/aluguel", {"valido_ate": "2026-10"}).status_code == 200
     assert req(cli, "POST", "/api/v1/cadastros/compromissos", {**NOVO, "id": "aluguel-202611", "valido_de": "2026-11", "valor_padrao": "2200"}).status_code == 201
+
+
+def test_categorias_do_banco_sem_equivalencia_em_ordem_de_volume(cli, banco):
+    c = conectar(banco)
+    for i, cat in enumerate(["Groceries"] * 3 + ["Eating out"] * 5 + ["Transfer - PIX"] * 2 + [None]):
+        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, categoria_banco, status) values (1,?,?,?,?,?, 'posted')",
+                  (f"x{i}", "2026-10-01", -100, "X", cat))
+    c.execute("insert into equivalencia_categoria(origem_pluggy, categoria_id) values ('Groceries', 1)")
+    c.close()
+    r = req(cli, "GET", "/api/v1/cadastros/categorias/equivalencias/pendentes")
+    assert r.status_code == 200
+    assert itens(r) == [{"origem_pluggy": "Eating out", "lancamentos": 5}, {"origem_pluggy": "Transfer - PIX", "lancamentos": 2}]
+    assert cli.get("/api/v1/cadastros/categorias/equivalencias/pendentes", headers=VIP).status_code == 403

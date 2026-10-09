@@ -424,6 +424,19 @@ def equivalencias(request: Request):
         con.close()
 
 
+@router.get("/categorias/equivalencias/pendentes")
+def equivalencias_pendentes(request: Request):
+    """Categorias do banco que aparecem nos lançamentos e ainda não têm equivalência, as de maior volume primeiro."""
+    con = _con(request)
+    try:
+        itens = [{"origem_pluggy": r[0], "lancamentos": r[1]} for r in con.execute(
+            "select categoria_banco, count(*) as n from lancamento where categoria_banco is not null "
+            "and categoria_banco not in (select origem_pluggy from equivalencia_categoria) group by 1 order by n desc, 1")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
 @router.put("/categorias/equivalencias")
 async def equivalencia_definir(request: Request, ident: Identidade = Depends(exigir("boss"))):
     """Cria ou troca uma equivalência de categoria."""

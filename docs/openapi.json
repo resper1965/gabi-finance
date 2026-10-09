@@ -294,6 +294,23 @@
     "summary": "Equivalencia Definir"
    }
   },
+  "/api/v1/cadastros/categorias/equivalencias/pendentes": {
+   "get": {
+    "description": "Categorias do banco que aparecem nos lançamentos e ainda não têm equivalência, as de maior volume primeiro.",
+    "operationId": "equivalencias_pendentes_api_v1_cadastros_categorias_equivalencias_pendentes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Equivalencias Pendentes"
+   }
+  },
   "/api/v1/cadastros/categorias/equivalencias/{origem}": {
    "delete": {
     "description": "Remove uma equivalência de categoria.",
