@@ -44,3 +44,4 @@ Não mexer em segredos (Ricardo coloca). Nada no claude.ai. Dados nunca chumbado
 
 ## Andamento
 - 09/10 noite: A1–A5 feitas (código, testes, painel). Falta de A5: capturas p/ G14 e faixa "Reconectar" (dependem de G11/G12). Próximo da pista A: job de rodada do Trabalho (precisa de credencial real para validar) e A6.
+- 09/10 noite: Ricardo aceitou todas as fases e aprovações (por decisão, sem dado real). Pista A segue: serviço `gabi-brain-fontes`, job de rodada do Trabalho, A6. Pista B técnica (tokens, reconexões) continua com o Ricardo.

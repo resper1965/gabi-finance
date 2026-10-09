@@ -63,3 +63,14 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - Contatos (Mensagens) e Entregas · Linear (Tarefas) seguem "ainda não construída" (Fase 4/Linear).
 - **Telas aprovadas pelo Ricardo (09/10 noite, mensagem "telas aprovadas")**: lido como G14 das telas da Fase 2 e da Fase 3 (sem capturas lado a lado geradas; aprovação no painel real).
 - **BLOQUEIO DE ARQUITETURA (Fase 2):** a unit da API tem `RestrictAddressFamilies=AF_UNIX` e `IPAddressDeny=any` (testes de deploy exigem), então a API **não alcança o Paperless (127.0.0.1:8000) nem o Nibo (internet)**, e nem o MCP (só localhost, sem EnvironmentFile). Rotas /cobrar que chamam Paperless/Nibo não funcionam como instaladas. Decisão do Ricardo: (a) serviço separado `gabi-brain-fontes` (Paperless+Nibo, com `/etc/gabi/cobrar.env`, rede liberada) que a API chama por socket Unix — recomendado, mantém a API isolada; ou (b) afrouxar a unit da API. Tokens G7/G8 só depois disso; scripts `~/g7-paperless.sh` e `~/g8-nibo.sh` foram removidos até lá.
+
+## 09/10/2026 (noite): aceites e aprovações do Ricardo
+- **Ricardo declarou (09/10, "todas as fases e aprovações que demandavam minha aprovação e/ou aceite") aceitas:** Fases 1, 2 e 3 (T1.14, T2.10, T3.7) e todos os G14/aprovações pendentes. Registrado como **aceite por decisão do dono**, sem a evidência de dado real que a trilha previa (7 dias `conferida=1`, ≥80 % de comprovantes casados, 7 caixas com itens).
+- **O aceite não destrava o que é técnico.** Seguem sem aceite de dado, por dependerem de credencial/ação externa: reconectar C6/XP (issue 0001), G7/G8 (tokens Paperless/Nibo), G11/G12 (Entra ID, Google), cadastros, job de rodada do Trabalho. Os tokens o Ricardo coloca (regra de segredos).
+- **Decisão de arquitetura ainda aberta (Fase 2):** serviço `gabi-brain-fontes` (recomendado) x afrouxar a unit da API. Sem ela, rotas /cobrar que chamam Paperless/Nibo não funcionam.
+
+## 09/10/2026 (noite): bloqueio de rede da Fase 2 RESOLVIDO (opção a)
+- **Serviço `gabi-brain-fontes`** (user `gabibrain-fontes`, grupo `gabibrain`, único com rede e tokens, `/etc/gabi/cobrar.env` 0600 root). Ponte Unix `/run/gabi-brain-fontes/fontes.sock` (0660); API e MCP seguem com `IPAddressDeny=any` e usam `GABI_FONTES_SOCKET`. Código: `gabi/fontes/{ponte,servico,ambiente}.py`; lista branca de métodos (sem `preparar_usuario`). 858 testes.
+- Provado em produção: sandbox idêntico ao da API alcança o Paperless pela ponte (docs e download de PDF) e não tem rede direta. Backup pré-instalação: `/var/backups/gabi-brain/pre-fontes-2026-10-09.sqlite`.
+- Paperless configurado com o token do usuário `resper` (dado pelo Ricardo, que autorizou). Nibo ainda NÃO configurado (G8: acrescentar `NIBO_TOKEN` em `/etc/gabi/cobrar.env` e `sudo systemctl restart gabi-brain-fontes`).
+- Próximo: ingestão de comprovantes (job que lê o Paperless pela ponte), cadastros da cobrança, G8.
