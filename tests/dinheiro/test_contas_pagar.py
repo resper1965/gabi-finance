@@ -125,6 +125,48 @@ def test_caixa_unico_nao_inclui_cartao_no_saldo_e_soma_faturas_abertas(con):
     assert r.saldo_centavos == 100000 and r.faturas_abertas_centavos == 80025
 
 
+def _fatura(con, cc, fid, venc, total, status):
+    con.execute("insert into fatura(id, account_id, vencimento, total_centavos, pagamento_status, conta_id) values (?,?,?,?,?,?)", (fid, "cartao", venc, total, status, cc))
+
+
+def _debito(con, cid, data, valor, ext="l1"):
+    con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original) values (?,?,?,?, 'PGTO FATURA')", (cid, ext, data, valor))
+
+
+def test_fatura_nao_confirmada_com_debito_no_banco_nao_conta_como_aberta(con):
+    """O banco ainda diz PAST_DUE_UNCONFIRMED, mas o débito do mesmo valor já saiu da conta: não pode contar duas vezes."""
+    b, cc = _conta(con, "c6"), _conta(con, "cartao", tipo="CREDIT")
+    _fatura(con, cc, "f1", "2026-10-07", 401663, "PAST_DUE_UNCONFIRMED")
+    _debito(con, b, "2026-10-07", -401663)
+    assert caixa_unico(con, HOJE).faturas_abertas_centavos == 0
+
+
+def test_fatura_nao_confirmada_sem_debito_continua_aberta(con):
+    b, cc = _conta(con, "c6"), _conta(con, "cartao", tipo="CREDIT")
+    _fatura(con, cc, "f1", "2026-10-07", 401663, "PAST_DUE_UNCONFIRMED")
+    _debito(con, b, "2026-10-07", -401000)  # valor diferente
+    assert caixa_unico(con, HOJE).faturas_abertas_centavos == 401663
+
+
+def test_debito_so_vale_para_fatura_nao_confirmada_e_dentro_da_janela(con):
+    b, cc = _conta(con, "c6"), _conta(con, "cartao", tipo="CREDIT")
+    _fatura(con, cc, "f1", "2026-10-20", 80025, "OPEN")                      # em aberto de verdade: só o banco muda isso
+    _fatura(con, cc, "f2", "2026-09-07", 50000, "PAST_DUE_UNPAID")           # o banco afirma que não foi paga
+    _fatura(con, cc, "f3", "2026-10-07", 30000, "PAST_DUE_UNCONFIRMED")      # débito de 30 dias antes não conta
+    _debito(con, b, "2026-10-20", -80025, "a")
+    _debito(con, b, "2026-09-07", -50000, "b")
+    _debito(con, b, "2026-09-07", -30000, "c")
+    assert caixa_unico(con, HOJE).faturas_abertas_centavos == 80025 + 50000 + 30000
+
+
+def test_debito_de_cartao_nao_paga_fatura(con):
+    """Só débito em conta BANK baixa a fatura; compra de mesmo valor no próprio cartão não."""
+    cc = _conta(con, "cartao", tipo="CREDIT")
+    _fatura(con, cc, "f1", "2026-10-07", 401663, "PAST_DUE_UNCONFIRMED")
+    _debito(con, cc, "2026-10-07", -401663)
+    assert caixa_unico(con, HOJE).faturas_abertas_centavos == 401663
+
+
 def test_caixa_unico_sem_contas(con):
     r = caixa_unico(con, HOJE)
     assert (r.saldo_centavos, r.contas, r.faturas_abertas_centavos) == (0, [], 0)

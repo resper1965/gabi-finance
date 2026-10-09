@@ -101,16 +101,30 @@ class CaixaUnico:
     faturas_abertas_centavos: int
 
 
+JANELA_PAGAMENTO_DIAS = 7  # o débito da fatura pode sair alguns dias antes do vencimento
+
+
+def faturas_abertas(con, em: dt.date) -> list:
+    """Faturas ainda não pagas dos cartões liberados (id, vencimento, total_centavos).
+    O banco demora a trocar PAST_DUE_UNCONFIRMED por PAID: se já saiu da conta BANK um débito do mesmo valor
+    entre (vencimento − 7 dias) e `em`, a fatura está paga e não pode contar de novo ao lado do saldo que já caiu."""
+    return con.execute(
+        "select f.id, f.vencimento, f.total_centavos from fatura f join conta c on c.id=f.conta_id "
+        "where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null and upper(coalesce(f.pagamento_status,''))<>'PAID' "
+        "and not (upper(coalesce(f.pagamento_status,''))='PAST_DUE_UNCONFIRMED' and f.total_centavos>0 and exists ("
+        "  select 1 from lancamento l join conta b on b.id=l.conta_id where b.tipo='BANK' and l.valor_centavos=-f.total_centavos "
+        "  and l.data>=date(f.vencimento, ?) and l.data<=?)) order by f.vencimento",
+        (f"-{JANELA_PAGAMENTO_DIAS} days", em.isoformat())).fetchall()
+
+
 def caixa_unico(con, em: dt.date) -> CaixaUnico:
     """Soma o saldo mais recente (até `em`) das contas BANK que o Ricardo liberou (estado 'sim'). Cartão não entra no saldo;
-    as faturas ainda não pagas dos cartões liberados somam em `faturas_abertas_centavos`."""
+    as faturas ainda não pagas dos cartões liberados (ver `faturas_abertas`) somam em `faturas_abertas_centavos`."""
     fim = f"{em.isoformat()}T23:59:59"
     contas = []
     for c in con.execute("select id, apelido, externo_id from conta where estado='sim' and tipo='BANK' and excluido_em is null order by id"):
         s = con.execute("select em, saldo_centavos from saldo where conta_id=? and em<=? order by em desc limit 1", (c["id"], fim)).fetchone()
         if s:
             contas.append({"apelido": c["apelido"] or c["externo_id"], "saldo_centavos": s["saldo_centavos"], "em": s["em"]})
-    abertas = con.execute(
-        "select coalesce(sum(f.total_centavos),0) from fatura f join conta c on c.id=f.conta_id "
-        "where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null and upper(coalesce(f.pagamento_status,''))<>'PAID'").fetchone()[0]
+    abertas = sum(f["total_centavos"] for f in faturas_abertas(con, em))
     return CaixaUnico(sum(c["saldo_centavos"] for c in contas), contas, abertas)

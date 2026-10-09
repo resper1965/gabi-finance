@@ -95,9 +95,7 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
         assinaturas = sum(r["valor_medio"] for r in recorrentes)
         status_ass = {a["estabelecimento"]: a["status"] for a in con.execute("select estabelecimento, status from assinatura")}
         a_conferir = sum(1 for r in recorrentes if status_ass.get(r.get("chave") or r.get("descricao"), "a_conferir") == "a_conferir")
-        abertas = con.execute(
-            "select f.vencimento from fatura f join conta c on c.id=f.conta_id where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null "
-            "and upper(coalesce(f.pagamento_status,''))<>'PAID' order by f.vencimento").fetchall()
+        abertas = [(f["vencimento"],) for f in cp.faturas_abertas(con, hoje)]
         serie = _serie_saldo(con, hoje, PERIODOS[periodo], conta)
         prev = analise.previsao(fonte, 14, None, hoje)
         delta = cx.saldo_centavos - para_centavos(prev["saldo_inicial"])  # projeção parte do saldo do caixa único
