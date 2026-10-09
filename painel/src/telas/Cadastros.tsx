@@ -4,6 +4,7 @@ import { Painel } from "../componentes/Painel";
 import { api } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
+import { CadastrosCobranca } from "./CadastrosCobranca";
 
 interface Conta { id: number; apelido: string; instituicao: string; tipo: string; estado: string; limite: string | null }
 
@@ -20,6 +21,7 @@ export function Cadastros() {
   return (
     <Painel leitura={leitura} arquivo="contas conectadas">
       {(d) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <Bloco titulo="Contas">
           <p style={{ color: "var(--ink2)", marginTop: 0 }}>Conta nova só entra no caixa único depois que você decidir.</p>
           {d.itens.map((c) => (
@@ -31,6 +33,8 @@ export function Cadastros() {
             </div>
           ))}
         </Bloco>
+        <CadastrosCobranca />
+        </div>
       )}
     </Painel>
   );

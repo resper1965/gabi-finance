@@ -26,4 +26,5 @@ export const api = {
   get: <T>(url: string) => chamar<T>("GET", url),
   post: <T>(url: string, corpo: unknown = {}) => chamar<T>("POST", url, corpo),
   patch: <T>(url: string, corpo: unknown) => chamar<T>("PATCH", url, corpo),
+  put: <T>(url: string, corpo: unknown) => chamar<T>("PUT", url, corpo),
 };

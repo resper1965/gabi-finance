@@ -9,7 +9,8 @@ import { useToast } from "../../lib/toast";
 import { useApi } from "../../lib/useApi";
 
 interface ItemR { lancamento_id: number; data: string; descricao: string | null; valor: string; em_aberto: string; comprovante: "confirmado" | "proposto" | "faltando" }
-interface Empresa { empresa_id: string; nome: string; em_aberto: string; itens: ItemR[]; reembolsos: { id: number; estado: string; cobrado_em: string | null }[] }
+interface Credito { lancamento_id: number; data: string; descricao: string | null; valor: string; a_aplicar: string }
+interface Empresa { empresa_id: string; nome: string; em_aberto: string; itens: ItemR[]; reembolsos: { id: number; estado: string; cobrado_em: string | null }[]; creditos?: Credito[] }
 interface ItemLote { lancamento_id: number; data: string; descricao: string | null; valor: string }
 interface Lote { id: number | null; texto_confirmacao: string; itens: ItemLote[] }
 interface Dados { empresas: Empresa[]; lote: Lote }
@@ -38,6 +39,13 @@ export function Reembolsos() {
       const rid = (await api.post<{ id: number }>("/api/v1/cobrar/reembolsos", { empresa_id: empresaId })).dados.id;
       await api.post(`/api/v1/cobrar/reembolsos/${rid}/cobrado`);
       avisar("Anotado: reembolso cobrado. Agora aguardo o recebimento na conta PJ.");
+      leitura.recarregar();
+    } catch (e) { avisar((e as Error).message); }
+  };
+  const conciliar = async (empresaId: string, creditoId: number) => {
+    try {
+      const r = (await api.post<{ casados: number[]; sobra: string }>("/api/v1/cobrar/reembolsos/conciliar", { empresa_id: empresaId, credito_id: creditoId })).dados;
+      avisar(`Baixado: ${r.casados.length} item(ns) quitado(s)${r.sobra !== "0.00" ? `, sobraram R$ ${r.sobra.replace(".", ",")} do crédito` : ""}.`);
       leitura.recarregar();
     } catch (e) { avisar((e as Error).message); }
   };
@@ -95,6 +103,18 @@ export function Reembolsos() {
                     <span style={{ fontVariantNumeric: "tabular-nums" }}><Valor valor={i.em_aberto} /></span>
                   </label>
                 ))}
+                {(empresa?.creditos ?? []).length > 0 && (
+                  <div style={{ border: "1px solid var(--color-divider)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={{ font: "600 10.5px var(--font-body)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink2)" }}>Recebido na PJ</span>
+                    {(empresa?.creditos ?? []).map((c) => (
+                      <span key={c.lancamento_id} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ font: "500 12.5px var(--mono)" }}>{dataCurta(c.data)}</span><span style={{ flex: 1 }}>{c.descricao}</span>
+                        <span style={{ fontVariantNumeric: "tabular-nums" }}><Valor valor={c.a_aplicar} /></span>
+                        <button className="btn btn-secondary" onClick={() => conciliar(atual, c.lancamento_id)}>Baixar nos itens cobrados</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div><button className="btn btn-primary" disabled={(empresa?.itens ?? []).length === 0} onClick={() => preparar(atual)}>{marcadas.length ? `Preparar e-mail de reembolso (${marcadas.length})` : "Preparar e-mail com todos os itens"}</button>
                   {" "}<button className="btn btn-secondary" disabled={(empresa?.itens ?? []).length === 0} onClick={() => cobrado(atual)}>Marcar como cobrado</button></div>
               </section>
