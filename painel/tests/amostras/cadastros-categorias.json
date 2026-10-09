@@ -4,30 +4,35 @@
    {
     "excluido_em": null,
     "id": 4,
+    "nibo_category_id": null,
     "nome": "Assinaturas",
     "pai_id": null
    },
    {
     "excluido_em": null,
     "id": 5,
+    "nibo_category_id": null,
     "nome": "Casa",
     "pai_id": null
    },
    {
     "excluido_em": null,
     "id": 1,
+    "nibo_category_id": null,
     "nome": "Mercado",
     "pai_id": null
    },
    {
     "excluido_em": null,
     "id": 3,
+    "nibo_category_id": null,
     "nome": "Receita",
     "pai_id": null
    },
    {
     "excluido_em": null,
     "id": 2,
+    "nibo_category_id": null,
     "nome": "Transporte",
     "pai_id": null
    }

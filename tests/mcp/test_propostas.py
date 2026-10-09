@@ -15,11 +15,11 @@ from tests.mcp.test_servidor import AGORA, HOST, PERMITIDAS, banco, chamar, rpc 
 @pytest.fixture
 def banco2(banco):
     c = conectar(banco)
-    c.execute("insert into empresa(id, nome, relacao, dados) values ('ness','Ness','contratante', ?)", (json.dumps({"email_cobranca": "fin@ness.com.br"}),))
+    c.execute("insert into empresa(id, nome, dados) values ('ness','Ness', ?)", (json.dumps({"relacao": "contratante", "email_cobranca": "fin@ness.com.br"}),))
     c.execute("update conta set pj=0 where id=1")
     c.execute("update lancamento set empresa_id='ness' where id=2")  # UBER TRIP -22,50 pago no PF para a Ness
-    c.execute("insert into pessoa(id, nome, canais, pode_pedir, dados) values ('ana','Ana',?,1,?)",
-              (json.dumps(["whatsapp:+5511911110000"]), json.dumps({"documentos": [{"tipo": "CPF", "numero": "123.456.789-09"}]})))
+    c.execute("insert into pessoa(id, nome, dados) values ('ana','Ana',?)",
+              (json.dumps({"canais": ["whatsapp:+5511911110000"], "pode_pedir": True, "documentos": [{"tipo": "CPF", "numero": "123.456.789-09"}]}),))
     c.close()
     return banco
 

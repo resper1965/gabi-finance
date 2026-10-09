@@ -41,8 +41,8 @@ def con(tmp_path):
     migrar(c, MIGRACOES)
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")   # 1
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pj','C6','BANK','C6 PJ',1,'sim')")       # 2
-    c.execute("insert into empresa(id, nome, relacao) values ('bekaa','Bekaa','pj_titular')")
-    c.execute("insert into empresa(id, nome, relacao) values ('ness','Ness','contratante')")
+    c.execute("insert into empresa(id, nome, dados) values ('bekaa','Bekaa','{\"relacao\": \"pj_titular\"}')")
+    c.execute("insert into empresa(id, nome, dados) values ('ness','Ness','{\"relacao\": \"contratante\"}')")
     c.execute("insert into categoria(nome, nibo_category_id) values ('Software','cat-sw')")
     c.execute("insert into parametro(chave, valor) values ('nibo_socio_id', '\"socio-ricardo\"')")
     return c

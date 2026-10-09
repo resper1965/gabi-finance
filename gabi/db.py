@@ -1,5 +1,6 @@
 """Conexão SQLite (WAL, FKs) e migrações numeradas. Consome: nada. Spec §12/§13.4."""
 import sqlite3
+from contextlib import contextmanager
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,3 +63,16 @@ def _instrucoes(sql: str) -> list[str]:
     if resto:
         saida.append(resto)
     return saida
+
+
+@contextmanager
+def transacao(con):
+    """Tudo ou nada: begin/commit, rollback se algo falhar (a conexão é autocommit; sem isto cada execute grava na hora)."""
+    con.execute("begin")
+    try:
+        yield
+    except BaseException:
+        con.execute("rollback")
+        raise
+    else:
+        con.execute("commit")

@@ -6,7 +6,7 @@ import base64
 import datetime as dt
 import json
 
-from gabi.cobrar import cobranca, pedidos
+from gabi.cobrar import cadastro, cobranca, pedidos
 from gabi.cobrar.reembolso import itens_a_reembolsar
 from gabi.dinheiro import regras
 from gabi.dinheiro.valor import formatar
@@ -42,7 +42,7 @@ def registrar(srv, executar, paperless) -> None:
         """Busca documentos no Paperless por texto. Devolve só id, título e data; use documentos_baixar para o arquivo."""
         def f(con, agora):
             try:
-                docs = _paperless(paperless).docs(query=texto, page_size=min(max(limite, 1), 50))
+                docs = _paperless(paperless).docs(query=texto, page_size=min(max(limite, 1), 50), limite=max(limite, 1))
             except ErroPaperless as e:
                 raise ErroFerramenta("fonte_indisponivel", str(e)) from None
             return {"itens": [{"id": d["id"], "titulo": d.get("title"), "criado_em": d.get("created")} for d in docs[:limite]]}
@@ -151,7 +151,7 @@ def registrar(srv, executar, paperless) -> None:
         """Reembolsos em aberto por empresa contratante (ness, IONIC): valor a receber, número de itens e cobranças em andamento."""
         def f(con, agora):
             saida = []
-            for e in con.execute("select id, nome from empresa where relacao='contratante' and excluido_em is null order by nome"):
+            for e in cadastro.contratantes(con):
                 itens = itens_a_reembolsar(con, e["id"])
                 saida.append({"empresa_id": e["id"], "nome": e["nome"], "itens": len(itens), "em_aberto": formatar(sum(i.em_aberto_centavos for i in itens)),
                               "reembolsos": [{"id": r["id"], "estado": r["estado"]} for r in con.execute(
@@ -174,6 +174,10 @@ def registrar(srv, executar, paperless) -> None:
             valor = (next((d["numero"] for d in docs if d.get("tipo", "").upper() == "CPF"), None) if campo == "cpf"
                      else dados.get("nascimento") if campo == "nascimento"
                      else next((d["numero"] for d in docs if d.get("tipo", "").upper() != "CPF"), None))
-            con.execute("update liberacao_sensivel set usada_em=? where id=?", (agora.isoformat(), lib["id"]))
+            if valor is None:  # não há o que entregar: a liberação NÃO é gasta
+                return {"status": "sem_dado", "pessoa_id": pessoa_id, "campo": campo}
+            # reivindica a liberação de forma atômica: duas chamadas concorrentes não leem o valor com uma só liberação
+            if con.execute("update liberacao_sensivel set usada_em=? where id=? and usada_em is null", (agora.isoformat(), lib["id"])).rowcount != 1:
+                return {"status": "aguardando_liberacao", "pessoa_id": pessoa_id, "campo": campo}
             return {"status": "liberado", "pessoa_id": pessoa_id, "campo": campo, "valor": valor}
         return executar("pessoas_dado", f)

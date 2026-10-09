@@ -1,12 +1,13 @@
 """Lote diário "Lançar na PJ": despesas da Bekaa pagas no PF viram agendamento a pagar ao sócio no Nibo. ÚNICA gravação externa (R2):
 só executa com o texto de confirmação IGUAL, byte a byte, ao que o servidor gerou (409 se divergir). Idempotente por `reference gabi:<id>`.
-Consome: db (lancamento, empresa.relacao, categoria.nibo_category_id, parametro nibo_socio_id), fontes.nibo_escrita."""
+Consome: db (lancamento, empresa.dados.relacao, categoria.nibo_category_id, parametro nibo_socio_id), fontes.nibo_escrita."""
 import datetime as dt
 import json
 from dataclasses import dataclass
 from typing import Callable
 
-from gabi.fontes.nibo import ErroNibo
+from gabi.cobrar import cadastro
+from gabi.db import transacao
 
 
 class ConfirmacaoDivergente(ValueError):
@@ -49,10 +50,11 @@ def _texto_lote(itens: list[ItemLote]) -> str:
 
 def itens_do_lote(con) -> list[ItemLote]:
     """Despesas da Bekaa (`pj_titular`) pagas em conta PF e ainda sem agendamento ok no Nibo (não grava nada)."""
-    return [ItemLote(r["id"], r["data"], r["descricao_original"], -r["valor_centavos"]) for r in con.execute(
+    consulta = (
         "select l.id, l.data, l.descricao_original, l.valor_centavos from lancamento l join conta c on c.id=l.conta_id "
-        "join empresa e on e.id=l.empresa_id where e.relacao='pj_titular' and l.valor_centavos<0 and c.pj=0 and not exists ("
-        "  select 1 from lote_nibo_item i where i.lancamento_id=l.id and i.estado='ok') order by l.data, l.id")]
+        f"join empresa e on e.id=l.empresa_id where {cadastro.RELACAO_SQL}='pj_titular' and l.valor_centavos<0 and c.pj=0 and not exists ("
+        "  select 1 from lote_nibo_item i where i.lancamento_id=l.id and i.estado='ok') order by l.data, l.id")
+    return [ItemLote(r["id"], r["data"], r["descricao_original"], -r["valor_centavos"]) for r in con.execute(consulta)]
 
 
 def texto_do_lote(itens: list[ItemLote]) -> str:
@@ -60,7 +62,12 @@ def texto_do_lote(itens: list[ItemLote]) -> str:
 
 
 def montar_lote(con, dia: dt.date) -> Lote:
-    """Monta o lote do dia (remonta o lote aberto, se houver)."""
+    """Monta o lote do dia (remonta o lote aberto, se houver). Tudo ou nada."""
+    with transacao(con):
+        return _montar_lote(con, dia)
+
+
+def _montar_lote(con, dia: dt.date) -> Lote:
     itens = itens_do_lote(con)
     texto = _texto_lote(itens)
     aberto = con.execute("select id from lote_nibo where dia=? and estado='montado'", (dia.isoformat(),)).fetchone()
@@ -113,13 +120,15 @@ def executar_lote(con, lote_id: int, confirmacao: str, nibo, *, baixar_comprovan
                 _marcar(con, lote_id, lid, "erro", schedule_id=sid, erro="anexo pendente")  # guarda o id já: se o anexo falhar, o reprocesso só anexa
             vinc = con.execute("select c.paperless_id from comprovante_vinculo v join comprovante c on c.id=v.comprovante_id "
                                "where v.lancamento_id=? and v.estado='confirmado' order by v.id limit 1", (lid,)).fetchone()
-            if vinc and baixar_comprovante:
+            if vinc:
+                if baixar_comprovante is None:  # há comprovante confirmado mas nada para buscá-lo: NÃO vira ok sem anexo
+                    raise ValueError("comprovante confirmado, mas o Paperless não está configurado; o reprocesso só anexa")
                 nome, conteudo = baixar_comprovante(vinc["paperless_id"])
                 nibo.anexar_arquivo(sid, nome, conteudo)
             _marcar(con, lote_id, lid, "ok", schedule_id=sid)
             ok += 1
-        except (ErroNibo, ValueError, OSError) as e:
-            _marcar(con, lote_id, lid, "erro", erro=str(e)[:300])
+        except Exception as e:  # um item que falha (Nibo, Paperless, resposta estranha) não derruba os outros: fica `erro` e volta no próximo lote
+            _marcar(con, lote_id, lid, "erro", erro=f"{type(e).__name__}: {e}"[:300])
             erro += 1
     con.execute("update lote_nibo set estado='executado' where id=?", (lote_id,))
     return ResultadoLote(ok, erro)
@@ -150,5 +159,7 @@ def executar_baixa(con, lancamento_id: int, credito_id: int, confirmacao: str, n
         raise ConfirmacaoDivergente("a confirmação não é igual ao texto gerado pelo servidor; nada foi gravado")
     if it["baixa_credito_id"] == credito_id:
         return
+    if it["baixa_credito_id"] is not None:
+        raise ValueError("o agendamento já foi baixado por outro crédito; nada foi enviado ao Nibo")
     nibo.baixar_pagamento(it["schedule_id"], account_id=account_id, data=c["data"][:10], valor_centavos=c["valor_centavos"], identifier=f"gabi:baixa:{credito_id}")
     con.execute("update lote_nibo_item set baixa_credito_id=? where lancamento_id=? and estado='ok'", (credito_id, lancamento_id))

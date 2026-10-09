@@ -46,13 +46,20 @@ class NiboEscrita(Nibo):
         r = self._post("/schedules/debit/FormatType=json", {
             "stakeholderId": stakeholder_id, "value": valor_centavos / 100, "dueDate": data, "scheduleDate": data, "accrualDate": data,
             "categoryId": category_id, "description": descricao, "reference": reference})
-        return r["scheduleId"]
+        try:
+            return r["scheduleId"]
+        except (KeyError, TypeError):
+            raise ErroNibo("resposta inesperada do Nibo ao criar o agendamento") from None
 
     def anexar_arquivo(self, schedule_id: str, nome: str, conteudo: bytes) -> None:
         status, resp = self._http_arquivo(self.base + "/files", nome, conteudo, {"ApiToken": self._token})
         if status >= 400:
             raise ErroNibo(f"POST /files -> {status}")
-        self._post(f"/schedules/debit/{quote(str(schedule_id), safe='')}/files/attach", [resp[0]["fileId"]])
+        try:
+            arquivo_id = resp[0]["fileId"]
+        except (KeyError, IndexError, TypeError):
+            raise ErroNibo("resposta inesperada do Nibo ao enviar o arquivo") from None
+        self._post(f"/schedules/debit/{quote(str(schedule_id), safe='')}/files/attach", [arquivo_id])
 
     def baixar_pagamento(self, schedule_id: str, *, account_id: str, data: str, valor_centavos: int, identifier: str) -> None:
         self._post(f"/schedules/debit/{quote(str(schedule_id), safe='')}/payments",

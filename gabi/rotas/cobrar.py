@@ -5,7 +5,7 @@ import datetime as dt
 
 from fastapi import APIRouter, Depends, Request
 
-from gabi.cobrar import cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
+from gabi.cobrar import cadastro, cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -32,14 +32,19 @@ def reembolsos(request: Request):
     con = _con(request)
     try:
         empresas = []
-        for e in con.execute("select id, nome from empresa where relacao='contratante' and excluido_em is null order by nome"):
+        for e in cadastro.contratantes(con):
             itens = rb.itens_a_reembolsar(con, e["id"])
             empresas.append({
                 "empresa_id": e["id"], "nome": e["nome"], "em_aberto": formatar(sum(i.em_aberto_centavos for i in itens)),
                 "itens": [{"lancamento_id": i.lancamento_id, "data": i.data, "descricao": i.descricao, "valor": formatar(i.valor_centavos),
                            "em_aberto": formatar(i.em_aberto_centavos), "comprovante": _situacao_comprovante(con, i.lancamento_id)} for i in itens],
                 "reembolsos": [{"id": r["id"], "estado": r["estado"], "cobrado_em": r["cobrado_em"]}
-                               for r in con.execute("select id, estado, cobrado_em from reembolso where empresa_id=? order by id desc", (e["id"],))]})
+                               for r in con.execute("select id, estado, cobrado_em from reembolso where empresa_id=? order by id desc", (e["id"],))],
+                "creditos": [{"lancamento_id": c["id"], "data": c["data"], "descricao": c["descricao_original"], "valor": formatar(c["valor_centavos"]),
+                              "a_aplicar": formatar(c["valor_centavos"] - c["aplicado"])} for c in con.execute(
+                    "select l.id, l.data, l.descricao_original, l.valor_centavos, coalesce(b.valor_centavos, 0) as aplicado from lancamento l "
+                    "join conta cn on cn.id=l.conta_id left join reembolso_baixa b on b.credito_lancamento_id=l.id "
+                    "where l.empresa_id=? and l.valor_centavos>0 and cn.pj=1 and l.valor_centavos > coalesce(b.valor_centavos, 0) order by l.data, l.id", (e["id"],))]})
         itens_lote = lote.itens_do_lote(con)
         aberto = con.execute("select id from lote_nibo where estado='montado' order by id desc limit 1").fetchone()
         return envelope(con, {"empresas": empresas, "lote": _lote_json(itens_lote, lote.texto_do_lote(itens_lote), aberto["id"] if aberto and itens_lote else None)},
@@ -59,6 +64,23 @@ async def reembolso_abrir(request: Request, ident: Identidade = Depends(exigir("
         except ValueError as e:
             raise erro(400, "requisicao_invalida", str(e))
         return envelope(con, {"id": rid}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/reembolsos/conciliar")
+async def reembolso_conciliar(request: Request):
+    """Baixa um crédito (entrada em conta PJ classificada como da empresa) contra os itens já cobrados, do mais antigo ao mais novo."""
+    corpo = _corpo(await _json(request))
+    con = _con(request)
+    try:
+        try:
+            r = rb.conciliar_recebimento(con, str(corpo.get("empresa_id", "")), int(corpo.get("credito_id", 0)))
+        except LookupError as e:
+            raise erro(404, "nao_encontrado", str(e))
+        except (ValueError, TypeError) as e:
+            raise erro(400, "requisicao_invalida", str(e))
+        return envelope(con, {"casados": r.casados, "sobra": formatar(r.sobra_centavos)}, agora=_agora(request))
     finally:
         con.close()
 

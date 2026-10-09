@@ -15,9 +15,9 @@ def con(tmp_path):
     c = conectar(tmp_path / "g.db")
     migrar(c, MIGRACOES)
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")
-    c.execute("insert into empresa(id, nome, relacao, dados) values ('ness','Ness','contratante', ?)", (json.dumps({"email_cobranca": "financeiro@ness.com.br"}),))
-    c.execute("insert into empresa(id, nome, relacao) values ('ionic','IONIC','contratante')")  # sem e-mail cadastrado
-    c.execute("insert into empresa(id, nome, relacao) values ('bekaa','Bekaa','pj_titular')")
+    c.execute("insert into empresa(id, nome, dados) values ('ness','Ness', ?)", (json.dumps({"relacao": "contratante", "email_cobranca": "financeiro@ness.com.br"}),))
+    c.execute("insert into empresa(id, nome, dados) values ('ionic','IONIC','{\"relacao\": \"contratante\"}')")  # sem e-mail cadastrado
+    c.execute("insert into empresa(id, nome, dados) values ('bekaa','Bekaa','{\"relacao\": \"pj_titular\"}')")
     return c
 
 

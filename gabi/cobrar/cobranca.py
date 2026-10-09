@@ -5,6 +5,8 @@ import json
 from dataclasses import dataclass
 
 from gabi.cobrar.reembolso import ItemReembolso, itens_a_reembolsar
+from gabi.cobrar import cadastro
+from gabi.db import transacao
 
 
 class NaoPermitido(Exception):
@@ -28,12 +30,17 @@ def _brl(centavos: int) -> str:
 
 
 def montar(con, empresa_id: str, itens: list[int] | None, *, hoje: dt.date | None = None) -> Cobranca:
-    """Monta a cobrança (ou atualiza o rascunho aberto da empresa) com os itens em aberto; `itens` escolhe um subconjunto de lançamentos."""
+    """Monta a cobrança (ou atualiza o rascunho aberto da empresa) com os itens em aberto; `itens` escolhe um subconjunto de lançamentos. Tudo ou nada."""
+    with transacao(con):
+        return _montar(con, empresa_id, itens, hoje)
+
+
+def _montar(con, empresa_id: str, itens: list[int] | None, hoje: dt.date | None) -> Cobranca:
     hoje = hoje or dt.date.today()
-    emp = con.execute("select nome, relacao, dados from empresa where id=? and excluido_em is null", (empresa_id,)).fetchone()
+    emp = con.execute("select nome, dados from empresa where id=? and excluido_em is null", (empresa_id,)).fetchone()
     if emp is None:
         raise LookupError(f"empresa {empresa_id} não existe")
-    if emp["relacao"] == "pj_titular":
+    if cadastro.relacao(con, empresa_id) == "pj_titular":
         raise ValueError("a Bekaa vai pelo lote do Nibo, não por e-mail de cobrança")
     para = (json.loads(emp["dados"] or "{}")).get("email_cobranca")
     if not para:

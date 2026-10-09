@@ -153,7 +153,7 @@ class Simples:
 # ---------------- categorias ----------------
 class Categorias:
     def _ser(self, r):
-        return {"id": r["id"], "nome": r["nome"], "pai_id": r["pai_id"], "excluido_em": r["excluido_em"]}
+        return {"id": r["id"], "nome": r["nome"], "pai_id": r["pai_id"], "nibo_category_id": r["nibo_category_id"], "excluido_em": r["excluido_em"]}
 
     def listar(self, con, busca, incluir):
         sql = "select * from categoria where 1=1" + ("" if incluir else " and excluido_em is null")
@@ -185,25 +185,26 @@ class Categorias:
         return pai
 
     def criar(self, con, corpo, quem, tipo):
-        _so(corpo, {"nome", "pai_id"})
-        nome, pai = _texto(corpo, "nome", True), self._pai(con, corpo)
+        _so(corpo, {"nome", "pai_id", "nibo_category_id"})
+        nome, pai, nibo = _texto(corpo, "nome", True), self._pai(con, corpo), _texto(corpo, "nibo_category_id")
 
         def fazer():
-            cid = con.execute("insert into categoria(nome, pai_id) values (?,?)", (nome, pai)).lastrowid
+            cid = con.execute("insert into categoria(nome, pai_id, nibo_category_id) values (?,?,?)", (nome, pai, nibo or None)).lastrowid
             _auditar(con, quem, tipo, cid, "criada")
             return cid
         return self.obter(con, _tx(con, fazer))
 
     def atualizar(self, con, id_, corpo, quem, tipo):
         atual = self.obter(con, id_)
-        _so(corpo, {"nome", "pai_id"})
+        _so(corpo, {"nome", "pai_id", "nibo_category_id"})
         if not corpo:
             raise erro(400, "requisicao_invalida", "informe ao menos um campo")
         nome = _texto(corpo, "nome", True) if "nome" in corpo else atual["nome"]
         pai = self._pai(con, corpo, atual["id"]) if "pai_id" in corpo else atual["pai_id"]
+        nibo = (_texto(corpo, "nibo_category_id") or None) if "nibo_category_id" in corpo else atual["nibo_category_id"]
 
         def fazer():
-            con.execute("update categoria set nome=?, pai_id=? where id=?", (nome, pai, atual["id"]))
+            con.execute("update categoria set nome=?, pai_id=?, nibo_category_id=? where id=?", (nome, pai, nibo, atual["id"]))
             _auditar(con, quem, tipo, atual["id"], "alterada")
         _tx(con, fazer)
         return self.obter(con, id_)
@@ -478,6 +479,74 @@ def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("b
 
 
 # ---------------- CRUD genérico ----------------
+# ---------------- cobrança: sócio do Nibo e liberação de dado sensível (Fase 2) ----------------
+@router.get("/nibo")
+def nibo_ler(request: Request):
+    """Parâmetros do Nibo: id do sócio (stakeholder) usado no lote diário."""
+    con = _con(request)
+    try:
+        r = con.execute("select valor from parametro where chave='nibo_socio_id'").fetchone()
+        return envelope(con, {"socio_id": json.loads(r["valor"]) if r else None}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.put("/nibo")
+async def nibo_definir(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Define o id do sócio no Nibo (stakeholderId), necessário para o lote "Lançar na PJ"."""
+    corpo = _corpo(await _json(request))
+    _so(corpo, {"socio_id"})
+    socio = _texto(corpo, "socio_id", True)
+    con = _con(request)
+    try:
+        def fazer():
+            con.execute("insert into parametro(chave, valor) values ('nibo_socio_id', ?) on conflict(chave) do update set valor=excluded.valor", (json.dumps(socio),))
+            _auditar(con, ident.login, "nibo", "socio_id", "definido")
+        _tx(con, fazer)
+        return envelope(con, {"socio_id": socio}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+CAMPOS_SENSIVEIS = ("cpf", "nascimento", "documento")
+
+
+@router.get("/liberacoes")
+def liberacoes(request: Request):
+    """Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente)."""
+    con = _con(request)
+    try:
+        itens = [{"id": r["id"], "pessoa_id": r["pessoa_id"], "campo": r["campo"], "liberado_por": r["liberado_por"], "liberado_em": r["liberado_em"]}
+                 for r in con.execute("select * from liberacao_sensivel where usada_em is null order by id")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/liberacoes", status_code=201)
+async def liberar(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada."""
+    corpo = _corpo(await _json(request))
+    _so(corpo, {"pessoa_id", "campo"})
+    pessoa, campo = _texto(corpo, "pessoa_id", True), _texto(corpo, "campo", True)
+    if campo not in CAMPOS_SENSIVEIS:
+        raise erro(400, "requisicao_invalida", f"campo deve ser um de {list(CAMPOS_SENSIVEIS)}")
+    con = _con(request)
+    try:
+        if con.execute("select 1 from pessoa where id=? and excluido_em is null", (pessoa,)).fetchone() is None:
+            raise erro(404, "nao_encontrado", f"pessoa {pessoa} não existe")
+
+        def fazer():
+            lid = con.execute("insert into liberacao_sensivel(pessoa_id, campo, liberado_por, liberado_em) values (?,?,?,?)",
+                              (pessoa, campo, ident.login, _agora(request).isoformat())).lastrowid
+            con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cadastros')",
+                        (_agora(request).isoformat(), ident.login, f"liberou uma leitura de {campo} de {pessoa} para o agente"))
+            return lid
+        return envelope(con, {"id": _tx(con, fazer), "pessoa_id": pessoa, "campo": campo}, agora=_agora(request))
+    finally:
+        con.close()
+
+
 @router.get("/{tipo}")
 def listar(tipo: str, request: Request, busca: str | None = None, incluir_excluidos: bool = False):
     """Lista um cadastro: empresas, contas, pessoas, compromissos ou categorias."""

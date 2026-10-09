@@ -4,6 +4,8 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 
+from gabi.db import transacao
+
 JANELA_DIAS = 3
 BASE, BONUS_DATA_EXATA, BONUS_CNPJ = 0.5, 0.3, 0.2
 
@@ -35,7 +37,12 @@ def registrar_comprovante(con, *, paperless_id: int, tipo: str, valor_centavos: 
 
 
 def propor_vinculos(con, comprovante_id: int) -> list[Vinculo]:
-    """Propõe (estado `proposto`) os lançamentos de saída com o mesmo valor, ±3 dias, sem comprovante já confirmado."""
+    """Propõe (estado `proposto`) os lançamentos de saída com o mesmo valor, ±3 dias, sem comprovante já confirmado. Tudo ou nada."""
+    with transacao(con):
+        return _propor(con, comprovante_id)
+
+
+def _propor(con, comprovante_id: int) -> list[Vinculo]:
     c = con.execute("select * from comprovante where id=?", (comprovante_id,)).fetchone()
     if c is None:
         raise LookupError(f"comprovante {comprovante_id} não existe")
@@ -59,12 +66,20 @@ def propor_vinculos(con, comprovante_id: int) -> list[Vinculo]:
 
 
 def _decidir(con, vinculo_id: int, estado: str, por: str) -> None:
+    with transacao(con):
+        _decidir_tx(con, vinculo_id, estado, por)
+
+
+def _decidir_tx(con, vinculo_id: int, estado: str, por: str) -> None:
     v = con.execute("select * from comprovante_vinculo where id=?", (vinculo_id,)).fetchone()
     if v is None:
         raise LookupError(f"vínculo {vinculo_id} não existe")
     if v["estado"] != "proposto":
         raise ValueError(f"vínculo {vinculo_id} já foi {v['estado']}")
     con.execute("update comprovante_vinculo set estado=?, decidido_em=?, decidido_por=? where id=?", (estado, _agora(), por, vinculo_id))
+    if estado == "confirmado":  # um comprovante casa com um lançamento e um lançamento tem um comprovante: as outras propostas saem
+        con.execute("update comprovante_vinculo set estado='rejeitado', decidido_em=?, decidido_por='auto: outro vínculo foi confirmado' "
+                    "where estado='proposto' and id<>? and (comprovante_id=? or lancamento_id=?)", (_agora(), vinculo_id, v["comprovante_id"], v["lancamento_id"]))
     con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')",
                 (_agora(), por, f"vínculo {vinculo_id} (comprovante {v['comprovante_id']} ↔ lançamento {v['lancamento_id']}) {estado}"))
 

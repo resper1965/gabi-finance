@@ -14,8 +14,8 @@ def con(tmp_path):
     migrar(c, MIGRACOES)
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")      # 1
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pj','C6','BANK','C6 PJ',1,'sim')")          # 2
-    c.execute("insert into empresa(id, nome, relacao) values ('ness','Ness','contratante')")
-    c.execute("insert into empresa(id, nome, relacao) values ('bekaa','Bekaa','pj_titular')")
+    c.execute("insert into empresa(id, nome, dados) values ('ness','Ness','{\"relacao\": \"contratante\"}')")
+    c.execute("insert into empresa(id, nome, dados) values ('bekaa','Bekaa','{\"relacao\": \"pj_titular\"}')")
     c.execute("insert into empresa(id, nome) values ('x','Sem relação')")
     return c
 
@@ -57,21 +57,21 @@ def test_estado_so_avanca_na_ordem(con):
     assert _estado(con, rid) == "cobrado"
     with pytest.raises(ValueError):
         marcar_cobrado(con, rid)  # já cobrado: não volta nem repete
-    conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 4000, conta=2))
+    conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 4000, conta=2, empresa="ness"))
     assert _estado(con, rid) == "parcialmente_recebido"
 
 
 def test_recebimento_antes_da_cobranca_nao_baixa_nada(con):
     _l(con, 1, "2026-10-01", -10000, empresa="ness")
     rid = criar_reembolso(con, "ness")  # ainda a_cobrar
-    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 10000, conta=2))
+    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 10000, conta=2, empresa="ness"))
     assert r.casados == [] and r.sobra_centavos == 10000 and _estado(con, rid) == "a_cobrar"
 
 
 def test_recebimento_parcial_deixa_resto_em_aberto(con):
     _l(con, 1, "2026-10-01", -10000, empresa="ness")
     rid = criar_reembolso(con, "ness"); marcar_cobrado(con, rid)
-    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 6000, conta=2))
+    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 6000, conta=2, empresa="ness"))
     assert r.casados == [] and r.sobra_centavos == 0
     assert [(i.lancamento_id, i.em_aberto_centavos) for i in itens_a_reembolsar(con, "ness")] == [(1, 4000)]
     assert _estado(con, rid) == "parcialmente_recebido"
@@ -81,16 +81,16 @@ def test_baixa_casa_mais_antigo_primeiro_e_quita(con):
     _l(con, 1, "2026-10-05", -3000, empresa="ness")
     _l(con, 2, "2026-10-01", -5000, empresa="ness")   # mais antigo
     rid = criar_reembolso(con, "ness"); marcar_cobrado(con, rid)
-    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 5000, conta=2))
+    r = conciliar_recebimento(con, "ness", _l(con, 9, "2026-10-10", 5000, conta=2, empresa="ness"))
     assert r.casados == [2] and r.sobra_centavos == 0  # o de 01/10 quita primeiro
-    r2 = conciliar_recebimento(con, "ness", _l(con, 10, "2026-10-11", 4000, conta=2))
+    r2 = conciliar_recebimento(con, "ness", _l(con, 10, "2026-10-11", 4000, conta=2, empresa="ness"))
     assert r2.casados == [1] and r2.sobra_centavos == 1000 and _estado(con, rid) == "quitado"
 
 
 def test_o_mesmo_credito_nao_baixa_duas_vezes(con):
     _l(con, 1, "2026-10-01", -10000, empresa="ness")
     rid = criar_reembolso(con, "ness"); marcar_cobrado(con, rid)
-    cred = _l(con, 9, "2026-10-10", 4000, conta=2)
+    cred = _l(con, 9, "2026-10-10", 4000, conta=2, empresa="ness")
     conciliar_recebimento(con, "ness", cred)
     r = conciliar_recebimento(con, "ness", cred)
     assert r.casados == [] and r.sobra_centavos == 0

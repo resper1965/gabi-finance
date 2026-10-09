@@ -1,8 +1,11 @@
 """Reembolsos de despesas pagas no PF para empresas contratantes (ness, IONIC): a_cobrar → cobrado → parcialmente_recebido → quitado.
 Baixa por crédito em conta PJ, do item mais antigo para o mais novo. A Bekaa (`pj_titular`) nunca gera cobrança: vai ao lote do Nibo (T2.4).
-Consome: db (empresa.relacao, lancamento, conta.pj)."""
+Consome: cadastros (empresa.dados.relacao), lancamento, conta.pj."""
 import datetime as dt
 from dataclasses import dataclass
+
+from gabi.cobrar import cadastro
+from gabi.db import transacao
 
 
 @dataclass(frozen=True)
@@ -25,8 +28,7 @@ def _agora() -> str:
 
 
 def _contratante(con, empresa_id: str) -> bool:
-    r = con.execute("select relacao from empresa where id=? and excluido_em is null", (empresa_id,)).fetchone()
-    return bool(r) and r["relacao"] == "contratante"
+    return cadastro.relacao(con, empresa_id) == "contratante"
 
 
 def itens_a_reembolsar(con, empresa_id: str) -> list[ItemReembolso]:
@@ -42,10 +44,15 @@ def itens_a_reembolsar(con, empresa_id: str) -> list[ItemReembolso]:
 
 
 def criar_reembolso(con, empresa_id: str) -> int:
+    """Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança. Bekaa/empresa sem relação: ValueError. Tudo ou nada."""
+    with transacao(con):
+        return _criar_reembolso(con, empresa_id)
+
+
+def _criar_reembolso(con, empresa_id: str) -> int:
     """Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança. Bekaa/empresa sem relação: ValueError."""
     if not _contratante(con, empresa_id):
-        r = con.execute("select relacao from empresa where id=?", (empresa_id,)).fetchone()
-        raise ValueError("a Bekaa vai pelo lote do Nibo, não por cobrança" if r and r["relacao"] == "pj_titular"
+        raise ValueError("a Bekaa vai pelo lote do Nibo, não por cobrança" if cadastro.relacao(con, empresa_id) == "pj_titular"
                          else "a empresa não está cadastrada como contratante")
     novos = [i for i in itens_a_reembolsar(con, empresa_id)
              if not con.execute("select 1 from reembolso_item where lancamento_id=?", (i.lancamento_id,)).fetchone()]
@@ -75,15 +82,26 @@ def _atualizar_estado(con, reembolso_id: int) -> None:
 
 
 def conciliar_recebimento(con, empresa_id: str, credito_id: int) -> ResultadoConciliacao:
-    """Baixa um crédito (entrada em conta PJ) contra os itens JÁ COBRADOS, do mais antigo ao mais novo. Idempotente por crédito."""
-    c = con.execute("select l.valor_centavos, cn.pj from lancamento l join conta cn on cn.id=l.conta_id where l.id=?", (credito_id,)).fetchone()
+    """Baixa um crédito (entrada em conta PJ, classificado como da empresa) contra os itens JÁ COBRADOS, do mais antigo ao mais novo.
+    Só o que foi de fato aplicado fica registrado: a sobra (ou um crédito que chegou antes da cobrança) pode ser aplicada depois. Tudo ou nada."""
+    with transacao(con):
+        return _conciliar(con, empresa_id, credito_id)
+
+
+def _conciliar(con, empresa_id: str, credito_id: int) -> ResultadoConciliacao:
+    c = con.execute("select l.valor_centavos, l.empresa_id, cn.pj from lancamento l join conta cn on cn.id=l.conta_id where l.id=?", (credito_id,)).fetchone()
     if c is None:
         raise LookupError(f"lançamento {credito_id} não existe")
     if c["valor_centavos"] <= 0 or not c["pj"]:
         raise ValueError("o recebimento precisa ser uma entrada em conta PJ")
-    if con.execute("select 1 from reembolso_baixa where credito_lancamento_id=?", (credito_id,)).fetchone():
-        return ResultadoConciliacao([], 0)  # já baixado
-    restante, casados, tocados = c["valor_centavos"], [], set()
+    if c["empresa_id"] != empresa_id:
+        raise ValueError(f"classifique o crédito como da empresa {empresa_id} antes de baixar os reembolsos")
+    antes = con.execute("select valor_centavos from reembolso_baixa where credito_lancamento_id=?", (credito_id,)).fetchone()
+    aplicado_antes = antes["valor_centavos"] if antes else 0
+    restante = inicial = c["valor_centavos"] - aplicado_antes
+    if restante <= 0:
+        return ResultadoConciliacao([], 0)  # já aplicado por inteiro
+    casados, tocados = [], set()
     for it in con.execute(
             "select ri.reembolso_id, ri.lancamento_id, ri.valor_centavos, ri.recebido_centavos, l.data from reembolso_item ri "
             "join reembolso r on r.id=ri.reembolso_id join lancamento l on l.id=ri.lancamento_id "
@@ -91,15 +109,18 @@ def conciliar_recebimento(con, empresa_id: str, credito_id: int) -> ResultadoCon
             "order by l.data, l.id", (empresa_id,)).fetchall():
         if restante <= 0:
             break
-        pagar = min(restante, it["valor_centavos"] - it["recebido_centavos"])
+        falta = it["valor_centavos"] - it["recebido_centavos"]
+        pagar = min(restante, falta)
         con.execute("update reembolso_item set recebido_centavos=recebido_centavos+? where reembolso_id=? and lancamento_id=?",
                     (pagar, it["reembolso_id"], it["lancamento_id"]))
         restante -= pagar
         tocados.add(it["reembolso_id"])
-        if pagar == it["valor_centavos"] - it["recebido_centavos"]:
+        if pagar == falta:
             casados.append(it["lancamento_id"])
     for rid in tocados:
         _atualizar_estado(con, rid)
-    con.execute("insert into reembolso_baixa(credito_lancamento_id, empresa_id, valor_centavos, criado_em) values (?,?,?,?)",
-                (credito_id, empresa_id, c["valor_centavos"] - restante, _agora()))
+    aplicado = inicial - restante
+    if aplicado > 0:
+        con.execute("insert into reembolso_baixa(credito_lancamento_id, empresa_id, valor_centavos, criado_em) values (?,?,?,?) "
+                    "on conflict(credito_lancamento_id) do update set valor_centavos=valor_centavos+excluded.valor_centavos", (credito_id, empresa_id, aplicado, _agora()))
     return ResultadoConciliacao(casados, restante)

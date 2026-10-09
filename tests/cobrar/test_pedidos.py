@@ -17,8 +17,8 @@ def con(tmp_path):
     c = conectar(tmp_path / "g.db")
     migrar(c, MIGRACOES)
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")
-    c.execute("insert into pessoa(id, nome, canais, pode_pedir) values ('ana','Ana',?,1)", (json.dumps(["whatsapp:+5511911110000"]),))
-    c.execute("insert into pessoa(id, nome, canais, pode_pedir) values ('lia','Lia',?,0)", (json.dumps(["telegram:@lia"]),))
+    c.execute("insert into pessoa(id, nome, dados) values ('ana','Ana',?)", (json.dumps({"canais": ["whatsapp:+5511911110000"], "pode_pedir": True}),))
+    c.execute("insert into pessoa(id, nome, dados) values ('lia','Lia',?)", (json.dumps({"canais": ["telegram:@lia"], "pode_pedir": False}),))
     return c
 
 

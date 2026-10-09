@@ -145,6 +145,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada
+    resultado.paperless = paperless  # idem, para o teste da fábrica
     return resultado
 
 
@@ -157,4 +158,5 @@ def fabrica():
     finally:
         con.close()
     hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8081,localhost:8081").split(",") if h.strip()]
-    return criar_mcp(banco, hosts)
+    from gabi.fontes.ambiente import fontes_do_ambiente
+    return criar_mcp(banco, hosts, paperless=fontes_do_ambiente()["paperless"]())

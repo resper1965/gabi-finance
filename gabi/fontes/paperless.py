@@ -3,6 +3,7 @@
 R2/R10: não existe método de exclusão (nem de remover etiqueta); só GET, POST (criar) e PATCH (acrescentar etiqueta).
 R5: o token vem de quem instancia (arquivo de ambiente) e nunca entra em erro ou log. Consome: nada.
 """
+import itertools
 import json
 import secrets
 import urllib.error
@@ -56,10 +57,11 @@ class Paperless:
             yield from resp["results"]
             url = resp.get("next")
 
-    def docs(self, **filtros) -> list[dict]:
-        """Documentos (todas as páginas), com os filtros do Paperless como argumentos (ex.: tags__id__all=3, page_size=100)."""
+    def docs(self, *, limite: int | None = None, **filtros) -> list[dict]:
+        """Documentos (todas as páginas, ou só os `limite` primeiros), com os filtros do Paperless como argumentos (ex.: tags__id__all=3, page_size=100)."""
         filtros.setdefault("page_size", 100)
-        return list(self._paginas("/api/documents/?" + urlencode(filtros)))
+        paginas = self._paginas("/api/documents/?" + urlencode(filtros))
+        return list(itertools.islice(paginas, limite) if limite else paginas)
 
     def baixar(self, id: int) -> bytes:
         return self._pedir("GET", f"/api/documents/{int(id)}/download/")

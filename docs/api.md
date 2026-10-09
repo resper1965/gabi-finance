@@ -15,6 +15,10 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/cadastros/categorias/equivalencias` | Equivalência entre a categoria do banco (Pluggy) e a nossa. |
 | PUT | `/api/v1/cadastros/categorias/equivalencias` | Cria ou troca uma equivalência de categoria. |
 | DELETE | `/api/v1/cadastros/categorias/equivalencias/{origem}` | Remove uma equivalência de categoria. |
+| GET | `/api/v1/cadastros/liberacoes` | Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente). |
+| POST | `/api/v1/cadastros/liberacoes` | Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada. |
+| GET | `/api/v1/cadastros/nibo` | Parâmetros do Nibo: id do sócio (stakeholder) usado no lote diário. |
+| PUT | `/api/v1/cadastros/nibo` | Define o id do sócio no Nibo (stakeholderId), necessário para o lote "Lançar na PJ". |
 | GET | `/api/v1/cadastros/pessoas/{pid}/cpf` | Documentos da pessoa (sempre mascarados); a consulta fica auditada. |
 | GET | `/api/v1/cadastros/{tipo}` | Lista um cadastro: empresas, contas, pessoas, compromissos ou categorias. |
 | POST | `/api/v1/cadastros/{tipo}` | Cria um item de cadastro. |
@@ -34,6 +38,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/cobrar/pedidos/{pid}/decidir` | aprovar (exige conta_id e beneficiario_id), recusar ou pedir_info. Só o Ricardo decide, pelo painel. |
 | GET | `/api/v1/cobrar/reembolsos` | Reembolsos por empresa contratante (itens em aberto e cobranças) e a prévia do lote do Nibo da Bekaa. |
 | POST | `/api/v1/cobrar/reembolsos` | Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança da empresa contratante. |
+| POST | `/api/v1/cobrar/reembolsos/conciliar` | Baixa um crédito (entrada em conta PJ classificada como da empresa) contra os itens já cobrados, do mais antigo ao mais novo. |
 | POST | `/api/v1/cobrar/reembolsos/{rid}/cobrado` | Marca a cobrança como cobrada (a_cobrar → cobrado); repetir dá 409. |
 | POST | `/api/v1/cobrar/vinculos/{vid}/confirmar` | Confirma um vínculo proposto (comprovante × lançamento); só o Ricardo confirma. |
 | POST | `/api/v1/cobrar/vinculos/{vid}/rejeitar` | Rejeita um vínculo proposto; o par não volta a ser proposto como confirmado. |

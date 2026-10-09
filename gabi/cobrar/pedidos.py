@@ -1,11 +1,13 @@
 """Pedidos de pagamento vindos do canal: a Gabi REGISTRA (sem dizer que pagou); só o Ricardo decide, pelo painel (R1, R2).
-Aprovar cria uma linha de compromisso do mês (entra na agenda) e um aviso para o canal. Consome: db (pessoa.canais/pode_pedir)."""
+Aprovar cria uma linha de compromisso do mês (entra na agenda) e um aviso para o canal. Consome: cadastros (pessoa.dados.canais e dados.pode_pedir)."""
 import base64
 import datetime as dt
 import json
 from dataclasses import dataclass
 from typing import Callable
 
+from gabi.cobrar import cadastro
+from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
 
 
@@ -25,8 +27,9 @@ def _agora() -> str:
 
 
 def _pessoa_autorizada(con, solicitante: str):
-    for p in con.execute("select id, nome, canais from pessoa where pode_pedir=1 and excluido_em is null"):
-        if solicitante in json.loads(p["canais"] or "[]"):
+    for p in con.execute("select id, nome, dados from pessoa where excluido_em is null"):
+        d = cadastro.dados(p)  # permissão e canais ficam no cadastro da pessoa (dados.pode_pedir, dados.canais)
+        if d.get("pode_pedir") is True and solicitante in (d.get("canais") or []):
             return p
     return None
 
@@ -38,14 +41,24 @@ def registrar(con, *, solicitante: str, canal: str, mensagem_original: str, desc
     pessoa = _pessoa_autorizada(con, solicitante)
     if pessoa is None:
         raise SemEscopo("remetente não autorizado a fazer pedidos")
+    centavos = para_centavos(valor)  # valida tudo ANTES de subir o anexo ou gravar: pedido ruim não deixa rastro
+    if centavos is None or centavos <= 0:
+        raise ValueError("o pedido precisa de um valor maior que zero")
+    if vencimento:
+        try:
+            dt.date.fromisoformat(vencimento)
+        except ValueError:
+            raise ValueError("vencimento deve ser AAAA-MM-DD") from None
+    if para_quem and con.execute("select 1 from pessoa where id=?", (para_quem,)).fetchone() is None:
+        raise ValueError(f"pessoa {para_quem!r} não existe")
     if anexo_base64:
         if enviar_ao_paperless is None:
             raise ValueError("para guardar o anexo é preciso o Paperless configurado")
         anexo_paperless_id = enviar_ao_paperless(base64.b64decode(anexo_base64), f"pedido-{pessoa['id']}.pdf")
     pid = con.execute(
         "insert into pedido(solicitante_pessoa_id, canal, mensagem_original, descricao, valor_centavos, vencimento, anexo_paperless_id, pix_chave, "
-        "linha_digitavel, para_quem_id, criado_em) values (?,?,?,?,?,?,?,?,?,?,?)",
-        (pessoa["id"], canal, mensagem_original, descricao, para_centavos(valor), vencimento, anexo_paperless_id, pix_chave, linha_digitavel, para_quem, _agora())).lastrowid
+        "linha_digitavel, para_quem_id, criado_em, solicitante_ident) values (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (pessoa["id"], canal, mensagem_original, descricao, centavos, vencimento, anexo_paperless_id, pix_chave, linha_digitavel, para_quem, _agora(), solicitante)).lastrowid
     return RegistroPedido(pid, "pendente", f"Anotado, {pessoa['nome']}. O Ricardo vai ver.")
 
 
@@ -61,19 +74,28 @@ def _aviso(con, tipo: str, payload: dict) -> None:
 
 
 def decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None = None, beneficiario_id: str | None = None, mensagem: str | None = None) -> None:
+    """aprovar | recusar | pedir_info. Aprovar exige conta e beneficiário, cria o compromisso do mês e avisa o canal. Tudo ou nada."""
+    with transacao(con):
+        _decidir(con, pedido_id, acao, por, conta_id, beneficiario_id, mensagem)
+
+
+def _decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None, beneficiario_id: str | None, mensagem: str | None) -> None:
     """aprovar | recusar | pedir_info. Aprovar exige conta e beneficiário, cria o compromisso do mês e avisa o canal."""
     p = estado(con, pedido_id)
     if p["estado"] not in ("pendente", "info_pedida"):  # info_pedida continua aberto até o Ricardo decidir
         raise ValueError(f"pedido {pedido_id} já está {p['estado']}")
     if acao not in ("aprovar", "recusar", "pedir_info"):
         raise ValueError("ação inválida")
-    solicitante = con.execute("select canais from pessoa where id=?", (p["solicitante_pessoa_id"],)).fetchone()
-    ident = next((c for c in json.loads(solicitante["canais"] or "[]") if c.startswith(p["canal"] + ":")), None)
+    ident = p["solicitante_ident"]  # quem enviou, exatamente (a pessoa pode ter vários números no mesmo canal)
     if acao == "aprovar":
         if conta_id is None:
             raise ValueError("escolha a conta de onde sai o pagamento")
         if not beneficiario_id:
             raise ValueError("escolha o beneficiário")
+        if con.execute("select 1 from pessoa where id=?", (beneficiario_id,)).fetchone() is None:
+            raise ValueError("o beneficiário não existe")
+        if p["valor_centavos"] is None:
+            raise ValueError("o pedido não tem valor")
         conta = con.execute("select apelido from conta where id=?", (conta_id,)).fetchone()
         if conta is None:
             raise LookupError(f"conta {conta_id} não existe")

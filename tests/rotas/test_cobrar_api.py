@@ -27,11 +27,11 @@ def banco(tmp_path):
     adicionar(c, "vip@x.com", "p2", "familia_vip", por="t")
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")   # 1
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pj','C6','BANK','C6 PJ',1,'sim')")       # 2
-    c.execute("insert into empresa(id, nome, relacao, dados) values ('ness','Ness','contratante', ?)", (json.dumps({"email_cobranca": "fin@ness.com.br"}),))
-    c.execute("insert into empresa(id, nome, relacao) values ('bekaa','Bekaa','pj_titular')")
+    c.execute("insert into empresa(id, nome, dados) values ('ness','Ness', ?)", (json.dumps({"relacao": "contratante", "email_cobranca": "fin@ness.com.br"}),))
+    c.execute("insert into empresa(id, nome, dados) values ('bekaa','Bekaa','{\"relacao\": \"pj_titular\"}')")
     c.execute("insert into categoria(nome, nibo_category_id) values ('Software','cat-sw')")
     c.execute("insert into parametro(chave, valor) values ('nibo_socio_id', '\"socio\"')")
-    c.execute("insert into pessoa(id, nome, canais, pode_pedir) values ('ana','Ana',?,1)", (json.dumps(["whatsapp:+5511911110000"]),))
+    c.execute("insert into pessoa(id, nome, dados) values ('ana','Ana',?)", (json.dumps({"canais": ["whatsapp:+5511911110000"], "pode_pedir": True}),))
     for i, (d, v, emp, desc) in enumerate([("2026-10-01", -10000, "ness", "HOTEL"), ("2026-10-02", -5000, "ness", "TAXI"), ("2026-10-03", -7000, "bekaa", "LICENCA")], 1):
         c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, empresa_id, categoria_id, status) "
                   "values (1,?,?,?,?,?,?,1,'posted')", (f"l{i}", d, v, desc, desc, emp))

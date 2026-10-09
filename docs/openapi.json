@@ -271,6 +271,70 @@
     "summary": "Equivalencia Excluir"
    }
   },
+  "/api/v1/cadastros/liberacoes": {
+   "get": {
+    "description": "Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente).",
+    "operationId": "liberacoes_api_v1_cadastros_liberacoes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Liberacoes"
+   },
+   "post": {
+    "description": "Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada.",
+    "operationId": "liberar_api_v1_cadastros_liberacoes_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Liberar"
+   }
+  },
+  "/api/v1/cadastros/nibo": {
+   "get": {
+    "description": "Parâmetros do Nibo: id do sócio (stakeholder) usado no lote diário.",
+    "operationId": "nibo_ler_api_v1_cadastros_nibo_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Nibo Ler"
+   },
+   "put": {
+    "description": "Define o id do sócio no Nibo (stakeholderId), necessário para o lote \"Lançar na PJ\".",
+    "operationId": "nibo_definir_api_v1_cadastros_nibo_put",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Nibo Definir"
+   }
+  },
   "/api/v1/cadastros/pessoas/{pid}/cpf": {
    "get": {
     "description": "Documentos da pessoa (sempre mascarados); a consulta fica auditada.",
@@ -972,6 +1036,23 @@
      }
     },
     "summary": "Reembolso Abrir"
+   }
+  },
+  "/api/v1/cobrar/reembolsos/conciliar": {
+   "post": {
+    "description": "Baixa um crédito (entrada em conta PJ classificada como da empresa) contra os itens já cobrados, do mais antigo ao mais novo.",
+    "operationId": "reembolso_conciliar_api_v1_cobrar_reembolsos_conciliar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Reembolso Conciliar"
    }
   },
   "/api/v1/cobrar/reembolsos/{rid}/cobrado": {
