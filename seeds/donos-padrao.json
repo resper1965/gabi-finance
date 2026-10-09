@@ -1,24 +1,47 @@
 {
   "coletivos": [
-    {"id": "casa", "nome": "Casa (todos)"},
-    {"id": "pets", "nome": "Pets"}
+    {
+      "id": "casa",
+      "nome": "Casa (todos)"
+    },
+    {
+      "id": "pets",
+      "nome": "Pets"
+    }
   ],
   "responsaveis": {
-    "carla": ["giovanna"],
-    "adriana": ["louise"]
+    "carla": [
+      "giovanna"
+    ],
+    "adriana": [
+      "louise"
+    ]
   },
   "categorias": {
     "Mercado": "casa",
     "Moradia e contas": "casa",
-    "Pets": "pets"
+    "Pets": "pets",
+    "Restaurantes e delivery": "ricardo"
   },
   "contas": {
-    "PAO DE ACUCAR MC BLACK": ["sabrina"],
-    "PERSONNALITE LATAM PASS VISA INFINITE": ["ricardo", "louise"],
-    "PERSONNALITE MC BLACK": ["ricardo", "giovanna"]
+    "PAO DE ACUCAR MC BLACK": [
+      "sabrina"
+    ],
+    "PERSONNALITE LATAM PASS VISA INFINITE": [
+      "ricardo",
+      "louise"
+    ],
+    "PERSONNALITE MC BLACK": [
+      "ricardo",
+      "giovanna"
+    ]
   },
   "compromissos": {
-    "carla-pensao": {"para_quem": "giovanna"},
-    "carla-reembolso": {"para_quem": "giovanna"}
+    "carla-pensao": {
+      "para_quem": "giovanna"
+    },
+    "carla-reembolso": {
+      "para_quem": "giovanna"
+    }
   }
 }
