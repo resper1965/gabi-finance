@@ -775,6 +775,76 @@
     "summary": "Semanas"
    }
   },
+  "/api/v1/caixas-email": {
+   "get": {
+    "description": "Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe.",
+    "operationId": "listar_caixas_api_v1_caixas_email_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar Caixas"
+   },
+   "post": {
+    "description": "Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim).",
+    "operationId": "criar_caixa_api_v1_caixas_email_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar Caixa"
+   }
+  },
+  "/api/v1/caixas-email/{caixa_id}": {
+   "patch": {
+    "description": "Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler).",
+    "operationId": "atualizar_caixa_api_v1_caixas_email__caixa_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "caixa_id",
+      "required": true,
+      "schema": {
+       "title": "Caixa Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Atualizar Caixa"
+   }
+  },
   "/api/v1/cartoes": {
    "get": {
     "description": "Cartões: fatura aberta, % do limite, série de 12 meses e categorias.",

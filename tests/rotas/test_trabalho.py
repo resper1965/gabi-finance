@@ -88,3 +88,25 @@ def test_concluir_sem_origem_configurada_da_503_e_nao_marca(cli, banco):
     _semear(banco)
     assert post(cli, "/api/v1/tarefas/1/concluir").status_code == 503
     assert get(cli, "/api/v1/tarefas").json()["dados"]["itens"][0]["estado"] == "aberta"
+
+
+def test_caixas_de_email_cadastro_nasce_a_decidir_e_so_boss(cli):
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "x@y.com", "provedor": "google"}, VIP).status_code == 403
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "x@y.com", "provedor": "google"}).status_code == 201
+    item = get(cli, "/api/v1/caixas-email").json()["dados"]["itens"][0]
+    assert item["estado"] == "a_decidir" and item["itens"] == 0
+
+
+def test_caixas_validacao(cli):
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "", "provedor": "google"}).status_code == 400
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "a@b", "provedor": "imap"}).status_code == 400
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "a@b", "provedor": "google", "senha": "x"}).status_code == 400   # nunca guarda segredo
+    post(cli, "/api/v1/caixas-email", {"endereco": "a@b", "provedor": "google"})
+    assert post(cli, "/api/v1/caixas-email", {"endereco": "a@b", "provedor": "graph"}).status_code == 409
+
+
+def test_liberar_caixa_pelo_patch(cli):
+    cid = post(cli, "/api/v1/caixas-email", {"endereco": "a@b", "provedor": "graph"}).json()["dados"]["id"]
+    r = cli.patch(f"/api/v1/caixas-email/{cid}", headers={**BOSS, "Content-Type": "application/json"}, content=json.dumps({"estado": "sim", "ler_a_partir_de": "2026-10-01T00:00:00Z"}))
+    assert r.status_code == 200
+    assert get(cli, "/api/v1/caixas-email").json()["dados"]["itens"][0]["estado"] == "sim"

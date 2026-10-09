@@ -28,6 +28,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | PATCH | `/api/v1/cadastros/{tipo}/{id_}` | Atualiza campos de um item de cadastro. |
 | GET | `/api/v1/caixa/resumo` | KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção. |
 | GET | `/api/v1/caixa/semanas` | Semanas (passado real e projeção): entradas e saídas por categoria e saldo. |
+| GET | `/api/v1/caixas-email` | Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe. |
+| POST | `/api/v1/caixas-email` | Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim). |
+| PATCH | `/api/v1/caixas-email/{caixa_id}` | Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler). |
 | GET | `/api/v1/cartoes` | Cartões: fatura aberta, % do limite, série de 12 meses e categorias. |
 | GET | `/api/v1/cobrar/cobrancas` | Rascunhos de cobrança guardados (opcionalmente de uma empresa). |
 | POST | `/api/v1/cobrar/cobrancas` | Monta o RASCUNHO do e-mail de cobrança (não envia). Corpo: {"empresa_id", "itens"?: [lancamento_id]}. |

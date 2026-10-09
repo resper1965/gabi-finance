@@ -142,3 +142,72 @@ def concluir(request: Request, tarefa_id: int):
         return envelope(con, {"ok": True}, agora=_agora(request))
     finally:
         con.close()
+
+
+# ---------------- caixas de e-mail (cadastro do Ricardo; nada fixo no código) ----------------
+CAMPOS_CAIXA = {"endereco", "provedor", "papel", "empresa_id", "como_entra", "le", "rascunho", "frente_padrao_id", "migra_para", "ler_a_partir_de", "estado"}
+
+
+def _validar_caixa(corpo: dict, criar: bool) -> dict:
+    extra = set(corpo) - CAMPOS_CAIXA
+    if extra:
+        raise erro(400, "requisicao_invalida", f"campos desconhecidos: {sorted(extra)}")
+    if criar and not (corpo.get("endereco") or "").strip():
+        raise erro(400, "requisicao_invalida", "informe o endereço")
+    if "provedor" in corpo and corpo["provedor"] not in ("graph", "google"):
+        raise erro(400, "requisicao_invalida", "provedor é graph ou google")
+    if "estado" in corpo and corpo["estado"] not in ("a_decidir", "sim", "nao"):
+        raise erro(400, "requisicao_invalida", "estado é a_decidir, sim ou nao")
+    if criar and "provedor" not in corpo:
+        raise erro(400, "requisicao_invalida", "informe o provedor")
+    for c in ("le", "rascunho"):
+        if c in corpo:
+            corpo[c] = 1 if corpo[c] else 0
+    return corpo
+
+
+@router.get("/caixas-email")
+def listar_caixas(request: Request):
+    """Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe."""
+    con = _con(request)
+    try:
+        itens = [dict(r) for r in con.execute(
+            "select c.id, c.endereco, c.provedor, c.papel, c.empresa_id, c.como_entra, c.le, c.rascunho, c.frente_padrao_id, c.migra_para, c.ler_a_partir_de, c.estado, "
+            "(select count(*) from item_email i where i.caixa_id=c.id) as itens from caixa_email c order by c.endereco")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/caixas-email", status_code=201)
+async def criar_caixa(request: Request):
+    """Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim)."""
+    corpo = _validar_caixa(_corpo(await _json(request)), True)
+    con = _con(request)
+    try:
+        cols = [c for c in CAMPOS_CAIXA if c in corpo]
+        try:
+            cur = con.execute(f"insert into caixa_email({','.join(cols)}) values ({','.join('?' * len(cols))})", [corpo[c] for c in cols])
+        except Exception as e:
+            raise erro(409, "conflito", "caixa já cadastrada ou empresa inexistente") from e
+        return envelope(con, {"id": cur.lastrowid}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.patch("/caixas-email/{caixa_id}")
+async def atualizar_caixa(request: Request, caixa_id: int):
+    """Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler)."""
+    corpo = _validar_caixa(_corpo(await _json(request)), False)
+    con = _con(request)
+    try:
+        if con.execute("select 1 from caixa_email where id=?", (caixa_id,)).fetchone() is None:
+            raise erro(404, "nao_encontrado", "caixa não existe")
+        if corpo:
+            try:
+                con.execute(f"update caixa_email set {','.join(c + '=?' for c in corpo)} where id=?", [*corpo.values(), caixa_id])
+            except Exception as e:
+                raise erro(409, "conflito", "endereço repetido ou empresa inexistente") from e
+        return envelope(con, {"ok": True}, agora=_agora(request))
+    finally:
+        con.close()
