@@ -7,6 +7,10 @@
     {
       "id": "pets",
       "nome": "Pets"
+    },
+    {
+      "id": "casal",
+      "nome": "Ricardo e Sabrina (meio a meio)"
     }
   ],
   "responsaveis": {
@@ -152,6 +156,12 @@
       "acao": {
         "para_quem": "ricardo",
         "categoria": "Restaurantes e delivery"
+      }
+    },
+    {
+      "padrao": "SEM PARAR",
+      "acao": {
+        "para_quem": "casal"
       }
     }
   ]
