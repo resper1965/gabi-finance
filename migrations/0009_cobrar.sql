@@ -79,3 +79,10 @@ create table aviso(
   tipo text not null, payload text not null,
   criado_em text not null, entregue_em text);
 create index aviso_pendentes on aviso(entregue_em);
+
+-- Dado sensível (CPF, nascimento, documento) só sai pelo MCP depois de uma liberação ÚNICA do Ricardo (T2.8); toda leitura é registrada.
+create table liberacao_sensivel(
+  id integer primary key,
+  pessoa_id text not null references pessoa(id),
+  campo text not null check (campo in ('cpf','nascimento','documento')),
+  liberado_por text not null, liberado_em text not null, usada_em text);

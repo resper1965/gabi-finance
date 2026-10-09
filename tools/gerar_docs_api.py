@@ -34,7 +34,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
                   "## REST (`/api/...`, só por `tailscale serve`; nível `boss` salvo indicação)", "",
                   "| Método | Rota | O que faz |", "|---|---|---|"]
         linhas += [f"| {m} | `{p}` | {d} |" for p, m, d in rotas]
-        linhas += ["", "## MCP (`/mcp`, Streamable HTTP, `Authorization: Bearer <token>`; só leitura)", "",
+        linhas += ["", "## MCP (`/mcp`, Streamable HTTP, `Authorization: Bearer <token>`; leitura e PROPOSTAS: nenhuma ferramenta aprova, envia, paga ou apaga)", "",
                    "| Ferramenta | Escopo | Entrada | O que faz |", "|---|---|---|---|"]
         for t in sorted(ferramentas, key=lambda t: t.name):
             props = (t.input_schema or {}).get("properties", {}) if hasattr(t, "input_schema") else (t.inputSchema or {}).get("properties", {})

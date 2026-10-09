@@ -42,13 +42,25 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/sugestoes/{sid}/aprovar` | Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado. |
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |
 
-## MCP (`/mcp`, Streamable HTTP, `Authorization: Bearer <token>`; só leitura)
+## MCP (`/mcp`, Streamable HTTP, `Authorization: Bearer <token>`; leitura e PROPOSTAS: nenhuma ferramenta aprova, envia, paga ou apaga)
 
 | Ferramenta | Escopo | Entrada | O que faz |
 |---|---|---|---|
+| `avisos_confirmar_entrega` | `pedidos` | aviso_id | Marca um aviso como entregue no canal (só depois da entrega de fato). |
+| `avisos_pendentes` | `pedidos` | desde | Avisos para entregar no canal (resultado de pedidos decididos). Ler NÃO tira da fila: confirme com avisos_confirmar_entrega depois de entregar. |
+| `classificar_lancamento` | `propostas` | categoria_id, empresa_id, lancamento_id, motivo, para_quem_id | PROPÕE categoria, para quem e/ou empresa de um lançamento. Cria só sugestão pendente; o Ricardo aprova no painel e nada muda antes disso. |
+| `documentos_baixar` | `docs` | id | Baixa um documento do Paperless (PDF em base64, até 5 MB). Exige o escopo docs. |
+| `documentos_buscar` | `docs` | limite, texto | Busca documentos no Paperless por texto. Devolve só id, título e data; use documentos_baixar para o arquivo. |
 | `financeiro_contas_a_pagar` | `fin` | ate | Contas atrasadas (com dias de atraso), do dia e dos próximos 7 dias. `ate` (AAAA-MM-DD) corta o que vence depois. |
 | `financeiro_lancamentos` | `fin` | ate, categoria, conta, de, empresa, limite, para_quem, texto | Lançamentos (mais recentes primeiro). Datas AAAA-MM-DD; `limite` até 200. Cada item traz de onde veio cada classificação (origens). |
 | `financeiro_para_onde_vai` | `fin` | periodo, por | Para onde foi o dinheiro: periodo = mes | semana | 12m; por = categoria | pessoa | fornecedor. Traz % do total e variação contra o período anterior. |
 | `financeiro_saldo` | `fin` | conta | Saldo do caixa único (só as contas que o Ricardo liberou) e faturas de cartão em aberto. `conta` filtra pelo apelido. |
+| `pedidos_estado` | `pedidos` | pedido_id | Estado de um pedido (pendente, aprovado, recusado ou info_pedida) e a mensagem ao solicitante, se houver. |
+| `pedidos_registrar` | `pedidos` | anexo_paperless_id, canal, descricao, linha_digitavel, mensagem_original, para_quem, pix_chave, solicitante, valor, vencimento | Registra um pedido de pagamento feito por alguém no canal (solicitante = "canal:identificador"). Fica PENDENTE; quem decide é o Ricardo, no painel. |
+| `pessoas_dado` | `sensivel` | campo, pessoa_id | Dado sensível de uma pessoa (cpf, nascimento ou documento). Só sai depois de uma liberação ÚNICA do Ricardo; sem ela devolve aguardando_liberacao. |
+| `reembolsos_listar` | `fin` | — | Reembolsos em aberto por empresa contratante (ness, IONIC): valor a receber, número de itens e cobranças em andamento. |
+| `reembolsos_preparar_email` | `propostas` | empresa_id, itens | Prepara o RASCUNHO do e-mail de cobrança de reembolso de uma empresa contratante. Não envia nada: o rascunho fica no painel (ADR-006). |
+| `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |
+| `tarefas_propor` | `propostas` | motivo, titulo, vencimento | PROPÕE uma tarefa para o Ricardo. Cria só sugestão pendente; nada vai para a origem (Microsoft 365, Linear) sem ele aprovar. |
 
 Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).
