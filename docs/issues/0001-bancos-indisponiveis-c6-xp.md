@@ -24,6 +24,9 @@ O mcp.ai (Open Finance) devolve `status_conexao` com erro para duas instituiçõ
 - Ricardo viu o mcp.ai indicando todos os bancos funcionais, mas as rodadas seguintes seguiram com `conferida=False`: Santander, Itaú, C6 Bank Empresas e XP Banking com "última atualização 09/10 18:00 UTC" e XP Investimentos desde 12/08 (a sincronização forçada não obteve dados novos dentro da janela de 5 min). Ou seja, o problema não é só C6/XP: nenhum banco publicou lançamentos novos depois das 18:00 UTC.
 - Uma rodada de extratos com `--sincronizar` demora vários minutos (até 5 min por banco; limite da unit 15 min), o que não é falha.
 
+## Decisão pendente do Ricardo (G16, plano de finalização)
+Até **17/10/2026**: reconectar a XP Investimentos no mcp.ai **ou** desligar a conta (`PATCH /api/v1/cadastros/contas/10 {"estado":"nao"}`). Se reconectou: `sudo systemctl start gabi-brain-extratos` e conferir `conta_estado.ult_sync_ok` da conta 10; fechar a issue com a data. Se desligou: registrar aqui.
+
 ## Decisões
 - Tratado como **seed**, não desenvolvimento: não bloqueia o app (foco em painel/Fase 1). (Ricardo, 09/10)
 - Não alterar a conferência para "perdoar" essas contas; só reavaliar se o provedor seguir indisponível.
