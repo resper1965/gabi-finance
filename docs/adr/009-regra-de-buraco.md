@@ -12,8 +12,11 @@ Na primeira rodada real conferida (09/10/2026, 15 contas liberadas) a conferênc
 4. Cartão continua sem conferência de saldo e de buraco.
 5. **Saldo final** (BANK): a diferença também passa se for igual à soma dos lançamentos **pendentes** da janela (o banco já abateu o pendente do saldo; evidência real 09/10: débito automático do cartão Pão de Açúcar, R$ 4.016,63, pendente).
 
+6. **Revisão 09/10/2026 (noite) — conta de movimento irregular.** O C6 PJ (conta 12) reprovava por 28 e 29/09 sem movimento; nos últimos 56 dias úteis ele teve movimento em 64% dos dias (Itaú conta 6: 56%) e sequências de 2 e até 3 dias úteis vazios são rotina. Se a fração de dias úteis com movimento no histórico é **< 75%** (`DENSIDADE_REGULAR`), o buraco só reprova com **≥ 4 dias úteis seguidos** (`MIN_SEGUIDOS_IRREGULAR`); contas regulares seguem com 2. Decisão do Ricardo: "c6 não movimenta muito, é normal". Obs.: a conferência de `saldo_final` compara só o último dia com o anterior; ela **não** prova que dias antigos estavam vazios, por isso o critério é o perfil da conta, não o saldo.
+
 ## Consequência
 A rodada passa a ficar `conferida` com dados normais; buracos reais (≥ 2 dias seguidos) e diferenças sem explicação continuam travando o `dados_ate`. Risco aceito: um dia útil isolado sem extrato não trava mais (fica registrado em `conferencia.detalhe`).
 
 ## Quando reverter
+Para contas irregulares, se uma perda de 2–3 dias passar despercebida: baixar `MIN_SEGUIDOS_IRREGULAR` para 3.
 Se aparecer um extrato com perda de um dia único que ninguém viu: baixar `MIN_SEGUIDOS` para 1 e exigir sync recente (`conta_estado.ult_sync_ok`) como atenuante.

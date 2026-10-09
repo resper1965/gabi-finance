@@ -17,6 +17,8 @@ FRACAO_ESPERADO = 0.5   # dia da semana com movimento em >= 50% das semanas é d
 VOLUME_MINIMO = 0.5     # ontem >= 50% da mediana dos dias úteis anteriores
 MEDIANA_MINIMA = 2
 MIN_SEGUIDOS = 2        # buraco só reprova com >= 2 dias úteis SEGUIDOS sem movimento (calibrado com dado real, 09/10/2026; ADR-009)
+DENSIDADE_REGULAR = 0.75   # fração dos dias úteis do histórico com movimento; abaixo disso a conta é "de movimento irregular"
+MIN_SEGUIDOS_IRREGULAR = 4  # conta irregular: 2 e até 3 dias úteis vazios seguidos são rotina (C6 PJ e Itaú, dado real 09/10/2026; ADR-009)
 
 
 @dataclass(frozen=True)
@@ -79,10 +81,15 @@ def _dias_sem_buraco(con, conta_id: int, hoje: dt.date, tipo: str = "BANK") -> t
         esperado[w] = bool(dw) and sum(d in dias for d in dw) / len(dw) >= FRACAO_ESPERADO
     buracos = [d for d in (hoje - dt.timedelta(days=k) for k in range(1, JANELA_BURACO + 1))
                if _util(d) and esperado[d.weekday()] and d not in dias]
+    uteis = [d for d in hist if _util(d)]
+    irregular = bool(uteis) and sum(d in dias for d in uteis) / len(uteis) < DENSIDADE_REGULAR
+    limite = MIN_SEGUIDOS_IRREGULAR if irregular else MIN_SEGUIDOS
     if buracos:
         lista = ", ".join(d.isoformat() for d in sorted(buracos))
-        if _maior_sequencia(buracos) >= MIN_SEGUIDOS:
+        if _maior_sequencia(buracos) >= limite:
             return False, "dias úteis sem movimento: " + lista
+        if irregular:
+            return True, f"conta de movimento irregular: até {limite - 1} dias úteis vazios seguidos são rotina (não reprova): " + lista
         return True, "dias úteis isolados sem movimento (não reprova): " + lista
     return True, "nenhum dia útil esperado sem movimento"
 

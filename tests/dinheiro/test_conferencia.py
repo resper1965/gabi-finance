@@ -319,3 +319,31 @@ def test_saldo_final_pendente_de_outro_valor_nao_explica(con):
     _lanc(con, 1, "2026-10-08", -9999, status="pending")
     _saldo(con, "2026-10-08T15:00:00", 100000 - 40166)
     assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False
+
+
+# ---------------- buraco em conta de movimento irregular (ADR-009, revisão 09/10 noite) ----------------
+def _conta_irregular(con, vazios):
+    """~60% dos dias úteis com movimento (cada dia da semana com movimento em 3 de 5 semanas) fora da janela de 14 dias;
+    na janela, todo dia útil tem movimento, menos `vazios`."""
+    i, d = 1000, HOJE - dt.timedelta(days=56)
+    while d <= HOJE:
+        if d.weekday() < 5:
+            semana = (d - dt.date(2026, 8, 10)).days // 7
+            na_janela = (HOJE - d).days <= 14
+            cheio = (not na_janela and d.weekday() not in {semana % 5, (semana + 2) % 5}) or (na_janela and d not in vazios)
+            if cheio and d != HOJE:
+                _lanc(con, i, d.isoformat(), -1000 - i)
+                i += 1
+        d += dt.timedelta(days=1)
+
+
+def test_conta_de_movimento_irregular_tolera_dois_dias_uteis_seguidos_vazios(con):
+    _conta_irregular(con, vazios={dt.date(2026, 10, 5), dt.date(2026, 10, 6)})
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"]
+    assert r.ok is True and "2026-10-05" in r.detalhe and "irregular" in r.detalhe
+
+
+def test_conta_de_movimento_irregular_reprova_quatro_dias_uteis_seguidos_vazios(con):
+    _conta_irregular(con, vazios={dt.date(2026, 10, 5), dt.date(2026, 10, 6), dt.date(2026, 10, 7)} | {dt.date(2026, 10, 2)})
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"]
+    assert r.ok is False and "2026-10-02" in r.detalhe
