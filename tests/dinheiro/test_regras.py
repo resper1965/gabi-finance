@@ -212,3 +212,13 @@ def test_criar_regra_ativa_valida_o_padrao_e_a_acao(con):
         with pytest.raises(ValueError):
             criar_regra_ativa(con, padrao, acao, "r")
     assert con.execute("select count(*) from regra").fetchone()[0] == 0
+
+
+def test_regra_por_estabelecimento_sobrescreve_padrao_do_cadastro_mas_nao_regra_nem_decisao(con):
+    padrao = _l(con, 1, desc="PETSUPERMARK", estab="PETSUPERMARK", para_quem_id="p1", para_quem_origem="fonte")
+    de_regra = _l(con, 2, desc="PETSUPERMARK", estab="PETSUPERMARK", para_quem_id="p1", para_quem_origem="regra")
+    decidido = _l(con, 3, desc="PETSUPERMARK", estab="PETSUPERMARK", para_quem_id="p1", para_quem_origem="voce")
+    con.execute("insert into pessoa(id, nome) values ('pets','Pets')")
+    criar_regra_ativa(con, "PETSUPERMARK", {"para_quem_id": "pets"}, "r")
+    assert _get(con, padrao)["para_quem_id"] == "pets" and _get(con, padrao)["para_quem_origem"] == "regra"
+    assert _get(con, de_regra)["para_quem_id"] == "p1" and _get(con, decidido)["para_quem_id"] == "p1"

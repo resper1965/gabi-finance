@@ -13,7 +13,7 @@ interface Sug { id: number; tipo: string; lancamento_id: number | null; payload:
 interface Pessoa { id: number | string; nome: string; papel?: string | null; dados?: Record<string, unknown> }
 interface ContaUso { apelido: string; usuarios?: string[] }
 
-const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "Gabi sugere", voce: "você", fonte: "fonte" };
+const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "Gabi sugere", voce: "você", fonte: "padrão do cadastro" };
 
 /** "De quem é cada gasto?": toque no chip; vale só para aquele lançamento. "sempre assim" cria regra (R1: só com o seu toque). */
 export function Lancamentos() {

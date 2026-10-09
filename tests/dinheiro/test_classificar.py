@@ -181,8 +181,8 @@ def test_pagamento_a_quem_responde_por_uma_filha_vai_para_a_filha(con):
     _pessoas_da_familia(con)
     lid = _lanc(con, 1, desc="Pix enviado para CARLA NOCE DELA TORRE", estab="Pix enviado para CARLA NOCE DELA TORRE")
     c = classificar(con, lid)
-    assert c.para_quem_id == "giovanna" and c.origens["para_quem"] == "regra"
-    assert _l(con, lid)["para_quem_origem"] == "regra"
+    assert c.para_quem_id == "giovanna" and c.origens["para_quem"] == "fonte"
+    assert _l(con, lid)["para_quem_origem"] == "fonte"   # padrão do cadastro, não regra do Ricardo: uma regra por estabelecimento pode sobrescrevê-lo
 
 
 def test_dinheiro_que_ENTRA_da_responsavel_nao_vira_para_quem(con):

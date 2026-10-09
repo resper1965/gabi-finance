@@ -126,14 +126,15 @@ def classificar(con, lancamento_id: int) -> Classificacao:
             confianca = max(confianca, CONFIANCA["banco"])
 
     # 2b) "para quem" sem perguntar (padrões que o Ricardo cadastrou), só se ainda vazio. Ordem: responsável > compromisso > conta > categoria.
-    #     Origem 'regra': são regras dele (a coluna só aceita banco|regra|gabi|voce|fonte).
+    #     Origem 'fonte' (padrão do cadastro): uma regra por estabelecimento que ele dita vence, e 'voce'/'regra' nunca são sobrescritos
+    #     (a coluna só aceita banco|regra|gabi|voce|fonte).
     if atual["para_quem_id"] is None:
         dono = _responsavel(con, r)
         if dono is None:
             comp = _padrao_do_compromisso(con, r["externo_id"])
             if comp and comp["categoria_id"] is not None and atual["categoria_id"] is None:
-                _preencher(con, lancamento_id, "categoria", "categoria_id", comp["categoria_id"], "regra")
-                atual["categoria_id"], origens["categoria"] = comp["categoria_id"], "regra"
+                _preencher(con, lancamento_id, "categoria", "categoria_id", comp["categoria_id"], "fonte")
+                atual["categoria_id"], origens["categoria"] = comp["categoria_id"], "fonte"
             dono = comp["para_quem_id"] if comp else None
         if dono is None:
             dono = _usuario_unico(con, r["conta_id"])
@@ -141,8 +142,8 @@ def classificar(con, lancamento_id: int) -> Classificacao:
             c = con.execute("select dono_padrao from categoria where id=?", (atual["categoria_id"],)).fetchone()
             dono = c["dono_padrao"] if c else None
         if dono is not None:
-            _preencher(con, lancamento_id, "para_quem", "para_quem_id", dono, "regra")
-            atual["para_quem_id"], origens["para_quem"], confianca = dono, "regra", max(confianca, CONFIANCA["regra"])
+            _preencher(con, lancamento_id, "para_quem", "para_quem_id", dono, "fonte")
+            atual["para_quem_id"], origens["para_quem"], confianca = dono, "fonte", max(confianca, CONFIANCA["regra"])
 
     # 3) cache por estabelecimento: só sugestão
     if r["estabelecimento"]:
