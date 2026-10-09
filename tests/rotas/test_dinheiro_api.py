@@ -270,3 +270,21 @@ def test_toda_chamada_v1_e_registrada(cli, banco):
 def test_post_v1_cross_site_recusado(cli, banco):
     r = cli.post("/api/v1/contas-pagar/iptu:2026-10/paga", headers={**BOSS, **JSON, "Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
+
+
+def test_rodada_traz_as_conferencias_reprovadas_so_de_contas_liberadas(cli, banco):
+    c = conectar(banco)
+    rid = c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T18:00:00+00:00','2026-10-08T18:10:00+00:00','ok',0)").lastrowid
+    for conta, ok in ((1, 0), (2, 0)):  # conta 1 liberada (sim), conta 2 a_decidir
+        c.execute("insert into conferencia(rodada_id, tipo, conta_id, ok, detalhe, criado_em) values (?,?,?,?,?, '2026-10-08T18:10:00+00:00')",
+                  (rid, "dias_sem_buraco", conta, ok, "dias úteis sem movimento: 2026-10-05, 2026-10-06"))
+    c.close()
+    itens = get(cli, "/api/v1/rodadas").json()["dados"]["itens"]
+    r = next(x for x in itens if x["id"] == rid)
+    assert r["conferida"] is False
+    assert r["reprovadas"] == [{"conta": "C6 PJ", "tipo": "dias_sem_buraco", "detalhe": "dias úteis sem movimento: 2026-10-05, 2026-10-06"}]
+
+
+def test_rodada_conferida_nao_tem_reprovadas(cli):
+    itens = get(cli, "/api/v1/rodadas").json()["dados"]["itens"]
+    assert all(x["reprovadas"] == [] for x in itens if x["conferida"])

@@ -379,8 +379,14 @@ def rodadas(request: Request, limite: int = 50):
     """Últimas rodadas de ingestão e se foram conferidas."""
     con = _con(request)
     try:
+        def reprovadas(rodada_id):  # só contas liberadas travam a rodada; o resto é registrado mas não aparece aqui
+            return [{"conta": x["apelido"] or x["instituicao"], "tipo": x["tipo"], "detalhe": x["detalhe"]} for x in con.execute(
+                "select c.apelido, c.instituicao, cf.tipo, cf.detalhe from conferencia cf join conta c on c.id=cf.conta_id "
+                "where cf.rodada_id=? and cf.ok=0 and c.estado='sim' and c.excluido_em is null order by c.id, cf.tipo", (rodada_id,))]
+
         itens = [{"id": r["id"], "fonte": r["fonte"], "inicio": r["inicio"], "fim": r["fim"], "status": r["status"], "lidos": r["lidos"],
-                  "novos": r["novos"], "alterados": r["alterados"], "erro": r["erro"], "conferida": bool(r["conferida"])}
+                  "novos": r["novos"], "alterados": r["alterados"], "erro": r["erro"], "conferida": bool(r["conferida"]),
+                  "reprovadas": [] if r["conferida"] else reprovadas(r["id"])}
                  for r in con.execute("select * from rodada order by id desc limit ?", (min(max(limite, 1), 200),))]
         return envelope(con, {"itens": itens}, agora=_agora(request))
     finally:

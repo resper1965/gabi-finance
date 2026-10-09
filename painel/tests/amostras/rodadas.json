@@ -1,0 +1,29 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "alterados": 0,
+    "conferida": true,
+    "erro": null,
+    "fim": "2026-10-08T17:00:30+00:00",
+    "fonte": "open-finance",
+    "id": 1,
+    "inicio": "2026-10-08T17:00:00+00:00",
+    "lidos": 0,
+    "novos": 0,
+    "reprovadas": [],
+    "status": "ok"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

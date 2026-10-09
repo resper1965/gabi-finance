@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Etiqueta } from "../../componentes/Etiqueta";
+import { formatarDadosAte } from "../../componentes/Faixa";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { api } from "../../lib/api";
@@ -12,6 +13,32 @@ interface Item {
   dias_atraso?: number; pago_em?: string | null; diferenca?: string | null; motivo?: string | null;
 }
 type Grupos = Record<"atrasadas" | "hoje" | "proximas" | "adiante" | "debito_automatico" | "a_conferir" | "pagas", Item[]>;
+
+interface Rodada { id: number; fonte: string; fim: string | null; status: string; lidos: number; novos: number; conferida: boolean; reprovadas: { conta: string; tipo: string; detalhe: string }[] }
+const TIPO_CONFERENCIA: Record<string, string> = { saldo_final: "saldo", dias_sem_buraco: "dias sem movimento", volume_proximo: "volume" };
+
+/** Últimas rodadas de extrato (06h e 14h) com o que foi lido e se a conferência fechou; se não, quais contas reprovaram e por quê. */
+function Rodadas() {
+  const itens = (useApi<{ itens: Rodada[] }>("/api/v1/rodadas?limite=20").env?.dados.itens ?? []).filter((r) => r.fonte === "open-finance").slice(0, 2);
+  if (itens.length === 0) return null;
+  return (
+    <section role="region" aria-label="Rodadas" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <h3 style={{ margin: 0, fontSize: 20 }}>Rodadas <span style={{ font: "500 12px var(--mono)", color: "var(--ink2)" }}>· extratos às 6h e 14h</span></h3>
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column" }}>
+        {itens.map((r) => (
+          <li key={r.id} style={{ padding: "8px 0", borderTop: "1px solid var(--line2)", display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+              <span style={{ font: "500 12.5px var(--mono)" }}>{r.fim ? formatarDadosAte(r.fim) : "em andamento"}</span>
+              <span data-estado={r.conferida ? "conferida" : "nao-conferida"} style={{ fontWeight: 600, color: r.conferida ? "var(--ok)" : "var(--warn)" }}>{r.conferida ? "conferida" : "não conferida"}</span>
+              <span style={{ color: "var(--ink2)" }}>{r.lidos} lidos · {r.novos} novos</span>
+            </span>
+            {r.reprovadas.map((x, i) => <span key={i} style={{ fontSize: 12.5, color: "var(--ink2)" }}>▲ {x.conta}: {TIPO_CONFERENCIA[x.tipo] ?? x.tipo} — {x.detalhe}</span>)}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 const GRUPOS: [keyof Grupos, string, string, string][] = [
   ["atrasadas", "Atrasadas", "var(--danger)", "já venceram"], ["hoje", "Vencem hoje", "var(--warn)", "pague hoje"],
@@ -91,6 +118,7 @@ export function APagar() {
                 })}
               </section>
             )}
+            <Rodadas />
           </div>
         );
       }}

@@ -155,3 +155,29 @@ test("CustoGabi mostra em reais quando ha cambio e em dolar quando nao ha", asyn
   montar(<CustoGabi />);
   expect(await screen.findByText(/US\$ 0,50 \/ US\$ 1,00/)).toBeInTheDocument();
 });
+
+const rodadas = () => {
+  const base = amostra("rodadas");
+  const r = (id: number, fim: string, conferida: boolean, reprovadas: object[]) => ({ id, fonte: "open-finance", inicio: fim, fim, status: "ok", lidos: 2280, novos: 12, alterados: 0, erro: null, conferida, reprovadas });
+  return { ...base, dados: { itens: [
+    r(21, "2026-10-09T18:10:00Z", false, [{ conta: "Itaú PF", tipo: "saldo_final", detalhe: "diferença de -401663 centavos" }]),
+    r(20, "2026-10-09T10:10:00Z", true, []),
+    { ...r(19, "2026-10-09T12:05:00Z", true, []), fonte: "open-finance-saldos" },
+  ] } };
+};
+
+test("APagar mostra as ultimas rodadas de extrato com estado e conferida", async () => {
+  apiFalsa({ rodadas: rodadas() });
+  montar(<APagar />);
+  const bloco = await screen.findByRole("region", { name: "Rodadas" });
+  expect(within(bloco).getAllByRole("listitem")).toHaveLength(2); // a rodada de saldos fica de fora
+  expect(within(bloco).getByText(/conferida/, { selector: "[data-estado='conferida']" })).toBeInTheDocument();
+});
+
+test("APagar: rodada nao conferida mostra o motivo", async () => {
+  apiFalsa({ rodadas: rodadas() });
+  montar(<APagar />);
+  const bloco = await screen.findByRole("region", { name: "Rodadas" });
+  expect(within(bloco).getByText(/Itaú PF/)).toBeInTheDocument();
+  expect(within(bloco).getByText(/diferença de -401663 centavos/)).toBeInTheDocument();
+});
