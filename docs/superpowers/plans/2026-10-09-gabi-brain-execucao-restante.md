@@ -83,7 +83,7 @@
 - [ ] Testes `APagar_mostra_ultimas_rodadas_com_estado_e_conferida`, `APagar_rodada_nao_conferida_mostra_motivo`; implementar bloco "Rodadas" (06h/14h) com estado, lidos, conferida; commit.
 
 ### Task F1.H: Gate G14 — aprovação tela a tela (Ricardo)
-- [ ] `python -m tools.capturas` regenera `docs/design/*-{prototipo,app}-*.png`; **PARAR** e pedir ao Ricardo a aprovação de cada tela (lista em `docs/design/INDICE.md`); registrar aprovações e correções; desvio só por ADR assinado (R17).
+- [ ] `python -m tools.capturas` regenera `docs/design/*-{prototipo,app}-*.png`; **PARAR** e pedir ao Ricardo a aprovação de cada tela (as capturas em `docs/design/`); registrar aprovações e correções; desvio só por ADR assinado (R17).
 
 ### Task F1.I: Aceite da Fase 1 (T1.14)
 - [ ] Rodando ≥ 7 dias seguidos com `conferida=1` nas rodadas 06h/14h; ≥ 90 % classificado sem intervenção após 14 dias; telas e MCP verificados; `docs/aceite-fase-1.md` com evidência e data; mostrar ao Ricardo o que está no ar e o que ficou pendente. **Libera a aceitação (não o código) da Fase 2.**
