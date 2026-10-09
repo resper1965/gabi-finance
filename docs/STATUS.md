@@ -74,3 +74,9 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - Provado em produção: sandbox idêntico ao da API alcança o Paperless pela ponte (docs e download de PDF) e não tem rede direta. Backup pré-instalação: `/var/backups/gabi-brain/pre-fontes-2026-10-09.sqlite`.
 - Paperless configurado com o token do usuário `resper` (dado pelo Ricardo, que autorizou). Nibo ainda NÃO configurado (G8: acrescentar `NIBO_TOKEN` em `/etc/gabi/cobrar.env` e `sudo systemctl restart gabi-brain-fontes`).
 - Próximo: ingestão de comprovantes (job que lê o Paperless pela ponte), cadastros da cobrança, G8.
+
+## 09/10/2026 (noite): decisões
+- **Fase 3 (Trabalho) congelada** (ver TRILHA.md). Nada novo é desenvolvido nela até as Fases 1 e 2 estarem em uso diário.
+- Rodada de extratos conferida pela 1ª vez (rodada 43): o relógio de 7 dias do T1.14 começou em 09/10. Regra de buraco revista para contas de movimento irregular (ADR-009, item 6).
+- NFS-e do Nibo importadas (243 notas, 193 PDF/XML em /var/lib/gabi-brain/notas) e previsão de caixa de entradas (GET /api/v1/cobrar/previsao).
+- 26 categorias do Nibo criadas com `nibo_category_id`. Falta a taxonomia pessoal e a equivalência das 82 categorias do banco (próximo item).
