@@ -258,7 +258,7 @@ def recebimentos(request: Request):
                  for r in con.execute(
                      "select rn.id, rn.confianca, rn.motivo, n.numero, n.tomador_nome, n.vencimento, n.valor_liquido_centavos, l.id as lid, l.data, l.descricao_original, l.valor_centavos "
                      "from recebimento_nota rn join nota_fiscal n on n.id=rn.nota_id join lancamento l on l.id=rn.lancamento_id where rn.estado='proposto' "
-                     "order by rn.confianca desc, rn.id")]
+                     "order by rn.confianca desc, rn.id limit 100")]
         return envelope(con, {"itens": itens}, agora=_agora(request))
     finally:
         con.close()
