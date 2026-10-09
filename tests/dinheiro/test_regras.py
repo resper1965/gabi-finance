@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro.regras import (aprovar, aprovar_lote, contar_afetados, criar_sugestao, definir_ativa, rejeitar, sempre_assim)
+from gabi.dinheiro.regras import (aprovar, aprovar_lote, contar_afetados, criar_regra_ativa, criar_sugestao, definir_ativa, rejeitar, sempre_assim)
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 HOJE = dt.date(2026, 10, 8)
@@ -187,3 +187,28 @@ def test_ligar_regra_aplica_ao_passado_e_desligar_nao_desfaz(con):
 def test_definir_ativa_regra_inexistente(con):
     with pytest.raises(LookupError):
         definir_ativa(con, 999, True, por="x")
+
+
+def test_criar_regra_ativa_aplica_ao_passado_audita_e_e_idempotente(con):
+    a = _l(con, 1, desc="MERCADOLIVRE PROD", estab="MERCADOLIVRE")
+    b = _l(con, 2, desc="MERCADOLIVRE PROD", estab="MERCADOLIVRE", para_quem_id="p1", para_quem_origem="voce")
+    rid = criar_regra_ativa(con, "MERCADOLIVRE", {"categoria_id": 1}, "ricardo (via Claude)")
+    assert rid and con.execute("select ativa from regra where id=?", (rid,)).fetchone()[0] == 1
+    assert _get(con, a)["categoria_id"] == 1 and _get(con, a)["categoria_origem"] == "regra"
+    assert _get(con, b)["categoria_id"] == 1
+    assert con.execute("select count(*) from decisao where quem='ricardo (via Claude)' and o_que like '%regra%'").fetchone()[0] == 1
+    assert criar_regra_ativa(con, "MERCADOLIVRE", {"categoria_id": 1}, "x") is None   # mesmo padrão: não duplica
+    assert con.execute("select count(*) from regra").fetchone()[0] == 1
+
+
+def test_criar_regra_ativa_nunca_sobrescreve_o_que_o_ricardo_decidiu(con):
+    lid = _l(con, 1, categoria_id=2, categoria_origem="voce")
+    criar_regra_ativa(con, "UBER", {"categoria_id": 1}, "r")
+    assert _get(con, lid)["categoria_id"] == 2
+
+
+def test_criar_regra_ativa_valida_o_padrao_e_a_acao(con):
+    for padrao, acao in (("", {"categoria_id": 1}), ("(", {"categoria_id": 1}), ("X", {}), ("X", {"categoria_id": 999}), ("X", {"para_quem_id": "fantasma"})):
+        with pytest.raises(ValueError):
+            criar_regra_ativa(con, padrao, acao, "r")
+    assert con.execute("select count(*) from regra").fetchone()[0] == 0

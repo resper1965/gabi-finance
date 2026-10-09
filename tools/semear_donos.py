@@ -1,5 +1,5 @@
 """Aplica `seeds/donos-padrao.json`: donos coletivos (Casa, Pets), quem responde por qual filha, dono padrão por categoria,
-quem usa cada cartão/conta, o padrão por compromisso e parâmetros (ex.: categorias de assinatura). Dados em arquivo editável (R6). Idempotente; nunca sobrescreve o que o
+quem usa cada cartão/conta, o padrão por compromisso parâmetros (ex.: categorias de assinatura) e regras por estabelecimento (na ordem do arquivo). Dados em arquivo editável (R6). Idempotente; nunca sobrescreve o que o
 Ricardo já escolheu (vira `conflitos`). Uso: python -m tools.semear_donos [--arquivo CAMINHO] [--banco CAMINHO]."""
 import argparse
 import json
@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from gabi.db import conectar, transacao
+from gabi.dinheiro.regras import criar_regra_ativa
 from gabi.rotas.cadastros import _auditar
 
 
@@ -95,6 +96,19 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
                 r.aplicados += 1
             elif json.loads(atual["valor"]) != valor:
                 r.conflitos.append(f"parametro {chave}")
+    for regra in d.get("regras", []):  # na ordem do arquivo: a primeira que casa vale, então a exceção vem antes da regra geral
+        acao = {}
+        for campo, valor in regra["acao"].items():
+            if campo == "para_quem" and _pessoa(con, valor):
+                acao["para_quem_id"] = valor
+            elif campo == "categoria":
+                linha = con.execute("select id from categoria where nome=? and excluido_em is null", (valor,)).fetchone()
+                if linha:
+                    acao["categoria_id"] = linha["id"]
+        if len(acao) != len(regra["acao"]):
+            r.nao_encontrados.append(f"regra {regra['padrao']}")
+        elif criar_regra_ativa(con, regra["padrao"], acao, quem) is not None:
+            r.aplicados += 1
     return r
 
 

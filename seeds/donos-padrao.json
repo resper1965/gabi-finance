@@ -51,5 +51,33 @@
     "categorias_assinatura": [
       "Assinaturas e serviços digitais"
     ]
-  }
+  },
+  "regras": [
+    {
+      "padrao": "MELIMAIS",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "AMAZON ?PRIME",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "SHEIN",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "MERCADO ?LIVRE|MERCADOLIVRE|ALIEXPRESS|AMAZON",
+      "acao": {
+        "para_quem": "casa"
+      }
+    }
+  ]
 }

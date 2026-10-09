@@ -179,6 +179,21 @@ def sempre_assim(con, lancamento_id: int, por: str) -> int:
     return _em_transacao(con, fazer)
 
 
+def criar_regra_ativa(con, padrao: str, acao: dict, por: str) -> int | None:
+    """Regra ATIVA direta, para quando o Ricardo a dita (chat ou arquivo de seeds). Aplica ao passado sem sobrescrever o que ele ou outra
+    regra já decidiu. Mesmo padrão já cadastrado: devolve None e não duplica."""
+    def fazer():
+        rx, ac = _validar(con, padrao, acao)
+        if con.execute("select 1 from regra where padrao=?", (padrao,)).fetchone():
+            return None
+        rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
+                          (padrao, json.dumps(ac, ensure_ascii=False), _agora(), por)).lastrowid
+        n = _aplicar(con, rx, ac)
+        _decisao(con, por, f"regra {rid} criada ({padrao}) aplicada a {n} lançamento(s)")
+        return rid
+    return _em_transacao(con, fazer)
+
+
 def definir_ativa(con, regra_id: int, ativa: bool, por: str) -> None:
     """Liga/desliga. Ligar aplica ao passado; desligar não desfaz o que já foi feito."""
     def fazer():
