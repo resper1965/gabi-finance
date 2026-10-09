@@ -13,7 +13,7 @@ from urllib.parse import quote, urlencode
 BASE = "https://api.nibo.com.br/empresas/v1"
 TOP = 500
 # Rotas confirmadas por referencias/nibo_api.md: organizations, accounts, schedules, nfse, accounts/{id}/views/statement.
-# NÃO VERIFICADAS (docs 'a abrir antes de codar', conferir com o token real no G8): partners, customers, categories.
+# partners, customers, categories: CONFIRMADAS com o token real em 09/10/2026 (G8): GET 200, paginação OData e formato `items` ok.
 ROTAS_A_CONFIRMAR = {"socios": "/partners", "clientes": "/customers", "categorias": "/categories"}
 
 Http = Callable[..., "tuple[int, object]"]  # (metodo, url, corpo, cabecalhos) -> (status, json)

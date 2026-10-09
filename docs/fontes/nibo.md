@@ -2,7 +2,7 @@
 
 - **Autenticação:** header `ApiToken` com o token em `NIBO_TOKEN` (arquivo de ambiente, root 600; G8; plano Premium). Nunca `Authorization`; o token nunca entra em erro ou log.
 - **Cliente (T2.3):** `Nibo.organizations/contas/agendamentos(desde_update, tipo)/extrato(conta, de, ate)/nfse(desde)/socios/clientes/categorias`. **Nenhum** método de escrita ou exclusão. Paginação OData: `$orderby` obrigatório, `$top=500`, `$skip`. Incremental por `updateDate`.
-- **Rotas NÃO VERIFICADAS (conferir com o token real no G8):** `/partners` (sócios), `/customers` (clientes), `/categories` (categorias) e o formato da resposta (`items`/`count`). A documentação oficial (nibo.readme.io) não estava acessível na construção do cliente.
+- **Rotas confirmadas com o token real (G8, 09/10/2026, só leitura):** `/partners` (sócios; 2 registros), `/customers` (clientes; 29), `/categories` (categorias; 26), além de `organizations` (3) e contas (3); paginação OData e formato `items` funcionam. Ainda NÃO verificadas com dado real: as rotas de escrita (agendamento, anexo, baixa) e o formato de resposta delas — só serão exercitadas no primeiro lote, com confirmação do Ricardo.
 - **Erros:** 500 `{error, error_description}` e 400 `{message, messageDetail}` viram `ErroNibo("GET <rota> -> <status>: <detalhe>")`.
 - **Gravação:** só no lote diário confirmado (T2.4, `cobrar/lote_nibo.py`), conforme abaixo.
 
