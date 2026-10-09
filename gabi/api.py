@@ -42,7 +42,8 @@ def _recusa(status: int, erro: str, mensagem: str) -> JSONResponse:
 
 
 def _guarda_csrf(request: Request) -> JSONResponse | None:
-    """A identidade vem da rede, então POST de outro site (CSRF) precisa ser barrado: só JSON, só same-origin."""
+    """A identidade vem da rede, então POST de outro site (CSRF) precisa ser barrado: só JSON, só same-origin.
+    Atrás do `tailscale serve` o Host não é o nome público; `origens_confiaveis` lista as origens do próprio painel."""
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     com_corpo = request.headers.get("content-length", "0") not in ("0", "") or "transfer-encoding" in request.headers
@@ -51,16 +52,17 @@ def _guarda_csrf(request: Request) -> JSONResponse | None:
     if request.headers.get("sec-fetch-site", "same-origin") not in ("same-origin", "none"):
         return _recusa(403, "nao_permitido", "Requisição de outro site recusada.")
     origem = request.headers.get("origin")
-    if origem and urlsplit(origem).netloc != request.headers.get("host", ""):
+    if origem and origem not in request.app.state.origens_confiaveis and urlsplit(origem).netloc != request.headers.get("host", ""):
         return _recusa(403, "nao_permitido", "Requisição de outra origem recusada.")
     return None
 
 
-def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> FastAPI:
+def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origens_confiaveis=()) -> FastAPI:
     """permite_tcp_local=False é o padrão de produção: só o socket Unix do serviço é origem confiável."""
     app = FastAPI(title="gabi.brain", docs_url=None, redoc_url=None)
     app.state.banco = Path(banco)
     app.state.permite_tcp_local = permite_tcp_local
+    app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
     app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)
@@ -164,11 +166,12 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None) -> Fas
 
 
 def fabrica() -> FastAPI:
-    """uvicorn --factory gabi.api:fabrica --uds ... ; banco em GABI_BANCO. TCP local só com GABI_PERMITE_TCP_LOCAL=1 (dev)."""
+    """uvicorn --factory gabi.api:fabrica --uds ... ; banco em GABI_BANCO. TCP local só com GABI_PERMITE_TCP_LOCAL=1 (dev). Origens do painel (CSRF) em GABI_ORIGENS_CONFIAVEIS, separadas por vírgula."""
     banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
     con = conectar(banco)
     try:
         migrar(con, MIGRACOES)
     finally:
         con.close()
-    return criar_app(banco, permite_tcp_local=os.environ.get("GABI_PERMITE_TCP_LOCAL") == "1")
+    origens = [o.strip() for o in os.environ.get("GABI_ORIGENS_CONFIAVEIS", "").split(",") if o.strip()]
+    return criar_app(banco, permite_tcp_local=os.environ.get("GABI_PERMITE_TCP_LOCAL") == "1", origens_confiaveis=origens)

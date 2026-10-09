@@ -10,6 +10,8 @@ User=gabibrain
 Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
+# Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
+Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi.tail985643.ts.net
 # Socket em pasta 0700 do serviço: nenhum outro processo da VPS alcança a API (e não pode forjar a identidade).
 # --no-proxy-headers: nunca confiar em X-Forwarded-For (o tailscale serve o envia e o uvicorn trocaria a origem).
 ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.api:fabrica --uds /run/gabi-brain/api.sock --no-proxy-headers

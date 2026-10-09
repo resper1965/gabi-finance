@@ -27,6 +27,8 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer
+# enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
+systemctl restart gabi-brain-api.service gabi-brain-mcp.service
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).
 
 echo "OK. Verifique:"

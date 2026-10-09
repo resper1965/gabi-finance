@@ -178,3 +178,26 @@ def test_raiz_serve_o_painel_compilado_quando_existe(banco, monkeypatch, tmp_pat
     assert "PAINEL-REACT" in c.get("/", headers=BOSS).text
     assert c.get("/assets/a.js").status_code == 200
     assert c.get("/").status_code == 401
+
+
+PUBLICA = "https://gabi.exemplo.ts.net"
+
+
+def _cli_publico(banco):
+    app = criar_app(banco, permite_tcp_local=True, origens_confiaveis=[PUBLICA])
+    return TestClient(app, client=("127.0.0.1", 50000))
+
+
+def test_origem_publica_confiavel_passa_mesmo_com_host_interno(banco):
+    """Atrás do tailscale serve o Host chega como o do upstream, não o nome público."""
+    r = _cli_publico(banco).post("/api/revogar-tudo", headers={**BOSS, "Origin": PUBLICA, "Sec-Fetch-Site": "same-origin"}, json={"confirmo": True})
+    assert r.status_code == 200
+
+
+def test_origem_fora_da_lista_continua_recusada(banco):
+    c = _cli_publico(banco)
+    for origem in ("https://evil.example", "http://gabi.exemplo.ts.net"):
+        r = c.post("/api/revogar-tudo", headers={**BOSS, "Origin": origem}, json={"confirmo": True})
+        assert r.status_code == 403 and r.json()["erro"] == "nao_permitido"
+    r = c.post("/api/revogar-tudo", headers={**BOSS, "Origin": PUBLICA, "Sec-Fetch-Site": "cross-site"}, json={"confirmo": True})
+    assert r.status_code == 403
