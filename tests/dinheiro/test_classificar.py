@@ -166,3 +166,80 @@ def test_regra_tambem_casa_pelo_estabelecimento_normalizado(con):
     lid = _lanc(con, 1, desc="LOJA (X) *123", estab="LOJA X")  # a descrição original tem pontuação; o estabelecimento é normalizado
     classificar(con, lid)
     assert _l(con, lid)["categoria_id"] == 2
+
+
+# ---------------- donos padrão ("para quem" sem perguntar): responsável > compromisso > conta > categoria ----------------
+def _pessoas_da_familia(con):
+    con.execute("insert into pessoa(id, nome, papel, dados) values ('casa','Casa (todos)','coletivo','{}')")
+    con.execute("insert into pessoa(id, nome, papel, dados) values ('giovanna','Giovanna Della Torre Esper','filha','{}')")
+    con.execute("insert into pessoa(id, nome, papel, dados) values ('sabrina','Sabrina Barbosa de Barros','esposa','{}')")
+    con.execute("insert into pessoa(id, nome, papel, dados) values ('carla','Carla Noce Della Torre','ex-esposa', ?)",
+                (json.dumps({"responsavel_por": ["giovanna"], "beneficiario": False}),))
+
+
+def test_pagamento_a_quem_responde_por_uma_filha_vai_para_a_filha(con):
+    _pessoas_da_familia(con)
+    lid = _lanc(con, 1, desc="Pix enviado para CARLA NOCE DELA TORRE", estab="Pix enviado para CARLA NOCE DELA TORRE")
+    c = classificar(con, lid)
+    assert c.para_quem_id == "giovanna" and c.origens["para_quem"] == "regra"
+    assert _l(con, lid)["para_quem_origem"] == "regra"
+
+
+def test_dinheiro_que_ENTRA_da_responsavel_nao_vira_para_quem(con):
+    _pessoas_da_familia(con)
+    lid = _lanc(con, 1, desc="Pix recebido CARLA NOCE DELA TORRE", estab="CARLA NOCE", valor_centavos=5000)
+    assert classificar(con, lid).para_quem_id is None
+
+
+def test_responsavel_de_duas_filhas_nao_adivinha(con):
+    _pessoas_da_familia(con)
+    con.execute("update pessoa set dados=? where id='carla'", (json.dumps({"responsavel_por": ["giovanna", "sabrina"]}),))
+    assert classificar(con, _lanc(con, 1, desc="Pix enviado CARLA NOCE DELA TORRE")).para_quem_id is None
+
+
+def test_cartao_de_um_unico_usuario_define_o_para_quem(con):
+    _pessoas_da_familia(con)
+    con.execute("update conta set usuarios=? where id=1", (json.dumps(["sabrina"]),))
+    lid = _lanc(con, 1)
+    assert classificar(con, lid).para_quem_id == "sabrina"
+
+
+def test_cartao_com_dois_usuarios_nao_decide_sozinho(con):
+    _pessoas_da_familia(con)
+    con.execute("update conta set usuarios=? where id=1", (json.dumps(["sabrina", "giovanna"]),))
+    assert classificar(con, _lanc(con, 1)).para_quem_id is None
+
+
+def test_categoria_com_dono_padrao_preenche_o_para_quem(con):
+    _pessoas_da_familia(con)
+    con.execute("update categoria set dono_padrao='casa' where nome='Mercado'")
+    con.execute("insert into equivalencia_categoria(origem_pluggy, categoria_id) values ('Groceries', 1)")
+    lid = _lanc(con, 1, cat_banco="Groceries")
+    c = classificar(con, lid)
+    assert (c.categoria_id, c.para_quem_id) == (1, "casa")
+
+
+def test_pagamento_conciliado_com_compromisso_herda_o_padrao_dele(con):
+    _pessoas_da_familia(con)
+    con.execute("insert into compromisso_linha(id, nome, extrato, vencimento, valor_tipo, forma) values ('escola','Escola','ESCOLA X','dia:5','fixo','pix')")
+    con.execute("insert into compromisso(id, linha_id, nome, vencimento, valor_centavos, estado) values ('escola:2026-10','escola','Escola','2026-10-05',1000,'pago')")
+    con.execute("insert into compromisso_padrao(linha_id, para_quem_id, categoria_id) values ('escola','giovanna', 2)")
+    lid = _lanc(con, 1, desc="PGTO QUALQUER COISA")
+    con.execute("insert into conciliacao(tx_id, compromisso_id, metodo, diferenca_centavos, criado_em) values ('l1','escola:2026-10','valor',0,'x')")
+    c = classificar(con, lid)
+    assert (c.para_quem_id, c.categoria_id) == ("giovanna", 2)
+
+
+def test_precedencia_regra_do_ricardo_vence_os_padroes(con):
+    _pessoas_da_familia(con)
+    con.execute("update conta set usuarios=? where id=1", (json.dumps(["sabrina"]),))
+    _regra(con, "UBER", {"para_quem_id": "giovanna"})
+    assert classificar(con, _lanc(con, 1)).para_quem_id == "giovanna"
+
+
+def test_nunca_sobrescreve_o_que_o_ricardo_ja_decidiu(con):
+    _pessoas_da_familia(con)
+    con.execute("update conta set usuarios=? where id=1", (json.dumps(["sabrina"]),))
+    lid = _lanc(con, 1, para_quem_id="giovanna", para_quem_origem="voce")
+    classificar(con, lid)
+    assert _l(con, lid)["para_quem_id"] == "giovanna" and _l(con, lid)["para_quem_origem"] == "voce"

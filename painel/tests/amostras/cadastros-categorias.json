@@ -2,6 +2,7 @@
  "dados": {
   "itens": [
    {
+    "dono_padrao": null,
     "excluido_em": null,
     "id": 4,
     "nibo_category_id": null,
@@ -9,6 +10,7 @@
     "pai_id": null
    },
    {
+    "dono_padrao": null,
     "excluido_em": null,
     "id": 5,
     "nibo_category_id": null,
@@ -16,6 +18,7 @@
     "pai_id": null
    },
    {
+    "dono_padrao": null,
     "excluido_em": null,
     "id": 1,
     "nibo_category_id": null,
@@ -23,6 +26,7 @@
     "pai_id": null
    },
    {
+    "dono_padrao": null,
     "excluido_em": null,
     "id": 3,
     "nibo_category_id": null,
@@ -30,6 +34,7 @@
     "pai_id": null
    },
    {
+    "dono_padrao": null,
     "excluido_em": null,
     "id": 2,
     "nibo_category_id": null,

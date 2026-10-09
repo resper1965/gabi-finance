@@ -1,0 +1,82 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from gabi.db import conectar, migrar
+from tools.semear_donos import aplicar
+
+MIGR = Path(__file__).parent.parent / "migrations"
+DADOS = {
+    "coletivos": [{"id": "casa", "nome": "Casa (todos)"}],
+    "responsaveis": {"carla": ["giovanna"]},
+    "categorias": {"Mercado": "casa"},
+    "contas": {"CARTAO X": ["sabrina"]},
+    "compromissos": {"carla-pensao": {"para_quem": "giovanna"}},
+}
+
+
+@pytest.fixture
+def con(tmp_path):
+    c = conectar(tmp_path / "t.db")
+    migrar(c, MIGR)
+    for pid, nome, dados in (("giovanna", "Giovanna", "{}"), ("sabrina", "Sabrina", "{}"), ("carla", "Carla", '{"obs": "x"}')):
+        c.execute("insert into pessoa(id, nome, dados) values (?,?,?)", (pid, nome, dados))
+    c.execute("insert into categoria(nome) values ('Mercado')")
+    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values ('c1','Itau','CREDIT','  cartao x  ','sim')")
+    c.execute("insert into compromisso_linha(id, nome, extrato, vencimento, valor_tipo, forma) values ('carla-pensao','Pensão','X','dia:5','fixo','pix')")
+    return c
+
+
+@pytest.fixture
+def arq(tmp_path):
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps(DADOS), encoding="utf-8")
+    return p
+
+
+def test_aplica_tudo_e_preserva_os_outros_dados(con, arq):
+    r = aplicar(con, arq, "teste")
+    assert r.conflitos == [] and r.nao_encontrados == []
+    assert con.execute("select nome, papel from pessoa where id='casa'").fetchone()[:] == ("Casa (todos)", "coletivo")
+    d = json.loads(con.execute("select dados from pessoa where id='carla'").fetchone()[0])
+    assert d == {"obs": "x", "responsavel_por": ["giovanna"], "beneficiario": False}
+    assert con.execute("select dono_padrao from categoria where nome='Mercado'").fetchone()[0] == "casa"
+    assert json.loads(con.execute("select usuarios from conta where id=1").fetchone()[0]) == ["sabrina"]   # casou pelo apelido sem espaços/caixa
+    assert tuple(con.execute("select para_quem_id from compromisso_padrao where linha_id='carla-pensao'").fetchone()) == ("giovanna",)
+
+
+def test_e_idempotente_e_audita(con, arq):
+    aplicar(con, arq, "teste")
+    antes = con.execute("select count(*) from decisao").fetchone()[0]
+    aplicar(con, arq, "teste")
+    assert con.execute("select count(*) from decisao").fetchone()[0] == antes and antes > 0
+
+
+def test_nao_sobrescreve_o_que_o_ricardo_ja_escolheu(con, arq):
+    con.execute("update conta set usuarios=? where id=1", (json.dumps(["giovanna"]),))
+    con.execute("update categoria set dono_padrao='sabrina' where nome='Mercado'")
+    r = aplicar(con, arq, "teste")
+    assert sorted(r.conflitos) == ["categoria Mercado", "conta CARTAO X"]
+    assert json.loads(con.execute("select usuarios from conta where id=1").fetchone()[0]) == ["giovanna"]
+    assert con.execute("select dono_padrao from categoria where nome='Mercado'").fetchone()[0] == "sabrina"
+
+
+def test_item_inexistente_e_reportado_sem_derrubar(con, tmp_path):
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"coletivos": [{"id": "casa", "nome": "Casa"}], "contas": {"NAO EXISTE": ["sabrina"]}, "categorias": {"Fantasma": "casa"}, "compromissos": {"x": {"para_quem": "sabrina"}}, "responsaveis": {"ninguem": ["sabrina"]}}), encoding="utf-8")
+    r = aplicar(con, p, "teste")
+    assert sorted(r.nao_encontrados) == ["categoria Fantasma", "compromisso x", "conta NAO EXISTE", "pessoa ninguem"]
+
+
+def test_pessoa_inexistente_como_dono_nao_grava_nada(con, tmp_path):
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"contas": {"CARTAO X": ["fantasma"]}}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        aplicar(con, p, "teste")
+    assert con.execute("select usuarios from conta where id=1").fetchone()[0] is None
+
+
+def test_o_arquivo_de_seeds_do_projeto_e_json_valido():
+    d = json.loads((Path(__file__).parent.parent / "seeds" / "donos-padrao.json").read_text(encoding="utf-8"))
+    assert {"coletivos", "responsaveis", "categorias", "contas", "compromissos"} <= set(d)

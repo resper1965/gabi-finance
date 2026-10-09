@@ -6,6 +6,7 @@ Consome: db (lancamento, regra, equivalencia_categoria, sugestao).
 """
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from gabi.dinheiro.regras import casa
@@ -63,6 +64,42 @@ def _sugerir_por_cache(con, lid: int, estab: str, campo: str, col: str) -> bool:
     return True
 
 
+def _norm(t: str | None) -> str:
+    return " ".join("".join(c for c in unicodedata.normalize("NFD", t or "") if unicodedata.category(c) != "Mn").upper().split())
+
+
+def _responsavel(con, r) -> str | None:
+    """Pagamento (saída) a quem responde por UMA filha (pessoa.dados.responsavel_por) vai para ela. O nome do favorecido vem no
+    descritivo: casa pelos dois primeiros nomes da pessoa. Responsável por duas ou mais: não adivinha."""
+    if r["valor_centavos"] >= 0:
+        return None
+    texto = _norm(f"{r['descricao_original']} {r['estabelecimento']}")
+    for p in con.execute("select nome, dados from pessoa where dados like '%responsavel_por%'"):
+        try:
+            alvo = json.loads(p["dados"] or "{}").get("responsavel_por")
+        except ValueError:
+            continue
+        toks = _norm(p["nome"]).split()[:2]
+        if isinstance(alvo, list) and len(alvo) == 1 and toks and all(t in texto for t in toks):
+            return alvo[0]
+    return None
+
+
+def _padrao_do_compromisso(con, externo_id: str):
+    return con.execute(
+        "select cp.para_quem_id, cp.categoria_id from conciliacao co join compromisso c on c.id=co.compromisso_id "
+        "join compromisso_padrao cp on cp.linha_id=c.linha_id where co.tx_id=?", (externo_id,)).fetchone()
+
+
+def _usuario_unico(con, conta_id: int) -> str | None:
+    u = con.execute("select usuarios from conta where id=?", (conta_id,)).fetchone()
+    try:
+        lista = json.loads(u["usuarios"]) if u and u["usuarios"] else []
+    except ValueError:
+        return None
+    return lista[0] if isinstance(lista, list) and len(lista) == 1 else None
+
+
 def classificar(con, lancamento_id: int) -> Classificacao:
     r = con.execute("select * from lancamento where id=?", (lancamento_id,)).fetchone()
     if r is None:
@@ -87,6 +124,25 @@ def classificar(con, lancamento_id: int) -> Classificacao:
             _preencher(con, lancamento_id, "categoria", "categoria_id", e["categoria_id"], "banco")
             atual["categoria_id"], origens["categoria"] = e["categoria_id"], "banco"
             confianca = max(confianca, CONFIANCA["banco"])
+
+    # 2b) "para quem" sem perguntar (padrões que o Ricardo cadastrou), só se ainda vazio. Ordem: responsável > compromisso > conta > categoria.
+    #     Origem 'regra': são regras dele (a coluna só aceita banco|regra|gabi|voce|fonte).
+    if atual["para_quem_id"] is None:
+        dono = _responsavel(con, r)
+        if dono is None:
+            comp = _padrao_do_compromisso(con, r["externo_id"])
+            if comp and comp["categoria_id"] is not None and atual["categoria_id"] is None:
+                _preencher(con, lancamento_id, "categoria", "categoria_id", comp["categoria_id"], "regra")
+                atual["categoria_id"], origens["categoria"] = comp["categoria_id"], "regra"
+            dono = comp["para_quem_id"] if comp else None
+        if dono is None:
+            dono = _usuario_unico(con, r["conta_id"])
+        if dono is None and atual["categoria_id"] is not None:
+            c = con.execute("select dono_padrao from categoria where id=?", (atual["categoria_id"],)).fetchone()
+            dono = c["dono_padrao"] if c else None
+        if dono is not None:
+            _preencher(con, lancamento_id, "para_quem", "para_quem_id", dono, "regra")
+            atual["para_quem_id"], origens["para_quem"], confianca = dono, "regra", max(confianca, CONFIANCA["regra"])
 
     # 3) cache por estabelecimento: só sugestão
     if r["estabelecimento"]:

@@ -150,10 +150,14 @@ class Simples:
         return {"id": id_, "excluido": True}
 
 
+def _pessoa_existe(con, pid) -> bool:
+    return isinstance(pid, str) and con.execute("select 1 from pessoa where id=? and excluido_em is null", (pid,)).fetchone() is not None
+
+
 # ---------------- categorias ----------------
 class Categorias:
     def _ser(self, r):
-        return {"id": r["id"], "nome": r["nome"], "pai_id": r["pai_id"], "nibo_category_id": r["nibo_category_id"], "excluido_em": r["excluido_em"]}
+        return {"id": r["id"], "nome": r["nome"], "pai_id": r["pai_id"], "nibo_category_id": r["nibo_category_id"], "dono_padrao": r["dono_padrao"], "excluido_em": r["excluido_em"]}
 
     def listar(self, con, busca, incluir):
         sql = "select * from categoria where 1=1" + ("" if incluir else " and excluido_em is null")
@@ -196,15 +200,20 @@ class Categorias:
 
     def atualizar(self, con, id_, corpo, quem, tipo):
         atual = self.obter(con, id_)
-        _so(corpo, {"nome", "pai_id", "nibo_category_id"})
+        _so(corpo, {"nome", "pai_id", "nibo_category_id", "dono_padrao"})
         if not corpo:
             raise erro(400, "requisicao_invalida", "informe ao menos um campo")
         nome = _texto(corpo, "nome", True) if "nome" in corpo else atual["nome"]
         pai = self._pai(con, corpo, atual["id"]) if "pai_id" in corpo else atual["pai_id"]
         nibo = (_texto(corpo, "nibo_category_id") or None) if "nibo_category_id" in corpo else atual["nibo_category_id"]
+        dono = atual["dono_padrao"]
+        if "dono_padrao" in corpo:
+            dono = corpo["dono_padrao"]
+            if dono is not None and not _pessoa_existe(con, dono):
+                raise erro(400, "requisicao_invalida", f"dono_padrao={dono!r} não é uma pessoa cadastrada")
 
         def fazer():
-            con.execute("update categoria set nome=?, pai_id=?, nibo_category_id=? where id=?", (nome, pai, nibo, atual["id"]))
+            con.execute("update categoria set nome=?, pai_id=?, nibo_category_id=?, dono_padrao=? where id=?", (nome, pai, nibo, dono, atual["id"]))
             _auditar(con, quem, tipo, atual["id"], "alterada")
         _tx(con, fazer)
         return self.obter(con, id_)
@@ -224,7 +233,8 @@ class Contas:
     def _ser(self, r):
         return {"id": r["id"], "externo_id": r["externo_id"], "instituicao": r["instituicao"], "tipo": r["tipo"], "apelido": r["apelido"],
                 "pj": bool(r["pj"]), "estado": r["estado"], "titular": r["titular"], "limite": None if r["limite_centavos"] is None else formatar(r["limite_centavos"]),
-                "nibo_account_id": r["nibo_account_id"], "origem": "manual" if str(r["externo_id"]).startswith("manual-") else "open_finance",
+                "nibo_account_id": r["nibo_account_id"], "usuarios": json.loads(r["usuarios"]) if r["usuarios"] else [],
+                "origem": "manual" if str(r["externo_id"]).startswith("manual-") else "open_finance",
                 "excluido_em": r["excluido_em"]}
 
     def listar(self, con, busca, incluir):
@@ -263,18 +273,25 @@ class Contas:
 
     def atualizar(self, con, id_, corpo, quem, tipo):
         atual = self._linha(con, id_)
-        _so(corpo, {"apelido", "estado", "pj", "nibo_account_id"})  # instituição e tipo vêm da fonte e não se editam
+        _so(corpo, {"apelido", "estado", "pj", "nibo_account_id", "usuarios"})  # instituição e tipo vêm da fonte e não se editam
         if not corpo:
             raise erro(400, "requisicao_invalida", "informe ao menos um campo")
         if "estado" in corpo and corpo["estado"] not in ESTADOS_CONTA:
             raise erro(400, "requisicao_invalida", f"estado deve ser um de {sorted(ESTADOS_CONTA)}")
         if "pj" in corpo and not isinstance(corpo["pj"], bool):
             raise erro(400, "requisicao_invalida", "pj deve ser true ou false")
+        usuarios = atual["usuarios"]
+        if "usuarios" in corpo:
+            u = corpo["usuarios"]
+            if not isinstance(u, list) or len(set(u)) != len(u) or not all(_pessoa_existe(con, p) for p in u):
+                raise erro(400, "requisicao_invalida", "usuarios deve ser uma lista, sem repetição, de pessoas cadastradas")
+            usuarios = json.dumps(u, ensure_ascii=False) if u else None
         vals = {"apelido": _texto(corpo, "apelido", True) if "apelido" in corpo else atual["apelido"], "estado": corpo.get("estado", atual["estado"]),
-                "pj": int(corpo["pj"]) if "pj" in corpo else atual["pj"], "nibo_account_id": _texto(corpo, "nibo_account_id") if "nibo_account_id" in corpo else atual["nibo_account_id"]}
+                "pj": int(corpo["pj"]) if "pj" in corpo else atual["pj"], "nibo_account_id": _texto(corpo, "nibo_account_id") if "nibo_account_id" in corpo else atual["nibo_account_id"],
+                "usuarios": usuarios}
 
         def fazer():
-            con.execute("update conta set apelido=?, estado=?, pj=?, nibo_account_id=? where id=?", (*vals.values(), atual["id"]))
+            con.execute("update conta set apelido=?, estado=?, pj=?, nibo_account_id=?, usuarios=? where id=?", (*vals.values(), atual["id"]))
             _auditar(con, quem, tipo, atual["id"], "alterada")
         _tx(con, fazer)
         return self.obter(con, id_)

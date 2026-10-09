@@ -10,7 +10,8 @@ import { useApi } from "../../lib/useApi";
 interface Campo { id: number | string | null; nome: string | null; origem: string | null }
 interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo }
 interface Sug { id: number; tipo: string; lancamento_id: number | null; payload: Record<string, number | string>; motivo: string }
-interface Pessoa { id: number | string; nome: string }
+interface Pessoa { id: number | string; nome: string; papel?: string | null; dados?: Record<string, unknown> }
+interface ContaUso { apelido: string; usuarios?: string[] }
 
 const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "Gabi sugere", voce: "você", fonte: "fonte" };
 
@@ -22,10 +23,17 @@ export function Lancamentos() {
   const url = `/api/v1/lancamentos?limite=100${filtro === "esperando" ? "&pendente=para_quem" : ""}${conta ? `&conta=${encodeURIComponent(conta)}` : ""}`;
   const leitura = useApi<{ itens: Lanc[]; total: number }>(url);
   const pessoas = useApi<{ itens: Pessoa[] }>("/api/v1/cadastros/pessoas").env?.dados.itens ?? [];
+  const contas = useApi<{ itens: ContaUso[] }>("/api/v1/cadastros/contas").env?.dados.itens ?? [];
   const sugestoes = useApi<{ itens: Sug[] }>("/api/v1/sugestoes");
   const sugParaQuem = (sugestoes.env?.dados.itens ?? []).filter((s) => s.tipo === "para_quem" && s.lancamento_id !== null);
   const recarregar = () => { leitura.recarregar(); sugestoes.recarregar(); };
 
+  /** Quem aparece como opção: nunca quem só recebe pagamento (beneficiario=false); num cartão de 2+ usuários, só eles e os donos coletivos (Casa, Pets). */
+  const opcoesPara = (l: Lanc) => {
+    const usuarios = contas.find((c) => c.apelido.trim() === l.conta.trim())?.usuarios ?? [];
+    return pessoas.filter((p) => p.id === l.para_quem.id || (p.dados?.beneficiario !== false &&
+      (usuarios.length < 2 || usuarios.includes(String(p.id)) || p.papel === "coletivo")));
+  };
   const escolher = async (l: Lanc, p: Pessoa) => {
     try { await api.patch(`/api/v1/lancamentos/${l.id}`, { beneficiario_id: p.id }); avisar(`Anotado: ${l.estabelecimento} é de ${p.nome}, só este lançamento.`); recarregar(); }
     catch (e) { avisar((e as Error).message); }
@@ -75,7 +83,7 @@ export function Lancamentos() {
                     <span style={{ font: "600 16px var(--font-heading)", fontVariantNumeric: "tabular-nums" }}><Valor valor={l.valor} /></span>
                   </div>
                   <div role="group" aria-label={`Para quem: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {pessoas.map((p) => {
+                    {opcoesPara(l).map((p) => {
                       const marcado = l.para_quem.id === p.id, sugerido = sug?.payload.para_quem_id === p.id;
                       return (
                         <button key={p.id} aria-pressed={marcado} onClick={() => escolher(l, p)}

@@ -13,7 +13,8 @@
     "origem": "open_finance",
     "pj": false,
     "tipo": "BANK",
-    "titular": null
+    "titular": null,
+    "usuarios": []
    },
    {
     "apelido": "Itaú Visa",
@@ -27,7 +28,8 @@
     "origem": "open_finance",
     "pj": false,
     "tipo": "CREDIT",
-    "titular": null
+    "titular": null,
+    "usuarios": []
    }
   ]
  },

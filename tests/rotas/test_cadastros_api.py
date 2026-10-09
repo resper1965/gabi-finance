@@ -250,3 +250,20 @@ def test_categorias_do_banco_sem_equivalencia_em_ordem_de_volume(cli, banco):
     assert r.status_code == 200
     assert itens(r) == [{"origem_pluggy": "Eating out", "lancamentos": 5}, {"origem_pluggy": "Transfer - PIX", "lancamentos": 2}]
     assert cli.get("/api/v1/cadastros/categorias/equivalencias/pendentes", headers=VIP).status_code == 403
+
+
+def test_conta_aceita_quem_usa_e_valida_as_pessoas(cli):
+    r = req(cli, "PATCH", "/api/v1/cadastros/contas/1", {"usuarios": ["lia"]})
+    assert r.status_code == 200 and r.json()["dados"]["usuarios"] == ["lia"]
+    assert itens(req(cli, "GET", "/api/v1/cadastros/contas"))[0]["usuarios"] == ["lia"]
+    assert req(cli, "PATCH", "/api/v1/cadastros/contas/1", {"usuarios": ["ninguem"]}).status_code == 400
+    assert req(cli, "PATCH", "/api/v1/cadastros/contas/1", {"usuarios": "lia"}).status_code == 400
+    assert req(cli, "PATCH", "/api/v1/cadastros/contas/1", {"usuarios": ["lia", "lia"]}).status_code == 400
+    assert req(cli, "PATCH", "/api/v1/cadastros/contas/1", {"usuarios": []}).json()["dados"]["usuarios"] == []
+
+
+def test_categoria_aceita_dono_padrao_existente(cli):
+    r = req(cli, "PATCH", "/api/v1/cadastros/categorias/1", {"dono_padrao": "lia"})
+    assert r.status_code == 200 and r.json()["dados"]["dono_padrao"] == "lia"
+    assert req(cli, "PATCH", "/api/v1/cadastros/categorias/1", {"dono_padrao": "fantasma"}).status_code == 400
+    assert req(cli, "PATCH", "/api/v1/cadastros/categorias/1", {"dono_padrao": None}).json()["dados"]["dono_padrao"] is None

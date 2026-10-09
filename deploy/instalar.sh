@@ -17,8 +17,8 @@ install -d -o root -g root -m 755 /opt/gabi-brain
 
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/
-# Utilitário de administração (seeds editáveis): só o carregador de categorias, não o diretório tools inteiro.
-install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" /opt/gabi-brain/tools/
+# Utilitário de administração (seeds editáveis): só os carregadores de seeds, não o diretório tools inteiro.
+install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" /opt/gabi-brain/tools/
 find /opt/gabi-brain -name __pycache__ -prune -exec rm -rf {} +
 [ -d /opt/gabi-brain/venv ] || python3 -m venv /opt/gabi-brain/venv
 # Só as dependências, com versão fixa; o código roda direto de /opt/gabi-brain (WorkingDirectory), sem pip install do projeto.
