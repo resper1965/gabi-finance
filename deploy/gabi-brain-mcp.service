@@ -13,6 +13,8 @@ Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Hosts aceitos (anti DNS-rebinding). Para expor na tailnet: tailscale serve --https=8443 http://127.0.0.1:8081 e acrescente
 # o nome da máquina (ex.: gabi.<tailnet>.ts.net:8443) aqui por drop-in.
 Environment=GABI_MCP_HOSTS=127.0.0.1:8081,localhost:8081
+# Paperless e Nibo vivem no serviço gabi-brain-fontes (esta unidade não tem rede nem tokens).
+Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
 ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8081 --no-proxy-headers
 Restart=on-failure
 RestartSec=5s

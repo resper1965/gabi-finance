@@ -160,4 +160,8 @@ def fabrica():
         con.close()
     hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8081,localhost:8081").split(",") if h.strip()]
     from gabi.fontes.ambiente import fontes_do_ambiente
-    return criar_mcp(banco, hosts, paperless=fontes_do_ambiente()["paperless"]())
+    from gabi.fontes.ponte import Ponte
+    caminho = os.environ.get("GABI_FONTES_SOCKET")
+    # Pela ponte o objeto existe sempre (o serviço pode subir depois); "não configurado" chega como ErroPaperless a cada chamada.
+    paperless = Ponte(caminho, "paperless") if caminho else fontes_do_ambiente()["paperless"]()
+    return criar_mcp(banco, hosts, paperless=paperless)

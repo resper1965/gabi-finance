@@ -207,3 +207,30 @@ def test_instalar_cria_pastas_do_bruto_e_dos_locks_privadas():
 def test_nenhuma_unidade_traz_segredo():
     for p in DEPLOY.iterdir():
         assert not re.search(r"sk_live|sk-[a-z0-9]{10}|Bearer |gb_[A-Za-z0-9_-]{20}", p.read_text()), p.name
+
+
+# ---------------- Fase 2: serviço de fontes (ponte para Paperless e Nibo) ----------------
+FONTES = _ler("gabi-brain-fontes.service")
+
+
+def test_so_o_servico_de_fontes_tem_rede_e_le_o_arquivo_de_tokens():
+    assert "EnvironmentFile=-/etc/gabi/cobrar.env" in FONTES
+    assert "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" in FONTES and "IPAddressDeny" not in FONTES
+    for u in (API, MCP):
+        assert "EnvironmentFile" not in u and "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in u
+        assert "IPAddressDeny=any" in u  # a API e o MCP continuam sem rede
+
+
+def test_ponte_so_para_o_servico_e_o_grupo():
+    assert "User=gabibrain-fontes" in FONTES and "Group=gabibrain" in FONTES
+    assert "RuntimeDirectory=gabi-brain-fontes" in FONTES and "RuntimeDirectoryMode=0750" in FONTES and "UMask=0007" in FONTES
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "CapabilityBoundingSet="):
+        assert dur in FONTES, dur
+    assert "-m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock" in FONTES
+    assert hasattr(importlib.import_module("gabi.fontes.servico"), "main")
+
+
+def test_instalar_cria_o_usuario_e_liga_o_servico_de_fontes():
+    assert "useradd" in INSTALAR and "gabibrain-fontes" in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert "gabi-brain-fontes.service" in ligadas[0] and "gabi-brain-fontes.service" in INSTALAR.split("restart")[1]

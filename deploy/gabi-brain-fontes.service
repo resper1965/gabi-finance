@@ -1,0 +1,34 @@
+[Unit]
+Description=gabi.brain fontes (Paperless e Nibo): único serviço com rede e tokens; a API e o MCP falam com ele por socket Unix
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=gabibrain-fontes
+Group=gabibrain
+WorkingDirectory=/opt/gabi-brain
+# PAPERLESS_URL, PAPERLESS_TOKEN e NIBO_TOKEN ficam aqui, colocados por você (R5); '-' = sobe sem o arquivo e a fonte responde "não configurada".
+EnvironmentFile=-/etc/gabi/cobrar.env
+ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock
+# Pasta e socket para o dono e o grupo gabibrain (a API e o MCP); mais ninguém na VPS alcança a ponte.
+RuntimeDirectory=gabi-brain-fontes
+RuntimeDirectoryMode=0750
+UMask=0007
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target
