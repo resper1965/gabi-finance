@@ -302,6 +302,9 @@ def custo(request: Request):
         teto = {r["chave"]: float(__import__("json").loads(r["valor"])) for r in con.execute("select chave, valor from parametro where chave in ('teto_modelo_dia_usd','teto_modelo_mes_usd')")}
         td, tm = teto.get("teto_modelo_dia_usd", TETO_DIA_USD), teto.get("teto_modelo_mes_usd", TETO_MES_USD)
         orc = Orcamento(td, tm, gasto_dia_usd=dia, gasto_mes_usd=mes)
-        return envelope(con, {"dia_usd": round(dia, 4), "mes_usd": round(mes, 4), "teto_dia_usd": td, "teto_mes_usd": tm, "alerta": orc.alerta()}, agora=_agora(request))
+        cambio = con.execute("select valor from parametro where chave='cambio_usd_brl'").fetchone()  # editável; nunca fixo no código (R6)
+        cambio = f"{float(__import__('json').loads(cambio['valor'])):.2f}" if cambio else None
+        return envelope(con, {"dia_usd": round(dia, 4), "mes_usd": round(mes, 4), "teto_dia_usd": td, "teto_mes_usd": tm, "alerta": orc.alerta(),
+                              "cambio_usd_brl": cambio}, agora=_agora(request))
     finally:
         con.close()

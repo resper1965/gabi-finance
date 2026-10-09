@@ -1,13 +1,15 @@
 import { useApi } from "../lib/useApi";
 
-interface Custo { dia_usd: number; mes_usd: number; teto_dia_usd: number; teto_mes_usd: number }
+interface Custo { dia_usd: number; mes_usd: number; teto_dia_usd: number; teto_mes_usd: number; cambio_usd_brl?: string | null }
 
-const usd = (n: number) => `US$ ${n.toFixed(2).replace(".", ",")}`;
+const virgula = (n: number) => n.toFixed(2).replace(".", ",");
 
 /** Cartão "Custo da Gabi" (dia e mês contra o teto, marca aos 70%); sempre visível na barra lateral. */
 export function CustoGabi() {
   const c = useApi<Custo>("/api/v1/custo").env?.dados;
   if (!c) return null;
+  const cambio = c.cambio_usd_brl ? Number(c.cambio_usd_brl) : null; // câmbio vem de `parametro` (editável); sem ele, fica em dólar
+  const usd = (n: number) => (cambio ? `R$ ${virgula(n * cambio)}` : `US$ ${virgula(n)}`);
   const pDia = Math.min(100, (c.dia_usd / c.teto_dia_usd) * 100), pMes = Math.min(100, (c.mes_usd / c.teto_mes_usd) * 100);
   const aviso = pMes >= 70;
   const barra = (pct: number, cor: string) => (

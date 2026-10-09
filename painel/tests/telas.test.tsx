@@ -6,6 +6,7 @@ import { Lancamentos } from "../src/telas/Gastos/Lancamentos";
 import { Semanas } from "../src/telas/Caixa/Semanas";
 import { Regras } from "../src/telas/Regras";
 import { Cartoes } from "../src/telas/Gastos/Cartoes";
+import { CustoGabi } from "../src/componentes/CustoGabi";
 import { ParaOndeVai } from "../src/telas/Gastos/ParaOndeVai";
 import { Resumo } from "../src/telas/Caixa/Resumo";
 import { APagar } from "../src/telas/Caixa/APagar";
@@ -141,4 +142,16 @@ test("Cartoes: filtro Tipo 'Só assinatura' mostra so lancamentos de assinaturas
   const linhas = [...document.querySelectorAll("tbody tr")].map((l) => l.textContent ?? "");
   expect(linhas.length).toBeGreaterThan(0);
   expect(linhas.every((t) => /NETFLIX/.test(t))).toBe(true); // a amostra tem NETFLIX como assinatura; TV e LOJA saem
+});
+
+test("CustoGabi mostra em reais quando ha cambio e em dolar quando nao ha", async () => {
+  const base = amostra("custo");
+  apiFalsa({ custo: { ...base, dados: { ...base.dados, dia_usd: 0.5, mes_usd: 4, teto_dia_usd: 1, teto_mes_usd: 10, cambio_usd_brl: "5.50" } } });
+  const { unmount } = montar(<CustoGabi />);
+  expect(await screen.findByText(/R\$ 2,75 \/ R\$ 5,50/)).toBeInTheDocument(); // hoje: 0,5 × 5,5 = 2,75 de 1 × 5,5 = 5,50
+  unmount();
+  vi.unstubAllGlobals();
+  apiFalsa({ custo: { ...base, dados: { ...base.dados, dia_usd: 0.5, teto_dia_usd: 1, cambio_usd_brl: null } } });
+  montar(<CustoGabi />);
+  expect(await screen.findByText(/US\$ 0,50 \/ US\$ 1,00/)).toBeInTheDocument();
 });

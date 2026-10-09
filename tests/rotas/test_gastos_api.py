@@ -298,3 +298,18 @@ def test_destino_agrupado_valida_entrada_e_exige_boss(cli):
     assert get(cli, "/api/v1/destino/agrupado?por=xis").status_code == 400
     assert get(cli, "/api/v1/destino/agrupado?periodo=ano").status_code == 400
     assert get(cli, "/api/v1/destino/agrupado", VIP).status_code == 403
+
+
+def _custo(cli):
+    return cli.get("/api/v1/custo", headers=BOSS).json()["dados"]
+
+
+def test_custo_sem_cambio_nao_inventa_brl(cli):
+    assert _custo(cli)["cambio_usd_brl"] is None
+
+
+def test_custo_com_cambio_do_parametro_devolve_o_cambio(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into parametro(chave, valor) values ('cambio_usd_brl', ?)", (json.dumps(5.5),))
+    c.close()
+    assert _custo(cli)["cambio_usd_brl"] == "5.50"

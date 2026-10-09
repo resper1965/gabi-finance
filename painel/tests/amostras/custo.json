@@ -1,6 +1,7 @@
 {
  "dados": {
   "alerta": null,
+  "cambio_usd_brl": null,
   "dia_usd": 0,
   "mes_usd": 0,
   "teto_dia_usd": 0.7,
