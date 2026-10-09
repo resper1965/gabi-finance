@@ -268,6 +268,19 @@
         "para_quem": "ricardo",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "REGISTRO ?BR",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness"
+      }
+    },
+    {
+      "padrao": "ZENKLUB",
+      "acao": {
+        "para_quem": "giovanna"
+      }
     }
   ]
 }
