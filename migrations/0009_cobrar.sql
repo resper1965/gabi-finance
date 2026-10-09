@@ -51,3 +51,14 @@ create table lote_nibo_item(
   schedule_id text, erro text, baixa_credito_id integer references lancamento(id),
   primary key (lote_id, lancamento_id));
 create index lote_nibo_item_lancamento on lote_nibo_item(lancamento_id, estado);
+
+-- E-mail de cobrança: só RASCUNHO (ADR-006). O envio fica desabilitado; o app guarda e mostra.
+create table cobranca(
+  id integer primary key,
+  empresa_id text not null references empresa(id),
+  para text not null, assunto text not null, corpo text not null,
+  criado_em text not null);
+create table cobranca_item(
+  cobranca_id integer not null references cobranca(id),
+  lancamento_id integer not null references lancamento(id),
+  primary key (cobranca_id, lancamento_id));
