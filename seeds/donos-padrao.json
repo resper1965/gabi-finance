@@ -301,6 +301,12 @@
       "acao": {
         "para_quem": "sabrina"
       }
+    },
+    {
+      "padrao": "PEX ?-?ONR",
+      "acao": {
+        "para_quem": "louise"
+      }
     }
   ]
 }
