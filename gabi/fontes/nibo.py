@@ -106,6 +106,7 @@ class Nibo:
 
     def nfse(self, desde: dt.date) -> Iterator[dict]:
         """NFS-e emitidas (todas as situações) com createDate a partir de `desde`. O Nibo responde 500 a $orderby=emissionDate e a datas sem offset."""
+        desde = dt.date.fromisoformat(desde) if isinstance(desde, str) else desde  # via ponte a data chega como texto ISO
         return self._paginar("/nfse", "createDate", f"createDate ge {desde.isoformat()}T00:00:00Z")
 
     def obter_arquivo(self, url: str) -> bytes:

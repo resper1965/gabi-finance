@@ -3,6 +3,7 @@ Uma requisição por conexão: JSON de uma linha {"fonte", "metodo", "args", "kw
 `bytes` viaja como {"__b64__": ...}. Só métodos da lista branca; `preparar_usuario` (token admin) nunca atravessa a ponte.
 R5: nenhum token ou cabeçalho trafega aqui; o servidor devolve só o tipo e a mensagem do erro. Consome: fontes.paperless, fontes.nibo_escrita."""
 import base64
+import datetime as dt
 import json
 import os
 import socket
@@ -22,6 +23,8 @@ ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo}
 
 
 def _codificar(v):
+    if isinstance(v, (dt.date, dt.datetime)):
+        return v.isoformat()  # o outro lado (métodos do Nibo) aceita o texto ISO
     if isinstance(v, (bytes, bytearray)):
         return {"__b64__": base64.b64encode(bytes(v)).decode()}
     if isinstance(v, dict):

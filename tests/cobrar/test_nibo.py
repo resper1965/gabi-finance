@@ -123,3 +123,11 @@ def test_obter_arquivo_status_de_erro_vira_erronibo():
     n = Nibo("t", http=NiboFalso(), http_arquivo=lambda u, c: (404, b""))
     with pytest.raises(ErroNibo):
         n.obter_arquivo("https://arquivos.nibo.com.br/download/x")
+
+
+def test_nfse_aceita_data_como_texto_iso_porque_a_ponte_so_leva_json():
+    from gabi.fontes.ponte import _codificar
+    assert _codificar([dt.date(2017, 1, 1)]) == ["2017-01-01"]
+    n, srv = _nibo(itens=[])
+    list(n.nfse("2017-01-01"))
+    assert "createDate ge 2017-01-01T00:00:00Z" in unquote(parse_qs(urlparse(srv.chamadas[0][1]).query)["$filter"][0])
