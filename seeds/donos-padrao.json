@@ -313,6 +313,12 @@
       "acao": {
         "para_quem": "sabrina"
       }
+    },
+    {
+      "padrao": "REVISTARIA BIRMAN",
+      "acao": {
+        "para_quem": "louise"
+      }
     }
   ]
 }
