@@ -93,3 +93,10 @@ def test_main_com_backup_corrompido_retorna_erro_e_rodada_erro(banco, tmp_path, 
     monkeypatch.setattr(b, "testar_restauracao", lambda *a, **k: {"ok": False, "contagens": {}})
     assert main(banco, tmp_path / "bk", hoje=HOJE, testar=True) == 1
     assert conectar(banco).execute("select status from rodada where fonte='backup'").fetchone()["status"] == "erro"
+
+
+def test_main_reexecucao_no_mesmo_dia_nao_e_falha(banco, tmp_path, capsys):
+    from gabi.backup import main
+    assert main(banco, tmp_path / "bk", HOJE) == 0
+    assert main(banco, tmp_path / "bk", HOJE) == 0
+    assert "já existe" in capsys.readouterr().out

@@ -64,9 +64,13 @@ def testar_restauracao(arquivo: Path, tabelas: list[str]) -> dict:
 def main(banco: Path, destino_dir: Path, hoje: date | None = None, testar: bool = False) -> int:
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
+    hoje = hoje or date.today()
+    if (Path(destino_dir) / f"gabi-brain-{hoje.isoformat()}.sqlite").exists():
+        print(f"backup de {hoje} já existe; nada a fazer")  # reexecução no mesmo dia (instalação) não é falha
+        return 0
     try:
         with registrar_rodada(con, "backup") as r:
-            arq = backup_db(con, destino_dir, hoje or date.today())
+            arq = backup_db(con, destino_dir, hoje)
             r.lidos = 1
             if testar:
                 res = testar_restauracao(arq, TABELAS_CONTAGEM)
