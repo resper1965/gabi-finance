@@ -182,7 +182,7 @@ def test_captura_chama_os_modulos_certos():
 
 def test_horarios_saldos_de_hora_em_hora_e_extratos_as_07_e_15_de_brasilia():
     assert "OnCalendar=*-*-* *:05:00" in T_SALDOS and "Persistent=true" in T_SALDOS
-    assert "OnCalendar=*-*-* 07,15:00:00 America/Sao_Paulo" in T_EXTRATOS and "Persistent=true" in T_EXTRATOS
+    assert "OnCalendar=*-*-* 06,14:00:00 America/Sao_Paulo" in T_EXTRATOS and "Persistent=true" in T_EXTRATOS
 
 
 @pytest.mark.skipif(subprocess.run(["which", "systemd-analyze"], capture_output=True).returncode != 0, reason="sem systemd-analyze")

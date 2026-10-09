@@ -4,7 +4,7 @@ import datetime as dt
 IGNORADAS = ("backup", "importacao-staging", "open-finance-saldos")  # não são fontes que se "confere" (saldos têm rodada própria)
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 BRT = dt.timezone(dt.timedelta(hours=-3))
-HORAS_RODADAS = (7, 15)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
+HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
 
 
 def _utc(s: str) -> dt.datetime:
