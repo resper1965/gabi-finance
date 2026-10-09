@@ -246,6 +246,23 @@ def test_cartao_com_todas_as_faturas_pagas_nao_tem_fatura_aberta(cli, banco):
     assert it["fatura_aberta"] is None and it["por_categoria"] == []
 
 
+def test_cartao_fatura_nao_confirmada_com_debito_no_banco_nao_e_aberta(cli, banco):
+    """Mesma regra do Caixa: o banco diz UNCONFIRMED mas o débito igual já saiu da conta BANK."""
+    c = conectar(banco)
+    c.execute("update fatura set pagamento_status='PAST_DUE_UNCONFIRMED', vencimento='2026-10-07' where id='f1'")
+    _l(c, 1, "pg1", "2026-10-07", "PGTO FATURA", -47590, "custo", 1)
+    c.close()
+    it = get(cli, "/api/v1/cartoes").json()["dados"]["itens"][0]
+    assert it["fatura_aberta"] is None and it["por_categoria"] == []
+
+
+def test_cartao_fatura_nao_confirmada_sem_debito_segue_aberta(cli, banco):
+    c = conectar(banco)
+    c.execute("update fatura set pagamento_status='PAST_DUE_UNCONFIRMED', vencimento='2026-10-07' where id='f1'")
+    c.close()
+    assert get(cli, "/api/v1/cartoes").json()["dados"]["itens"][0]["fatura_aberta"]["status"] == "PAST_DUE_UNCONFIRMED"
+
+
 def test_entrada_recorrente_no_cartao_nao_e_assinatura(cli, banco):
     c = conectar(banco)
     for i, d in enumerate(("2026-10-05", "2026-09-05", "2026-08-05", "2026-07-05")):

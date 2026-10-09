@@ -105,11 +105,11 @@ JANELA_PAGAMENTO_DIAS = 7  # o débito da fatura pode sair alguns dias antes do 
 
 
 def faturas_abertas(con, em: dt.date) -> list:
-    """Faturas ainda não pagas dos cartões liberados (id, vencimento, total_centavos).
+    """Faturas ainda não pagas dos cartões liberados (id, conta_id, vencimento, total_centavos).
     O banco demora a trocar PAST_DUE_UNCONFIRMED por PAID: se já saiu da conta BANK um débito do mesmo valor
     entre (vencimento − 7 dias) e `em`, a fatura está paga e não pode contar de novo ao lado do saldo que já caiu."""
     return con.execute(
-        "select f.id, f.vencimento, f.total_centavos from fatura f join conta c on c.id=f.conta_id "
+        "select f.id, f.conta_id, f.vencimento, f.total_centavos from fatura f join conta c on c.id=f.conta_id "
         "where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null and upper(coalesce(f.pagamento_status,''))<>'PAID' "
         "and not (upper(coalesce(f.pagamento_status,''))='PAST_DUE_UNCONFIRMED' and f.total_centavos>0 and exists ("
         "  select 1 from lancamento l join conta b on b.id=l.conta_id where b.tipo='BANK' and l.valor_centavos=-f.total_centavos "

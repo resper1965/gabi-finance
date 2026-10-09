@@ -159,8 +159,11 @@ def cartoes(request: Request):
     try:
         hoje = _agora(request).date()
         itens = []
+        abertas = {}  # mesma regra do Caixa: fatura com débito no banco não é aberta, mesmo se o banco ainda diz UNCONFIRMED
+        for a in cp.faturas_abertas(con, hoje):
+            abertas[a["conta_id"]] = a["id"]  # ordenadas por vencimento: a última de cada cartão vence por último
         for c in con.execute("select * from conta where tipo='CREDIT' and estado='sim' and excluido_em is null order by id"):
-            f = con.execute("select * from fatura where conta_id=? and upper(coalesce(pagamento_status,''))<>'PAID' order by vencimento desc limit 1", (c["id"],)).fetchone()
+            f = con.execute("select * from fatura where id=?", (abertas[c["id"]],)).fetchone() if c["id"] in abertas else None
             fatura = None
             if f:
                 pct = round(f["total_centavos"] / c["limite_centavos"] * 100, 1) if c["limite_centavos"] and f["total_centavos"] is not None else None
