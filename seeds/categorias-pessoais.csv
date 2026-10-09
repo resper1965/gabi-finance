@@ -5,7 +5,8 @@ Transporte por app;Pessoal;;Taxi and ride-hailing
 Combustível;Pessoal;;Gas stations
 Veículo;Pessoal;;Parking|Tolls and in vehicle payment|Vehicle maintenance|Vehicle ownership taxes and fees|Car rental|Bicycle
 Compras;Pessoal;;Shopping|Online shopping|Clothing|Houseware|Electronics|Sports goods|Kids and toys|Bookstore|Optometry
-Saúde;Pessoal;;Pharmacy|Healthcare|Dentist|Hospital clinics and labs|Health insurance
+Farmácia;Pessoal;;Pharmacy
+Saúde;Pessoal;;Healthcare|Dentist|Hospital clinics and labs|Health insurance
 Bem-estar e esporte;Pessoal;;Wellness and fitness|Sports practice
 Educação;Pessoal;;School|Education
 Seguros;Pessoal;;Insurance
