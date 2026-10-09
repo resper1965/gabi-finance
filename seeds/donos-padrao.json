@@ -409,6 +409,38 @@
       "acao": {
         "para_quem": "louise"
       }
+    },
+    {
+      "padrao": "CURSOR USAGE",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "ESTORNO JUROS DE FINANC",
+      "acao": {
+        "para_quem": "nenhum"
+      }
+    },
+    {
+      "padrao": "JOUSE",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "ESCH CAFE",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "PORTO SEGURO",
+      "acao": {
+        "para_quem": "ricardo"
+      }
     }
   ]
 }
