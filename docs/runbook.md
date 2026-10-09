@@ -64,3 +64,10 @@ O painel é `painel/` (React + Vite); `npm run build` gera `gabi/painel/` e a AP
 **Ver sem dados reais:** `python -m tools.demo 8099` sobe a API com banco sintético (relógio fixo em 08/10/2026) e o painel compilado; mande o cabeçalho `Tailscale-User-Login: boss@x.com`.
 **Comparar com o protótipo (G14):** `python -m tools.capturas` grava `docs/design/<tela>-{prototipo,app}-{claro,escuro,celular}.png` (precisa do demo em :8099, do protótipo servido por `python -m http.server 8098` em `prototipo/` e de `playwright install chromium`).
 **Testes das telas** usam respostas reais da API (`painel/tests/amostras`, geradas por `python -m tools.gerar_amostras`); `tests/test_amostras_painel.py` falha se a API mudar e as amostras não.
+
+## Reembolsos {#reembolsos}
+Despesa paga no PF para uma **empresa contratante** (ness, IONIC; `empresa.relacao='contratante'`, cadastro do Ricardo) vira item de reembolso. Estados: `a_cobrar → cobrado → parcialmente_recebido → quitado` (`cobrar/reembolso.py`).
+1. `criar_reembolso(con, empresa_id)` junta os itens ainda sem cobrança (a Bekaa, `relacao='pj_titular'`, **nunca** entra: vai ao lote do Nibo).
+2. `marcar_cobrado` quando o Ricardo cobra (o e-mail é só rascunho, ADR-006).
+3. `conciliar_recebimento(con, empresa_id, credito_id)`: entrada em conta PJ baixa os itens **já cobrados**, do mais antigo ao mais novo; a sobra volta no resultado; o mesmo crédito não baixa duas vezes (`reembolso_baixa`).
+4. Para a Gabi propor o vínculo de um comprovante ao item, ver `#comprovantes`.

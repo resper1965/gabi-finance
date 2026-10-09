@@ -18,3 +18,21 @@ create table comprovante_vinculo(
   criado_em text not null, decidido_em text, decidido_por text,
   unique (comprovante_id, lancamento_id));
 create index comprovante_vinculo_lancamento on comprovante_vinculo(lancamento_id, estado);
+
+-- Reembolsos de contratantes (ness, IONIC): a Bekaa (pj_titular) nunca entra aqui, vai ao lote do Nibo (T2.4). Relação é cadastro (R6).
+alter table empresa add column relacao text check (relacao is null or relacao in ('pj_titular','contratante'));
+
+create table reembolso(
+  id integer primary key,
+  empresa_id text not null references empresa(id),
+  estado text not null default 'a_cobrar' check (estado in ('a_cobrar','cobrado','parcialmente_recebido','quitado')),
+  criado_em text not null, cobrado_em text);
+create table reembolso_item(
+  reembolso_id integer not null references reembolso(id),
+  lancamento_id integer not null unique references lancamento(id),
+  valor_centavos integer not null check (valor_centavos > 0),
+  recebido_centavos integer not null default 0 check (recebido_centavos >= 0 and recebido_centavos <= valor_centavos),
+  primary key (reembolso_id, lancamento_id));
+create table reembolso_baixa(  -- um crédito baixa uma vez só
+  credito_lancamento_id integer primary key references lancamento(id),
+  empresa_id text not null references empresa(id), valor_centavos integer not null, criado_em text not null);
