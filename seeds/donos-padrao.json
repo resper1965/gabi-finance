@@ -319,6 +319,12 @@
       "acao": {
         "para_quem": "louise"
       }
+    },
+    {
+      "padrao": "CODARI SOLUCOE",
+      "acao": {
+        "para_quem": "ricardo"
+      }
     }
   ]
 }
