@@ -667,6 +667,23 @@
     "summary": "Cartoes"
    }
   },
+  "/api/v1/contagens": {
+   "get": {
+    "description": "Itens que pedem decisão por área do menu (caixa, gastos, regras) e o total do sino.",
+    "operationId": "contagens_api_v1_contagens_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Contagens"
+   }
+  },
   "/api/v1/contas-pagar": {
    "get": {
     "description": "Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas.",

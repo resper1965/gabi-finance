@@ -159,6 +159,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_gastos)
     from gabi.rotas.cadastros import router as rotas_cadastros
     app.include_router(rotas_cadastros)
+    from gabi.rotas.contagens import router as rotas_contagens
+    app.include_router(rotas_contagens)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")

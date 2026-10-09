@@ -1,0 +1,20 @@
+{
+ "dados": {
+  "menu": {
+   "caixa": 1,
+   "gastos": 0,
+   "regras": 1
+  },
+  "sino": 2
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

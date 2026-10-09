@@ -32,11 +32,21 @@ export interface ShellProps {
   tela: (area: Area, aba: string) => ReactNode;
   /** Seletores de período/conta só aparecem nas telas de dinheiro. */
   seletores?: (area: Area, celular: boolean) => ReactNode;
+  /** Itens que pedem decisão: total no sino e um número por área do menu (0 = sem selo). */
+  contagens?: Contagens;
+}
+
+export interface Contagens { sino: number; menu: Record<string, number> }
+
+/** Selo numérico (sino e menu); some quando não há nada a decidir. */
+function Selo({ n }: { n?: number }) {
+  if (!n) return null;
+  return <span data-selo style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "var(--color-accent)", color: "#fff", font: "600 11px/18px var(--mono)", textAlign: "center" }}>{n > 99 ? "99+" : n}</span>;
 }
 
 const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-export function Shell({ tela, seletores }: ShellProps) {
+export function Shell({ tela, seletores, contagens }: ShellProps) {
   const celular = useCelular();
   const [areaId, setAreaId] = useLocal("gabi.area", "hoje");
   const [recolhido, setRecolhido] = useLocal("gabi.menu", "0");
@@ -77,7 +87,7 @@ export function Shell({ tela, seletores }: ShellProps) {
                       <div key={g.titulo} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                         {g.titulo && !mini && <span style={{ padding: "14px 10px 6px", font: "600 10.5px/1 var(--font-body)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink2)" }}>{g.titulo}</span>}
                         {g.titulo && mini && <span style={{ display: "block", margin: "8px 8px", borderTop: "1px solid var(--line2)" }} />}
-                        {g.areas.map((a) => <ItemNav key={a.id} area={a} atual={a.id === area.id} mini={mini} ir={ir} />)}
+                        {g.areas.map((a) => <ItemNav key={a.id} area={a} atual={a.id === area.id} mini={mini} ir={ir} selo={contagens?.menu[a.id]} />)}
                       </div>
                     ))}
                   </div>
@@ -95,7 +105,7 @@ export function Shell({ tela, seletores }: ShellProps) {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button className="btn btn-secondary btn-icon" aria-label={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} title={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} aria-pressed={oculto === "1"} onClick={() => setOculto(oculto === "1" ? "0" : "1")}>{oculto === "1" ? <EyeOff size={18} {...icone} /> : <Eye size={18} {...icone} />}</button>
                     <button className="btn btn-secondary btn-icon" aria-label={tema === "escuro" ? "Tema claro" : "Tema escuro"} title={tema === "escuro" ? "Tema claro" : "Tema escuro"} onClick={() => setTema(tema === "escuro" ? "claro" : "escuro")}>{tema === "escuro" ? <Sun size={18} {...icone} /> : <Moon size={18} {...icone} />}</button>
-                    <button className="btn btn-secondary btn-icon" aria-label="Alertas" title="Alertas"><Bell size={18} {...icone} /></button>
+                    <button className="btn btn-secondary btn-icon" aria-label="Alertas" title="Alertas" style={{ position: "relative" }}><Bell size={18} {...icone} /><span style={{ position: "absolute", top: -6, right: -6 }}><Selo n={contagens?.sino} /></span></button>
                   </div>
                   {celular && <div style={{ flex: "1 0 100%" }}>{seletores?.(area, true)}</div>}
                   {area.abas.length > 1 && (
@@ -136,13 +146,14 @@ export function Shell({ tela, seletores }: ShellProps) {
   );
 }
 
-function ItemNav({ area, atual, mini, ir }: { area: Area; atual: boolean; mini: boolean; ir: (id: string) => void }) {
+function ItemNav({ area, atual, mini, ir, selo }: { area: Area; atual: boolean; mini: boolean; ir: (id: string) => void; selo?: number }) {
   const I = ICONE[area.id];
   return (
     <button onClick={() => ir(area.id)} aria-current={atual ? "page" : undefined} aria-label={area.rotulo} title={area.pergunta}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, width: "100%", minHeight: 40, padding: "0 8px", border: 0, borderLeft: `2px solid ${atual ? "var(--color-accent)" : "transparent"}`, background: atual ? "var(--sel)" : "transparent", color: "var(--color-text)", fontWeight: atual ? 700 : 500, fontSize: 14.5, textAlign: "left", cursor: "pointer" }}>
       <I size={19} {...icone} style={{ flex: "none", marginLeft: mini ? 6 : 0 }} />
       {!mini && <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{area.rotulo}</span>}
+      <Selo n={selo} />
     </button>
   );
 }

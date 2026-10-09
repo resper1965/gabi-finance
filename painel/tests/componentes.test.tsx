@@ -83,3 +83,16 @@ test("textos da navegacao iguais ao prototipo", () => {
     Casa: ["Família", "Cadastros", "Gabi"],
   });
 });
+
+test("Shell mostra selo de contagem no item do menu e total no sino", () => {
+  render(<Shell tela={() => null} contagens={{ sino: 5, menu: { regras: 3, caixa: 2 } }} />);
+  expect(within(screen.getByRole("button", { name: "Regras" })).getByText("3")).toHaveAttribute("data-selo");
+  expect(within(screen.getByRole("button", { name: "Caixa" })).getByText("2")).toHaveAttribute("data-selo");
+  expect(within(screen.getByRole("button", { name: "Alertas" })).getByText("5")).toHaveAttribute("data-selo");
+});
+
+test("Shell sem pendencia nao mostra selo", () => {
+  render(<Shell tela={() => null} contagens={{ sino: 0, menu: { regras: 0 } }} />);
+  expect(screen.queryByText("0")).toBeNull();
+  expect(document.querySelectorAll("[data-selo]").length).toBe(0);
+});

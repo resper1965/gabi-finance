@@ -9,7 +9,7 @@ const ROTAS: [RegExp, string][] = [
   [/\/lancamentos.*pendente=para_quem/, "lancamentos-pendentes"], [/\/lancamentos/, "lancamentos"],
   [/\/destino\/agrupado.*por=pessoa/, "destino-pessoa"], [/\/destino\/agrupado/, "destino-fornecedor"], [/\/destino/, "destino"],
   [/\/cartoes/, "cartoes"], [/\/parcelas/, "parcelas"], [/\/assinaturas/, "assinaturas"], [/\/sugestoes/, "sugestoes"], [/\/regras/, "regras"],
-  [/\/custo/, "custo"], [/\/cadastros\/contas/, "cadastros-contas"], [/\/cadastros\/pessoas/, "cadastros-pessoas"],
+  [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/cadastros\/contas/, "cadastros-contas"], [/\/cadastros\/pessoas/, "cadastros-pessoas"],
   [/\/cadastros\/categorias/, "cadastros-categorias"], [/\/cadastros\/empresas/, "cadastros-empresas"],
 ];
 
