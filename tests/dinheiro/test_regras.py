@@ -222,3 +222,19 @@ def test_regra_por_estabelecimento_sobrescreve_padrao_do_cadastro_mas_nao_regra_
     criar_regra_ativa(con, "PETSUPERMARK", {"para_quem_id": "pets"}, "r")
     assert _get(con, padrao)["para_quem_id"] == "pets" and _get(con, padrao)["para_quem_origem"] == "regra"
     assert _get(con, de_regra)["para_quem_id"] == "p1" and _get(con, decidido)["para_quem_id"] == "p1"
+
+
+def test_regra_nova_nao_se_aplica_ao_que_uma_regra_anterior_ja_pegou(con):
+    # mesma semântica do classificador: a PRIMEIRA regra ativa que casa vale; a seguinte não completa os campos que a primeira deixou
+    iof = _l(con, 1, desc="IOF INTERNACIONAL - NEON.TECH", estab="IOF")
+    neon = _l(con, 2, desc="NEON.TECH", estab="NEON.TECH")
+    criar_regra_ativa(con, r"IOF.*NEON\.TECH", {"para_quem_id": "p1"}, "r")          # 1ª: só para quem
+    criar_regra_ativa(con, r"NEON\.TECH", {"para_quem_id": "p1", "categoria_id": 1}, "r")   # 2ª: também categoria
+    assert _get(con, iof)["categoria_id"] is None and _get(con, iof)["para_quem_id"] == "p1"
+    assert _get(con, neon)["categoria_id"] == 1
+
+
+def test_previa_de_regra_nova_tambem_exclui_o_que_regra_existente_ja_pega(con):
+    _l(con, 1, desc="NEON.TECH", estab="NEON")
+    criar_regra_ativa(con, "NEON", {"para_quem_id": "p1"}, "r")
+    assert contar_afetados(con, "NEON", {"categoria_id": 1}, HOJE)["passado"] == 0

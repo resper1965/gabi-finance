@@ -48,19 +48,34 @@ def _validar(con, padrao, acao) -> tuple[re.Pattern, dict]:
     return rx, dict(acao)
 
 
-def _linhas_afetadas(con, rx, acao):
-    """(id, [colunas que mudariam]) dos lançamentos em que a regra faria diferença."""
+def _anteriores(con, rid: int | None) -> list[re.Pattern]:
+    """Regras ATIVAS que vencem esta na ordem do classificador (a primeira que casa vale): as de id menor; sem id (regra nova/prévia), todas."""
+    saida = []
+    for r in con.execute("select padrao from regra where ativa=1" + (" and id<?" if rid is not None else ""), (rid,) if rid is not None else ()):
+        try:
+            saida.append(re.compile(r["padrao"], re.I))
+        except re.error:
+            continue
+    return saida
+
+
+def _linhas_afetadas(con, rx, acao, rid: int | None = None):
+    """(id, [colunas que mudariam]) dos lançamentos em que a regra faria diferença. Não toca no que uma regra anterior já pega:
+    no classificador a primeira regra que casa vale, e as seguintes não completam os campos que ela deixou."""
+    anteriores = _anteriores(con, rid)
     for r in con.execute("select * from lancamento"):
         if not casa(rx, r["descricao_original"], r["estabelecimento"]):
+            continue
+        if any(casa(a, r["descricao_original"], r["estabelecimento"]) for a in anteriores):
             continue
         mudam = [c for c in acao if not (r[f"{_CAMPO[c]}_origem"] in ("voce", "regra") and r[c] is not None)]
         if mudam:
             yield r["id"], mudam
 
 
-def _aplicar(con, rx, acao) -> int:
+def _aplicar(con, rx, acao, rid: int | None = None) -> int:
     n = 0
-    for lid, cols in list(_linhas_afetadas(con, rx, acao)):
+    for lid, cols in list(_linhas_afetadas(con, rx, acao, rid)):
         for c in cols:
             con.execute(f"update lancamento set {c}=?, {_CAMPO[c]}_origem='regra' where id=?", (acao[c], lid))
         n += 1
@@ -119,7 +134,7 @@ def _aprovar(con, sugestao_id: int, edicao: dict | None, por: str) -> int | None
         rx, acao = _validar(con, payload.get("padrao"), payload.get("acao"))
         rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
                           (payload["padrao"], json.dumps(acao, ensure_ascii=False), _agora(), por)).lastrowid
-        n = _aplicar(con, rx, acao)
+        n = _aplicar(con, rx, acao, rid)
         _decisao(con, por, f"regra {rid} criada ({payload['padrao']}) aplicada a {n} lançamento(s)")
     elif s["tipo"] in ("categoria", "para_quem", "empresa"):
         col = f"{s['tipo']}_id"
@@ -173,7 +188,7 @@ def sempre_assim(con, lancamento_id: int, por: str) -> int:
         rx, ac = _validar(con, padrao, acao)
         rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
                           (padrao, json.dumps(ac, ensure_ascii=False), _agora(), por)).lastrowid
-        n = _aplicar(con, rx, ac)
+        n = _aplicar(con, rx, ac, rid)
         _decisao(con, por, f"regra {rid} criada (sempre assim para {chave}) aplicada a {n} lançamento(s)")
         return rid
     return _em_transacao(con, fazer)
@@ -188,7 +203,7 @@ def criar_regra_ativa(con, padrao: str, acao: dict, por: str) -> int | None:
             return None
         rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
                           (padrao, json.dumps(ac, ensure_ascii=False), _agora(), por)).lastrowid
-        n = _aplicar(con, rx, ac)
+        n = _aplicar(con, rx, ac, rid)
         _decisao(con, por, f"regra {rid} criada ({padrao}) aplicada a {n} lançamento(s)")
         return rid
     return _em_transacao(con, fazer)
@@ -203,6 +218,6 @@ def definir_ativa(con, regra_id: int, ativa: bool, por: str) -> None:
         con.execute("update regra set ativa=? where id=?", (1 if ativa else 0, regra_id))
         if ativa:
             rx, acao = _validar(con, r["padrao"], json.loads(r["acao"]))
-            _aplicar(con, rx, acao)
+            _aplicar(con, rx, acao, regra_id)
         _decisao(con, por, f"regra {regra_id} {'ligada' if ativa else 'desligada'}")
     _em_transacao(con, fazer)

@@ -361,6 +361,22 @@
         "empresa": "ness",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "ANTHROPIC|CLAUDE\\.AI",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "FEATHERLESS",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
     }
   ]
 }
