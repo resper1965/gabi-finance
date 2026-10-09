@@ -346,6 +346,21 @@
         "empresa": "ness",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "IOF.*NEON\\.TECH",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness"
+      }
+    },
+    {
+      "padrao": "NEON\\.TECH",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
     }
   ]
 }
