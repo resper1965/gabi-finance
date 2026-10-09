@@ -403,6 +403,12 @@
       "acao": {
         "para_quem": "louise"
       }
+    },
+    {
+      "padrao": "WOW\\*WOWSOHO|WOWSOHO",
+      "acao": {
+        "para_quem": "louise"
+      }
     }
   ]
 }
