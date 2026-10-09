@@ -234,3 +234,32 @@ def test_instalar_cria_o_usuario_e_liga_o_servico_de_fontes():
     assert "useradd" in INSTALAR and "gabibrain-fontes" in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
     assert "gabi-brain-fontes.service" in ligadas[0] and "gabi-brain-fontes.service" in INSTALAR.split("restart")[1]
+
+
+# ---------------- avisos (plano de finalização, tarefa 4): o brain passa a avisar quando algo para ----------------
+AVISOS, T_AVISOS, FALHA = _ler("gabi-brain-avisos.service"), _ler("gabi-brain-avisos.timer"), _ler("gabi-brain-falha@.service")
+NOTAS = _ler("gabi-brain-notas.service")
+
+
+def test_timer_de_avisos_roda_a_cada_15_minutos_e_esta_instalado_e_habilitado():
+    assert "OnUnitActiveSec=15min" in T_AVISOS and "Unit=gabi-brain-avisos.service" in T_AVISOS
+    for nome in ("gabi-brain-avisos.service", "gabi-brain-avisos.timer", "gabi-brain-falha@.service"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and "gabi-brain-avisos.timer" in ligadas[0]
+
+
+def test_servicos_de_rotina_avisam_quando_falham():
+    # a chave do mcp.ai expirou em 09/10 e ninguém soube por horas: toda rotina com OnFailure= chama o serviço de falha
+    for texto in (SALDOS, EXTRATOS, BKP, NOTAS, AVISOS):
+        assert "OnFailure=gabi-brain-falha@%n.service" in texto
+
+
+def test_servico_de_falha_grava_aviso_com_o_nome_da_unidade_e_sem_rede():
+    ex = re.search(r"^ExecStart=(.*)$", FALHA, re.M).group(1)
+    assert "gabi.avisos" in ex and "--falha %i" in ex and "RestrictAddressFamilies=AF_UNIX" in FALHA and "User=gabibrain" in FALHA
+
+
+def test_servico_de_avisos_so_le_e_grava_o_banco_sem_rede():
+    assert "gabi.avisos" in AVISOS and "User=gabibrain" in AVISOS and "RestrictAddressFamilies=AF_UNIX" in AVISOS and "ReadWritePaths=/var/lib/gabi-brain" in AVISOS
+    assert "NoNewPrivileges=yes" in AVISOS and "ProtectSystem=strict" in AVISOS

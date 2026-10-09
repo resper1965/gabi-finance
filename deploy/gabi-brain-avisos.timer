@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain avisos a cada 15 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=gabi-brain-avisos.service
+
+[Install]
+WantedBy=timers.target

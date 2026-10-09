@@ -1,6 +1,7 @@
 [Unit]
 Description=gabi.brain saldos das contas (de hora em hora)
 After=network-online.target
+OnFailure=gabi-brain-falha@%n.service
 Wants=network-online.target
 
 [Service]

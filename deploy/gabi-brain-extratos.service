@@ -1,6 +1,7 @@
 [Unit]
 Description=gabi.brain extratos: captura, conferência, classificação e compromissos
 After=network-online.target
+OnFailure=gabi-brain-falha@%n.service
 Wants=network-online.target
 
 [Service]

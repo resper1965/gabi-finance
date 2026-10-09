@@ -1,5 +1,6 @@
 [Unit]
 Description=gabi.brain backup diário do banco, com teste de restauração
+OnFailure=gabi-brain-falha@%n.service
 
 [Service]
 Type=oneshot

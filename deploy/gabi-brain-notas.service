@@ -1,6 +1,7 @@
 [Unit]
 Description=gabi.brain notas fiscais (NFS-e) do Nibo: histórico, PDF/XML e vencimentos (só leitura)
 After=gabi-brain-fontes.service
+OnFailure=gabi-brain-falha@%n.service
 Wants=gabi-brain-fontes.service
 
 [Service]
