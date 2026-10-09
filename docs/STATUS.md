@@ -80,3 +80,12 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - Rodada de extratos conferida pela 1ª vez (rodada 43): o relógio de 7 dias do T1.14 começou em 09/10. Regra de buraco revista para contas de movimento irregular (ADR-009, item 6).
 - NFS-e do Nibo importadas (243 notas, 193 PDF/XML em /var/lib/gabi-brain/notas) e previsão de caixa de entradas (GET /api/v1/cobrar/previsao).
 - 26 categorias do Nibo criadas com `nibo_category_id`. Falta a taxonomia pessoal e a equivalência das 82 categorias do banco (próximo item).
+
+## 09/10/2026 (noite, fim do dia): classificação em massa e donos padrão
+- **Classificação:** 4.136/4.656 com categoria (equivalência do banco → categorias pessoais, `seeds/categorias-pessoais.csv`). **"Para quem": 4.331/4.656 (93%)**, 325 sem dono (Drogaria São Paulo 22, L'Occitane 8, ~140 lojas de 1 lançamento).
+- **Donos padrão** (`seeds/donos-padrao.json`, carregador `tools/semear_donos.py`, aplicar com `sudo ~/aplicar-donos.sh`): quem usa cada cartão/conta, dono por categoria, padrão por compromisso, responsável (Carla→Giovanna, Adriana→Louise; favorecido ≠ para quem), regras por loja (com `empresa` para reembolso: IONIC e NESS; Bekaa), parâmetros (`categorias_assinatura`, `categorias_habito`). Origem `fonte` = padrão do cadastro (uma regra por loja vence; `voce`/`regra` nunca são sobrescritos). Memória do projeto: pets-e-donos-padrao.
+- **Pendente de código:** regras com condição (cartão, valor, dia da semana) — proposta aprovada em conversa, ainda não feita; vigia/avisos por Telegram (o brain não envia nada); previsão de saídas (impostos, faturas); gabi-agent (Hermes) ainda sem plano; Fase 3 congelada.
+- **Assinaturas:** lista = detector (sem hábito) + categorias de assinatura; BrandYourself marcado para cancelar (renovou em 16/09/2026); 44 a conferir.
+- **Reembolsos a cobrar:** NESS 34 itens (R$ 7,9 mil), IONIC 12 (R$ 5,9 mil); falta comprovante p/ lote do Nibo.
+- **Aceite T1.14:** rodada conferida desde 09/10; relógio de 7 dias roda até ~16/10 (precisa de 7 rodadas seguidas conferidas; XP Investimentos segue parada, issue 0001).
+
