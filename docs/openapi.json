@@ -743,6 +743,45 @@
     "summary": "Atualizar"
    }
   },
+  "/api/v1/caixa/projecao": {
+   "get": {
+    "description": "Saldo projetado dia a dia (hoje até 90 dias): saldo atual, saídas de compromissos e faturas, entradas de NFS-e a vencer e recorrentes.",
+    "operationId": "caixa_projecao_api_v1_caixa_projecao_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "dias",
+      "required": false,
+      "schema": {
+       "default": 30,
+       "title": "Dias",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Caixa Projecao"
+   }
+  },
   "/api/v1/caixa/resumo": {
    "get": {
     "description": "KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção.",

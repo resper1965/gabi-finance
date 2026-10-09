@@ -300,3 +300,21 @@ def test_lista_de_sugestoes_aceita_regra_sem_categoria_e_aprovar_sem_escolher_da
     item = next(i for i in r.json()["dados"]["itens"] if i["id"] == sid)
     assert item["payload"]["acao"] == {"categoria_id": None} and item["impacto"] is None   # sem categoria, não há o que contar
     assert post(cli, f"/api/v1/sugestoes/{sid}/aprovar", {}).status_code == 400
+
+
+def test_projecao_do_caixa_formata_valores_e_aponta_o_menor_saldo(cli):
+    r = get(cli, "/api/v1/caixa/projecao?dias=6")
+    assert r.status_code == 200
+    d = r.json()["dados"]
+    assert d["saldo_inicial"] == "12345.60" and len(d["dias"]) == 6
+    hoje = d["dias"][0]
+    assert (hoje["dia"], hoje["saidas"], hoje["saldo"]) == ("2026-10-08", "1300.00", "11045.60")   # IPTU atrasado + condomínio saem hoje
+    luz = next(x for x in d["dias"] if x["dia"] == "2026-10-12")
+    assert luz["saidas"] == "230.50" and luz["saldo"] == "10815.10"
+    assert d["menor_saldo"] == {"dia": "2026-10-12", "saldo": "10815.10"} and "Nibo" in d["aviso"]
+
+
+def test_projecao_valida_o_horizonte_e_so_o_boss_ve(cli):
+    assert get(cli, "/api/v1/caixa/projecao?dias=0").status_code == 400
+    assert get(cli, "/api/v1/caixa/projecao?dias=91").status_code == 400
+    assert get(cli, "/api/v1/caixa/projecao", h=VIP).status_code == 403

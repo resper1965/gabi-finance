@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gabi.db import conectar
 from gabi.dinheiro import analise, consultas, contas_pagar as cp, regras as rg, repositorio
+from gabi.dinheiro.projecao import projetar
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
@@ -75,6 +76,26 @@ def _serie_saldo(con, hoje: dt.date, dias: int, conta: str | None):
         if algum:
             pontos.append({"data": d.isoformat(), "valor": formatar(total), "projecao": False})
     return pontos
+
+
+@router.get("/caixa/projecao")
+def caixa_projecao(request: Request, dias: int = 30):
+    """Saldo projetado dia a dia (hoje até 90 dias): saldo atual, saídas de compromissos e faturas, entradas de NFS-e a vencer e recorrentes."""
+    if not 1 <= dias <= 90:
+        raise erro(400, "requisicao_invalida", "dias deve estar entre 1 e 90")
+    con = _con(request)
+    try:
+        agora = _agora(request)
+        serie = projetar(con, agora.date(), dias)
+        menor = min(serie, key=lambda d: (d["saldo_centavos"], d["dia"]))
+        inicial = cp.caixa_unico(con, agora.date()).saldo_centavos
+        dados = {"saldo_inicial": formatar(inicial),
+                 "dias": [{"dia": d["dia"], "entradas": formatar(d["entradas_centavos"]), "saidas": formatar(d["saidas_centavos"]), "saldo": formatar(d["saldo_centavos"])} for d in serie],
+                 "menor_saldo": {"dia": menor["dia"], "saldo": formatar(menor["saldo_centavos"])},
+                 "aviso": "Entradas só de notas ainda não vencidas e contratos recorrentes; o Nibo é defasado, então nota vencida e não baixada fica na fila de conferência e não entra."}
+        return envelope(con, dados, agora=agora)
+    finally:
+        con.close()
 
 
 @router.get("/caixa/resumo")

@@ -102,6 +102,7 @@ class CaixaUnico:
 
 
 JANELA_PAGAMENTO_DIAS = 7  # o débito da fatura pode sair alguns dias antes do vencimento
+DIAS_FATURA_ANTIGA = 45    # PAST_DUE_UNPAID mais velha que isto é saldo antigo (financiado/parcelado), não fatura aberta do caixa
 
 
 def faturas_abertas(con, em: dt.date) -> list:
@@ -111,10 +112,11 @@ def faturas_abertas(con, em: dt.date) -> list:
     return con.execute(
         "select f.id, f.conta_id, f.vencimento, f.total_centavos from fatura f join conta c on c.id=f.conta_id "
         "where c.estado='sim' and c.tipo='CREDIT' and c.excluido_em is null and upper(coalesce(f.pagamento_status,''))<>'PAID' "
+        "and not (upper(coalesce(f.pagamento_status,''))='PAST_DUE_UNPAID' and f.vencimento < date(?, ?)) "
         "and not (upper(coalesce(f.pagamento_status,''))='PAST_DUE_UNCONFIRMED' and f.total_centavos>0 and exists ("
         "  select 1 from lancamento l join conta b on b.id=l.conta_id where b.tipo='BANK' and l.valor_centavos=-f.total_centavos "
         "  and l.data>=date(f.vencimento, ?) and l.data<=?)) order by f.vencimento",
-        (f"-{JANELA_PAGAMENTO_DIAS} days", em.isoformat())).fetchall()
+        (em.isoformat(), f"-{DIAS_FATURA_ANTIGA} days", f"-{JANELA_PAGAMENTO_DIAS} days", em.isoformat())).fetchall()
 
 
 def caixa_unico(con, em: dt.date) -> CaixaUnico:

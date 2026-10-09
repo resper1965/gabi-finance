@@ -29,6 +29,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | DELETE | `/api/v1/cadastros/{tipo}/{id_}` | Exclusão lógica de um item de cadastro (nada é apagado). |
 | GET | `/api/v1/cadastros/{tipo}/{id_}` | Um item de cadastro. |
 | PATCH | `/api/v1/cadastros/{tipo}/{id_}` | Atualiza campos de um item de cadastro. |
+| GET | `/api/v1/caixa/projecao` | Saldo projetado dia a dia (hoje até 90 dias): saldo atual, saídas de compromissos e faturas, entradas de NFS-e a vencer e recorrentes. |
 | GET | `/api/v1/caixa/resumo` | KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção. |
 | GET | `/api/v1/caixa/semanas` | Semanas (passado real e projeção): entradas e saídas por categoria e saldo. |
 | GET | `/api/v1/caixas-email` | Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe. |

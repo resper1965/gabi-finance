@@ -227,3 +227,14 @@ def test_linha_criada_no_painel_sem_numero_entra_depois_das_da_planilha(con):
     assert leitura["linhas"][-1]["id"] == "novo" and isinstance(leitura["linhas"][-1]["linha_planilha"], int)
     atualizar_compromissos(con, h, a, docs=[])
     assert con.execute("select valor_centavos from compromisso where id='novo:2026-10'").fetchone()[0] == 12345
+
+
+def test_fatura_vencida_nao_paga_ha_mais_de_45_dias_e_saldo_antigo_e_nao_conta_como_aberta(con):
+    # real (09/10/2026): Itaú Visa Infinite, fatura de 25/04 de R$ 61.844,58 PAST_DUE_UNPAID: saldo financiado, não conta como aberta do caixa
+    from gabi.dinheiro.contas_pagar import faturas_abertas
+    cc = _conta(con, "cartao", tipo="CREDIT")
+    _fatura(con, cc, "velha", "2026-04-25", 6184458, "PAST_DUE_UNPAID")
+    _fatura(con, cc, "limite", "2026-08-24", 1000, "PAST_DUE_UNPAID")      # 45 dias exatos até 08/10: ainda conta
+    _fatura(con, cc, "recente", "2026-10-05", 528055, "PAST_DUE_UNCONFIRMED")
+    _fatura(con, cc, "aberta", "2026-10-20", 80025, "OPEN")
+    assert sorted(f["id"] for f in faturas_abertas(con, HOJE)) == ["aberta", "limite", "recente"]
