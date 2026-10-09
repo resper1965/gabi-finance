@@ -2,7 +2,8 @@ categoria;grupo;equivale_nibo;origens_banco
 Restaurantes e delivery;Pessoal;;Eating out|Food delivery|Food and drinks
 Mercado;Pessoal;;Groceries
 Transporte por app;Pessoal;;Taxi and ride-hailing
-Veículo;Pessoal;;Gas stations|Parking|Tolls and in vehicle payment|Vehicle maintenance|Vehicle ownership taxes and fees|Car rental|Bicycle
+Combustível;Pessoal;;Gas stations
+Veículo;Pessoal;;Parking|Tolls and in vehicle payment|Vehicle maintenance|Vehicle ownership taxes and fees|Car rental|Bicycle
 Compras;Pessoal;;Shopping|Online shopping|Clothing|Houseware|Electronics|Sports goods|Kids and toys|Bookstore|Optometry
 Saúde;Pessoal;;Pharmacy|Healthcare|Dentist|Hospital clinics and labs|Health insurance
 Bem-estar e esporte;Pessoal;;Wellness and fitness|Sports practice
