@@ -9,6 +9,7 @@ Type=simple
 User=gabibrain
 Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
+EnvironmentFile=-/etc/gabi/brain.env
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
 Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi.tail985643.ts.net

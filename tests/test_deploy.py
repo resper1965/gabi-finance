@@ -207,3 +207,9 @@ def test_instalar_cria_pastas_do_bruto_e_dos_locks_privadas():
 def test_nenhuma_unidade_traz_segredo():
     for p in DEPLOY.iterdir():
         assert not re.search(r"sk_live|sk-[a-z0-9]{10}|Bearer |gb_[A-Za-z0-9_-]{20}", p.read_text()), p.name
+
+
+def test_api_e_mcp_leem_o_arquivo_de_ambiente_dos_segredos():
+    from pathlib import Path
+    for u in ("gabi-brain-api.service", "gabi-brain-mcp.service"):
+        assert "EnvironmentFile=-/etc/gabi/brain.env" in (Path(__file__).parent.parent / "deploy" / u).read_text()  # NIBO_TOKEN/PAPERLESS_* chegam ao processo

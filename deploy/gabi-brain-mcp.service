@@ -9,6 +9,7 @@ Type=simple
 User=gabibrain
 Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
+EnvironmentFile=-/etc/gabi/brain.env
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Hosts aceitos (anti DNS-rebinding). Para expor na tailnet: tailscale serve --https=8443 http://127.0.0.1:8081 e acrescente
 # o nome da máquina (ex.: gabi.<tailnet>.ts.net:8443) aqui por drop-in.
