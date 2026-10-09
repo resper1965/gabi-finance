@@ -199,7 +199,6 @@ def test_notas_lista_so_autorizadas_em_aberto_e_formata_valores(banco):
 def test_recebimentos_propostos_sao_listados_e_confirmar_marca_a_nota_como_recebida(banco):
     _nota(banco, "BARRA", "2026-10-15", 366015)
     c = conectar(banco)
-    c.execute("update conta set pj=1 where id=2")
     c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (2,'cred1','2026-10-16',366015,'Pix recebido BARRA','posted')")
     from gabi.cobrar.recebimentos import propor_recebimentos
     assert propor_recebimentos(c) == 1

@@ -16,8 +16,9 @@ _n = iter(range(1, 100000))
 def con(tmp_path):
     c = conectar(tmp_path / "t.db")
     migrar(c, MIGR)
-    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pj','C6','BANK','C6 PJ',1,'sim')")   # 1
-    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")  # 2
+    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('c6','C6','BANK','C6',0,'sim')")        # 1: caixa único (bancos_pj vazio, decisão do Ricardo)
+    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('fora','Itau','BANK','Fora',0,'nao')")   # 2: fora do caixa único
+    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('cc','Itau','CREDIT','Cartão',0,'sim')") # 3: cartão
     return c
 
 
@@ -61,9 +62,16 @@ def test_nao_propoe_para_nota_negada_ou_cancelada(con):
     assert propor_recebimentos(con) == 0
 
 
-def test_credito_em_conta_pessoal_ou_de_valor_diferente_nao_casa(con):
-    nota(con); credito(con, conta=2); credito(con, valor=366016)
+def test_credito_em_conta_fora_do_caixa_unico_ou_em_cartao_ou_de_valor_diferente_nao_casa(con):
+    nota(con); credito(con, conta=2); credito(con, conta=3); credito(con, valor=366016)
     assert propor_recebimentos(con) == 0
+
+
+def test_conta_de_banco_marcada_pj_ou_nao_casa_do_mesmo_jeito(con):
+    # o C6 PJ entra no caixa único e na conciliação como as demais (bancos_pj vazio): o casamento não depende do flag pj
+    nota(con); credito(con)
+    con.execute("update conta set pj=0 where id=1")
+    assert propor_recebimentos(con) == 1
 
 
 def test_dois_creditos_iguais_geram_duas_propostas_sem_duplicar(con):

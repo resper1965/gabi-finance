@@ -1,4 +1,6 @@
-"""Casamento de recebimentos: crédito em conta PJ com o valor LÍQUIDO de uma NFS-e autorizada. Consome: db (nota_fiscal, lancamento, conta, recebimento_nota).
+"""Casamento de recebimentos: crédito em conta BANK liberada no caixa único com o valor LÍQUIDO de uma NFS-e autorizada. Consome: db (nota_fiscal, lancamento, conta, recebimento_nota).
+
+Não depende do flag `pj`: o C6 PJ entra no caixa único e na conciliação como as demais contas (`bancos_pj` vazio, decisão do Ricardo em 06/10/2026).
 
 Só propõe (estado `proposto`, com confiança e motivo); confirmar ou rejeitar é do Ricardo (R1). Janela: do dia da emissão até 90 dias depois do
 vencimento. Confiança: 0,5 pelo valor igual; +0,3 se o crédito cai a até 5 dias do vencimento; +0,2 se o nome ou o CNPJ do tomador está no descritivo."""
@@ -43,7 +45,7 @@ def propor_recebimentos(con) -> int:
             ini = (n["emissao"] or (venc - dt.timedelta(days=JANELA_DIAS)).isoformat())[:10] if (n["emissao"] or venc) else "0000-01-01"
             fim = (venc + dt.timedelta(days=JANELA_DIAS)).isoformat() if venc else "9999-12-31"
             for l in con.execute(
-                    "select l.* from lancamento l join conta c on c.id=l.conta_id where c.pj=1 and c.excluido_em is null and l.valor_centavos=? and l.data>=? and l.data<=? "
+                    "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null and l.valor_centavos=? and l.data>=? and l.data<=? "
                     "and not exists (select 1 from recebimento_nota r where r.lancamento_id=l.id and r.estado='confirmado')", (n["valor_liquido_centavos"], ini, fim)):
                 conf, motivo = _confianca(n, l)
                 novas += con.execute("insert or ignore into recebimento_nota(nota_id, lancamento_id, confianca, motivo, criado_em) values (?,?,?,?,?)",
