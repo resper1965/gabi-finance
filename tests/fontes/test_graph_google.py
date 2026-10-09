@@ -128,3 +128,12 @@ def test_dedupe_por_message_id_entre_google_e_graph(tmp_path):
     email.ingerir_email(con, 1, lambda c, cur: ([msg], "h"))
     email.ingerir_email(con, 2, lambda c, cur: ([msg], "d"))
     assert con.execute("select count(*) from item_email").fetchone()[0] == 1
+
+
+def test_concluir_tarefa_so_faz_patch_de_status():
+    srv = Servidor({"/tasks/t1": {}})
+    Graph(token=lambda: "tk", http=srv).concluir_tarefa("a@x.com", "L1/t1")
+    assert srv.chamadas[0][0] == "PATCH" and srv.chamadas[0][2] == {"status": "completed"}
+    srv = Servidor({"/tasks/t1": {}})
+    Google(token=lambda: "tk", http=srv).concluir_tarefa("L1/t1")
+    assert srv.chamadas[0][0] == "PATCH"

@@ -1,0 +1,90 @@
+import json
+import time
+
+from gabi.db import conectar
+from gabi.trabalho import email
+
+from tests.rotas.test_dinheiro_api import AGORA, BOSS, VIP, banco, cli, get, post  # noqa: F401  (fixtures)
+
+
+def _semear(banco, n_emails=3):
+    c = conectar(banco)
+    c.execute("insert into caixa_email(id, endereco, provedor, empresa_id, estado) values (1,'a@ness.com','google','e1','sim')")
+    c.execute("insert into caixa_email(id, endereco, provedor, estado) values (2,'b@x.com','graph','sim')")
+    c.execute("insert into parametro(chave, valor) values ('email_palavras_relevantes', ?)", (json.dumps(["contrato"]),))
+    msgs = [dict(message_id=f"<m{i}>", remetente="x@y.com", assunto="Contrato novo" if i % 2 == 0 else "Oi", recebido_em=f"2026-10-08T{10 + i % 10:02d}:00:00Z", corpo="t")
+            for i in range(n_emails)]
+    email.ingerir_email(c, 1, lambda cx, cur: (msgs, None))
+    email.ingerir_email(c, 2, lambda cx, cur: ([dict(message_id="<b1>", remetente="z@z.com", assunto="Contrato B", recebido_em="2026-10-08T09:00:00Z", corpo="")], None))
+    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo) values (1,'e1','2026-10-08T14:00:00','2026-10-08T15:00:00','Reunião A')")
+    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo) values (1,'e2','2026-10-08T14:30:00','2026-10-08T15:30:00','Reunião B')")
+    c.execute("insert into tarefa(origem, externo_id, titulo) values ('graph','t1','Enviar proposta')")
+    c.close()
+
+
+def test_rotas_de_trabalho_exigem_boss(cli):
+    for url in ("/api/v1/hoje", "/api/v1/frentes", "/api/v1/agenda", "/api/v1/mensagens", "/api/v1/tarefas"):
+        assert get(cli, url, VIP).status_code == 403 and cli.get(url).status_code == 401, url
+
+
+def test_hoje_traz_as_quatro_partes_com_envelope(cli, banco):
+    _semear(banco)
+    j = get(cli, "/api/v1/hoje").json()
+    assert {"dados_ate", "dados"} <= set(j)
+    d = j["dados"]
+    assert d["emails_importantes"] and len(d["agenda"]) == 2 and d["dinheiro"]["atrasadas"]["n"] == 1
+    assert any(p["tipo"] == "conflito" for p in d["prioridades"])
+
+
+def test_filtro_recorta_a_tela_inteira(cli, banco):
+    _semear(banco)
+    d = get(cli, "/api/v1/hoje?filtro=e1").json()["dados"]      # só a caixa da empresa e1
+    assert {m["caixa"] for m in d["emails_importantes"]} == {"a@ness.com"}
+    assert d["dinheiro"] is None
+    assert get(cli, "/api/v1/hoje?filtro=e9").json()["dados"]["emails_importantes"] == []
+
+
+def test_filtro_invalido_da_400(cli):
+    assert get(cli, "/api/v1/hoje?filtro=a'b").status_code == 400
+
+
+def test_hoje_carrega_em_menos_de_1s_com_muitos_itens(cli, banco):
+    _semear(banco, n_emails=3000)
+    t = time.perf_counter()
+    assert get(cli, "/api/v1/hoje").status_code == 200
+    assert time.perf_counter() - t < 1.0
+
+
+def test_hoje_le_so_de_tabelas_prontas():
+    import inspect
+    from gabi.trabalho import hoje
+    fonte = inspect.getsource(hoje)
+    assert "fontes." not in fonte and "urllib" not in fonte and "httpx" not in fonte
+
+
+def test_frente_criar_sugerir_confirmar(cli, banco):
+    _semear(banco)
+    fid = post(cli, "/api/v1/frentes", {"nome": "Acme", "tipo": "cliente", "regra": {"palavras": ["contrato"]}}).json()["dados"]["id"]
+    assert post(cli, "/api/v1/frentes", {"nome": "X", "tipo": "invalido"}).status_code == 400
+    assert get(cli, f"/api/v1/frentes/{fid}").json()["dados"]["emails"] == []
+    assert post(cli, f"/api/v1/frentes/{fid}/itens/1/confirmar").status_code == 200
+    assert len(get(cli, f"/api/v1/frentes/{fid}").json()["dados"]["emails"]) == 1
+    assert get(cli, "/api/v1/frentes/999").status_code == 404
+
+
+def test_concluir_tarefa_chama_a_origem(banco):
+    from fastapi.testclient import TestClient
+    from gabi.api import criar_app
+    _semear(banco)
+    chamadas = []
+    app = criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"concluir_tarefa": lambda: (lambda o, e: chamadas.append((o, e)))})
+    c = TestClient(app, client=("127.0.0.1", 50000))
+    assert post(c, "/api/v1/tarefas/1/concluir").status_code == 200
+    assert chamadas == [("graph", "t1")]
+    assert get(c, "/api/v1/tarefas").json()["dados"]["itens"][0]["estado"] == "concluida"
+
+
+def test_concluir_sem_origem_configurada_da_503_e_nao_marca(cli, banco):
+    _semear(banco)
+    assert post(cli, "/api/v1/tarefas/1/concluir").status_code == 503
+    assert get(cli, "/api/v1/tarefas").json()["dados"]["itens"][0]["estado"] == "aberta"

@@ -69,7 +69,7 @@ class Google:
         saida = []
         for lista in self._req("GET", f"{TASKS}/users/@me/lists").get("items", []):
             for t in self._req("GET", f"{TASKS}/lists/{lista['id']}/tasks").get("items", []):
-                saida.append({"externo_id": t["id"], "titulo": t.get("title", ""), "prazo": t.get("due"), "concluida": t.get("status") == "completed"})
+                saida.append({"externo_id": f"{lista['id']}/{t['id']}", "titulo": t.get("title", ""), "prazo": t.get("due"), "concluida": t.get("status") == "completed"})
         return saida
 
     def criar_rascunho(self, caixa: str, para: list[str], assunto: str, corpo: str) -> str:
@@ -81,3 +81,8 @@ class Google:
         bruto = msg.as_bytes().decode("ascii", "replace")
         r = self._req("POST", f"{GMAIL}/{quote(caixa)}/drafts", {"message": {"raw": base64.urlsafe_b64encode(msg.as_bytes()).decode()}})
         return r["id"]
+
+    def concluir_tarefa(self, externo_id: str) -> None:
+        """Marca a tarefa como concluída no Google Tasks (`externo_id` = lista/tarefa; PATCH do status; sem exclusão)."""
+        lista_id, tarefa_id = externo_id.split("/", 1)
+        self._req("PATCH", f"{TASKS}/lists/{lista_id}/tasks/{tarefa_id}", {"status": "completed"})

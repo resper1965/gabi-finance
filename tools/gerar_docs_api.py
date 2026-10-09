@@ -44,7 +44,10 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
                    "## Pedidos {#pedidos}", "",
                    "Receita (agente de canal): 1) `pedidos_registrar` com o remetente (`canal:identificador`) e os dados do pedido; 2) responder ao solicitante exatamente com `texto_para_responder` (nunca diga que pagou); "
                    "3) o Ricardo decide no painel (Caixa › Pedidos): aprovar, pedir mais informação ou recusar; 4) `avisos_pendentes` traz o resultado; entregue no canal e confirme com `avisos_confirmar_entrega`; "
-                   "5) `pedidos_estado` consulta o andamento. Remetente não cadastrado ou sem permissão de pedir recebe `sem_escopo`.", ""]
+                   "5) `pedidos_estado` consulta o andamento. Remetente não cadastrado ou sem permissão de pedir recebe `sem_escopo`.", "",
+                   "## Hoje {#hoje}", "",
+                   "`GET /api/v1/hoje?filtro=all|<empresa>|t-<frente>` devolve `prioridades[]`, `agenda[]`, `emails_importantes[]` e `dinheiro` (só em `all`). Lê apenas de tabelas prontas, sem rede. "
+                   "No MCP: `hoje_resumo`, `frentes_listar`, `frentes_itens` (escopo `trabalho`, só leitura). Concluir tarefa age na origem; criar rascunho é o único efeito externo e nunca envia.", ""]
         return "\n".join(linhas), openapi
 
 

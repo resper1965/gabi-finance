@@ -72,7 +72,7 @@ class Graph:
         saida = []
         for lista in r.get("value", []):
             ts = self._req("GET", f"{self.base}/users/{quote(caixa)}/todo/lists/{lista['id']}/tasks")
-            saida += [{"externo_id": t["id"], "titulo": t["title"], "prazo": (t.get("dueDateTime") or {}).get("dateTime"),
+            saida += [{"externo_id": f"{lista['id']}/{t['id']}", "titulo": t["title"], "prazo": (t.get("dueDateTime") or {}).get("dateTime"),
                        "concluida": t.get("status") == "completed"} for t in ts.get("value", [])]
         return saida
 
@@ -82,3 +82,8 @@ class Graph:
                       {"subject": assunto, "body": {"contentType": "Text", "content": corpo},
                        "toRecipients": [{"emailAddress": {"address": a}} for a in para]})
         return r["id"]
+
+    def concluir_tarefa(self, caixa: str, externo_id: str) -> None:
+        """Marca a tarefa como concluída no To Do (`externo_id` = lista/tarefa; PATCH do status; não existe exclusão aqui)."""
+        lista_id, tarefa_id = externo_id.split("/", 1)
+        self._req("PATCH", f"{self.base}/users/{quote(caixa)}/todo/lists/{lista_id}/tasks/{tarefa_id}", {"status": "completed"})

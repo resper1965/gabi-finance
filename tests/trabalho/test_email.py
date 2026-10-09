@@ -100,3 +100,17 @@ def test_conflito_gera_proposta_nao_envia(con):
     c = achados[0]
     assert c.sugestao_inicio >= "2026-10-10T15:30:00"
     assert not hasattr(email, "enviar")
+
+
+def test_eventos_e_tarefas_sao_idempotentes(con):
+    from gabi.trabalho import agenda, tarefas
+    ev = [{"externo_id": "e1", "inicio": "2026-10-10T10:00:00", "fim": "2026-10-10T11:00:00", "titulo": "A", "participantes": ["x@y.com"]}]
+    agenda.ingerir_eventos(con, 1, lambda c, cur: (ev, None))
+    ev[0]["titulo"] = "A2"
+    agenda.ingerir_eventos(con, 1, lambda c, cur: (ev, None))
+    assert con.execute("select count(*), max(titulo) from evento").fetchone()[:] == (1, "A2")
+    t = [{"externo_id": "t1", "titulo": "X", "prazo": None, "concluida": False}]
+    tarefas.ingerir_tarefas(con, "graph", t)
+    t[0]["concluida"] = True
+    tarefas.ingerir_tarefas(con, "graph", t)
+    assert con.execute("select count(*), max(estado) from tarefa").fetchone()[:] == (1, "concluida")
