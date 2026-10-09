@@ -163,6 +163,13 @@
       "acao": {
         "para_quem": "casal"
       }
+    },
+    {
+      "padrao": "MM GLOBAL GYM",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Saúde"
+      }
     }
   ]
 }
