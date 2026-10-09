@@ -295,6 +295,12 @@
         "empresa": "bekaa",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "ANIMALE",
+      "acao": {
+        "para_quem": "sabrina"
+      }
     }
   ]
 }
