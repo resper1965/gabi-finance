@@ -67,16 +67,17 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
                 _auditar(con, quem, "categorias", linha["id"], "alterada")
                 r.aplicados += 1
         for apelido, usuarios in d.get("contas", {}).items():
-            linha = next((x for x in con.execute("select id, usuarios, apelido from conta where excluido_em is null")
-                          if " ".join((x["apelido"] or "").split()).upper() == " ".join(apelido.split()).upper()), None)
-            if linha is None:
+            norm = lambda t: " ".join((t or "").split()).upper()
+            achadas = [x for x in con.execute("select id, usuarios, apelido from conta where excluido_em is null") if norm(x["apelido"]) == norm(apelido)]
+            if not achadas:
                 r.nao_encontrados.append(f"conta {apelido}")
-            elif linha["usuarios"] and json.loads(linha["usuarios"]) != usuarios:
-                r.conflitos.append(f"conta {apelido}")
-            elif not linha["usuarios"]:
-                con.execute("update conta set usuarios=? where id=?", (json.dumps(usuarios, ensure_ascii=False), linha["id"]))
-                _auditar(con, quem, "contas", linha["id"], "alterada")
-                r.aplicados += 1
+            for linha in achadas:   # o mesmo apelido pode existir em mais de uma conta (ex.: duas contas "XP")
+                if linha["usuarios"] and json.loads(linha["usuarios"]) != usuarios:
+                    r.conflitos.append(f"conta {apelido}")
+                elif not linha["usuarios"]:
+                    con.execute("update conta set usuarios=? where id=?", (json.dumps(usuarios, ensure_ascii=False), linha["id"]))
+                    _auditar(con, quem, "contas", linha["id"], "alterada")
+                    r.aplicados += 1
         for linha_id, padrao in d.get("compromissos", {}).items():
             if con.execute("select 1 from compromisso_linha where id=? and excluido_em is null", (linha_id,)).fetchone() is None:
                 r.nao_encontrados.append(f"compromisso {linha_id}")

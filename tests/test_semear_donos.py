@@ -115,3 +115,13 @@ def test_regra_com_nome_inexistente_e_reportada_sem_gravar(con, tmp_path):
     p.write_text(json.dumps({"regras": [{"padrao": "X", "acao": {"para_quem": "fantasma"}}, {"padrao": "Y", "acao": {"categoria": "Nao existe"}}]}), encoding="utf-8")
     r = aplicar(con, p, "teste")
     assert sorted(r.nao_encontrados) == ["regra X", "regra Y"] and con.execute("select count(*) from regra").fetchone()[0] == 0
+
+
+def test_conta_com_apelido_repetido_recebe_o_mesmo_dono_em_todas(con, tmp_path):
+    con.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values ('c2','XP','BANK','XP','sim')")
+    con.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values ('c3','XP','BANK','xp ','sim')")
+    p = tmp_path / "d.json"
+    p.write_text(json.dumps({"contas": {"XP": ["sabrina"]}}), encoding="utf-8")
+    r = aplicar(con, p, "teste")
+    assert r.aplicados == 2 and r.nao_encontrados == []
+    assert [json.loads(x[0]) for x in con.execute("select usuarios from conta where apelido like '%xp%' collate nocase")] == [["sabrina"], ["sabrina"]]
