@@ -252,6 +252,9 @@ def assinaturas(request: Request):
         # Além do detector: lojas das categorias de assinatura (parâmetro editável) com cobrança em 2+ meses; as que pararam vêm como inativas.
         p = con.execute("select valor from parametro where chave='categorias_assinatura'").fetchone()
         nomes = json.loads(p["valor"]) if p else []
+        h = con.execute("select valor from parametro where chave='categorias_habito'").fetchone()
+        habito = json.loads(h["valor"]) if h else []
+        recs = [r for r in recs if not assinaturas_mod.eh_habito(con, r["chave"], habito)]   # almoço, mercado... repetem todo mês mas não são assinatura
         extras = assinaturas_mod.candidatas_por_categoria(con, hoje, nomes, {r["chave"] for r in recs})
         todas = [{**r, "ativa": True} for r in recs] + extras
         con.execute("begin")

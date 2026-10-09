@@ -43,3 +43,15 @@ def candidatas_por_categoria(con, hoje: dt.date, nomes: list[str], ja_detectadas
                       "ultimo": valores[-1], "mediana_anterior": statistics.median(anteriores) if len(anteriores) >= 2 else None,
                       "ativa": (hoje - ultima).days <= DIAS_INATIVA, "sentido": "saida"})
     return sorted(saida, key=lambda c: (not c["ativa"], -c["valor_medio"]))
+
+
+def eh_habito(con, chave: str, categorias_habito: list[str]) -> bool:
+    """A categoria dominante da loja (a de mais lançamentos) é de hábito de consumo (restaurante, mercado...): não é assinatura.
+    Lista vazia ou loja sem lançamento: nunca é hábito (na dúvida a loja fica na lista para o Ricardo decidir)."""
+    if not categorias_habito:
+        return False
+    r = con.execute(
+        "select ca.nome, count(*) as n from lancamento l join categoria ca on ca.id=l.categoria_id "
+        "where (l.estabelecimento=? or l.descricao_original like ?) and l.valor_centavos<0 group by ca.id order by n desc, ca.nome limit 1",
+        (chave, f"{chave}%")).fetchone()
+    return bool(r) and r["nome"] in categorias_habito

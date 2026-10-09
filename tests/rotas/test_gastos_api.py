@@ -327,3 +327,16 @@ def test_assinaturas_incluem_as_da_categoria_que_o_detector_nao_acha_e_marcam_as
     assert por_nome["NETFLIX"]["ativa"] is True
     assert [i["nome"] for i in d["itens"]].index("NETFLIX") < [i["nome"] for i in d["itens"]].index("OLDSAAS")  # ativas primeiro
     assert d["total_mensal"] == "55.90"   # só as ativas somam no mensal
+
+
+def test_assinaturas_tiram_da_lista_o_habito_de_consumo_pelo_parametro(cli, banco):
+    c = conectar(banco)
+    for i, mes in enumerate(("2026-07", "2026-08", "2026-09", "2026-10")):
+        _l(c, 1, f"alm{i}", f"{mes}-03", "AMORA", -5590, "custo", 1)   # categoria 1 = Mercado, mensal e igual: o detector acha
+    c.close()
+    assert "AMORA" in [i["nome"] for i in get(cli, "/api/v1/assinaturas").json()["dados"]["itens"]]
+    c = conectar(banco)
+    c.execute("insert into parametro(chave, valor) values ('categorias_habito', ?)", (json.dumps(["Mercado"]),))
+    c.close()
+    nomes = [i["nome"] for i in get(cli, "/api/v1/assinaturas").json()["dados"]["itens"]]
+    assert "AMORA" not in nomes and "NETFLIX" in nomes

@@ -49,6 +49,14 @@
   "parametros": {
     "categorias_assinatura": [
       "Assinaturas e serviços digitais"
+    ],
+    "categorias_habito": [
+      "Restaurantes e delivery",
+      "Mercado",
+      "Transporte por app",
+      "Compras",
+      "Combustível",
+      "Serviços diversos"
     ]
   },
   "regras": [
@@ -107,6 +115,13 @@
       "padrao": "PET LOVE CLUBE",
       "acao": {
         "para_quem": "pets"
+      }
+    },
+    {
+      "padrao": "AMORA GASTRONOMIA",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Restaurantes e delivery"
       }
     }
   ]

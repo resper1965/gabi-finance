@@ -75,3 +75,25 @@ def test_reajuste_usa_a_mediana_das_cobrancas_anteriores(con):
 
 def test_categoria_inexistente_ou_lista_vazia_devolve_vazio(con):
     assert candidatas_por_categoria(con, HOJE, [], set()) == [] and candidatas_por_categoria(con, HOJE, ["Nao existe"], set()) == []
+
+
+# ---------------- hábito (almoço, mercado...) não é assinatura ----------------
+from gabi.dinheiro.assinaturas import eh_habito  # noqa: E402
+
+
+def test_loja_cuja_categoria_dominante_e_de_habito_nao_e_assinatura(con):
+    _mensal(con, "AMORA GASTRONOMIA", ["2026-07", "2026-08", "2026-09"], cat=2)       # categoria 2 = Mercado (hábito)
+    _mensal(con, "NETFLIX COM", ["2026-07", "2026-08", "2026-09"], cat=1)
+    assert eh_habito(con, "AMORA GASTRONOMIA", ["Mercado"]) is True
+    assert eh_habito(con, "NETFLIX COM", ["Mercado"]) is False
+
+
+def test_sem_lista_de_habito_ou_sem_lancamentos_nada_e_habito(con):
+    _mensal(con, "AMORA GASTRONOMIA", ["2026-07", "2026-08"], cat=2)
+    assert eh_habito(con, "AMORA GASTRONOMIA", []) is False and eh_habito(con, "DESCONHECIDA", ["Mercado"]) is False
+
+
+def test_categoria_dominante_vence_a_minoritaria(con):
+    _mensal(con, "LOJA MISTA", ["2026-05", "2026-06", "2026-07"], cat=2)
+    _mensal(con, "LOJA MISTA", ["2026-08"], cat=1)
+    assert eh_habito(con, "LOJA MISTA", ["Mercado"]) is True
