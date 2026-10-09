@@ -10,6 +10,7 @@ Na primeira rodada real conferida (09/10/2026, 15 contas liberadas) a conferênc
 2. **Volume** (`volume_proximo`): não vale para cartão (gasto irregular).
 3. **Saldo final** (BANK): a diferença passa se for igual ao total de uma fatura **aberta** ainda sem débito publicado (`contas_pagar.faturas_abertas`); o `detalhe` diz qual fatura.
 4. Cartão continua sem conferência de saldo e de buraco.
+5. **Saldo final** (BANK): a diferença também passa se for igual à soma dos lançamentos **pendentes** da janela (o banco já abateu o pendente do saldo; evidência real 09/10: débito automático do cartão Pão de Açúcar, R$ 4.016,63, pendente).
 
 ## Consequência
 A rodada passa a ficar `conferida` com dados normais; buracos reais (≥ 2 dias seguidos) e diferenças sem explicação continuam travando o `dados_ate`. Risco aceito: um dia útil isolado sem extrato não trava mais (fica registrado em `conferencia.detalhe`).

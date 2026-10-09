@@ -54,6 +54,11 @@ def _saldo_final(con, conta_id: int, tipo: str) -> tuple[bool, str]:
     dif = variacao - esperado
     if dif == 0:
         return True, f"variação do saldo {variacao} = lançamentos {esperado} (centavos)"
+    pendentes = con.execute(
+        "select coalesce(sum(valor_centavos),0) from lancamento where conta_id=? and status='pending' and data>? and data<=?",
+        (conta_id, base["em"][:10], dia)).fetchone()[0]
+    if pendentes and dif == pendentes:  # o banco já abateu o pendente do saldo, mas ele ainda não é lançamento postado
+        return True, f"diferença de {dif} centavos explicada por lançamento(s) pendente(s)"
     from gabi.dinheiro.contas_pagar import faturas_abertas  # import tardio: contas_pagar não depende de conferência
     for f in faturas_abertas(con, _d(dia)):  # saída do saldo = débito de fatura que o banco ainda não publicou como lançamento
         if dif == -f["total_centavos"]:

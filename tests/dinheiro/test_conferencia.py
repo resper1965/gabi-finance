@@ -304,3 +304,18 @@ def test_saldo_final_sem_fatura_que_explique_continua_reprovando(con):
     _fatura(con, 12345)
     _saldo_caiu(con, 40166)
     assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False
+
+
+def test_saldo_final_explicado_por_lancamento_pendente_passa_com_detalhe(con):
+    _saldo(con, "2026-10-07T23:00:00", 100000)
+    _lanc(con, 1, "2026-10-08", -40166, status="pending")  # o banco já abateu o pendente do saldo
+    _saldo(con, "2026-10-08T15:00:00", 100000 - 40166)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"]
+    assert r.ok is True and "pendente" in r.detalhe
+
+
+def test_saldo_final_pendente_de_outro_valor_nao_explica(con):
+    _saldo(con, "2026-10-07T23:00:00", 100000)
+    _lanc(con, 1, "2026-10-08", -9999, status="pending")
+    _saldo(con, "2026-10-08T15:00:00", 100000 - 40166)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False

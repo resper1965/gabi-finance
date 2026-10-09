@@ -51,13 +51,14 @@ O painel é `painel/` (React + Vite); `npm run build` gera `gabi/painel/` e a AP
 |---|---|---|
 | Caixa · Resumo | Tenho caixa? | `GET /caixa/resumo` (saldos do caixa único, faturas, assinaturas, atenção) |
 | Caixa · Semanas | Como o caixa anda, semana a semana? | `GET /caixa/semanas` + `GET /lancamentos` da semana clicada |
-| Caixa · A pagar | O que vence, e quando? | `GET /contas-pagar`; "Já paguei" = `POST /contas-pagar/{id}/paga` |
+| Caixa · A pagar | O que vence, e quando? | `GET /contas-pagar`; "Já paguei" = `POST /contas-pagar/{id}/paga`; bloco "Rodadas" = `GET /rodadas` (2 últimas de extrato, com contas reprovadas quando não conferida) |
 | Gastos · Lançamentos | De quem é cada gasto? | `GET /lancamentos?pendente=para_quem`, `PATCH /lancamentos/{id}`, sugestões |
 | Gastos · Para onde vai | Para onde vai o dinheiro? | `GET /destino`, `GET /destino/agrupado` |
 | Gastos · Cartões | Quanto já foi no cartão? | `GET /cartoes` + lançamentos, edição em lote `POST /lancamentos/lote` |
 | Gastos · Parcelas | Quanto já está comprometido? | `GET /parcelas` |
 | Gastos · Assinaturas | O que é assinatura esquecida? | `GET /assinaturas`, `PATCH /assinaturas/{id}` |
-| Regras | O que a Gabi sugere classificar? | `GET /regras`, `GET /sugestoes`, aprovar/rejeitar/ligar |
+| Regras | O que a Gabi sugere classificar? | `GET /regras`, `GET /sugestoes`, aprovar (com `edicao` da categoria)/rejeitar/ligar |
+| Sino e menu | Quantos itens pedem decisão? | `GET /contagens` (`sino` e `menu` por área: caixa, gastos, regras) |
 | Cadastros · Contas | Quais contas entram no caixa único? | `GET/PATCH /cadastros/contas` |
 
 **Ver sem dados reais:** `python -m tools.demo 8099` sobe a API com banco sintético (relógio fixo em 08/10/2026) e o painel compilado; mande o cabeçalho `Tailscale-User-Login: boss@x.com`.
