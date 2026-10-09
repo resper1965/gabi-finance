@@ -87,10 +87,10 @@ def _semanas_uteis(con, ate, semanas=5, pular=()):
         d += dt.timedelta(days=1)
 
 
-def test_dia_util_sem_movimento_numa_conta_que_sempre_tem_reprova(con):
-    _semanas_uteis(con, HOJE, pular={dt.date(2026, 10, 6)})  # terça-feira vazia
+def test_dois_dias_uteis_seguidos_sem_movimento_numa_conta_que_sempre_tem_reprova(con):
+    _semanas_uteis(con, HOJE, semanas=8, pular={dt.date(2026, 10, 5), dt.date(2026, 10, 6)})  # segunda e terça vazias
     r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"]
-    assert r.ok is False and "2026-10-06" in r.detalhe
+    assert r.ok is False and "2026-10-05" in r.detalhe and "2026-10-06" in r.detalhe
 
 
 def test_fim_de_semana_sem_movimento_nao_e_buraco(con):
@@ -263,3 +263,44 @@ def test_envelope_ignora_backup_e_importacao(con):
 def test_envelope_exatamente_3_dias_ainda_e_atual(con):
     _conferida(con, "open-finance", "2026-10-05T14:00:00+00:00")
     assert envelope(con, {}, agora=AGORA)["desatualizado"] is False
+
+
+# ---- calibração com dado real (D1, 09/10/2026) ----
+def test_um_dia_util_isolado_sem_movimento_nao_reprova(con):
+    _semanas_uteis(con, HOJE, semanas=8, pular={dt.date(2026, 10, 6)})  # só a terça vazia
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"]
+    assert r.ok is True and "2026-10-06" in r.detalhe  # passa, mas o detalhe registra o dia
+
+
+def test_dois_dias_uteis_nao_seguidos_sem_movimento_nao_reprovam(con):
+    _semanas_uteis(con, HOJE, semanas=8, pular={dt.date(2026, 10, 2), dt.date(2026, 10, 6)})  # sexta e terça (segunda tem movimento)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"].ok is True
+
+
+def test_cartao_nao_confere_volume(con):
+    _volume(con, {"2026-10-07": 0, **{f"2026-09-{d}": 4 for d in (24, 25, 28, 29, 30)}, "2026-10-01": 4, "2026-10-02": 4, "2026-10-05": 4, "2026-10-06": 4})
+    r = _por_tipo(conferir(con, _rodada(con), 2, HOJE))["volume_proximo"]
+    assert r.ok is True and "cartão" in r.detalhe
+
+
+def _fatura(con, total, status="PAST_DUE_UNCONFIRMED", vencimento="2026-10-05"):
+    con.execute("insert into fatura(id, account_id, vencimento, total_centavos, conta_id, pagamento_status) values (?,?,?,?,2,?)",
+                (f"f{total}", "c1", vencimento, total, status))
+
+
+def _saldo_caiu(con, valor):
+    _saldo(con, "2026-10-07T23:00:00", 100000)
+    _saldo(con, "2026-10-08T15:00:00", 100000 - valor)  # sem nenhum lançamento postado
+
+
+def test_saldo_final_explicado_por_fatura_pendente_passa_com_detalhe(con):
+    _fatura(con, 40166)
+    _saldo_caiu(con, 40166)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"]
+    assert r.ok is True and "fatura" in r.detalhe
+
+
+def test_saldo_final_sem_fatura_que_explique_continua_reprovando(con):
+    _fatura(con, 12345)
+    _saldo_caiu(con, 40166)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False
