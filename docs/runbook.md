@@ -59,6 +59,10 @@ O painel é `painel/` (React + Vite); `npm run build` gera `gabi/painel/` e a AP
 | Gastos · Assinaturas | O que é assinatura esquecida? | `GET /assinaturas`, `PATCH /assinaturas/{id}` |
 | Regras | O que a Gabi sugere classificar? | `GET /regras`, `GET /sugestoes`, aprovar (com `edicao` da categoria)/rejeitar/ligar |
 | Sino e menu | Quantos itens pedem decisão? | `GET /contagens` (`sino` e `menu` por área: caixa, gastos, regras) |
+| Cobrar · Reembolsos | Quem me deve? | `GET /cobrar/reembolsos`; `POST /cobrar/reembolsos` + `/{id}/cobrado`; Bekaa = lote (`POST /cobrar/lote/montar` e `/{id}/executar` com a confirmação exata) |
+| Cobrar · Comprovantes | O que o Paperless já tem? | `GET /cobrar/comprovantes`; `POST /cobrar/vinculos/{id}/confirmar\|rejeitar` |
+| Cobrar · E-mail de cobrança | O que vou cobrar, e de quem? | `GET /cobrar/cobrancas`, `POST /cobrar/cobrancas` (rascunho); enviar = 403 (ADR-006) |
+| Caixa · Pedidos | O que me pediram para pagar? | `GET /cobrar/pedidos`, `POST /cobrar/pedidos/{id}/decidir` |
 | Cadastros · Contas | Quais contas entram no caixa único? | `GET/PATCH /cadastros/contas` |
 
 **Ver sem dados reais:** `python -m tools.demo 8099` sobe a API com banco sintético (relógio fixo em 08/10/2026) e o painel compilado; mande o cabeçalho `Tailscale-User-Login: boss@x.com`.

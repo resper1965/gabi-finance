@@ -10,6 +10,10 @@ import { AREAS_DINHEIRO, type Area } from "./navegacao";
 import { Resumo } from "./telas/Caixa/Resumo";
 import { Semanas } from "./telas/Caixa/Semanas";
 import { APagar } from "./telas/Caixa/APagar";
+import { Pedidos } from "./telas/Caixa/Pedidos";
+import { Reembolsos } from "./telas/Cobrar/Reembolsos";
+import { Comprovantes } from "./telas/Cobrar/Comprovantes";
+import { EmailCobranca } from "./telas/Cobrar/EmailCobranca";
 import { Lancamentos } from "./telas/Gastos/Lancamentos";
 import { ParaOndeVai } from "./telas/Gastos/ParaOndeVai";
 import { Cartoes } from "./telas/Gastos/Cartoes";
@@ -19,7 +23,7 @@ import { Regras } from "./telas/Regras";
 import { Cadastros } from "./telas/Cadastros";
 
 const TELAS: Record<string, () => ReactNode> = {
-  visao: Resumo, fluxo: Semanas, contas: APagar,
+  visao: Resumo, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros,
 };

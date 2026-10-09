@@ -16,7 +16,7 @@ ROTAS = {
     "lancamentos": "/api/v1/lancamentos?limite=100", "lancamentos-pendentes": "/api/v1/lancamentos?limite=100&pendente=para_quem",
     "destino": "/api/v1/destino?periodo=mes", "destino-fornecedor": "/api/v1/destino/agrupado?periodo=mes&por=fornecedor",
     "destino-pessoa": "/api/v1/destino/agrupado?periodo=mes&por=pessoa", "cartoes": "/api/v1/cartoes", "parcelas": "/api/v1/parcelas",
-    "assinaturas": "/api/v1/assinaturas", "sugestoes": "/api/v1/sugestoes", "regras": "/api/v1/regras", "custo": "/api/v1/custo", "contagens": "/api/v1/contagens", "rodadas": "/api/v1/rodadas",
+    "assinaturas": "/api/v1/assinaturas", "sugestoes": "/api/v1/sugestoes", "regras": "/api/v1/regras", "custo": "/api/v1/custo", "contagens": "/api/v1/contagens", "rodadas": "/api/v1/rodadas", "cobrar-reembolsos": "/api/v1/cobrar/reembolsos", "cobrar-comprovantes": "/api/v1/cobrar/comprovantes", "cobrar-pedidos": "/api/v1/cobrar/pedidos", "cobrar-cobrancas": "/api/v1/cobrar/cobrancas",
     "cadastros-contas": "/api/v1/cadastros/contas", "cadastros-pessoas": "/api/v1/cadastros/pessoas",
     "cadastros-categorias": "/api/v1/cadastros/categorias", "cadastros-empresas": "/api/v1/cadastros/empresas",
 }
