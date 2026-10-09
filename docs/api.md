@@ -13,6 +13,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/agenda` | Eventos do período e conflitos com sugestão de horário (proposta, não envia nada). |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |
 | PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura e o lembrete até cancelar. |
+| GET | `/api/v1/avisos` | Avisos abertos (não lidos) do gabi.brain, os mais novos primeiro, com título e texto em pt-BR. |
+| POST | `/api/v1/avisos/{aviso_id}/lido` | Marca um aviso como lido (idempotente) e registra quem leu. |
 | GET | `/api/v1/cadastros/categorias/equivalencias` | Equivalência entre a categoria do banco (Pluggy) e a nossa. |
 | PUT | `/api/v1/cadastros/categorias/equivalencias` | Cria ou troca uma equivalência de categoria. |
 | GET | `/api/v1/cadastros/categorias/equivalencias/pendentes` | Categorias do banco que aparecem nos lançamentos e ainda não têm equivalência, as de maior volume primeiro. |

@@ -22,7 +22,8 @@ def contagens(request: Request):
         regras = con.execute("select count(*) from sugestao where estado='pendente'").fetchone()[0]
         vencidas = sum(1 for f in cp.faturas_abertas(con, hoje) if f["vencimento"] < hoje.isoformat())
         alerta = sum(1 for i in assinaturas(request)["dados"]["itens"] if i["sinais"]["cobrada_depois_de_cancelar"] or i["sinais"]["reajustou"])
-        menu = {"caixa": caixa, "gastos": vencidas + alerta, "regras": regras}
+        avisos = con.execute("select count(*) from aviso where entregue_em is null").fetchone()[0]
+        menu = {"caixa": caixa, "gastos": vencidas + alerta, "regras": regras, "avisos": avisos}
         return envelope(con, {"sino": sum(menu.values()), "menu": menu}, agora=_agora(request))
     finally:
         con.close()

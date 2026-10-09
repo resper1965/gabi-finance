@@ -1,6 +1,7 @@
 {
  "dados": {
   "menu": {
+   "avisos": 0,
    "caixa": 1,
    "gastos": 0,
    "regras": 1

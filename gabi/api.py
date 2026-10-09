@@ -165,6 +165,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_contagens)
     from gabi.rotas.cobrar import router as rotas_cobrar
     app.include_router(rotas_cobrar)
+    from gabi.rotas.avisos import router as rotas_avisos
+    app.include_router(rotas_avisos)
     from gabi.rotas.trabalho import router as rotas_trabalho
     app.include_router(rotas_trabalho)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")

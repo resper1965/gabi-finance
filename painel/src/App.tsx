@@ -26,6 +26,7 @@ import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
 import { Mensagens } from "./telas/Trabalho/Mensagens";
 import { Tarefas } from "./telas/Trabalho/Tarefas";
+import { Avisos } from "./componentes/Avisos";
 
 const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
@@ -40,11 +41,12 @@ function tela(area: Area, aba: string) {
 }
 
 export function App() {
-  const contagens = useApi<Contagens>("/api/v1/contagens").env?.dados;
+  const leituraContagens = useApi<Contagens>("/api/v1/contagens");
+  const contagens = leituraContagens.env?.dados;
   return (
     <ToastProvider>
       <FiltrosProvider>
-        <Shell tela={tela} contagens={contagens} seletores={(a, celular) => (AREAS_DINHEIRO.includes(a.id) && a.id !== "regras" ? <Seletores celular={celular} /> : null)} />
+        <Shell tela={tela} contagens={contagens} avisos={<Avisos aoMudar={leituraContagens.recarregar} />} seletores={(a, celular) => (AREAS_DINHEIRO.includes(a.id) && a.id !== "regras" ? <Seletores celular={celular} /> : null)} />
       </FiltrosProvider>
     </ToastProvider>
   );

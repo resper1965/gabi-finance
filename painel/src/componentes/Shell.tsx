@@ -34,6 +34,8 @@ export interface ShellProps {
   seletores?: (area: Area, celular: boolean) => ReactNode;
   /** Itens que pedem decisão: total no sino e um número por área do menu (0 = sem selo). */
   contagens?: Contagens;
+  /** Painel que o sino abre e fecha (a lista de avisos). */
+  avisos?: ReactNode;
 }
 
 export interface Contagens { sino: number; menu: Record<string, number> }
@@ -46,8 +48,9 @@ function Selo({ n }: { n?: number }) {
 
 const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-export function Shell({ tela, seletores, contagens }: ShellProps) {
+export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const celular = useCelular();
+  const [sinoAberto, setSinoAberto] = useState(false);
   const [areaId, setAreaId] = useLocal("gabi.area", "hoje");
   const [recolhido, setRecolhido] = useLocal("gabi.menu", "0");
   const [tema, setTema] = useLocal("gabi.tema", "claro");
@@ -105,8 +108,9 @@ export function Shell({ tela, seletores, contagens }: ShellProps) {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button className="btn btn-secondary btn-icon" aria-label={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} title={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} aria-pressed={oculto === "1"} onClick={() => setOculto(oculto === "1" ? "0" : "1")}>{oculto === "1" ? <EyeOff size={18} {...icone} /> : <Eye size={18} {...icone} />}</button>
                     <button className="btn btn-secondary btn-icon" aria-label={tema === "escuro" ? "Tema claro" : "Tema escuro"} title={tema === "escuro" ? "Tema claro" : "Tema escuro"} onClick={() => setTema(tema === "escuro" ? "claro" : "escuro")}>{tema === "escuro" ? <Sun size={18} {...icone} /> : <Moon size={18} {...icone} />}</button>
-                    <button className="btn btn-secondary btn-icon" aria-label="Alertas" title="Alertas" style={{ position: "relative" }}><Bell size={18} {...icone} /><span style={{ position: "absolute", top: -6, right: -6 }}><Selo n={contagens?.sino} /></span></button>
+                    <button className="btn btn-secondary btn-icon" aria-label="Alertas" title="Alertas" aria-expanded={sinoAberto} onClick={() => setSinoAberto((v) => !v)} style={{ position: "relative" }}><Bell size={18} {...icone} /><span style={{ position: "absolute", top: -6, right: -6 }}><Selo n={contagens?.sino} /></span></button>
                   </div>
+                  {sinoAberto && avisos && <div style={{ flex: "1 0 100%" }}>{avisos}</div>}
                   {celular && <div style={{ flex: "1 0 100%" }}>{seletores?.(area, true)}</div>}
                   {area.abas.length > 1 && (
                     <div role="tablist" style={{ flex: "1 0 100%", display: "flex", overflowX: "auto", marginBottom: celular ? -10 : -12 }}>

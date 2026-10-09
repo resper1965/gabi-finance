@@ -262,6 +262,61 @@
     "summary": "Assinatura Patch"
    }
   },
+  "/api/v1/avisos": {
+   "get": {
+    "description": "Avisos abertos (não lidos) do gabi.brain, os mais novos primeiro, com título e texto em pt-BR.",
+    "operationId": "listar_api_v1_avisos_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar"
+   }
+  },
+  "/api/v1/avisos/{aviso_id}/lido": {
+   "post": {
+    "description": "Marca um aviso como lido (idempotente) e registra quem leu.",
+    "operationId": "lido_api_v1_avisos__aviso_id__lido_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "aviso_id",
+      "required": true,
+      "schema": {
+       "title": "Aviso Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Lido"
+   }
+  },
   "/api/v1/cadastros/categorias/equivalencias": {
    "get": {
     "description": "Equivalência entre a categoria do banco (Pluggy) e a nossa.",
