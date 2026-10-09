@@ -163,6 +163,45 @@ def test_uma_conferencia_reprovada_impede_a_rodada_conferida(con):
     assert con.execute("select conferida from rodada where id=?", (rid,)).fetchone()[0] == 0
 
 
+def test_cartao_nao_confere_buraco_de_dias(con):
+    """Cartão gasta de forma irregular: dia útil sem compra não é falha de captura."""
+    _semanas_uteis(con, HOJE, pular={dt.date(2026, 10, 6)})
+    con.execute("update lancamento set conta_id=2")  # os mesmos lançamentos, agora no cartão (conta 2)
+    r = _por_tipo(conferir(con, _rodada(con), 2, HOJE))["dias_sem_buraco"]
+    assert r.ok is True and "cartão" in r.detalhe
+
+
+def _banco_divergente(con, estado):
+    """Conta BANK com saldo que não bate com os lançamentos (reprova saldo_final)."""
+    con.execute("insert into conta(externo_id, instituicao, tipo, estado) values ('b2','XP','BANK',?)", (estado,))
+    _saldo(con, "2026-10-07T23:00:00", 100000, conta=3)
+    _saldo(con, "2026-10-08T15:00:00", 1, conta=3)
+
+
+def test_conta_nao_liberada_reprovada_nao_impede_a_rodada_conferida(con):
+    _banco_divergente(con, "a_decidir")
+    rid = _rodada(con)
+    conferir(con, rid, 1, HOJE)
+    conferir(con, rid, 3, HOJE)
+    assert con.execute("select ok from conferencia where rodada_id=? and conta_id=3 and tipo='saldo_final'", (rid,)).fetchone()[0] == 0  # segue registrada
+    assert marcar_conferida(con, rid) is True
+
+
+def test_conta_liberada_reprovada_impede_a_rodada_conferida(con):
+    _banco_divergente(con, "sim")
+    rid = _rodada(con)
+    conferir(con, rid, 1, HOJE)
+    conferir(con, rid, 3, HOJE)
+    assert marcar_conferida(con, rid) is False
+
+
+def test_so_conferencias_de_contas_nao_liberadas_nao_conferem_nada(con):
+    con.execute("update conta set estado='a_decidir'")
+    rid = _rodada(con)
+    conferir(con, rid, 1, HOJE)
+    assert marcar_conferida(con, rid) is False  # nenhuma conta que importa foi conferida
+
+
 def test_rodada_com_erro_ou_aviso_nunca_e_conferida_mesmo_com_conferencias_ok(con):
     r1 = _rodada(con, status="erro")
     r2 = _rodada(con, aviso="falhas: b1")

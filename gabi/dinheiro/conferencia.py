@@ -55,7 +55,9 @@ def _saldo_final(con, conta_id: int, tipo: str) -> tuple[bool, str]:
     return False, f"variação do saldo {variacao} ≠ lançamentos {esperado}: diferença de {dif} centavos"
 
 
-def _dias_sem_buraco(con, conta_id: int, hoje: dt.date) -> tuple[bool, str]:
+def _dias_sem_buraco(con, conta_id: int, hoje: dt.date, tipo: str = "BANK") -> tuple[bool, str]:
+    if tipo == "CREDIT":
+        return True, "cartão: sem conferência de buraco (gasto irregular)"
     dias = {_d(r[0]) for r in con.execute("select distinct data from lancamento where conta_id=? and data<=?", (conta_id, hoje.isoformat()))}
     if not dias or (hoje - min(dias)).days < MINIMO_HISTORICO:
         return True, f"sem base (histórico menor que {MINIMO_HISTORICO} dias)"
@@ -93,7 +95,7 @@ def _volume_proximo(con, conta_id: int, hoje: dt.date) -> tuple[bool, str]:
 def conferir(con, rodada_id: int, conta_id: int, hoje: dt.date) -> list[Conferencia]:
     tipo = con.execute("select tipo from conta where id=?", (conta_id,)).fetchone()["tipo"]
     resultados = [("saldo_final", *_saldo_final(con, conta_id, tipo)),
-                  ("dias_sem_buraco", *_dias_sem_buraco(con, conta_id, hoje)),
+                  ("dias_sem_buraco", *_dias_sem_buraco(con, conta_id, hoje, tipo)),
                   ("volume_proximo", *_volume_proximo(con, conta_id, hoje))]
     con.execute("delete from conferencia where rodada_id=? and conta_id=?", (rodada_id, conta_id))
     agora = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -104,11 +106,13 @@ def conferir(con, rodada_id: int, conta_id: int, hoje: dt.date) -> list[Conferen
 
 
 def marcar_conferida(con, rodada_id: int) -> bool:
-    """True (e `conferida=1`) só se a rodada terminou ok, sem aviso, e todas as suas conferências passaram."""
+    """True (e `conferida=1`) só se a rodada terminou ok, sem aviso, e todas as conferências das contas liberadas (estado 'sim')
+    passaram. Conta ainda não liberada é conferida e registrada, mas não trava o `dados_ate`; sem nenhuma liberada, não há o que afirmar."""
     r = con.execute("select status, erro from rodada where id=?", (rodada_id,)).fetchone()
     if r is None or r["status"] != "ok" or r["erro"]:
         return False
-    oks = [x[0] for x in con.execute("select ok from conferencia where rodada_id=?", (rodada_id,))]
+    oks = [x[0] for x in con.execute(
+        "select cf.ok from conferencia cf join conta c on c.id=cf.conta_id where cf.rodada_id=? and c.estado='sim' and c.excluido_em is null", (rodada_id,))]
     if not oks or not all(oks):
         return False
     con.execute("update rodada set conferida=1 where id=?", (rodada_id,))

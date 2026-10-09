@@ -21,6 +21,11 @@ def con(tmp_path):
     return c
 
 
+def _liberada(con):
+    """Só conta liberada (estado 'sim') conta para a rodada conferida; a captura preserva o estado ao atualizar."""
+    con.execute("insert into conta(externo_id, instituicao, tipo, estado) values ('acc-bank-1111','Banco','BANK','sim')")
+
+
 def _boa_historia(n_dias=30):
     """Movimento em todo dia útil dos últimos dias: conferências de buraco/volume passam."""
     txs, d, i = [], HOJE - dt.timedelta(days=n_dias), 0
@@ -38,6 +43,7 @@ def _rodar_ext(con, fin, tmp_path, **kw):
 
 # ---------------- extratos: captura + conferência + classificação + compromissos ----------------
 def test_extratos_encadeia_captura_conferencia_classificacao_e_compromissos(con, tmp_path):
+    _liberada(con)
     con.execute("insert into categoria(nome) values ('Compras')")
     r = _rodar_ext(con, FakeFin([BANCO], _boa_historia()), tmp_path)
     assert r.captura.lidos > 10 and r.captura.falhas == []
@@ -47,6 +53,7 @@ def test_extratos_encadeia_captura_conferencia_classificacao_e_compromissos(con,
 
 
 def test_rodada_com_saldo_incoerente_nao_e_conferida_e_dados_ate_nao_avanca(con, tmp_path):
+    _liberada(con)
     from gabi.envelope import envelope
     fin = FakeFin([BANCO], _boa_historia())
     r1 = _rodar_ext(con, fin, tmp_path)
@@ -139,6 +146,7 @@ def test_saldos_atualiza_o_saldo_no_estado_da_conta(con, tmp_path):
 
 
 def test_saldos_nao_aparece_como_fonte_nem_atrapalha_o_dados_ate(con, tmp_path):
+    _liberada(con)
     from gabi.envelope import envelope
     _rodar_ext(con, FakeFin([BANCO], _boa_historia()), tmp_path)
     rodar_saldos(con, FakeFin([BANCO], {}), AGORA + dt.timedelta(hours=1), tmp_path / "locks")

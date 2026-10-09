@@ -2,7 +2,7 @@
 Atualizado: 09/10/2026. Se a máquina caiu, leia só este arquivo e `.superpowers/sdd/progress.md`.
 
 ## Onde estamos
-- **Código da Fase 1 pronto, commitado e instalado na VPS** (637 testes: `.venv/bin/pytest -q`). Api, mcp, backup e timers de captura ativos.
+- **Código da Fase 1 pronto, commitado e instalado na VPS** (641 testes: `.venv/bin/pytest -q`). Api, mcp, backup e timers de captura ativos.
 - Repos: `/home/ricardo/gabi-brain` (app), `/home/ricardo/gabi-brain-migracao` (export/staging/congelar). Docs: `/home/ricardo/handoff/docs/superpowers/{specs,plans}/` (plano mestre com R1–R17, G1–G14).
 - Painel: `painel/` (React). `npm run build` → `gabi/painel/`. Ver sem dado real: `python -m tools.demo 8099` (+ `python -m tools.capturas`, ver `docs/runbook.md#telas-dinheiro`).
 - Cuidado: `pkill -f` mata o próprio shell; use PID guardado.
@@ -36,3 +36,6 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - **Contas capturadas (15):** Santander (BANK 2; CREDIT 1, 3, 4), Itaú (BANK 6; CREDIT 5, 7, 8, 9), XP Investimentos (CREDIT 10), C6 Bank Empresas (CREDIT 11, **BANK 12**: o C6 PJ apareceu), XP Banking (BANK 14, 15; CREDIT 13). Cartões 1/3/5/7 são distintos (vencimentos e totais diferentes), não há duplicata entre contas.
 - **G5 em andamento:** só a conta 1 (Santander CREDIT) está liberada (`sim`); as outras 14 seguem `a_decidir`. Cartão só entra em "faturas abertas", nunca no saldo; para saldo, liberar as contas BANK (em especial a 12).
 - Próximo: Ricardo libera as contas BANK em Cadastros; G14 (capturas); T1.14 (aceite com dados reais).
+- **Faixa "sem dados conferidos ainda / open-finance parou" (diagnóstico):** a rodada de extratos das 07h BRT terminou `ok` mas `conferida=0`; 5 conferências falharam (contas 5, 6, 7, 12: `dias_sem_buraco`; conta 6: `saldo_final` com −R$ 4.016,63 = débito da fatura do cartão 7, ainda sem lançamento no extrato). Uma falha em qualquer conta bloqueava o `dados_ate`. **Correção:** só conferências de contas liberadas (`sim`) travam a rodada (as demais seguem registradas); `dias_sem_buraco` não vale para cartão. Sem conta liberada, nada é conferido. `saldo_final` inalterado.
+- **Open Finance (log do extratos 12:10):** C6 Bank Empresas "não atualizou em 5 min" (última 06:40 UTC) e **XP Investimentos parado desde 12/08** (conexão/consentimento no provedor: ação do Ricardo, não do código). Reconectar/aguardar a rodada das 15h antes de liberar a conta 12 (C6 BANK).
+- Atenção: a regra de fatura paga (débito BANK de mesmo valor) só reconhece quando o *lançamento* chega; enquanto o banco não publica, a fatura segue aberta.
