@@ -331,6 +331,13 @@
       "acao": {
         "para_quem": "sabrina"
       }
+    },
+    {
+      "padrao": "HTM AUTON",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Veículo"
+      }
     }
   ]
 }
