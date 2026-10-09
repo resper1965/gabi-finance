@@ -62,3 +62,20 @@ create table cobranca_item(
   cobranca_id integer not null references cobranca(id),
   lancamento_id integer not null references lancamento(id),
   primary key (cobranca_id, lancamento_id));
+
+-- Pedidos vindos do canal (T2.7): quem pode pedir é cadastro da pessoa (R6); a Gabi registra, o Ricardo decide no painel (R1).
+alter table pessoa add column canais text;                              -- lista JSON de "canal:identificador" (ex.: "whatsapp:+5511...")
+alter table pessoa add column pode_pedir integer not null default 0;
+create table pedido(
+  id integer primary key,
+  solicitante_pessoa_id text not null references pessoa(id),
+  canal text not null, mensagem_original text not null, descricao text not null,
+  valor_centavos integer, vencimento text, anexo_paperless_id integer,
+  pix_chave text, linha_digitavel text, para_quem_id text references pessoa(id),
+  estado text not null default 'pendente' check (estado in ('pendente','aprovado','recusado','info_pedida')),
+  criado_em text not null, decidido_em text, decidido_por text, mensagem_ao_solicitante text);
+create table aviso(
+  id integer primary key,
+  tipo text not null, payload text not null,
+  criado_em text not null, entregue_em text);
+create index aviso_pendentes on aviso(entregue_em);
