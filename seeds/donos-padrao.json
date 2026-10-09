@@ -221,6 +221,45 @@
         "para_quem": "casa",
         "categoria": "Assinaturas e serviços digitais"
       }
+    },
+    {
+      "padrao": "CURSOR AI",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
+    },
+    {
+      "padrao": "ALLIANZ SEGU",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "SALAOELA",
+      "acao": {
+        "para_quem": "giovanna"
+      }
+    },
+    {
+      "padrao": "LATAM AIR",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "VINDI ?DRUON",
+      "acao": {
+        "para_quem": "ricardo"
+      }
+    },
+    {
+      "padrao": "ACELERADOR DE PONTOS",
+      "acao": {
+        "para_quem": "ricardo",
+        "categoria": "Assinaturas e serviços digitais"
+      }
     }
   ]
 }
