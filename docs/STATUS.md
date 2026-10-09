@@ -39,3 +39,8 @@ Ver `.superpowers/sdd/progress.md` (faixa sem "rodada das 07h", sino sem contado
 - **Faixa "sem dados conferidos ainda / open-finance parou" (diagnóstico):** a rodada de extratos das 07h BRT terminou `ok` mas `conferida=0`; 5 conferências falharam (contas 5, 6, 7, 12: `dias_sem_buraco`; conta 6: `saldo_final` com −R$ 4.016,63 = débito da fatura do cartão 7, ainda sem lançamento no extrato). Uma falha em qualquer conta bloqueava o `dados_ate`. **Correção:** só conferências de contas liberadas (`sim`) travam a rodada (as demais seguem registradas); `dias_sem_buraco` não vale para cartão. Sem conta liberada, nada é conferido. `saldo_final` inalterado.
 - **Open Finance (log do extratos 12:10):** C6 Bank Empresas "não atualizou em 5 min" (última 06:40 UTC) e **XP Investimentos parado desde 12/08** (conexão/consentimento no provedor: ação do Ricardo, não do código). Reconectar/aguardar a rodada das 15h antes de liberar a conta 12 (C6 BANK).
 - Atenção: a regra de fatura paga (débito BANK de mesmo valor) só reconhece quando o *lançamento* chega; enquanto o banco não publica, a fatura segue aberta.
+
+## Progresso 09/10/2026 (noite)
+- **G14 APROVADO pelo Ricardo em 09/10/2026** (galeria `docs/design/GALERIA.md`, 9 telas × claro/escuro/celular, protótipo × app). Plano de execução: `docs/superpowers/plans/2026-10-09-gabi-brain-execucao-restante.md` (F1.A–G feitas; F1.I = aceite T1.14 em contagem).
+- Rodadas de extratos agora 06h e 14h BRT. Conferência calibrada (ADR-009). Sino/menu com contadores, rodadas em A pagar, categoria editável na sugestão, filtro só assinatura. Custo da Gabi segue em US$ (decisão do Ricardo).
+- Pendente do Ricardo: reconectar C6 e XP Investimentos no mcp.ai (issue 0001).
