@@ -102,6 +102,12 @@
       "acao": {
         "para_quem": "pets"
       }
+    },
+    {
+      "padrao": "PET LOVE CLUBE",
+      "acao": {
+        "para_quem": "pets"
+      }
     }
   ]
 }
