@@ -110,7 +110,7 @@ def test_obter_arquivo_so_do_host_de_arquivos_do_nibo():
     def http_arquivo(url, cabecalhos):
         chamadas.append((url, cabecalhos))
         return 200, b"%PDF-1.4"
-    n = Nibo("tok-nibo", http=NiboFalso(), http_arquivo=http_arquivo)
+    n = Nibo("tok-nibo", http=NiboFalso(), http_download=http_arquivo)
     assert n.obter_arquivo("https://arquivos.nibo.com.br/download/abc") == b"%PDF-1.4"
     assert chamadas[0][1]["ApiToken"] == "tok-nibo"
     for ruim in ("https://evil.example/download/abc", "http://arquivos.nibo.com.br/download/abc", "https://arquivos.nibo.com.br.evil.example/x"):
@@ -120,7 +120,7 @@ def test_obter_arquivo_so_do_host_de_arquivos_do_nibo():
 
 
 def test_obter_arquivo_status_de_erro_vira_erronibo():
-    n = Nibo("t", http=NiboFalso(), http_arquivo=lambda u, c: (404, b""))
+    n = Nibo("t", http=NiboFalso(), http_download=lambda u, c: (404, b""))
     with pytest.raises(ErroNibo):
         n.obter_arquivo("https://arquivos.nibo.com.br/download/x")
 
@@ -131,3 +131,13 @@ def test_nfse_aceita_data_como_texto_iso_porque_a_ponte_so_leva_json():
     n, srv = _nibo(itens=[])
     list(n.nfse("2017-01-01"))
     assert "createDate ge 2017-01-01T00:00:00Z" in unquote(parse_qs(urlparse(srv.chamadas[0][1]).query)["$filter"][0])
+
+
+def test_nibo_escrita_herda_o_download_sem_colidir_com_o_envio_de_anexo():
+    # a ponte usa NiboEscrita; ele tem o próprio gancho de envio (multipart) e não pode atropelar o de download
+    from gabi.fontes.nibo_escrita import NiboEscrita
+    n = NiboEscrita("tok", http=NiboFalso(), http_arquivo=lambda *a: (200, b"envio"))
+    n._http_download = lambda url, cab: (200, b"%PDF-ok")
+    assert n.obter_arquivo("https://arquivos.nibo.com.br/download/x") == b"%PDF-ok"
+    sem_gancho = NiboEscrita("tok", http=NiboFalso(), http_arquivo=lambda *a: (200, b"envio"))
+    assert sem_gancho._http_download is not sem_gancho._http_arquivo

@@ -53,9 +53,9 @@ def _http_arquivo_real(url, cabecalhos):
 
 
 class Nibo:
-    def __init__(self, token: str, base: str = BASE, *, http: Http | None = None, http_arquivo=None):
+    def __init__(self, token: str, base: str = BASE, *, http: Http | None = None, http_download=None):
         self._token, self.base, self._http = token, base.rstrip("/"), http or _http_real
-        self._http_arquivo = http_arquivo or _http_arquivo_real
+        self._http_download = http_download or _http_arquivo_real
 
     def _get(self, caminho: str, consulta: dict | None = None):
         url = self.base + caminho + ("?" + urlencode(consulta, quote_via=quote) if consulta else "")
@@ -113,7 +113,7 @@ class Nibo:
         """PDF/XML de uma nota (pdfFileUrl/xmlFileUrl). Só o host de arquivos do Nibo: o token nunca vai para outra URL."""
         if not str(url).startswith(HOST_ARQUIVOS):
             raise ErroNibo("URL de arquivo fora do host do Nibo")
-        status, corpo = self._http_arquivo(url, {"ApiToken": self._token})
+        status, corpo = self._http_download(url, {"ApiToken": self._token})
         if status >= 400:
             raise ErroNibo(f"GET arquivo -> {status}")
         return corpo

@@ -100,7 +100,7 @@ def importar(con, notas, creditos: dict, obter, pasta, agora: dt.datetime) -> Re
             try:
                 _guardar(pasta, rel, obter(url))
             except Exception as e:  # um arquivo ruim não derruba as outras 200 notas
-                r.falhas.append(f"nota {l['numero'] or l['id']} ({ext}): {type(e).__name__}")
+                r.falhas.append(f"nota {l['numero'] or l['id']} ({ext}): {type(e).__name__}: {str(e)[:80]}")  # mensagens do cliente nunca levam o token (R5)
                 continue
             con.execute(f"update nota_fiscal set {campo}=? where id=?", (rel, l["id"]))
             r.arquivos += 1
