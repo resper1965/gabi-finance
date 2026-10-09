@@ -441,6 +441,12 @@
       "acao": {
         "para_quem": "ricardo"
       }
+    },
+    {
+      "padrao": "CLUBE PAINEIRAS|PAINEIRAS DO MOR",
+      "acao": {
+        "para_quem": "casa"
+      }
     }
   ]
 }
