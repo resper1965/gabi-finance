@@ -7,6 +7,10 @@
     {
       "id": "pets",
       "nome": "Pets"
+    },
+    {
+      "id": "nenhum",
+      "nome": "Sem beneficiário (movimentação)"
     }
   ],
   "responsaveis": {
@@ -23,7 +27,11 @@
     "Restaurantes e delivery": "ricardo",
     "Combustível": "ricardo",
     "Transporte por app": "louise",
-    "Assinaturas e serviços digitais": "ricardo"
+    "Assinaturas e serviços digitais": "ricardo",
+    "Tarifas e juros": "ricardo",
+    "Impostos": "ricardo",
+    "Empréstimos": "ricardo",
+    "Movimentação interna (não é gasto)": "nenhum"
   },
   "contas": {
     "PAO DE ACUCAR MC BLACK": [
