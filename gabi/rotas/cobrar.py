@@ -6,6 +6,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, Request
 
 from gabi.cobrar import cadastro, cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
+from gabi.cobrar.previsao import previsao as calcular_previsao
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -190,6 +191,30 @@ def _cobranca_json(c: cb.Cobranca) -> dict:
     return {"id": c.id, "empresa_id": c.empresa_id, "para": c.para, "assunto": c.assunto, "corpo": c.corpo, "itens": len(c.itens),
             "total": formatar(sum(i.em_aberto_centavos for i in c.itens)), "anexos": len(c.anexos), "itens_sem_comprovante": c.aviso_sem_comprovante,
             "texto_confirmacao": cb.texto_confirmacao(c)}
+
+
+def _bloco_json(b: dict) -> dict:
+    return {"qtd": b["qtd"], "liquido": formatar(b["liquido_centavos"]), "bruto": formatar(b["bruto_centavos"]),
+            "notas": [{"numero": n["numero"], "tomador": n["tomador"], "vencimento": n["vencimento"],
+                       "liquido": formatar(n["liquido_centavos"] or 0), "bruto": formatar(n["bruto_centavos"] or 0)} for n in b["notas"]]}
+
+
+@router.get("/previsao")
+def previsao(request: Request, meses: int = 3):
+    """Previsão de entradas a partir das NFS-e: a vencer, projetado (contrato recorrente) e, à parte, vencidas a confirmar pelo extrato."""
+    if not 1 <= meses <= 12:
+        raise erro(400, "requisicao_invalida", "meses deve estar entre 1 e 12")
+    con = _con(request)
+    try:
+        agora = _agora(request)
+        r = calcular_previsao(con, agora.date(), meses)
+        dados = {"hoje": r["hoje"], "aviso": r["aviso"],
+                 "meses": [{"mes": m["mes"], "a_vencer": _bloco_json(m["a_vencer"]), "projetado": _bloco_json(m["projetado"]),
+                            "total_liquido": formatar(m["a_vencer"]["liquido_centavos"] + m["projetado"]["liquido_centavos"])} for m in r["meses"]],
+                 "a_confirmar": _bloco_json(r["a_confirmar"]), "antigas": _bloco_json(r["antigas"])}
+        return envelope(con, dados, agora=agora)
+    finally:
+        con.close()
 
 
 @router.get("/cobrancas")

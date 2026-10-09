@@ -1137,6 +1137,45 @@
     "summary": "Pedido Decidir"
    }
   },
+  "/api/v1/cobrar/previsao": {
+   "get": {
+    "description": "Previsão de entradas a partir das NFS-e: a vencer, projetado (contrato recorrente) e, à parte, vencidas a confirmar pelo extrato.",
+    "operationId": "previsao_api_v1_cobrar_previsao_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "meses",
+      "required": false,
+      "schema": {
+       "default": 3,
+       "title": "Meses",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Previsao"
+   }
+  },
   "/api/v1/cobrar/reembolsos": {
    "get": {
     "description": "Reembolsos por empresa contratante (itens em aberto e cobranças) e a prévia do lote do Nibo da Bekaa.",

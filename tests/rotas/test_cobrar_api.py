@@ -152,3 +152,24 @@ def test_pedidos_listar_decidir_aprova_e_entra_na_agenda(cli, banco):
     assert any(i["nome"] == "Dentista" for g in pagar.values() for i in g)  # entrou na agenda
     assert get(cli, "/api/v1/cobrar/pedidos").json()["dados"]["itens"] == []
     assert [p["estado"] for p in get(cli, "/api/v1/cobrar/pedidos?estado=decididos").json()["dados"]["itens"]] == ["aprovado"]
+
+
+def _nota(banco, tomador, venc, liquido, status="autorizada", pago=0):
+    c = conectar(banco)
+    n = c.execute("select count(*) from nota_fiscal").fetchone()[0] + 1
+    c.execute("insert into nota_fiscal(id, numero, emissao, status, valor_bruto_centavos, tomador_nome, tomador_doc, vencimento, valor_liquido_centavos, nibo_pago, importado_em, atualizado_em) "
+              "values (?,?,?,?,?,?,?,?,?,?,'x','x')", (f"n{n}", str(n), venc, status, liquido + 10000, tomador, tomador, venc, liquido, pago))
+    c.close()
+
+
+def test_previsao_de_caixa_formata_valores_e_so_o_boss_ve(banco):
+    _nota(banco, "IONIC", "2026-10-25", 2226122)
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    r = cli.get("/api/v1/cobrar/previsao?meses=2", headers=BOSS)
+    assert r.status_code == 200
+    d = r.json()["dados"]
+    outubro = next(m for m in d["meses"] if m["mes"] == "2026-10")
+    assert outubro["a_vencer"]["qtd"] == 1 and outubro["a_vencer"]["liquido"] == "22261.22" and outubro["a_vencer"]["bruto"] == "22361.22"
+    assert "Nibo defasado" in d["aviso"] and len(d["meses"]) == 2
+    assert cli.get("/api/v1/cobrar/previsao", headers=VIP).status_code == 403
+    assert cli.get("/api/v1/cobrar/previsao?meses=0", headers=BOSS).status_code == 400
