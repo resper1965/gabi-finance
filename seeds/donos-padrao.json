@@ -338,6 +338,14 @@
         "para_quem": "ricardo",
         "categoria": "Veículo"
       }
+    },
+    {
+      "padrao": "OPENROUTER",
+      "acao": {
+        "para_quem": "ricardo",
+        "empresa": "ness",
+        "categoria": "Assinaturas e serviços digitais"
+      }
     }
   ]
 }
