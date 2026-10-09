@@ -54,6 +54,13 @@
   },
   "regras": [
     {
+      "padrao": "PETSUPERMARK",
+      "acao": {
+        "para_quem": "pets",
+        "categoria": "Pets"
+      }
+    },
+    {
       "padrao": "MELIMAIS",
       "acao": {
         "para_quem": "ricardo",
