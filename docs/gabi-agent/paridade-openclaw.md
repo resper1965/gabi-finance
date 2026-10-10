@@ -7,22 +7,22 @@ Fonte: `openclaw cron list` (21 automações), `systemctl` (units `gabi-*`), `/v
 |---|---|---|---|---|
 | Heartbeat (main) | 1h | liveness do agente | `gabi-vigia` + `hermes gateway status` | DESCARTAR |
 | briefing-matinal | 07:30 | agenda de pagamentos + custos da conta (do `agenda-contas.json`) | `resumo_manha` (brain, 07:05) cobre pagamentos; custos vêm de `financeiro_contas_a_pagar` | MIGRAR (desligar o antigo na virada; um só briefing, Review Focus 4) |
-| Resumo Diário de E-mails | 08:00 | resumo de e-mails | Trabalho do brain (Fase 3 congelada) ou triagem-email | DECIDIR (Task 8) |
+| Resumo Diário de E-mails | 08:00 | resumo de e-mails | Fase 3 congelada (decisão 10/10) | DESCARTAR por ora (volta com a Fase 3) |
 | Alerta de Pagamentos Diários | 09:00 | alerta de vencimentos/atraso/débito ausente | financeiro novo (branch `feat/financeiro-conciliacao`) + avisos do brain (`vence_hoje`, `conta_atrasada`) | OK após Task 6 |
-| Resumo Semanal de Pagamentos | dom 10:00 | agenda da semana + previsão 30 dias | aba Previsão do brain (ADR-013) + cron Hermes | MIGRAR |
-| forecast-semanal | seg 08:00 | previsão de caixa por semana, dia mais baixo, semana negativa (Sonnet 5.5; **com erro 2×**) | `financeiro_*` + Previsão do brain; cron Hermes | MIGRAR (corrigir erro antes) |
+| Resumo Semanal de Pagamentos | dom 10:00 | agenda da semana + previsão 30 dias | cron Hermes `resumo-semanal-pagamentos` (pausado) | MIGRADO (pausado) |
+| forecast-semanal | seg 08:00 | previsão de caixa por semana, dia mais baixo, semana negativa (Sonnet 5.5; **com erro 2×**) | cron Hermes `forecast-semanal` (pausado, Sonnet 5.5 via OpenRouter) | MIGRADO (pausado); o erro do OpenClaw some com o corte |
 | promessas-diario | 20:00 | revisa `operacao/promessas.md`, cartões na fila de decisões | cron Hermes lendo o arquivo (ou tabela no brain) | DECIDIR |
-| fechamento-noturno | 21:00 | `gabi_evening_wrapup.py` + gastos do dia e baixas | `financeiro_lancamentos` do dia + wrapup | MIGRAR |
+| fechamento-noturno | 21:00 | `gabi_evening_wrapup.py` + gastos do dia e baixas | cron Hermes `fechamento-noturno` (pausado; o `gabi_evening_wrapup.py` não foi portado — só gastos/baixas/atrasos do brain) | MIGRADO (pausado, escopo menor) |
 | sanidade-automacoes | 06:00 | `verificar_automacoes.py` (confere as próprias rotinas) | `gabi-vigia` (substitui) | DESCARTAR após vigia cobrir Hermes (Task 10) |
-| continuidade | 10:00 | **dead-man switch**: 3–4 dias sem mensagem → pergunta ao Boss; ≥5 dias → manda texto de continuidade a Louise e Giovanna por WhatsApp | exige WhatsApp do Hermes e é envio externo automático (**R2**) | DECIDIR — não pode perder em silêncio |
+| continuidade | 10:00 | **dead-man switch**: 3–4 dias sem mensagem → pergunta ao Boss; ≥5 dias → manda texto de continuidade a Louise e Giovanna por WhatsApp | `ops/hermes/continuidade.py` (sem LLM, 13 testes) + cron Hermes `continuidade`, **pausado e inativo** (só age com `~/.hermes/continuidade/ativo`, criado na Task 15). Exceção à R2 aprovada pelo Ricardo em 10/10 só para este envio | MIGRADO (inativo até o corte) |
 | validades-semanal | seg 08:30 | documentos da família que vencem em 180 dias | Paperless/`documentos_buscar` + cron Hermes | MIGRAR |
-| teams-copilot | */15 8–20h seg–sex | copiloto Teams (`gabi_teams_copilot.py`), sem externos | Fase 3 (Trabalho, congelada) | DECIDIR |
-| Auto-limpeza e-mails | 1h | limpeza de e-mails (sessão WhatsApp do pessoal) | triagem-email (branch) | DECIDIR (Task 8) |
+| teams-copilot | */15 8–20h seg–sex | copiloto Teams (`gabi_teams_copilot.py`), sem externos | Fase 3 (Trabalho, congelada) | DESCARTAR por ora (decisão 10/10) |
+| Auto-limpeza e-mails | 1h | limpeza de e-mails (sessão WhatsApp do pessoal) | spec de triagem mergeada (só documento); Fase 3 congelada | DESCARTAR por ora |
 | limpeza-emails-github | (command) | `github_email_cleanup.py` | rotina sem modelo; timer próprio | MIGRAR |
 | Skill collection review ×2 | 7d | revisão de skills (main, escuta) | `hermes curator` | DESCARTAR |
 | Alerta fatura Amex (dia 28) | mensal | lembrete de fatura | aviso do brain (`vence_hoje`) | OK |
-| por-onde-vazou | dia 1 | relatório mensal (Raio-X) | Raio-X mensal (Task 8) | DECIDIR |
-| Aniversários (Benedita, Cookie, Chafic, Sandra) e lembrete-passaporte (17/09/2027) | anual | lembretes | recriar como `hermes cron create` (um por data) | MIGRAR |
+| por-onde-vazou | dia 1 | relatório mensal (Raio-X) | Raio-X mensal (Task 8); não implementado | DECIDIR |
+| Aniversários (Benedita, Cookie, Chafic, Sandra) e lembrete-passaporte (17/09/2027) | anual | lembretes | 5 crons Hermes (pausados); número do passaporte omitido do texto | MIGRADO (pausado) |
 
 ## 2. Units e timers fora do gateway (independem do OpenClaw)
 `gabi-brain-*` (api, mcp, fontes, saldos, extratos, notas, comprovantes, trabalho, avisos, telegram, backup, exportação), `gabi-financeiro`, `gabi-fluxos-diario/mensal`, `gabi-drive`, `gabi-backup`, `gabi-vigia`, `gabi-guarda-sessoes`, `gabi-reembolso(.path/-segunda)`, `gabi-wa-docs.path`. **Status: OK**, exceto os que chamam o gateway do OpenClaw — a verificar linha a linha (Task 9 passo 2): `gabi-reembolso*` (fila `fila-reembolso`, escuta), `gabi-wa-docs.path` (PDF recebido no WhatsApp → Paperless), `gabi-guarda-sessoes` e `gabi-vigia` (vigiam sessões e gateway do OpenClaw).
