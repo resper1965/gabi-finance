@@ -61,3 +61,31 @@ def exigir(nivel_minimo: str = "terceiros"):
         request.state.identidade = ident
         return ident
     return dependencia
+
+
+GRAUS = ("nenhum", "parcial", "total")
+
+
+def grau(con: sqlite3.Connection, informacao: str, nivel: str) -> str:
+    """Quanto o nível enxerga da informação, pela `matriz_acesso` ('nenhum' | 'parcial' | 'total'). Sem linha na matriz: só o boss vê (nega por padrão)."""
+    r = con.execute("select boss, familia_vip, terceiros from matriz_acesso where informacao=?", (informacao,)).fetchone()
+    valor = r[nivel] if r is not None else ("total" if nivel == "boss" else "nenhum")
+    return valor if valor in GRAUS else "nenhum"
+
+
+def exigir_informacao(informacao: str, grau_minimo: str = "parcial"):
+    """Dependência FastAPI para dado que a matriz libera por nível (ex.: saúde): 403 se o grau do nível for menor que o pedido.
+    O handler que devolve dado `parcial` decide o recorte (só a própria pessoa, sem campos sensíveis)."""
+    base = exigir("terceiros")
+
+    def dependencia(request: Request) -> Identidade:
+        ident = base(request)
+        con = conectar(Path(request.app.state.banco))
+        try:
+            g = grau(con, informacao, ident.nivel)
+        finally:
+            con.close()
+        if GRAUS.index(g) < GRAUS.index(grau_minimo) or g == "nenhum":
+            raise HTTPException(403, detail={"erro": "sem_escopo", "mensagem": "Você não tem acesso a isto."})
+        return ident
+    return dependencia
