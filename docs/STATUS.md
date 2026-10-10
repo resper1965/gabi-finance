@@ -102,3 +102,9 @@ Plano: `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md` (execução
 - Pista A sem trabalho de código restante: o que falta depende do Ricardo ou do relógio (G16–G21, comprovante Pix real, ~16/10 para o aceite da Fase 1, 145 lançamentos sem dono). Fase 3 segue congelada; Fase 4 por pedido; tag só após G20 e os dois aceites.
 - Não verificado em produção nesta data (bloqueado por permissão): `tools.aceite`, `gabi.avisos`, contagem de lançamentos sem dono. Saúde da api: rota `/api/saude` exige login de boss (a rota `/api/v1/saude` não existe).
 - Retomada em ~16/10: rodar `python -m tools.aceite`, depois `tools.comparar_agenda`, depois tag.
+
+## 10/10/2026 (fim da tarde): código do módulo — pista A fechada
+- **Ingestão de comprovantes Pix** (`gabi/cobrar/ingestao.py`, `gabi-brain-comprovantes.timer` 07h BRT): escrita contra servidor falso; propõe vínculos, nunca confirma; idempotente; etiqueta `gabi:comprovante`.
+- **Job do Trabalho** (`python -m gabi.trabalho`, `gabi-brain-trabalho.timer` 15 min, 06h–22h): lê e-mail/agenda/tarefas das caixas `sim`, tokens do ambiente (`gabi/fontes/tokens.py`, `/etc/gabi/trabalho.env`), aviso **"Reconectar a caixa"** no sino (fecha sozinho), conclui na origem a tarefa pedida no painel (migração **0015**: `tarefa.pedido_concluir_em`; a API não tem rede). Esquema novo = 0016+.
+- 1046 pytest + 70 vitest verdes; instalado (commit 7adad28); sem credenciais e com todas as caixas `a_decidir` o job não faz nada (rodou, `Result=success`).
+- **Não escrito por falta de spec/decisão (não por dado):** regras com condição (cartão/valor/dia: só proposta oral, sem spec), Fase 4 (T4.1–T4.6, cada uma abre com mini-spec aprovado), aviso por Telegram (G15, exceção à R2), Canal/Hermes (depois do gabi.brain).
