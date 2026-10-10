@@ -68,3 +68,30 @@ def test_valores_em_centavos_inteiros(con):
     assert "valor" not in cols  # R7: nunca float no banco
     assert {r["name"]: r["type"] for r in con.execute("pragma table_info(fatura)")}["total_centavos"] == "INTEGER"
     assert {r["name"]: r["type"] for r in con.execute("pragma table_info(conta_estado)")}["saldo_centavos"] == "INTEGER"
+
+
+def _msg(con, id_externo):
+    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values (?, '+5511', '2026-10-11')", (id_externo,))
+
+
+def test_escuta_tabelas_existem(con):
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert {"escuta_msg", "escuta_remetente", "escuta_grupo", "contato_google"} <= nomes
+
+
+def test_escuta_msg_tem_id_grupo(con):
+    cols = [r["name"] for r in con.execute("pragma table_info(escuta_msg)")]
+    assert "id_grupo" in cols
+    assert cols.index("id_grupo") == cols.index("grupo") + 1
+
+
+def test_escuta_msg_id_externo_unico(con):
+    _msg(con, "abc")
+    with pytest.raises(sqlite3.IntegrityError):
+        _msg(con, "abc")
+
+
+def test_escuta_remetente_rejeita_estado_invalido(con):
+    con.execute("insert into escuta_remetente(numero, estado) values ('+55', 'pendente')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into escuta_remetente(numero, estado) values ('+56', 'xis')")
