@@ -45,6 +45,7 @@ def test_ingerir_grava_uma_vez(con, tmp_path):
     assert ingerir_spool(con, pasta, AGORA) == 0
     assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 1
     assert con.execute("select estado from escuta_msg").fetchone()[0] == "nova"
+    assert con.execute("select qtd from escuta_remetente").fetchone()[0] == 1
 
 
 def test_grupo_marcado(con, tmp_path):
@@ -100,3 +101,30 @@ def test_visto_incrementa_e_nao_reabre_ignorado(con):
     registrar_remetente_visto(con, "+5511900000001", "2026-10-12T10:00:00")
     r = con.execute("select estado, qtd, vista_em from escuta_remetente").fetchone()
     assert (r["estado"], r["qtd"], r["vista_em"]) == ("ignorado", 3, "2026-10-12T10:00:00")
+
+
+@pytest.mark.parametrize("anexo", ["../../x", "/etc/passwd", "a/b.jpg", "..", ".", "", "a\\b.jpg"])
+def test_anexo_traversal_vai_para_invalidos(con, tmp_path, anexo):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "t1", anexo=anexo)
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert (pasta / "invalidos" / "t1.json").exists()
+    assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("campo,valor", [("anexo", 5), ("anexo", ["a"]), ("texto", ["x"]), ("texto", {"a": 1}), ("id_grupo", ["g"])])
+def test_tipo_errado_invalido_e_rodada_continua(con, tmp_path, campo, valor):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "a-ruim", **{campo: valor})
+    _msg(pasta, "b-ok")
+    assert ingerir_spool(con, pasta, AGORA) == 1
+    assert (pasta / "invalidos" / "a-ruim.json").exists()
+    assert con.execute("select id_externo from escuta_msg").fetchone()[0] == "b-ok"
+
+
+def test_bloqueado_vale_para_forma_whatsapp(con, tmp_path):
+    con.execute("insert into escuta_remetente(numero, estado, qtd) values ('+5511912345678','bloqueado',0)")
+    pasta = tmp_path / "spool"
+    _msg(pasta, "w1", de="5511912345678@s.whatsapp.net")
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0

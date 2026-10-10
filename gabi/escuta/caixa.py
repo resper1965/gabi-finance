@@ -38,6 +38,12 @@ def _ler(arq: Path) -> dict:
     for k in ("id_externo", "de", "recebida_em"):
         if not isinstance(d.get(k), str) or not d[k]:
             raise ValueError(f"campo ausente: {k}")
+    for k in ("texto", "id_grupo", "anexo"):
+        if d.get(k) is not None and not isinstance(d[k], str):
+            raise ValueError(f"tipo inválido: {k}")
+    anexo = d.get("anexo")
+    if anexo is not None and (anexo in ("", ".", "..") or anexo != Path(anexo).name or "\\" in anexo):
+        raise ValueError("anexo inválido")
     return d
 
 
