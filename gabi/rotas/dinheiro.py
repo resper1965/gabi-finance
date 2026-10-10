@@ -354,7 +354,7 @@ def sugestao_rejeitar(sid: int, request: Request, ident: Identidade = Depends(ex
 
 
 def _regra(r) -> dict:
-    return {"id": r["id"], "padrao": r["padrao"], "acao": json.loads(r["acao"]), "ativa": bool(r["ativa"]),
+    return {"id": r["id"], "padrao": r["padrao"], "acao": json.loads(r["acao"]), "condicao": json.loads(r["condicao"]) if r["condicao"] else None, "ativa": bool(r["ativa"]),
             "criado_em": r["criado_em"], "criada_por": r["criada_por"]}
 
 

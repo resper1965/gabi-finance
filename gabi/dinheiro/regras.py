@@ -8,6 +8,8 @@ import json
 import math
 import re
 
+from gabi.dinheiro.condicao import confere, validar as validar_condicao
+
 CAMPOS_ACAO = ("categoria_id", "para_quem_id", "empresa_id")
 _CAMPO = {"categoria_id": "categoria", "para_quem_id": "para_quem", "empresa_id": "empresa"}
 _TABELA = {"categoria_id": ("categoria", "id"), "para_quem_id": ("pessoa", "id"), "empresa_id": ("empresa", "id")}
@@ -48,47 +50,48 @@ def _validar(con, padrao, acao) -> tuple[re.Pattern, dict]:
     return rx, dict(acao)
 
 
-def _anteriores(con, rid: int | None) -> list[re.Pattern]:
+def _anteriores(con, rid: int | None) -> list[tuple[re.Pattern, dict | None]]:
     """Regras ATIVAS que vencem esta na ordem do classificador (a primeira que casa vale): as de id menor; sem id (regra nova/prévia), todas."""
     saida = []
-    for r in con.execute("select padrao from regra where ativa=1" + (" and id<?" if rid is not None else ""), (rid,) if rid is not None else ()):
+    for r in con.execute("select padrao, condicao from regra where ativa=1" + (" and id<?" if rid is not None else ""), (rid,) if rid is not None else ()):
         try:
-            saida.append(re.compile(r["padrao"], re.I))
-        except re.error:
+            saida.append((re.compile(r["padrao"], re.I), json.loads(r["condicao"]) if r["condicao"] else None))
+        except (ValueError, re.error):
             continue
     return saida
 
 
-def _linhas_afetadas(con, rx, acao, rid: int | None = None):
+def _linhas_afetadas(con, rx, acao, rid: int | None = None, condicao: dict | None = None):
     """(id, [colunas que mudariam]) dos lançamentos em que a regra faria diferença. Não toca no que uma regra anterior já pega:
     no classificador a primeira regra que casa vale, e as seguintes não completam os campos que ela deixou."""
     anteriores = _anteriores(con, rid)
     for r in con.execute("select * from lancamento"):
-        if not casa(rx, r["descricao_original"], r["estabelecimento"]):
+        if not casa(rx, r["descricao_original"], r["estabelecimento"]) or not confere(condicao, r):
             continue
-        if any(casa(a, r["descricao_original"], r["estabelecimento"]) for a in anteriores):
+        if any(casa(a, r["descricao_original"], r["estabelecimento"]) and confere(c, r) for a, c in anteriores):
             continue
         mudam = [c for c in acao if not (r[f"{_CAMPO[c]}_origem"] in ("voce", "regra") and r[c] is not None)]
         if mudam:
             yield r["id"], mudam
 
 
-def _aplicar(con, rx, acao, rid: int | None = None) -> int:
+def _aplicar(con, rx, acao, rid: int | None = None, condicao: dict | None = None) -> int:
     n = 0
-    for lid, cols in list(_linhas_afetadas(con, rx, acao, rid)):
+    for lid, cols in list(_linhas_afetadas(con, rx, acao, rid, condicao)):
         for c in cols:
             con.execute(f"update lancamento set {c}=?, {_CAMPO[c]}_origem='regra' where id=?", (acao[c], lid))
         n += 1
     return n
 
 
-def contar_afetados(con, padrao: str, acao: dict, hoje: dt.date) -> dict:
+def contar_afetados(con, padrao: str, acao: dict, hoje: dt.date, condicao: dict | None = None) -> dict:
     """Quantos lançamentos a regra mudaria no passado e a média MENSAL que ela deve pegar daqui para a frente (últimos 6 meses)."""
     rx, acao = _validar(con, padrao, acao)
-    passado = sum(1 for _ in _linhas_afetadas(con, rx, acao))
+    condicao = validar_condicao(condicao)
+    passado = sum(1 for _ in _linhas_afetadas(con, rx, acao, None, condicao))
     desde = (hoje - dt.timedelta(days=30 * HISTORICO_MESES)).isoformat()
-    recentes = sum(1 for r in con.execute("select descricao_original, estabelecimento from lancamento where data>=?", (desde,))
-                   if casa(rx, r["descricao_original"], r["estabelecimento"]))
+    recentes = sum(1 for r in con.execute("select * from lancamento where data>=?", (desde,))
+                   if casa(rx, r["descricao_original"], r["estabelecimento"]) and confere(condicao, r))
     return {"passado": passado, "futuro_estimado": round(recentes / HISTORICO_MESES, 1)}  # média por mês, 1 casa
 
 
@@ -132,9 +135,10 @@ def _aprovar(con, sugestao_id: int, edicao: dict | None, por: str) -> int | None
     rid = None
     if s["tipo"] == "regra":
         rx, acao = _validar(con, payload.get("padrao"), payload.get("acao"))
-        rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
-                          (payload["padrao"], json.dumps(acao, ensure_ascii=False), _agora(), por)).lastrowid
-        n = _aplicar(con, rx, acao, rid)
+        cond = validar_condicao(payload.get("condicao"))
+        rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por, condicao) values (?,?,1,?,?,?)",
+                          (payload["padrao"], json.dumps(acao, ensure_ascii=False), _agora(), por, json.dumps(cond) if cond else None)).lastrowid
+        n = _aplicar(con, rx, acao, rid, cond)
         _decisao(con, por, f"regra {rid} criada ({payload['padrao']}) aplicada a {n} lançamento(s)")
     elif s["tipo"] in ("categoria", "para_quem", "empresa"):
         col = f"{s['tipo']}_id"
@@ -194,16 +198,18 @@ def sempre_assim(con, lancamento_id: int, por: str) -> int:
     return _em_transacao(con, fazer)
 
 
-def criar_regra_ativa(con, padrao: str, acao: dict, por: str) -> int | None:
+def criar_regra_ativa(con, padrao: str, acao: dict, por: str, condicao: dict | None = None) -> int | None:
     """Regra ATIVA direta, para quando o Ricardo a dita (chat ou arquivo de seeds). Aplica ao passado sem sobrescrever o que ele ou outra
-    regra já decidiu. Mesmo padrão já cadastrado: devolve None e não duplica."""
+    regra já decidiu. Mesmo padrão e mesma condição já cadastrados: devolve None e não duplica."""
     def fazer():
         rx, ac = _validar(con, padrao, acao)
-        if con.execute("select 1 from regra where padrao=?", (padrao,)).fetchone():
+        cond = validar_condicao(condicao)
+        cond_json = json.dumps(cond) if cond else None
+        if con.execute("select 1 from regra where padrao=? and condicao is ?", (padrao, cond_json)).fetchone():
             return None
-        rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values (?,?,1,?,?)",
-                          (padrao, json.dumps(ac, ensure_ascii=False), _agora(), por)).lastrowid
-        n = _aplicar(con, rx, ac, rid)
+        rid = con.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por, condicao) values (?,?,1,?,?,?)",
+                          (padrao, json.dumps(ac, ensure_ascii=False), _agora(), por, cond_json)).lastrowid
+        n = _aplicar(con, rx, ac, rid, cond)
         _decisao(con, por, f"regra {rid} criada ({padrao}) aplicada a {n} lançamento(s)")
         return rid
     return _em_transacao(con, fazer)
@@ -218,6 +224,6 @@ def definir_ativa(con, regra_id: int, ativa: bool, por: str) -> None:
         con.execute("update regra set ativa=? where id=?", (1 if ativa else 0, regra_id))
         if ativa:
             rx, acao = _validar(con, r["padrao"], json.loads(r["acao"]))
-            _aplicar(con, rx, acao, regra_id)
+            _aplicar(con, rx, acao, regra_id, json.loads(r["condicao"]) if r["condicao"] else None)
         _decisao(con, por, f"regra {regra_id} {'ligada' if ativa else 'desligada'}")
     _em_transacao(con, fazer)

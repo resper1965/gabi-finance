@@ -6,9 +6,24 @@ import { dataCurta } from "../lib/formato";
 import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
 
-interface Regra { id: number; padrao: string; acao: Record<string, number | string>; ativa: boolean; criado_em: string; casam: number }
-interface Sug { id: number; tipo: string; payload: { padrao?: string; acao?: Record<string, number | string> }; motivo: string; impacto: { passado?: number; futuro_estimado?: number } | null }
+interface Condicao { conta_id?: number[]; valor_min?: number; valor_max?: number; dias_semana?: number[] }
+interface Regra { id: number; padrao: string; acao: Record<string, number | string>; condicao?: Condicao | null; ativa: boolean; criado_em: string; casam: number }
+interface Sug { id: number; tipo: string; payload: { padrao?: string; acao?: Record<string, number | string>; condicao?: Condicao | null }; motivo: string; impacto: { passado?: number; futuro_estimado?: number } | null }
 interface Item { id: number | string; nome: string }
+
+const DIAS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+const reais = (c: number) => `R$ ${(c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+/** "só se: conta 1, 2 · de R$ 10,00 a R$ 50,00 · sáb, dom" (vazio quando a regra não tem condição). */
+export function textoCondicao(c?: Condicao | null): string {
+  if (!c) return "";
+  const p: string[] = [];
+  if (c.conta_id?.length) p.push(`conta ${c.conta_id.join(", ")}`);
+  if (c.valor_min !== undefined && c.valor_max !== undefined) p.push(`de ${reais(c.valor_min)} a ${reais(c.valor_max)}`);
+  else if (c.valor_min !== undefined) p.push(`a partir de ${reais(c.valor_min)}`);
+  else if (c.valor_max !== undefined) p.push(`até ${reais(c.valor_max)}`);
+  if (c.dias_semana?.length) p.push(c.dias_semana.map((d) => DIAS[d]).join(", "));
+  return p.length ? `só se: ${p.join(" · ")}` : "";
+}
 
 export function Regras() {
   const regras = useApi<{ itens: Regra[] }>("/api/v1/regras");
@@ -108,6 +123,7 @@ export function Regras() {
                     <span style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", minWidth: 0 }}>
                       <code style={{ font: "600 12.5px var(--mono)" }}>{r.padrao}</code><span style={{ color: "var(--ink2)" }}>→</span>
                       <span style={{ fontWeight: 600 }}>{alvo(r.acao)}</span>
+                      {textoCondicao(r.condicao) && <span style={{ fontSize: 12, color: "var(--ink2)" }}>({textoCondicao(r.condicao)})</span>}
                       <span style={{ fontSize: 12, color: "var(--ink2)" }}>· {r.casam} lançamentos · criada em {dataCurta(r.criado_em.slice(0, 10))}</span>
                     </span>
                     <button role="switch" aria-checked={r.ativa} aria-label={`Regra ${r.padrao} ${r.ativa ? "ligada" : "desligada"}`} onClick={() => alternar(r)}

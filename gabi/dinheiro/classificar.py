@@ -9,6 +9,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from gabi.dinheiro.condicao import confere
 from gabi.dinheiro.regras import casa
 
 CAMPOS = (("categoria", "categoria_id"), ("para_quem", "para_quem_id"), ("empresa", "empresa_id"))
@@ -31,15 +32,15 @@ class ResumoClassificacao:
     sugestoes: int
 
 
-def _regras_ativas(con) -> list[tuple[re.Pattern, dict]]:
+def _regras_ativas(con) -> list[tuple[re.Pattern, dict, dict | None]]:
     """Regras ligadas pelo Ricardo, por id. Regex ou ação inválidos (dado digitado por pessoa) são ignorados."""
     saida = []
-    for r in con.execute("select padrao, acao from regra where ativa=1 order by id"):
+    for r in con.execute("select padrao, acao, condicao from regra where ativa=1 order by id"):
         try:
             acao = json.loads(r["acao"])
             if not isinstance(acao, dict):
                 continue
-            saida.append((re.compile(r["padrao"], re.I), acao))
+            saida.append((re.compile(r["padrao"], re.I), acao, json.loads(r["condicao"]) if r["condicao"] else None))
         except (ValueError, re.error):
             continue
     return saida
@@ -109,8 +110,8 @@ def classificar(con, lancamento_id: int) -> Classificacao:
     confianca = 0.0
 
     # 1) regra ativa do Ricardo: a primeira que casa (por id) preenche os campos vazios
-    for padrao, acao in _regras_ativas(con):
-        if casa(padrao, r["descricao_original"], r["estabelecimento"]):
+    for padrao, acao, condicao in _regras_ativas(con):
+        if casa(padrao, r["descricao_original"], r["estabelecimento"]) and confere(condicao, r):
             for campo, col in CAMPOS:
                 if atual[col] is None and acao.get(col) is not None:
                     _preencher(con, lancamento_id, campo, col, acao[col], "regra")

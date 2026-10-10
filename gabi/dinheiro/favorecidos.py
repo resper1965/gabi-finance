@@ -28,7 +28,7 @@ def sugerir_por_favorecido(con, minimo: int = 3) -> int:
         else:
             cats.setdefault(nome, set()).add(l["categoria_id"])
     regras = []
-    for r in con.execute("select padrao, acao from regra where ativa=1"):
+    for r in con.execute("select padrao, acao from regra where ativa=1 and condicao is null"):
         try:
             if json.loads(r["acao"]).get("categoria_id") is not None:
                 regras.append(re.compile(r["padrao"], re.I))
