@@ -180,22 +180,19 @@
 - [ ] **Step 5:** Backup de `~/.hermes` (config, SOUL.md, sessions, memories) no pacote `gabi-backup`, com `.env` cifrado ou excluído; `restic`/`rclone` listam o novo caminho.
 - [ ] **Step 6:** Reboot controlado fora do horário (`sudo reboot` com aviso): `systemctl --failed` vazio; `hermes-gateway` habilitado; `gabi-brain-*` ativos. Expected: tudo volta sozinho. Commit.
 
-### Task 10b: Transporte único de avisos (tirar a dependência de `openclaw message send`)
+### Task 10b: Transporte único de avisos (shim `gabi-msg`)
 
-**Descoberto na Task 9:** `alertas_fin.py`, `avisos.py`, `cartoes.py`, `rodada.py`, `sessoes.py` e `vigia_gateway.py` (em `/opt/gabi-fin`, fonte no repo OP-Gabi) enviam ao Telegram por `openclaw message send`. Desligar o OpenClaw sem isto silencia o financeiro, o vigia e os alertas.
+**Descoberto na Task 9:** o financeiro, os cartões, o vigia, a guarda de sessões e os fluxos enviam ao Telegram por `openclaw message send`, sempre via a variável `OPENCLAW_CMD` definida dentro do `ExecStart` de cada unit (todas rodam como root). Desligar o OpenClaw sem isto silencia tudo.
 
-**Files:**
-- Create: `ops/enviar/gabi_enviar.py` (módulo) e `tests/enviar/test_gabi_enviar.py` (no worktree `~/OP-Gabi-fechamento`)
-- Modify: os 6 scripts acima, para chamar `gabi_enviar.enviar(texto, destino="boss") -> int` em vez de montar `openclaw message send`.
+**Files:** `ops/enviar/gabi_msg.py`, `tests/enviar/test_gabi_msg.py`, `infra/instalar-gabi-msg.sh` (worktree `~/OP-Gabi-fechamento`).
 
 **Interfaces:**
-- Produces: `enviar(texto: str, destino: str = "boss", backend: str | None = None) -> int` (0 = entregue). Backends: `openclaw` (padrão hoje, comportamento idêntico ao atual) e `bot` (HTTPS direto na Bot API com `/etc/gabi/telegram.env`, sem LLM e sem gateway; 3 tentativas, mantém a fila de reenvio de `avisos.py`). Escolha por `GABI_ENVIAR_BACKEND` no `financeiro.env`.
-- Consumes: `/etc/gabi/telegram.env` (Task 12) só quando o backend for `bot`.
+- Produces: `/usr/local/bin/gabi-msg message send --channel telegram --target CHAT -m TEXTO [--media ARQ]` (exit 0 entregue, 1 falha após 3 tentativas, 2 não suportado). Credencial em `/etc/gabi/telegram.env`.
+- Consumes: `/etc/gabi/telegram.env` (Task 12).
 
-- [ ] **Step 1:** Testes (RED): `test_backend_openclaw_monta_o_mesmo_comando`, `test_backend_bot_posta_na_bot_api_com_chat_do_boss` (servidor HTTP falso local, sem rede), `test_falha_tenta_3_vezes_e_retorna_diferente_de_zero`, `test_texto_nunca_aparece_com_token_nos_logs`.
-- [ ] **Step 2:** Implementar `gabi_enviar.py`; trocar os 6 pontos de chamada; `pytest -q` do OP-Gabi verde e teste de regressão de cada script (o comando `openclaw` continua igual com o backend padrão).
-- [ ] **Step 3:** Instalar com backend `openclaw` (nenhuma mudança observável); `systemctl --failed` vazio; uma mensagem de teste chega.
-- [ ] **Step 4:** Na Task 12, depois do `telegram.env`, virar `GABI_ENVIAR_BACKEND=bot` e provar uma entrega por `bot`; a Task 15 só prossegue se todos os envios usarem `bot` (`grep -r "openclaw message send" /opt/gabi-fin` = vazio).
+- [x] **Step 1–2:** 7 testes (texto, 3 tentativas, token fora da saída, mídia como documento, comando/canal não suportados, sem env) RED→GREEN; suíte do OP-Gabi 553 verde.
+- [x] **Step 3:** shim instalado (`sudo bash infra/instalar-gabi-msg.sh`), nenhuma unit alterada.
+- [ ] **Step 4 (na Task 12):** depois do `telegram.env`, `sudo bash infra/instalar-gabi-msg.sh --teste` entrega uma mensagem; então trocar `OPENCLAW_CMD` por `/usr/local/bin/gabi-msg` nas units `gabi-financeiro`, `gabi-fluxos-diario`, `gabi-contas-cartoes`, `gabi-vigia`, `gabi-guarda-sessoes`, `gabi-reembolso`, `gabi-reembolso-segunda`, e `systemctl daemon-reload`. Expected: `grep -l 'openclaw' /etc/systemd/system/gabi-*.service` só lista units que o corte trata (Task 15).
 
 ---
 
