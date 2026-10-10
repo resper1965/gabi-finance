@@ -181,3 +181,14 @@ def test_aprovar_reativa_pessoa_excluida(con):
     con.execute("update pessoa set excluido_em='2026-10-11' where id=?", (pid,))
     assert aprovar(con, N, "familia", "Fulano", "r") == pid
     assert estado_remetente(con, N) == ("aprovado", pid)
+
+
+def test_ignorar_apaga_texto_de_crise_mas_nao_de_outras_processadas(con):
+    registrar_remetente_visto(con, N, AGORA)
+    _msg(con, texto="crise-texto")
+    _msg(con, texto="pedido-texto")
+    con.execute("update escuta_msg set estado='processada', tipo='crise' where texto='crise-texto'")
+    con.execute("update escuta_msg set estado='processada', tipo='pedido' where texto='pedido-texto'")
+    ignorar(con, N, "ricardo")
+    assert [r[0] for r in con.execute("select texto from escuta_msg where tipo='crise'")] == [None]
+    assert [r[0] for r in con.execute("select texto from escuta_msg where tipo='pedido'")] == ["pedido-texto"]

@@ -54,7 +54,7 @@ def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None) ->
             _aviso(con, aviso[0], aviso[1], agora)
 
 
-def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list) -> None:
+def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list, spool) -> None:
     """Roda dentro da transação da mensagem. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
     Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
     id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
@@ -94,7 +94,7 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
         con.execute("update escuta_msg set estado='retida' where id=?", (id_,))
         return
     if not (texto or "").strip():
-        _nada(con, destinos, m, agora, ativo, c, apagar, None)
+        _nada(con, destinos, m, agora, ativo, c, apagar, None, spool)
         return
     r = classificar(texto, cliente, orcamento)
     if r is None:  # fica nova e tenta de novo na próxima rodada
@@ -106,11 +106,12 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
         c["falhas"] += 1  # conta só em falhas
         negado = True
     if tipo == "nada":
-        _nada(con, destinos, m, agora, ativo, c, apagar, r.confianca)
+        _nada(con, destinos, m, agora, ativo, c, apagar, r.confianca, spool)
         c["classificadas"] += 0 if negado else 1
         return
     if tipo == "saude":  # o texto e os campos de saúde não ficam no banco da escuta
         if ativo:
+            _exigir_dentro(m, spool)
             destinos.saude(con, dict(m), campos)
         _fechar(con, id_, agora, tipo="saude", confianca=r.confianca, apagar_texto=True)
         c["classificadas"] += 1
@@ -127,15 +128,22 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
     c["classificadas"] += 1
 
 
-def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca) -> None:
+def _exigir_dentro(m, spool) -> None:
+    """Caminho de anexo vem do banco (não confiável): só vai a um destino se estiver dentro do spool. Senão a mensagem falha e nada é tocado."""
+    if m["anexo_caminho"] and (spool is None or not _dentro(m["anexo_caminho"], Path(spool))):
+        raise RuntimeError("anexo fora do spool")
+
+
+def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca, spool) -> None:
     """Aprovado sem texto ou 'nada'. Com anexo: no ativo entrega (documento) antes de apagar; no registro guarda o anexo."""
     if not m["anexo_caminho"]:
         _fechar(con, m["id"], agora, tipo="nada", confianca=confianca, apagar_texto=True)
         return
-    c["documentos"] += 1
     if ativo:
+        _exigir_dentro(m, spool)
         destinos.documento(con, dict(m))  # se levantar, nada foi apagado (transação desfeita)
         apagar.append(m["anexo_caminho"])
+    c["documentos"] += 1
     _fechar(con, m["id"], agora, tipo="nada", confianca=confianca, apagar_texto=True, apagar_anexo=ativo)
 
 
@@ -157,7 +165,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
                 m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
                 if m is None:
                     continue
-                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar)
+                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool)
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)

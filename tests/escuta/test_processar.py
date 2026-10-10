@@ -137,18 +137,14 @@ def test_nada_apaga_texto(con, tmp_path):
     (spool / "anexos").mkdir(parents=True)
     arq = spool / "anexos" / "a.pdf"
     arq.write_text("x")
-    fora = tmp_path / "fora.pdf"
-    fora.write_text("x")
     _msg(con, texto=SEGREDO, anexo=str(arq))
-    _msg(con, ext="m2", texto=SEGREDO, anexo=str(fora), rec="2026-10-11T09:01:00")
     d = FakeDestinos()
     _rodar(con, d, FakeModelo(), spool=spool)
-    assert d.docs == ["m1", "m2"]
-    for e in ("m1", "m2"):
-        m = _msg_row(con, e)
-        assert m["texto"] is None and m["anexo_caminho"] is None and m["tipo"] == "nada"
-        assert m["id_externo"] == e and m["de"] == N and m["recebida_em"]
-    assert not arq.exists() and fora.exists()
+    assert d.docs == ["m1"]
+    m = _msg_row(con)
+    assert m["texto"] is None and m["anexo_caminho"] is None and m["tipo"] == "nada"
+    assert m["id_externo"] == "m1" and m["de"] == N and m["recebida_em"]
+    assert not arq.exists()
 
 
 def test_instrucao_no_texto_com_modelo_nada_vira_nada(con):
@@ -411,3 +407,55 @@ def test_retidas_conta_so_as_novas_retidas(con):
     _msg(con)
     assert _rodar(con, FakeDestinos(), _ped())["retidas"] == 1
     assert _rodar(con, FakeDestinos(), _ped())["retidas"] == 0
+
+
+def test_anexo_fora_do_spool_falha_sem_tocar(con, tmp_path):
+    _aprovado(con)
+    spool, _ = _anexo(tmp_path)
+    fora = tmp_path / "fora.pdf"
+    fora.write_text("x")
+    _msg(con, texto="", anexo=str(fora))
+    d = FakeDestinos()
+    r = _rodar(con, d, None, spool=spool)
+    m = _msg_row(con)
+    assert d.docs == [] and m["estado"] == "falhou" and m["anexo_caminho"] == str(fora) and fora.exists()
+    assert r["falhas"] == 1 and r["documentos"] == 0 and len(_avisos(con, "servico_falhou")) == 1
+
+
+def test_anexo_com_ponto_ponto_falha(con, tmp_path):
+    _aprovado(con)
+    spool, _ = _anexo(tmp_path)
+    fora = tmp_path / "fora.pdf"
+    fora.write_text("x")
+    _msg(con, texto="", anexo=str(spool / "anexos" / ".." / ".." / "fora.pdf"))
+    d = FakeDestinos()
+    _rodar(con, d, None, spool=spool)
+    assert d.docs == [] and _msg_row(con)["estado"] == "falhou" and fora.exists()
+
+
+def test_anexo_sem_spool_em_ativo_falha(con, tmp_path):
+    _aprovado(con)
+    _, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, None)
+    assert d.docs == [] and _msg_row(con)["estado"] == "falhou" and arq.exists()
+
+
+def test_saude_com_anexo_fora_do_spool_falha(con, tmp_path):
+    _aprovado(con)
+    spool, _ = _anexo(tmp_path)
+    fora = tmp_path / "fora.pdf"
+    fora.write_text("x")
+    _msg(con, texto=SEGREDO, anexo=str(fora))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo({"tipo": "saude", "confianca": 0.95, "campos": {}}), spool=spool)
+    assert d.saudes == [] and _msg_row(con)["estado"] == "falhou" and _msg_row(con)["texto"] == SEGREDO
+
+
+def test_documentos_so_conta_apos_sucesso(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    r = _rodar(con, FakeDestinos(erro_doc=RuntimeError("x")), None, spool=spool)
+    assert r["documentos"] == 0

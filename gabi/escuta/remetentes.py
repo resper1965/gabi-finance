@@ -121,7 +121,7 @@ def _descartar(con, numero: str, estado: str, por: str, spool: Path | None) -> N
                 d["escuta_aprovada"] = False
                 con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), p["id"]))
         anexos = [r[0] for r in con.execute("select anexo_caminho from escuta_msg where de=? and anexo_caminho is not null", (numero,))]
-        con.execute("update escuta_msg set texto=null where de=? and estado='retida'", (numero,))
+        con.execute("update escuta_msg set texto=null where de=? and (estado='retida' or tipo='crise')", (numero,))
         con.execute("update escuta_msg set anexo_caminho=null where de=?", (numero,))
         _auditar(con, por, f"escuta: {estado} {numero}")
     if spool is not None:  # só apaga arquivo dentro da pasta do spool; caminho vindo do banco não é confiável
