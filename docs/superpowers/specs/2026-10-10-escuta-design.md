@@ -7,11 +7,12 @@ Data: 10/10/2026 · Estado: **rascunho para revisão do Ricardo** · Substitui o
 - A escuta continua **nunca respondendo a ninguém**. Faz só três coisas: registrar **pedido de dinheiro**, **documento de saúde** (reembolso do plano) e **crise**.
 - **Crise: só chamar atenção**, para o Ricardo e mais ninguém. Sem citar a mensagem, sem avaliação, sem conselho.
 - Quem pode gerar registro é uma **lista de aprovados**, que o Ricardo mantém **pelo painel, sem código**.
-- **Contatos do Google** dão nome aos números e alimentam a fila de aprovação. Só sugerem; nunca aprovam.
+- **Contatos do Google** dão nome aos números e alimentam a fila de aprovação. Só sugerem; nunca aprovam. **Fonte única: `resper@gmail.com`** (decisão do Ricardo: centralizar todos os contatos nessa conta; a ness migra para a Microsoft).
+- **Dados de saúde são reprocessáveis**, sempre (decisão do Ricardo, muito importante), em especial a lista que ele está copiando. Nada de saúde é apagado depois de classificado.
 - Fora deste spec: agenda do Google (sub-projeto seguinte, reabre só a agenda da Fase 3), o corte do `gabi-financeiro` (G21), Telegram/WhatsApp do Hermes (Tasks 12–13), desligar o OpenClaw (Task 15).
 
 ## 2. Regras herdadas (valem sem exceção)
-R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático (a escuta **não envia nada ao remetente**; só avisa o Ricardo) · R14 texto de terceiros é dado delimitado, nunca instrução · ADR-007 só o Ricardo conversa com o Hermes · ADR-014 saúde não fica no `gabi.db` · dados nunca chumbados no código · segredos o Ricardo coloca.
+R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático (a escuta **não envia nada ao remetente**; só avisa o Ricardo) · R14 texto de terceiros é dado delimitado, nunca instrução · ADR-007 só o Ricardo conversa com o Hermes · ADR-014 saúde não fica no `gabi.db`: fica no arquivo cifrado próprio (AES-256-GCM) · dados nunca chumbados no código · segredos o Ricardo coloca.
 
 ## 3. Arquitetura
 ```
@@ -47,12 +48,14 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 
 ### 3.4 Destinos
 - **pedido** → `gabi/cobrar/pedidos.py` (já registra sem dizer que pagou; só o Ricardo aprova no painel). O remetente aprovado tem que ter `pode_pedir`.
-- **saúde** → o anexo vai para o `consume` do Paperless (assume o papel do `gabi-wa-docs`) e a pista segue o fluxo existente do `reembolso_fila.py` (casa por checksum, classifica, avisa). O texto de saúde **não** fica em `escuta_msg`: é apagado depois de extrair os campos; os dados de saúde seguem o caminho que já existe (Paperless/reembolso), sem ampliar o que o `gabi.db` guarda hoje.
+- **saúde** → o anexo vai para o `consume` do Paperless (assume o papel do `gabi-wa-docs`) e a pista segue o fluxo existente do `reembolso_fila.py` (casa por checksum, classifica, avisa). **O original (texto, anexo e campos extraídos) é guardado no cofre de saúde**: arquivo cifrado próprio, no padrão do ADR-014 (`saude.enc`, AES-256-GCM, chave do Ricardo), nunca em `escuta_msg` nem no `gabi.db`, fora do MCP e dos backups em claro. No `gabi.db` fica só uma referência (id do item no cofre, tipo e data).
+- **Reprocessar saúde** (requisito): o item no cofre guarda a entrada original; o brain pode **rodar de novo** a classificação e a extração (modelo novo, regra corrigida ou lote inteiro) sem depender de a mensagem ainda existir no WhatsApp. Reprocessar nunca apaga o resultado anterior: gera uma nova versão e mantém a antiga para comparar. Disparo pelo painel (um item, filtro ou lote), só para quem tem acesso total à saúde.
+- **Entrada em lote da lista do Ricardo**: além do WhatsApp, o cofre aceita importar uma lista de documentos de saúde por arquivo (pasta ou planilha em `~`, sem precisar colar na sessão). Cada linha vira um item reprocessável pelo mesmo caminho. Formato fechado na revisão do spec (ver pergunta aberta na seção 7).
 - **crise** → um `aviso` Telegram ao Ricardo: "Possível crise: <nome ou número>. Abra a conversa." Nada mais. Sem nível, sem trecho, sem conselho. Só ao Ricardo.
-- **nada** → texto e anexo apagados; fica só `id_externo`, remetente, data e tipo.
+- **nada** → texto e anexo apagados (vale só para tipo "nada"; saúde, pedido e crise nunca são apagados daqui); fica só `id_externo`, remetente, data e tipo.
 
 ### 3.5 Contatos do Google
-- Acesso `contacts.readonly` no mesmo OAuth do G12 (acrescenta um escopo). **Contas**: as mesmas da agenda (parâmetro de cadastro; decisão final do Ricardo, padrão = ness, bekaa.eu, esper.ws).
+- Acesso `contacts.readonly` no OAuth do G12 (acrescenta um escopo), **somente para `resper@gmail.com`** (parâmetro de cadastro; outras contas podem ser acrescentadas depois, sem código). A ness.com.br vai migrar para a Microsoft: contatos de lá não entram; se o Ricardo quiser, serão exportados para o Gmail por ele.
 - Timer diário, sem modelo, grava `contato_google(conta, nome, telefone_e164)`. Só nome e telefone; nada de foto, e-mail, endereço ou nota.
 - Uso: dar nome ao número na fila e no aviso; botão "Trazer dos contatos" no painel (seleção pessoa a pessoa) cria `pessoa`. **Estar nos contatos não aprova ninguém.**
 - Revogar o acesso apaga a tabela.
@@ -63,7 +66,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - Filas históricas (`feitas/`, `falhas/`) não se apagam; são arquivadas.
 
 ## 4. Dados (migração 0021)
-`escuta_msg`, `escuta_remetente` (estado: pendente/aprovado/ignorado/bloqueado), `escuta_grupo`, `contato_google`; colunas `pessoa.escuta_aprovada` e `pessoa.papel_escuta`. Parâmetros de cadastro: palavras de risco, contas de contatos, teto de custo, horas sem receber. Nada disso no código.
+`escuta_msg`, `saude_item_ref` (referência ao cofre), `escuta_remetente` (estado: pendente/aprovado/ignorado/bloqueado), `escuta_grupo`, `contato_google`; colunas `pessoa.escuta_aprovada` e `pessoa.papel_escuta`. Parâmetros de cadastro: palavras de risco, contas de contatos, teto de custo, horas sem receber. Nada disso no código.
 
 ## 5. Erros e segurança
 - Sem chave do modelo ou teto estourado: o timer **não classifica**; mensagens ficam "novas" e um aviso diz isso. Crise por palavra de risco continua funcionando sem modelo.
@@ -73,9 +76,14 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 
 ## 6. Testes e aceite
 - Unidade (contra cliente de modelo falso): classificação de cada tipo; JSON inválido; injeção ("ignore as instruções…") vira "nada"; remetente fora da lista não chama o modelo; crise sem modelo; grupo ignorado; texto de "nada" apagado; saúde não deixa texto no banco.
+- Saúde: item entra no cofre cifrado e nada de saúde aparece no `gabi.db` (teste varre o banco); reprocessar gera versão nova e preserva a anterior; reprocessar em lote; sem acesso total, o painel nega; importação da lista por arquivo.
 - Painel: fila, aprovar/ignorar/bloquear, "Trazer dos contatos" (vitest).
 - Ouvinte: contra servidor falso do WhatsApp.
 - **Paralelo** (aceite): ouvinte e brain rodam ao lado do agente antigo por alguns dias, só em modo registro; compara-se o que cada um classificou. Só depois a escuta antiga é aposentada. Aceite com dado real, como nas demais fases.
 
 ## 7. Pendências do Ricardo (não bloqueiam o código)
-Parear o ouvinte (QR) · G12 com o escopo de contatos · revisar a lista de candidatos no painel · confirmar as contas de contatos · chave do modelo já existe (OpenRouter).
+Parear o ouvinte (QR) · G12 com o escopo de contatos · revisar a lista de candidatos no painel · chave do modelo já existe (OpenRouter) · **chave do cofre de saúde** (a mesma do ADR-014, já é dele).
+
+**Pergunta aberta (saúde):** o que é a "lista que o Ricardo está copiando" (formato, onde está, quantos itens, se vem de WhatsApp, planilha, PDFs ou e-mail). Define o formato da importação em lote (seção 3.4). Até responder, o spec garante só o requisito: tudo que entra no cofre é reprocessável.
+
+**Nota para o sub-projeto da agenda:** a ness.com.br migra para a Microsoft; a agenda dela passa a depender do G11 (Graph), não do Google.
