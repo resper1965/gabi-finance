@@ -57,3 +57,46 @@ def test_item_de_outro_mes_ou_fora_da_janela_do_financeiro_nao_vira_divergencia(
     arq = _fin(tmp_path, proximos_7_dias=[("luz:2026-10", "2026-10-12", 1.0)])
     _brain(con, "luz:2026-10", "2026-10-12", 100)
     assert comparar(con, arq, "2026-10") == []
+
+
+def _brain_pago(con, id_, venc, centavos):
+    con.execute("insert into compromisso(id, nome, vencimento, vencimento_util, valor_centavos, estado) values (?,?,?,?,?, 'pago')",
+                (id_, id_, venc, venc, centavos))
+
+
+def _fin_com_pagos(tmp_path, pagos, **secoes):
+    arq = _fin(tmp_path, **secoes)
+    d = json.loads(arq.read_text())
+    d["pagos_ids"] = pagos
+    arq.write_text(json.dumps(d))
+    return arq
+
+
+def test_pago_dos_dois_lados_nao_gera_divergencia(con, tmp_path):
+    _brain_pago(con, "aluguel:2026-10", "2026-10-05", 450000)
+    _brain(con, "luz:2026-10", "2026-10-12", 31090)
+    arq = _fin_com_pagos(tmp_path, ["aluguel:2026-10"], proximos_7_dias=[("luz:2026-10", "2026-10-12", 310.9)])
+    assert comparar(con, arq, "2026-10") == []
+
+
+def test_pago_no_brain_e_aberto_no_financeiro_e_reportado(con, tmp_path):
+    _brain_pago(con, "clube:2026-10", "2026-10-13", 279305)
+    arq = _fin_com_pagos(tmp_path, [], proximos_7_dias=[("clube:2026-10", "2026-10-13", 2024.52)])
+    (d,) = comparar(con, arq, "2026-10")
+    assert d["estado_diferente"] == {"brain": "pago", "financeiro": "aberto"}
+    assert d["valor_diferente"] == {"brain": 279305, "financeiro": 202452}
+
+
+def test_pago_no_financeiro_e_aberto_no_brain_e_reportado(con, tmp_path):
+    _brain(con, "luz:2026-10", "2026-10-12", 31090)
+    arq = _fin_com_pagos(tmp_path, ["luz:2026-10"], proximos_7_dias=[("agua:2026-10", "2026-10-12", 1.0)])
+    _brain(con, "agua:2026-10", "2026-10-12", 100)
+    (d,) = comparar(con, arq, "2026-10")
+    assert d["linha"] == "luz:2026-10" and d["estado_diferente"] == {"brain": "previsto", "financeiro": "pago"}
+
+
+def test_pago_so_no_financeiro_sem_linha_no_brain_e_reportado(con, tmp_path):
+    arq = _fin_com_pagos(tmp_path, ["luz:2026-10"], proximos_7_dias=[("agua:2026-10", "2026-10-12", 1.0)])
+    _brain(con, "agua:2026-10", "2026-10-12", 100)
+    (d,) = comparar(con, arq, "2026-10")
+    assert d["linha"] == "luz:2026-10" and d["so_no_financeiro"]

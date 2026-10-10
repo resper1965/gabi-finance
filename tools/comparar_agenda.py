@@ -14,26 +14,39 @@ def _centavos(reais) -> int:
 
 
 def comparar(brain_con, compromissos_json: Path, mes: str) -> list[dict]:
-    """Divergências do mês. O JSON do financeiro só cobre uma janela de datas: do lado do brain só conta o que cai dentro dela."""
+    """Divergências do mês. O JSON do financeiro só lista o que está em aberto (os pagos vão em pagos_ids) e só cobre uma
+    janela de datas: do lado do brain só conta o que cai dentro dela."""
     dados = json.loads(Path(compromissos_json).read_text(encoding="utf-8"))
     fin = {i["id"]: i for s in SECOES for i in dados.get(s) or [] if str(i.get("id", "")).endswith(f":{mes}")}
+    pagos = {i for i in dados.get("pagos_ids") or [] if str(i).endswith(f":{mes}")}
     if not fin:
         return []
     vencs = [i["vencimento"] for i in fin.values() if i.get("vencimento")]
     ini, fim = min(vencs), max(vencs)
     brain = {r[0]: r for r in brain_con.execute(
-        "select id, valor_centavos, coalesce(vencimento_util, vencimento) from compromisso where id like ?", (f"%:{mes}",))}
+        "select id, valor_centavos, coalesce(vencimento_util, vencimento), estado from compromisso where id like ?", (f"%:{mes}",))}
     saida = []
-    for linha in sorted(set(fin) | set(brain)):
+    for linha in sorted(set(fin) | set(brain) | pagos):
         f, b = fin.get(linha), brain.get(linha)
-        if b and not f:
+        base = {"linha": linha, "so_no_brain": False, "so_no_financeiro": False, "valor_diferente": None, "estado_diferente": None}
+        if linha in pagos:
+            if not b:
+                saida.append({**base, "so_no_financeiro": True})
+            elif b[3] != "pago":
+                saida.append({**base, "estado_diferente": {"brain": b[3], "financeiro": "pago"}})
+        elif b and not f:
             if ini <= (b[2] or "") <= fim:
-                saida.append({"linha": linha, "so_no_brain": True, "so_no_financeiro": False, "valor_diferente": None})
+                saida.append({**base, "so_no_brain": True})
         elif f and not b:
-            saida.append({"linha": linha, "so_no_brain": False, "so_no_financeiro": True, "valor_diferente": None})
-        elif f.get("valor") is not None and b[1] is not None and _centavos(f["valor"]) != b[1]:
-            saida.append({"linha": linha, "so_no_brain": False, "so_no_financeiro": False,
-                          "valor_diferente": {"brain": b[1], "financeiro": _centavos(f["valor"])}})
+            saida.append({**base, "so_no_financeiro": True})
+        else:
+            d = dict(base)
+            if b[3] == "pago":
+                d["estado_diferente"] = {"brain": "pago", "financeiro": "aberto"}
+            if f.get("valor") is not None and b[1] is not None and _centavos(f["valor"]) != b[1]:
+                d["valor_diferente"] = {"brain": b[1], "financeiro": _centavos(f["valor"])}
+            if d != base:
+                saida.append(d)
     return saida
 
 
