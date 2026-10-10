@@ -48,9 +48,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 
 ### 3.4 Destinos
 - **pedido** → `gabi/cobrar/pedidos.py` (já registra sem dizer que pagou; só o Ricardo aprova no painel). O remetente aprovado tem que ter `pode_pedir`.
-- **saúde** → o anexo vai para o `consume` do Paperless (assume o papel do `gabi-wa-docs`) e a pista segue o fluxo existente do `reembolso_fila.py` (casa por checksum, classifica, avisa). **O original (texto, anexo e campos extraídos) é guardado no cofre de saúde**: arquivo cifrado próprio, no padrão do ADR-014 (`saude.enc`, AES-256-GCM, chave do Ricardo), nunca em `escuta_msg` nem no `gabi.db`, fora do MCP e dos backups em claro. No `gabi.db` fica só uma referência (id do item no cofre, tipo e data).
-- **Reprocessar saúde** (requisito): o item no cofre guarda a entrada original; o brain pode **rodar de novo** a classificação e a extração (modelo novo, regra corrigida ou lote inteiro) sem depender de a mensagem ainda existir no WhatsApp. Reprocessar nunca apaga o resultado anterior: gera uma nova versão e mantém a antiga para comparar. Disparo pelo painel (um item, filtro ou lote), só para quem tem acesso total à saúde.
-- **Entrada em lote da lista do Ricardo**: além do WhatsApp, o cofre aceita importar uma lista de documentos de saúde por arquivo (pasta ou planilha em `~`, sem precisar colar na sessão). Cada linha vira um item reprocessável pelo mesmo caminho. Formato fechado na revisão do spec (ver pergunta aberta na seção 7).
+- **saúde** → o **anexo vai para o Paperless** (`consume`, com a etiqueta `saude-exame`; assume o papel do `gabi-wa-docs`) e **o Paperless é o arquivo do original**. A extração, a confirmação do dono, o histórico por familiar e o **reprocessamento** são do módulo de exames (spec 2026-10-11-exames-design). A pista de reembolso segue o fluxo do `reembolso_fila.py` (casa por checksum, classifica, avisa). Mensagem de saúde **só de texto** (sem anexo) é guardada no cofre cifrado (ADR-014), nunca em `escuta_msg` nem no `gabi.db`. Nada de saúde é apagado.
 - **crise** → um `aviso` Telegram ao Ricardo: "Possível crise: <nome ou número>. Abra a conversa." Nada mais. Sem nível, sem trecho, sem conselho. Só ao Ricardo.
 - **nada** → texto e anexo apagados (vale só para tipo "nada"; saúde, pedido e crise nunca são apagados daqui); fica só `id_externo`, remetente, data e tipo.
 
@@ -69,7 +67,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - Filas históricas (`feitas/`, `falhas/`) não se apagam; são arquivadas.
 
 ## 4. Dados (migração 0021)
-`escuta_msg`, `saude_item_ref` (referência ao cofre), `escuta_remetente` (estado: pendente/aprovado/ignorado/bloqueado), `escuta_grupo`, `contato_google`; colunas `pessoa.escuta_aprovada` e `pessoa.papel_escuta`. Parâmetros de cadastro: palavras de risco, contas de contatos, teto de custo, horas sem receber. Nada disso no código.
+`escuta_msg`, `escuta_remetente` (estado: pendente/aprovado/ignorado/bloqueado), `escuta_grupo`, `contato_google`; colunas `pessoa.escuta_aprovada` e `pessoa.papel_escuta`. Parâmetros de cadastro: palavras de risco, contas de contatos, teto de custo, horas sem receber. Nada disso no código.
 
 ## 5. Erros e segurança
 - Sem chave do modelo ou teto estourado: o timer **não classifica**; mensagens ficam "novas" e um aviso diz isso. Crise por palavra de risco continua funcionando sem modelo.
@@ -85,8 +83,8 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - **Paralelo** (aceite): ouvinte e brain rodam ao lado do agente antigo por alguns dias, só em modo registro; compara-se o que cada um classificou. Só depois a escuta antiga é aposentada. Aceite com dado real, como nas demais fases.
 
 ## 7. Pendências do Ricardo (não bloqueiam o código)
-Parear o ouvinte (QR) · G12 com o escopo de contatos (as duas contas) · importar no Gmail o arquivo "só na ness" antes da migração · revisar a lista de candidatos no painel · chave do modelo já existe (OpenRouter) · **chave do cofre de saúde** (a mesma do ADR-014, já é dele).
+Parear o ouvinte (QR) · G12 com o escopo de contatos (as duas contas) · importar no Gmail o arquivo "só na ness" antes da migração · revisar a lista de candidatos no painel · chave do modelo já existe (OpenRouter) · chave do cofre de saúde (a mesma do ADR-014, já é dele).
 
-**Pergunta aberta (saúde):** o que é a "lista que o Ricardo está copiando" (formato, onde está, quantos itens, se vem de WhatsApp, planilha, PDFs ou e-mail). Define o formato da importação em lote (seção 3.4). Até responder, o spec garante só o requisito: tudo que entra no cofre é reprocessável.
+**Saúde:** a lista do Ricardo são PDFs de exames; o histórico por familiar é o módulo de exames (spec 2026-10-11-exames-design). Aqui a escuta só leva o anexo ao Paperless.
 
 **Nota para o sub-projeto da agenda:** a ness.com.br migra para a Microsoft; a agenda dela passa a depender do G11 (Graph), não do Google. A agenda do Gmail pessoal segue pelo Google.
