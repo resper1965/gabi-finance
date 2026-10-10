@@ -70,16 +70,15 @@ def test_grau_total_exigido_barra_o_parcial(banco):
 
 def test_nenhuma_rota_do_app_real_abre_para_familiar_ou_terceiro_alem_do_publico(banco):
     app = criar_app(banco, permite_tcp_local=True)
-    abertas = []
-    for rota in app.routes:
-        caminho = getattr(rota, "path", None)
-        if not caminho or not caminho.startswith("/api"):
-            continue
-        caminho = re.sub(r"\{[^}]+\}", "1", caminho)
-        for metodo in getattr(rota, "methods", set()) - {"HEAD", "OPTIONS"}:
-            for nivel in ("familia_vip", "terceiros"):
-                if _chamar(app, LOGINS[nivel], metodo, caminho).status_code not in (401, 403):
-                    abertas.append((metodo, caminho, nivel))
-    # hoje só duas rotas pedem 'terceiros' (identidade e saúde do serviço); qualquer outra abertura nova precisa entrar aqui de propósito
-    assert {(m, c) for m, c, n in abertas if n == "familia_vip"} == {(m, c) for m, c, n in abertas if n == "terceiros"}
-    assert len({c for _, c, _ in abertas}) <= 2, abertas
+    rotas = [(m.upper(), p) for p, ops in app.openapi()["paths"].items() if p.startswith("/api") for m in ops]  # openapi enxerga as rotas dos routers incluídos
+    assert len(rotas) > 80, "varredura curta demais: as rotas dos routers sumiram do openapi"
+    abertas = set()
+    for metodo, caminho in rotas:
+        url = re.sub(r"\{[^}]+\}", "1", caminho)
+        for nivel in ("familia_vip", "terceiros"):
+            if _chamar(app, LOGINS[nivel], metodo, url).status_code not in (401, 403):
+                abertas.add((metodo, caminho, nivel))
+    # rotas que pedem só 'terceiros' ou a matriz (saúde parcial): qualquer abertura nova precisa entrar aqui de propósito
+    esperadas = {("GET", "/api/eu", "familia_vip"), ("GET", "/api/eu", "terceiros")}
+    familia = {(m, c, "familia_vip") for m, c, _ in abertas if c.startswith("/api/v1/familia/") and m == "GET"}
+    assert abertas - familia == esperadas, sorted(abertas - familia - esperadas)
