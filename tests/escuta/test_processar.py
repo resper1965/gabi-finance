@@ -15,8 +15,13 @@ SEGREDO = "SEGREDO-123"
 
 
 class FakeDestinos:
-    def __init__(self, erro=None):
-        self.pedidos, self.saudes, self.crises, self.erro = [], [], [], erro
+    def __init__(self, erro=None, erro_doc=None):
+        self.pedidos, self.saudes, self.crises, self.docs, self.erro, self.erro_doc = [], [], [], [], erro, erro_doc
+
+    def documento(self, con, msg):
+        if self.erro_doc:
+            raise self.erro_doc
+        self.docs.append(msg["id_externo"])
 
     def pedido(self, con, remetente_pessoa_id, numero, msg, campos):
         if self.erro:
@@ -101,7 +106,9 @@ def test_fora_da_lista_com_risco_avisa_sem_citar(con):
     _rodar(con, d, cli)
     assert d.crises == [(N, None)] and cli.chamadas == 0
     assert SEGREDO not in json.dumps(d.crises)
-    assert _msg_row(con)["tipo"] == "crise" and _msg_row(con)["estado"] == "processada" and _msg_row(con)["texto"] is None
+    assert _msg_row(con)["tipo"] == "crise" and _msg_row(con)["estado"] == "processada" and _msg_row(con)["texto"]
+    assert len(_avisos(con, "escuta_novo_remetente")) == 1
+    assert SEGREDO not in json.dumps([dict(r) for r in con.execute("select * from aviso")])
     _rodar(con, d, cli)
     assert len(d.crises) == 1
 
@@ -134,7 +141,9 @@ def test_nada_apaga_texto(con, tmp_path):
     fora.write_text("x")
     _msg(con, texto=SEGREDO, anexo=str(arq))
     _msg(con, ext="m2", texto=SEGREDO, anexo=str(fora), rec="2026-10-11T09:01:00")
-    _rodar(con, FakeDestinos(), FakeModelo(), spool=spool)
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), spool=spool)
+    assert d.docs == ["m1", "m2"]
     for e in ("m1", "m2"):
         m = _msg_row(con, e)
         assert m["texto"] is None and m["anexo_caminho"] is None and m["tipo"] == "nada"
@@ -276,3 +285,129 @@ def test_ordem_por_recebida_em(con):
     d = FakeDestinos()
     _rodar(con, d, _ped())
     assert [p[2] for p in d.pedidos] == ["a", "b"]
+
+
+def _anexo(tmp_path, nome="a.pdf"):
+    spool = tmp_path / "spool"
+    (spool / "anexos").mkdir(parents=True, exist_ok=True)
+    arq = spool / "anexos" / nome
+    arq.write_text("x")
+    return spool, arq
+
+
+def test_anexo_sem_texto_ativo_entrega_e_depois_apaga(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    d, cli = FakeDestinos(), _ped()
+    r = _rodar(con, d, cli, spool=spool)
+    assert d.docs == ["m1"] and cli.chamadas == 0 and r["documentos"] == 1
+    assert _msg_row(con)["anexo_caminho"] is None and not arq.exists()
+    _rodar(con, d, cli, spool=spool)
+    assert d.docs == ["m1"]
+
+
+def test_anexo_registro_nao_apaga_anexo(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto=SEGREDO, anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), modo="registro", spool=spool)
+    m = _msg_row(con)
+    assert d.docs == [] and m["texto"] is None and m["anexo_caminho"] == str(arq) and arq.exists()
+
+
+def test_documento_falha_nao_apaga(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    r = _rodar(con, FakeDestinos(erro_doc=RuntimeError("paperless fora")), None, spool=spool)
+    m = _msg_row(con)
+    assert m["estado"] == "falhou" and m["anexo_caminho"] == str(arq) and arq.exists() and r["falhas"] == 1
+
+
+def test_saude_registro_sem_texto_nem_campos_em_nenhuma_tabela(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto=f"consulta ortopedia {SEGREDO}", anexo=str(arq))
+    cli = FakeModelo({"tipo": "saude", "confianca": 0.95, "campos": {"paciente": "PACIENTE-XYZ", "valor": 777.77}})
+    d = FakeDestinos()
+    _rodar(con, d, cli, modo="registro", spool=spool)
+    m = _msg_row(con)
+    assert m["tipo"] == "saude" and m["confianca"] == 0.95 and m["campos"] is None and m["texto"] is None
+    assert m["anexo_caminho"] == str(arq) and d.saudes == []
+    for t in [r[0] for r in con.execute("select name from sqlite_master where type='table'")]:
+        lixo = json.dumps([[str(x) for x in r] for r in con.execute(f"select * from {t}")])
+        assert SEGREDO not in lixo and "PACIENTE-XYZ" not in lixo and "777.77" not in lixo, t
+
+
+def test_saude_ativo_chama_destino_e_apaga_texto(con):
+    _aprovado(con)
+    _msg(con, texto=SEGREDO)
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo({"tipo": "saude", "confianca": 0.95, "campos": {"paciente": "P"}}))
+    assert d.saudes == [("m1", {"paciente": "P"})] and _msg_row(con)["texto"] is None
+
+
+def test_grupo_nao_aprovado_apaga_texto_e_anexo(con, tmp_path):
+    spool, arq = _anexo(tmp_path)
+    _msg(con, numero="123@g.us", grupo=1, id_grupo="g1", texto=SEGREDO, anexo=str(arq))
+    _rodar(con, FakeDestinos(), _ped(), spool=spool)
+    m = _msg_row(con)
+    assert m["texto"] is None and m["anexo_caminho"] is None and not arq.exists()
+
+
+def test_excecao_generica_avisa_servico_falhou_uma_vez_por_dia(con):
+    _aprovado(con)
+    for i in range(2):
+        _msg(con, ext=f"m{i}", rec=f"2026-10-11T09:0{i}:00")
+    d = FakeDestinos(erro=RuntimeError("boom"))
+    _rodar(con, d, _ped())
+    _rodar(con, d, _ped())
+    assert _avisos(con, "servico_falhou") == [{"unidade": "gabi-brain-escuta"}]
+    assert [r["estado"] for r in con.execute("select estado from escuta_msg")] == ["falhou", "falhou"]
+
+
+def test_pedido_incompleto_nao_gera_servico_falhou(con):
+    _aprovado(con)
+    _msg(con)
+    _rodar(con, FakeDestinos(erro=ValueError("x")), _ped())
+    assert _avisos(con, "servico_falhou") == []
+
+
+def test_bloqueado_ignorado(con):
+    con.execute("insert into escuta_remetente(numero, estado, vista_em, qtd) values (?, 'bloqueado', ?, 1)", (N, AGORA))
+    _msg(con, texto=SEGREDO)
+    cli, d = _ped(), FakeDestinos()
+    _rodar(con, d, cli)
+    assert cli.chamadas == 0 and (d.pedidos, d.crises, d.docs) == ([], [], []) and _msg_row(con)["texto"] is None
+
+
+def test_registro_apaga_texto_do_nada(con):
+    _aprovado(con)
+    _msg(con, texto=SEGREDO)
+    _rodar(con, FakeDestinos(), FakeModelo(), modo="registro")
+    assert _msg_row(con)["texto"] is None and _msg_row(con)["tipo"] == "nada"
+
+
+def test_crise_aprovado_teto_estourado_com_cliente(con):
+    _risco(con, "sem saida")
+    _aprovado(con)
+    _msg(con, texto=f"estou sem saída {SEGREDO}")
+    cli, d = _ped(), FakeDestinos()
+    processar(con, d, cli, Orcamento(0.0, 0.0), AGORA, "ativo")
+    assert d.crises == [(N, "Joana")] and cli.chamadas == 0
+    assert SEGREDO not in json.dumps([dict(r) for r in con.execute("select * from aviso")])
+
+
+def test_pedido_sem_pode_pedir_estado_e_contadores(con):
+    _aprovado(con, pode_pedir=False)
+    _msg(con)
+    r = _rodar(con, FakeDestinos(), _ped())
+    assert _msg_row(con)["estado"] == "processada" and r["falhas"] == 1 and r["classificadas"] == 0
+
+
+def test_retidas_conta_so_as_novas_retidas(con):
+    _msg(con)
+    assert _rodar(con, FakeDestinos(), _ped())["retidas"] == 1
+    assert _rodar(con, FakeDestinos(), _ped())["retidas"] == 0

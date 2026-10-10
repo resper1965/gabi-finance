@@ -10,3 +10,6 @@ class Destinos(Protocol):
 
     def crise(self, con, numero: str, nome: str | None) -> None:
         """Nunca recebe o texto da mensagem."""
+
+    def documento(self, con, msg: dict) -> None:
+        """Entrega o anexo da mensagem (Paperless). Se levantar, o anexo NÃO é apagado e a mensagem fica falhou."""

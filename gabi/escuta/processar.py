@@ -40,11 +40,11 @@ def _nome(con, numero: str, pessoa_id: str | None) -> str | None:
     return r["nome"] if r else None
 
 
-def _fechar(con, id_: int, agora: str, tipo=None, confianca=None, campos=None, apagar=False, estado="processada") -> None:
+def _fechar(con, id_: int, agora: str, tipo=None, confianca=None, campos=None, apagar_texto=False, apagar_anexo=False) -> None:
     con.execute(
-        "update escuta_msg set estado=?, tipo=?, confianca=?, campos=?, processada_em=?"
-        + (", texto=null, anexo_caminho=null" if apagar else "") + " where id=?",
-        (estado, tipo, confianca, json.dumps(campos, ensure_ascii=False) if campos else None, agora, id_))
+        "update escuta_msg set estado='processada', tipo=?, confianca=?, campos=?, processada_em=?"
+        + (", texto=null" if apagar_texto else "") + (", anexo_caminho=null" if apagar_anexo else "") + " where id=?",
+        (tipo, confianca, json.dumps(campos, ensure_ascii=False) if campos else None, agora, id_))
 
 
 def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None) -> None:
@@ -54,13 +54,15 @@ def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None) ->
             _aviso(con, aviso[0], aviso[1], agora)
 
 
-def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, spool, apagar: list) -> None:
-    """Roda dentro da transação da mensagem. Atualiza contadores em c; arquivos a apagar vão em `apagar` (após o commit)."""
-    id_, texto, ativo = m["id"], m["texto"], modo == "ativo"
+def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list) -> None:
+    """Roda dentro da transação da mensagem. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
+    Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
+    id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
     if m["grupo"]:
         g = con.execute("select aprovado from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
-        if not (g and g["aprovado"] == 1):
-            _fechar(con, id_, agora)
+        if not (g and g["aprovado"] == 1):  # grupo fora da lista: não guarda nada
+            _fechar(con, id_, agora, apagar_texto=True, apagar_anexo=True)
+            apagar.append(anexo)
             return
         numero, estado, pid = m["de"], "aprovado", None
     else:
@@ -70,42 +72,47 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, spool, 
             if estado == "ignorado" and tem_risco(texto or "", palavras):
                 if ativo:
                     destinos.crise(con, numero, _nome(con, numero, None))
-                _fechar(con, id_, agora, tipo="crise", apagar=True)
-                apagar.append(m["anexo_caminho"])
-                return
-            _fechar(con, id_, agora, apagar=True)
-            apagar.append(m["anexo_caminho"])
+                _fechar(con, id_, agora, tipo="crise", apagar_texto=True, apagar_anexo=True)
+            else:
+                _fechar(con, id_, agora, apagar_texto=True, apagar_anexo=True)
+            apagar.append(anexo)
             return
     nome = _nome(con, numero, pid)
     aprovado = estado == "aprovado"
-    if tem_risco(texto or "", palavras):  # independe do modelo e do remetente estar aprovado
+    if tem_risco(texto or "", palavras):  # independe do modelo e do remetente estar aprovado; crise nunca é apagada daqui
         if ativo:
             destinos.crise(con, numero, nome)
-        _fechar(con, id_, agora, tipo="crise", apagar=not aprovado)
         if not aprovado:
-            apagar.append(m["anexo_caminho"])
+            avisar_novo(con, numero, agora)
+        _fechar(con, id_, agora, tipo="crise")
         c["classificadas"] += 1
         return
     if not aprovado:
         avisar_novo(con, numero, agora)
+        if m["estado"] == "nova":
+            c["retidas"] += 1
         con.execute("update escuta_msg set estado='retida' where id=?", (id_,))
-        c["retidas"] += 1
         return
     if not (texto or "").strip():
-        _fechar(con, id_, agora, tipo="nada", apagar=True)
-        apagar.append(m["anexo_caminho"])
+        _nada(con, destinos, m, agora, ativo, c, apagar, None)
         return
     r = classificar(texto, cliente, orcamento)
     if r is None:  # fica nova e tenta de novo na próxima rodada
         _aviso_sem_modelo(con, agora)
         return
-    tipo, campos = r.tipo, r.campos
+    tipo, campos, negado = r.tipo, r.campos, False
     if tipo == "pedido" and not (pid and dados(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()).get("pode_pedir") is True):
         tipo, campos = "nada", {}
-        c["falhas"] += 1
+        c["falhas"] += 1  # conta só em falhas
+        negado = True
     if tipo == "nada":
-        _fechar(con, id_, agora, tipo="nada", confianca=r.confianca, apagar=True)
-        apagar.append(m["anexo_caminho"])
+        _nada(con, destinos, m, agora, ativo, c, apagar, r.confianca)
+        c["classificadas"] += 0 if negado else 1
+        return
+    if tipo == "saude":  # o texto e os campos de saúde não ficam no banco da escuta
+        if ativo:
+            destinos.saude(con, dict(m), campos)
+        _fechar(con, id_, agora, tipo="saude", confianca=r.confianca, apagar_texto=True)
         c["classificadas"] += 1
         return
     if ativo:
@@ -114,19 +121,30 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, spool, 
                 destinos.pedido(con, pid, numero, dict(m), campos)
             except ValueError as e:
                 raise _PedidoIncompleto() from e
-        elif tipo == "saude":
-            destinos.saude(con, dict(m), campos)
         elif tipo == "crise":
             destinos.crise(con, numero, nome)
     _fechar(con, id_, agora, tipo=tipo, confianca=r.confianca, campos=campos)
     c["classificadas"] += 1
 
 
+def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca) -> None:
+    """Aprovado sem texto ou 'nada'. Com anexo: no ativo entrega (documento) antes de apagar; no registro guarda o anexo."""
+    if not m["anexo_caminho"]:
+        _fechar(con, m["id"], agora, tipo="nada", confianca=confianca, apagar_texto=True)
+        return
+    c["documentos"] += 1
+    if ativo:
+        destinos.documento(con, dict(m))  # se levantar, nada foi apagado (transação desfeita)
+        apagar.append(m["anexo_caminho"])
+    _fechar(con, m["id"], agora, tipo="nada", confianca=confianca, apagar_texto=True, apagar_anexo=ativo)
+
+
 def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento: Orcamento, agora: str,
               modo: str = "registro", spool: Path | None = None) -> dict:
     if modo not in ("registro", "ativo"):
         raise ValueError(f"modo inválido: {modo!r}")
-    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0}
+    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0}
+    erro_geral = False
     palavras = palavras_risco(con)
     ids = [(r["id"], r["estado"]) for r in con.execute(
         "select id, estado from escuta_msg where estado in ('nova','retida') order by recebida_em, id")]
@@ -139,7 +157,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
                 m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
                 if m is None:
                     continue
-                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, spool, apagar)
+                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar)
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)
@@ -151,6 +169,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
         except Exception as e:
             log.warning("escuta: mensagem %s falhou (%s)", id_, type(e).__name__)
             c["falhas"] += 1
+            erro_geral = True
             _falhou(con, id_, agora)
             continue
         if spool is not None:
@@ -160,4 +179,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
                         Path(a).unlink(missing_ok=True)
                     except OSError:
                         pass
+    if erro_geral and not con.execute("select 1 from aviso where tipo='servico_falhou' and payload like ? and substr(criado_em,1,10)=?",
+                                      ('%gabi-brain-escuta%', agora[:10])).fetchone():
+        _aviso(con, "servico_falhou", {"unidade": "gabi-brain-escuta"}, agora)
     return c
