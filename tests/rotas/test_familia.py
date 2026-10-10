@@ -1,5 +1,3 @@
-import json
-import threading
 
 import pytest
 from fastapi.testclient import TestClient
@@ -111,3 +109,15 @@ def test_rejeitar_laudo_descarta(app, cli):
     post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
     assert post(cli, "/api/v1/familia/laudos/55/rejeitar", {}).json()["dados"]["rejeitadas"] == 2
     assert get(cli, "/api/v1/familia/laudos").json()["dados"]["itens"] == []
+
+
+def test_edicoes_externas_listar_e_decidir(app, cli, banco):
+    c = conectar(banco)
+    c.execute("insert into edicao_externa(pessoa_id, arquivo, texto, hash, criado_em) values ('p1','Frentes.md','novo','h','2026-10-10T10:00:00+00:00')")
+    c.close()
+    assert get(cli, "/api/v1/familia/edicoes", VIP).status_code == 403
+    assert [e["arquivo"] for e in get(cli, "/api/v1/familia/edicoes").json()["dados"]["itens"]] == ["Frentes.md"]
+    assert post(cli, "/api/v1/familia/edicoes/1/decidir", {"estado": "talvez"}).status_code == 400
+    assert post(cli, "/api/v1/familia/edicoes/1/decidir", {"estado": "rejeitada"}).status_code == 200
+    assert get(cli, "/api/v1/familia/edicoes").json()["dados"]["itens"] == []
+    assert post(cli, "/api/v1/familia/edicoes/1/decidir", {"estado": "aprovada"}).status_code == 404

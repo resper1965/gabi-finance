@@ -1804,6 +1804,61 @@
     "summary": "Entregas"
    }
   },
+  "/api/v1/familia/edicoes": {
+   "get": {
+    "description": "Edições feitas fora (Obsidian) esperando decisão do boss, com o texto novo.",
+    "operationId": "edicoes_api_v1_familia_edicoes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Edicoes"
+   }
+  },
+  "/api/v1/familia/edicoes/{edicao_id}/decidir": {
+   "post": {
+    "description": "Aprova (você aplicou o que mudou) ou rejeita (o arquivo volta ao exportado) uma edição externa.",
+    "operationId": "decidir_edicao_api_v1_familia_edicoes__edicao_id__decidir_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "edicao_id",
+      "required": true,
+      "schema": {
+       "title": "Edicao Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Edicao"
+   }
+  },
   "/api/v1/familia/exames/{pessoa_id}": {
    "get": {
     "description": "Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde.",

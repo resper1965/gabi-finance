@@ -134,3 +134,33 @@ async def rejeitar(paperless_id: int, request: Request, ident: Identidade = SO_B
     with _TRAVA, _cofre(request) as s:
         n = exames.rejeitar_laudo(s, paperless_id)
     return _resp(request, {"paperless_id": paperless_id, "rejeitadas": n})
+
+
+# ---- edições vindas do cofre Obsidian (ficam pendentes até o boss decidir; o banco nunca muda sozinho) ----
+@router.get("/edicoes")
+def edicoes(request: Request, ident: Identidade = SO_BOSS):
+    """Edições feitas fora (Obsidian) esperando decisão do boss, com o texto novo."""
+    con = _con(request)
+    try:
+        itens = [dict(r) for r in con.execute("select id, pessoa_id, arquivo, texto, criado_em from edicao_externa where estado='pendente' order by id")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/edicoes/{edicao_id}/decidir")
+async def decidir_edicao(edicao_id: int, request: Request, ident: Identidade = SO_BOSS):
+    """Aprova (você aplicou o que mudou) ou rejeita (o arquivo volta ao exportado) uma edição externa."""
+    corpo = _corpo(await _json(request))
+    if corpo.get("estado") not in ("aprovada", "rejeitada"):
+        raise erro(400, "requisicao_invalida", "estado deve ser aprovada ou rejeitada")
+    con = _con(request)
+    try:
+        agora = _agora(request).astimezone(dt.timezone.utc).isoformat()
+        n = con.execute("update edicao_externa set estado=?, decidida_em=? where id=? and estado='pendente'", (corpo["estado"], agora, edicao_id)).rowcount
+        if not n:
+            raise erro(404, "nao_encontrado", "edição não existe ou já foi decidida")
+        con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'api')", (agora, ident.login, f"edição externa {edicao_id} {corpo['estado']}"))
+        return envelope(con, {"id": edicao_id, "estado": corpo["estado"]}, agora=_agora(request))
+    finally:
+        con.close()

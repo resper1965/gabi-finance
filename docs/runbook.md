@@ -123,3 +123,6 @@ Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u g
 - **Laudo:** Família › "Ler laudo" (nº do documento no Paperless) grava só PROPOSTAS; "Confirmar e registrar" exige escolher de quem é o laudo.
 - **Rumo:** `GET /api/v1/rumo?ano=AAAA` (entradas, saídas, poupança, gasto por pessoa/frente, patrimônio mês a mês).
 - **Tailscale (G13):** convide cada familiar e limite por ACL ao `gabi:443` (sem SSH nem outras máquinas); confira o limite de usuários do plano.
+
+## Cofre Obsidian {#obsidian}
+`python -m gabi.familia.obsidian --destino /pasta/do/cofre --para p1` exporta os `.md` (família com CPF, saúde, frentes, decisões, memória) **de uma pessoa**, na pasta `<destino>/<id da pessoa>/`; cada um recebe só o que a matriz de acesso libera (`parcial` = só o que é dele). Saída idêntica se nada mudou. Se você editar um arquivo no Obsidian, a próxima exportação grava a edição como pendente (`edicao_externa`) e **não** sobrescreve o arquivo nem muda o banco; ao rejeitar a edição, o arquivo volta ao exportado. Sincronize **só** por Tailscale/Syncthing ou nuvem criptografada ponta a ponta: a pasta contém CPF e saúde.
