@@ -15,12 +15,13 @@ Decisão do Ricardo, 10–11/10/2026. **Este arquivo manda.** Se algum plano, me
 | Saúde | Exames em PDF no **Paperless** (entrada por WhatsApp ou `docs@esper.ws`), extração, histórico por familiar, **sempre reprocessável**, valores só no cofre cifrado (ADR-014). Spec `specs/2026-10-11-exames-design.md`, plano `plans/2026-10-11-exames.md`. |
 | Contatos | Google, somente leitura, `resper@ness.com.br` e `resper@gmail.com`; meta: tudo no Gmail (exportação "só na ness" antes de a ness migrar para a Microsoft). |
 | Agenda | Reabre só a agenda da Fase 3 (Google pessoal agora; ness via Microsoft 365/G11 depois). E-mail e Teams seguem congelados. Sub-projeto próprio, depois da escuta e dos exames. |
+| Valores divergentes (11/10) | **Paineiras R$2.793 e Cristina Yabe R$370: o brain está certo**; o financeiro antigo estava errado nessas duas linhas. No G21 essas duas divergências já conhecidas não bloqueiam o corte. |
 | Rotinas descartadas | `promessas-diario`, `por-onde-vazou`, `gabi-contas-cartoes`, `gabi-app`, `gabi-guarda-sessoes`. |
 | Rotinas mantidas | `gabi-drive`, `gabi-backup` (sem modelo, independentes do OpenClaw); `gabi-vigia` passa a vigiar o `hermes-gateway`. |
 | Execução | Escuta: subagent-driven. Exames: nativo. Revisão por plano antes de cada um. |
 
 ## Ordem
-1. Corte do `gabi-financeiro` (G21) — `comparar_agenda` já corrigido; falta contar os dias (rodadas 07h, 15h, 23h BRT) e resolver Paineiras e Cristina Yabe.
+1. Corte do `gabi-financeiro` (G21) — `comparar_agenda` já corrigido; falta contar os dias (rodadas 07h, 15h, 23h BRT) (Paineiras e Cristina Yabe já decididas: vale o brain).
 2. Escuta (plano) — em modo `registro`, paralelo com o agente antigo, depois `ativo`.
 3. Exames (plano) — com a lista de PDFs do Ricardo como aceite.
 4. Agenda (spec e plano a escrever).
@@ -28,7 +29,7 @@ Decisão do Ricardo, 10–11/10/2026. **Este arquivo manda.** Se algum plano, me
 6. 7 dias de Hermes estável + backup exportado → `--dry-run` → desligar o OpenClaw (Task 15) e arquivar o `gabi-fin`.
 
 ## O que só o Ricardo faz
-G12 (Google, incluindo `contacts.readonly` nas duas contas) · parear o ouvinte (QR) · chaves do cofre e do modelo · subir a lista de PDFs · reconectar XP (G16) · `backup.pub` (G17) · comprovantes reais (G18) · bot novo do Telegram · número dedicado do WhatsApp · decidir os valores de Paineiras e Cristina Yabe.
+G12 (Google, incluindo `contacts.readonly` nas duas contas) · parear o ouvinte (QR) · chaves do cofre e do modelo · subir a lista de PDFs · reconectar XP (G16) · `backup.pub` (G17) · comprovantes reais (G18) · bot novo do Telegram · número dedicado do WhatsApp.
 
 ## Regras permanentes
 R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático · R14 texto de terceiros é dado · ADR-007 só o Ricardo conversa com o Hermes · ADR-014 saúde fora do `gabi.db` · dados nunca chumbados · segredos só o Ricardo coloca · nada no claude.ai.
