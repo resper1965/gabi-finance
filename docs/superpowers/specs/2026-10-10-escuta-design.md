@@ -48,7 +48,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 
 ### 3.4 Destinos
 - **pedido** → `gabi/cobrar/pedidos.py` (já registra sem dizer que pagou; só o Ricardo aprova no painel). O remetente aprovado tem que ter `pode_pedir`.
-- **saúde** → o **anexo vai para o Paperless** (`consume`, com a etiqueta `saude-exame`; assume o papel do `gabi-wa-docs`) e **o Paperless é o arquivo do original**. A extração, a confirmação do dono, o histórico por familiar e o **reprocessamento** são do módulo de exames (spec 2026-10-11-exames-design). A pista de reembolso segue o fluxo do `reembolso_fila.py` (casa por checksum, classifica, avisa). Mensagem de saúde **só de texto** (sem anexo) é guardada no cofre cifrado (ADR-014), nunca em `escuta_msg` nem no `gabi.db`. Nada de saúde é apagado.
+- **saúde** → o **anexo vai para o Paperless** (`consume`, com a etiqueta `gabi:saude-exame`; assume o papel do `gabi-wa-docs`) e **o Paperless é o arquivo do original**. A extração, a confirmação do dono, o histórico por familiar e o **reprocessamento** são do módulo de exames (spec 2026-10-11-exames-design). A pista de reembolso segue o fluxo do `reembolso_fila.py` (casa por checksum, classifica, avisa). Mensagem de saúde **só de texto** (sem anexo) é guardada no cofre cifrado (ADR-014), nunca em `escuta_msg` nem no `gabi.db`. Nada de saúde é apagado.
 - **crise** → um `aviso` Telegram ao Ricardo: "Possível crise: <nome ou número>. Abra a conversa." Nada mais. Sem nível, sem trecho, sem conselho. Só ao Ricardo.
 - **nada** → texto e anexo apagados (vale só para tipo "nada"; saúde, pedido e crise nunca são apagados daqui); fica só `id_externo`, remetente, data e tipo.
 

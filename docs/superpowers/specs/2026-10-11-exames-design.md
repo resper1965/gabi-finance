@@ -28,9 +28,9 @@ docs@esper.ws (já existente) ────────────────�
 ```
 
 ### 3.1 Entrada e identificação
-- **Etiquetas no Paperless:** `saude-exame` marca o que é exame. WhatsApp: o anexo que a escuta classifica como saúde vai para o `consume` já com essa etiqueta. E-mail: documento que chega por docs@esper.ws sem etiqueta é classificado pelo brain (modelo, uma chamada) como exame/outro e etiquetado; o Ricardo pode também etiquetar à mão no Paperless.
+- **Etiquetas no Paperless:** `gabi:saude-exame` marca o que é exame. WhatsApp: o anexo que a escuta classifica como saúde vai para o `consume` já com essa etiqueta. E-mail: documento que chega por docs@esper.ws sem etiqueta é classificado pelo brain (modelo, uma chamada) como exame/outro e etiquetado; o Ricardo pode também etiquetar à mão no Paperless.
 - Lista em volume: o Ricardo joga os PDFs na pasta `consume` do Paperless (ou envia a docs@esper.ws); nada a colar na sessão.
-- **Proteção no Paperless:** documentos `saude-exame` ficam visíveis só ao dono (permissões do Paperless), porque o Paperless é o segundo lugar onde esses dados vivem.
+- **Proteção no Paperless:** documentos `gabi:saude-exame` ficam visíveis só ao dono (permissões do Paperless), porque o Paperless é o segundo lugar onde esses dados vivem.
 
 ### 3.2 Extração
 - Texto do PDF: o OCR do próprio Paperless. Se o texto vier vazio ou ruim, o brain pede ao modelo (visão) para ler o PDF.
