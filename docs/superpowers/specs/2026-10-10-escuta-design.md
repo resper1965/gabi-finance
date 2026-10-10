@@ -7,7 +7,7 @@ Data: 10/10/2026 · Estado: **rascunho para revisão do Ricardo** · Substitui o
 - A escuta continua **nunca respondendo a ninguém**. Faz só três coisas: registrar **pedido de dinheiro**, **documento de saúde** (reembolso do plano) e **crise**.
 - **Crise: só chamar atenção**, para o Ricardo e mais ninguém. Sem citar a mensagem, sem avaliação, sem conselho.
 - Quem pode gerar registro é uma **lista de aprovados**, que o Ricardo mantém **pelo painel, sem código**.
-- **Contatos do Google** dão nome aos números e alimentam a fila de aprovação. Só sugerem; nunca aprovam. **Fonte única: `resper@gmail.com`** (decisão do Ricardo: centralizar todos os contatos nessa conta; a ness migra para a Microsoft).
+- **Contatos do Google** dão nome aos números e alimentam a fila de aprovação. Só sugerem; nunca aprovam. Hoje em `resper@ness.com.br` e `resper@gmail.com`; **meta: tudo no `resper@gmail.com`** (a ness migra para a Microsoft).
 - **Dados de saúde são reprocessáveis**, sempre (decisão do Ricardo, muito importante), em especial a lista que ele está copiando. Nada de saúde é apagado depois de classificado.
 - Fora deste spec: agenda do Google (sub-projeto seguinte, reabre só a agenda da Fase 3), o corte do `gabi-financeiro` (G21), Telegram/WhatsApp do Hermes (Tasks 12–13), desligar o OpenClaw (Task 15).
 
@@ -54,10 +54,13 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - **crise** → um `aviso` Telegram ao Ricardo: "Possível crise: <nome ou número>. Abra a conversa." Nada mais. Sem nível, sem trecho, sem conselho. Só ao Ricardo.
 - **nada** → texto e anexo apagados (vale só para tipo "nada"; saúde, pedido e crise nunca são apagados daqui); fica só `id_externo`, remetente, data e tipo.
 
-### 3.5 Contatos do Google
-- Acesso `contacts.readonly` no OAuth do G12 (acrescenta um escopo), **somente para `resper@gmail.com`** (parâmetro de cadastro; outras contas podem ser acrescentadas depois, sem código). A ness.com.br vai migrar para a Microsoft: contatos de lá não entram; se o Ricardo quiser, serão exportados para o Gmail por ele.
-- Timer diário, sem modelo, grava `contato_google(conta, nome, telefone_e164)`. Só nome e telefone; nada de foto, e-mail, endereço ou nota.
-- Uso: dar nome ao número na fila e no aviso; botão "Trazer dos contatos" no painel (seleção pessoa a pessoa) cria `pessoa`. **Estar nos contatos não aprova ninguém.**
+### 3.5 Contatos do Google (duas contas hoje, uma só no futuro)
+- **Hoje** os contatos estão em `resper@ness.com.br` **e** em `resper@gmail.com`. **Meta do Ricardo: tudo em `resper@gmail.com`**, porque a ness migra para a Microsoft em breve.
+- Acesso `contacts.readonly` no OAuth do G12 (acrescenta um escopo), **somente leitura**, para as duas contas. As contas são parâmetro de cadastro: quando a ness sair do Google, basta tirá-la da lista, sem código.
+- Timer diário, sem modelo, grava `contato_google(conta, nome, telefone_e164)`. Só nome e telefone; nada de foto, e-mail, endereço ou nota. O mesmo telefone nas duas contas vira **um** contato (união por telefone normalizado); se os nomes diferem, vale o do Gmail.
+- **Consolidar no Gmail:** o brain **não escreve** nos contatos do Google (continua só leitura). Ele gera, pelo painel, um arquivo (CSV do Google) com os contatos que **existem só na ness**, para o Ricardo importar no Gmail em contacts.google.com. Depois da importação, o relatório "só na ness" fica vazio e a ness pode ser removida da lista de contas.
+- **Prazo:** a leitura da ness só funciona enquanto ela estiver no Google. O passo de exportação deve ser feito **antes** da migração para a Microsoft.
+- Uso: dar nome ao número na fila e no aviso; botão "Trazer dos contatos" (seleção pessoa a pessoa) cria `pessoa`. **Estar nos contatos não aprova ninguém.**
 - Revogar o acesso apaga a tabela.
 
 ### 3.6 Aposentadoria do que sai
@@ -82,8 +85,8 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - **Paralelo** (aceite): ouvinte e brain rodam ao lado do agente antigo por alguns dias, só em modo registro; compara-se o que cada um classificou. Só depois a escuta antiga é aposentada. Aceite com dado real, como nas demais fases.
 
 ## 7. Pendências do Ricardo (não bloqueiam o código)
-Parear o ouvinte (QR) · G12 com o escopo de contatos · revisar a lista de candidatos no painel · chave do modelo já existe (OpenRouter) · **chave do cofre de saúde** (a mesma do ADR-014, já é dele).
+Parear o ouvinte (QR) · G12 com o escopo de contatos (as duas contas) · importar no Gmail o arquivo "só na ness" antes da migração · revisar a lista de candidatos no painel · chave do modelo já existe (OpenRouter) · **chave do cofre de saúde** (a mesma do ADR-014, já é dele).
 
 **Pergunta aberta (saúde):** o que é a "lista que o Ricardo está copiando" (formato, onde está, quantos itens, se vem de WhatsApp, planilha, PDFs ou e-mail). Define o formato da importação em lote (seção 3.4). Até responder, o spec garante só o requisito: tudo que entra no cofre é reprocessável.
 
-**Nota para o sub-projeto da agenda:** a ness.com.br migra para a Microsoft; a agenda dela passa a depender do G11 (Graph), não do Google.
+**Nota para o sub-projeto da agenda:** a ness.com.br migra para a Microsoft; a agenda dela passa a depender do G11 (Graph), não do Google. A agenda do Gmail pessoal segue pelo Google.
