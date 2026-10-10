@@ -96,3 +96,9 @@ Plano: `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md` (execução
 - Esperando o Ricardo: **G15** exceção R2 para aviso por Telegram; **G16** XP Investimentos parada desde 12/08 (até 17/10); **G17** colocar `/etc/gabi/backup.pub` e puxar o 1º pacote (runbook "Backup fora da VPS"); **G18/G19** comprovantes reais e lote Nibo em conta real; **G20** aceitar a Fase 2 sem "pedido real pelo canal" (adiado ao gabi-agent); **G21** corte do gabi-financeiro após 7 dias de `tools.comparar_agenda` vazio (ler `/var/lib/gabi-fin/compromissos.json` exige permissão); cancelar BrandYourself; 145 lançamentos sem dono.
 - Aceite Fase 1 (T1.14): rodar `python -m tools.aceite` quando houver 7 rodadas conferidas seguidas (~16/10) e classificação ≥ 90% (hoje 86,9%).
 - Tag `v1.0-gabi-brain` só depois de G20 e dos dois aceites. Fase 3 congelada; Fase 4 por pedido; Hermes/OpenClaw só no plano gabi-agent, depois.
+
+## 10/10/2026 (tarde): instalação final da pista A
+- Commit 4494f54 (avisos `exportacao_parada`, projeção sem dupla contagem de fatura, sugestão de regra não reaparece após rejeitada). 1024 pytest + vitest verdes. Instalado (`deploy/instalar.sh --confirmo-backup-exportado`); api, mcp e fontes ativos desde 15:34, 6 timers agendados, nenhuma unit em falha.
+- Pista A sem trabalho de código restante: o que falta depende do Ricardo ou do relógio (G16–G21, comprovante Pix real, ~16/10 para o aceite da Fase 1, 145 lançamentos sem dono). Fase 3 segue congelada; Fase 4 por pedido; tag só após G20 e os dois aceites.
+- Não verificado em produção nesta data (bloqueado por permissão): `tools.aceite`, `gabi.avisos`, contagem de lançamentos sem dono. Saúde da api: rota `/api/saude` exige login de boss (a rota `/api/v1/saude` não existe).
+- Retomada em ~16/10: rodar `python -m tools.aceite`, depois `tools.comparar_agenda`, depois tag.
