@@ -16,6 +16,27 @@ def _brl(v) -> str:
     return f"R$ {v}" if v is not None else "valor a confirmar"
 
 
+def _quem(p: dict) -> str:
+    return p.get("nome") or p.get("numero") or "número desconhecido"
+
+
+def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
+    """Só número e nome: o texto da mensagem nunca vem para o aviso."""
+    if tipo == "escuta_novo_remetente":
+        return f"Novo remetente no WhatsApp: {_quem(p)}", "aprove, ignore ou bloqueie na fila da escuta"
+    if tipo == "escuta_atencao":
+        return f"Possível crise: {_quem(p)}. Abra a conversa.", ""
+    if tipo == "escuta_saude":
+        return f"Mensagem de saúde de {_quem(p)}: abra a conversa", ""
+    if tipo == "escuta_pedido_incompleto":
+        return f"Pedido incompleto de {_quem(p)}", "faltou valor ou vencimento; abra a conversa e peça o que falta"
+    if tipo == "escuta_parada":
+        return "Escuta do WhatsApp parada", p.get("motivo", "")
+    if tipo == "escuta_sem_modelo":
+        return "Escuta sem modelo de leitura", "o modelo que lê as mensagens não está configurado; as mensagens ficam retidas"
+    return tipo, ""
+
+
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
@@ -34,6 +55,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return "Reconectar a Linear", "a chave foi recusada ou não está configurada; as entregas não estão sendo lidas"
     if tipo == "caixa_reconectar":
         return f"Reconectar a caixa {p.get('endereco', '?')}", "a credencial foi recusada ou não está configurada; a caixa não está sendo lida"
+    if tipo.startswith("escuta_"):
+        return _descrever_escuta(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

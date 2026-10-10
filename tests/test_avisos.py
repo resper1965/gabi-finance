@@ -135,3 +135,15 @@ def test_exportacao_recente_nao_avisa(con):
     _rodada(con, 24 * 12, 1, fonte="backup"); _rodada(con, 24 * 3, 0, fonte="exportacao")
     gerar_avisos(con, AGORA)
     assert "exportacao_parada" not in _tipos(con)
+
+
+def test_descrever_tipos_da_escuta():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("escuta_atencao", {"numero": "+5511912345678", "nome": "Maria", "texto": "NAO"})
+    assert t == "Possível crise: Maria. Abra a conversa." and "NAO" not in x and "NAO" not in t
+    assert descrever("escuta_atencao", {"numero": "+5511912345678"})[0] == "Possível crise: +5511912345678. Abra a conversa."
+    assert descrever("escuta_saude", {"numero": "+55119", "nome": "Ana"})[0] == "Mensagem de saúde de Ana: abra a conversa"
+    for tipo, p in [("escuta_novo_remetente", {"numero": "+55119", "nome": None}), ("escuta_parada", {"motivo": "sem leitura"}),
+                    ("escuta_sem_modelo", {}), ("escuta_pedido_incompleto", {"numero": "+55119", "nome": "Ana"})]:
+        titulo, texto = descrever(tipo, p)
+        assert titulo != tipo and titulo and not titulo.startswith("escuta_")
