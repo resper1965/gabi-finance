@@ -111,6 +111,8 @@
 
 ### Task 6: Financeiro novo — virada (Task 11 do plano de conciliação)
 
+> **SUPERADA (11/10/2026):** a virada é o gabi.brain substituir o `gabi-financeiro` (G21, plano da finalização Task 12). Não implementar a Task 11 do OP-Gabi-fin. Ver `docs/PLANO-DEFINITIVO.md`.
+
 **Earliest:** 14/10 (7 dias de paralelo desde 07/10). **Files:** worktree `~/OP-Gabi-fin` (branch `feat/financeiro-conciliacao`), `infra/financeiro-virada.sh`.
 
 **Interfaces:**
