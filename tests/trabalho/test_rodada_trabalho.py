@@ -133,3 +133,31 @@ def test_conclui_na_origem_a_tarefa_pedida_pelo_painel_e_so_entao_marca(con):
     rodar(con, lambda c: g, AGORA)
     assert g.concluidas == [("a@ionic.health", "l/t1")]
     assert con.execute("select estado from tarefa where externo_id='l/t1'").fetchone()[0] == "concluida"
+
+
+class LinearFalso:
+    def __init__(self, entregas=None, erro=None):
+        self.entregas, self.erro = entregas or [], erro
+
+    def entregas_abertas(self):
+        if self.erro:
+            raise self.erro
+        return self.entregas
+
+
+E1 = {"externo_id": "a1", "identificador": "ION-1", "titulo": "Laudo", "projeto": "nCommand", "responsavel": "R", "prazo": "2026-10-20", "estado": "Todo", "atualizado_em": None}
+
+
+def test_entregas_da_linear_entram_e_as_que_sairam_da_lista_somem(con):
+    from gabi.fontes.linear import ErroLinear
+    r = rodar(con, lambda c: None, AGORA, LinearFalso([E1, {**E1, "externo_id": "a2", "identificador": "ION-2"}]))
+    assert r.entregas == 2 and con.execute("select count(*) from entrega").fetchone()[0] == 2
+    rodar(con, lambda c: None, AGORA, LinearFalso([E1]))
+    assert [x[0] for x in con.execute("select identificador from entrega")] == ["ION-1"]
+
+
+def test_linear_com_chave_recusada_pede_reconectar(con):
+    from gabi.fontes.linear import ErroLinear
+    r = rodar(con, lambda c: None, AGORA, LinearFalso(erro=ErroLinear("POST /graphql -> 401")))
+    assert r.falhas == 1
+    assert json.loads(con.execute("select payload from aviso").fetchone()[0])["endereco"] == "Linear"

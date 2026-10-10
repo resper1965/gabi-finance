@@ -6,15 +6,15 @@ import sys
 from pathlib import Path
 
 from gabi.db import conectar, migrar
-from gabi.fontes.tokens import cliente_do_ambiente
+from gabi.fontes.tokens import cliente_do_ambiente, linear_do_ambiente
 from gabi.trabalho.rodada_trabalho import rodar
 
 
 def main(banco: Path, cliente_de=None) -> int:
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
-    r = rodar(con, cliente_de or cliente_do_ambiente(), dt.datetime.now(dt.timezone.utc))
-    print(f"trabalho: caixas={r.caixas} mensagens={r.mensagens} eventos={r.eventos} tarefas={r.tarefas} falhas={r.falhas}")
+    r = rodar(con, cliente_de or cliente_do_ambiente(), dt.datetime.now(dt.timezone.utc), linear_do_ambiente())
+    print(f"trabalho: caixas={r.caixas} mensagens={r.mensagens} eventos={r.eventos} tarefas={r.tarefas} entregas={r.entregas} falhas={r.falhas}")
     return 0
 
 

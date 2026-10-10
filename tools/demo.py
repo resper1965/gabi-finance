@@ -69,6 +69,9 @@ def semear(caminho: Path) -> None:
     c.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values ('PADARIA','{\"categoria_id\": 1}',0,'2026-10-02T10:00:00','boss@x.com')")
     c.execute("insert into sugestao(tipo, lancamento_id, payload, estado, motivo, criado_em) values ('categoria', 5, ?, 'pendente', 'estabelecimento parecido com Mercado', '2026-10-08T12:00:00')",
               (json.dumps({"categoria_id": 1}),))
+    for ext, ident, tit, proj, resp, prazo, est in (("l1", "ION-12", "Entregar laudo do cliente", "nCommand", "Ricardo", "2026-10-20", "In Progress"),
+                                                    ("l2", "ION-13", "Revisar proposta", "IARA", None, None, "Todo")):
+        c.execute("insert into entrega(externo_id, identificador, titulo, projeto, responsavel, prazo, estado) values (?,?,?,?,?,?,?)", (ext, ident, tit, proj, resp, prazo, est))
     for pid, nome in (("p-ric", "Ricardo"), ("p-hel", "Helena"), ("p-lia", "Lia"), ("p-bia", "Bia"), ("p-casa", "Casa")):
         c.execute("insert into pessoa(id, nome, origem) values (?,?, 'demo')", (pid, nome))
     for cid, nome, venc, valor, estado, dados in (

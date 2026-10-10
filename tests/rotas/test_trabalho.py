@@ -113,3 +113,12 @@ def test_liberar_caixa_pelo_patch(cli):
     r = cli.patch(f"/api/v1/caixas-email/{cid}", headers={**BOSS, "Content-Type": "application/json"}, content=json.dumps({"estado": "sim", "ler_a_partir_de": "2026-10-01T00:00:00Z"}))
     assert r.status_code == 200
     assert get(cli, "/api/v1/caixas-email").json()["dados"]["itens"][0]["estado"] == "sim"
+
+
+def test_entregas_da_linear_so_leitura_e_so_boss(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into entrega(externo_id, identificador, titulo, prazo, estado) values ('a','ION-1','B','2026-11-01','Todo'), ('b','ION-2','A','2026-10-15','Todo'), ('c','ION-3','S',null,'Todo')")
+    c.close()
+    assert [i["identificador"] for i in get(cli, "/api/v1/entregas").json()["dados"]["itens"]] == ["ION-2", "ION-1", "ION-3"]
+    assert get(cli, "/api/v1/entregas", VIP).status_code == 403
+    assert post(cli, "/api/v1/entregas", {}).status_code == 405

@@ -13,7 +13,9 @@ from gabi.fontes.google import ErroGoogle
 from gabi.fontes.graph import ErroGraph
 from gabi.rodada import registrar_rodada
 from gabi.trabalho.agenda import ingerir_eventos
+from gabi.fontes.linear import ErroLinear
 from gabi.trabalho.email import ingerir_email
+from gabi.trabalho.entregas import ingerir_entregas
 from gabi.trabalho.tarefas import ingerir_tarefas
 
 CREDENCIAL = re.compile(r"-> (400|401|403)\b|invalid_grant")
@@ -26,6 +28,7 @@ class ResumoTrabalho:
     eventos: int
     tarefas: int
     falhas: int
+    entregas: int = 0
 
 
 def _fontes(cli, provedor: str):
@@ -65,8 +68,8 @@ def _concluir_pedidas(con, caixa: dict, cli) -> None:
         con.execute("update tarefa set estado='concluida' where id=?", (t["id"],))
 
 
-def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime) -> ResumoTrabalho:
-    caixas = msgs = evs = ts = falhas = 0
+def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime, linear=None) -> ResumoTrabalho:
+    caixas = msgs = evs = ts = falhas = entregas = 0
     with registrar_rodada(con, "trabalho") as r:
         for c in [dict(x) for x in con.execute("select * from caixa_email where estado='sim' and le=1 order by id")]:
             caixas += 1
@@ -79,7 +82,15 @@ def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime) 
                 continue
             msgs, evs, ts = msgs + m, evs + e, ts + t
             _fechar_aviso(con, c["id"], agora)
+        if linear is not None:
+            try:
+                entregas = ingerir_entregas(con, linear.entregas_abertas())
+                _fechar_aviso(con, 0, agora)
+            except ErroLinear as ex:
+                falhas += 1
+                if CREDENCIAL.search(str(ex)):
+                    _novo(con, agora, "caixa_reconectar", 0, {"endereco": "Linear", "provedor": "linear"})
         r.lidos, r.novos = caixas, msgs
         if falhas:
             r.aviso = f"{falhas} caixa(s) com falha"
-    return ResumoTrabalho(caixas, msgs, evs, ts, falhas)
+    return ResumoTrabalho(caixas, msgs, evs, ts, falhas, entregas)

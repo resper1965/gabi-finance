@@ -99,3 +99,11 @@ def cliente_do_ambiente(env=None, *, http=_form_real, relogio=time.time) -> Call
             return Google(token_google_oauth(env["GOOGLE_OAUTH_CLIENT_ID"], env["GOOGLE_OAUTH_CLIENT_SECRET"], refresh, http=http, relogio=relogio))
         return None
     return cliente
+
+
+def linear_do_ambiente(env=None, *, http=None):
+    """Cliente Linear (só leitura) se LINEAR_API_KEY estiver no ambiente; senão None (a rodada simplesmente não lê entregas)."""
+    from gabi.fontes.linear import Linear
+    env = os.environ if env is None else env
+    chave = env.get("LINEAR_API_KEY")
+    return Linear(lambda: chave, http=http) if chave else None

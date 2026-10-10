@@ -1787,6 +1787,23 @@
     "summary": "Destino Agrupado"
    }
   },
+  "/api/v1/entregas": {
+   "get": {
+    "description": "Entregas abertas da Linear (somente leitura), as com prazo primeiro.",
+    "operationId": "entregas_api_v1_entregas_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Entregas"
+   }
+  },
   "/api/v1/familia/exames/{pessoa_id}": {
    "get": {
     "description": "Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde.",
@@ -2588,6 +2605,51 @@
      }
     },
     "summary": "Rodadas"
+   }
+  },
+  "/api/v1/rumo": {
+   "get": {
+    "description": "Rumo do ano, mês a mês: entradas, saídas, poupança, gasto (por pessoa e por frente) e patrimônio das contas liberadas.",
+    "operationId": "rumo_api_v1_rumo_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "ano",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Ano"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Rumo"
    }
   },
   "/api/v1/sugestoes": {

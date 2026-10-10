@@ -60,3 +60,9 @@ def test_cliente_do_ambiente_escolhe_o_cliente_certo_e_devolve_none_sem_credenci
     assert isinstance(c({"provedor": "google", "endereco": "ricardo@ness.com.br"}), Google)
     assert c({"provedor": "google", "endereco": "outro@gmail.com"}) is None
     assert cliente_do_ambiente({})({"provedor": "graph", "endereco": "a@ionic.health"}) is None
+
+
+def test_linear_do_ambiente_so_existe_com_a_chave():
+    from gabi.fontes.linear import Linear
+    from gabi.fontes.tokens import linear_do_ambiente
+    assert linear_do_ambiente({}) is None and isinstance(linear_do_ambiente({"LINEAR_API_KEY": "k"}), Linear)

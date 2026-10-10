@@ -26,6 +26,7 @@ import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
 import { Mensagens } from "./telas/Trabalho/Mensagens";
 import { Tarefas } from "./telas/Trabalho/Tarefas";
+import { Entregas } from "./telas/Trabalho/Entregas";
 import { Familia } from "./telas/Familia";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
@@ -35,7 +36,7 @@ const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros,
-  hoje: Hoje, temas: Frentes, familia: Familia, agenda: Agenda, emails: Mensagens, tarefas: Tarefas,
+  hoje: Hoje, temas: Frentes, familia: Familia, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
 };
 
 function tela(area: Area, aba: string) {

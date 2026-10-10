@@ -318,3 +318,9 @@ def test_projecao_valida_o_horizonte_e_so_o_boss_ve(cli):
     assert get(cli, "/api/v1/caixa/projecao?dias=0").status_code == 400
     assert get(cli, "/api/v1/caixa/projecao?dias=91").status_code == 400
     assert get(cli, "/api/v1/caixa/projecao", h=VIP).status_code == 403
+
+
+def test_rumo_traz_os_12_meses_e_exige_boss(cli):
+    d = get(cli, "/api/v1/rumo?ano=2026").json()["dados"]
+    assert d["ano"] == 2026 and len(d["meses"]) == 12 and d["meses"][0]["mes"] == "2026-01"
+    assert get(cli, "/api/v1/rumo", VIP).status_code == 403 and get(cli, "/api/v1/rumo?ano=1").status_code == 400

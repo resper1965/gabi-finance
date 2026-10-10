@@ -318,3 +318,21 @@ def custo(request: Request):
                               "cambio_usd_brl": cambio}, agora=_agora(request))
     finally:
         con.close()
+
+
+@router.get("/rumo")
+def rumo(request: Request, ano: int | None = None):
+    """Rumo do ano, mês a mês: entradas, saídas, poupança, gasto (por pessoa e por frente) e patrimônio das contas liberadas."""
+    from gabi.dinheiro.rumo import rumo_mensal
+    hoje = _agora(request).date()
+    ano = ano or hoje.year
+    if not 2000 <= ano <= 2100:
+        raise erro(400, "requisicao_invalida", "ano deve estar entre 2000 e 2100")
+    con = _con(request)
+    try:
+        meses = [{"mes": l.mes, "entradas": _m(l.entradas), "saidas": _m(l.saidas), "poupanca": _m(l.poupanca), "gasto": _m(l.gasto),
+                  "patrimonio": _m(l.patrimonio), "por_pessoa": {k: _m(v) for k, v in l.por_pessoa.items()}, "por_frente": {k: _m(v) for k, v in l.por_frente.items()}}
+                 for l in rumo_mensal(con, ano)]
+        return envelope(con, {"ano": ano, "meses": meses}, agora=_agora(request))
+    finally:
+        con.close()

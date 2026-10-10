@@ -147,6 +147,17 @@ def concluir(request: Request, tarefa_id: int):
         con.close()
 
 
+@router.get("/entregas")
+def entregas(request: Request):
+    """Entregas abertas da Linear (somente leitura), as com prazo primeiro."""
+    con = _con(request)
+    try:
+        itens = [dict(r) for r in con.execute("select id, identificador, titulo, projeto, responsavel, prazo, estado from entrega order by prazo is null, prazo, identificador")]
+        return envelope(con, {"itens": itens}, agora=_agora(request))
+    finally:
+        con.close()
+
+
 # ---------------- caixas de e-mail (cadastro do Ricardo; nada fixo no código) ----------------
 CAMPOS_CAIXA = {"endereco", "provedor", "papel", "empresa_id", "como_entra", "le", "rascunho", "frente_padrao_id", "migra_para", "ler_a_partir_de", "estado"}
 

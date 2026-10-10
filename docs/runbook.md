@@ -110,7 +110,16 @@ O job `gabi-brain-trabalho.timer` (a cada 15 min, 06h–22h BRT) lê e-mail, age
 | `GOOGLE_SA_EMAIL`, `GOOGLE_SA_KEY_FILE`, `GOOGLE_SA_DOMINIOS` | Conta de serviço com delegação (ex.: `bekaa.eu,esper.ws`); a caixa é o `sub`. |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_REFRESH_<ENDEREÇO>` | OAuth próprio (ness, Gmail). O nome é o endereço em maiúsculas com `_` (ex.: `GOOGLE_REFRESH_RICARDO_NESS_COM_BR`). |
 
+| `LINEAR_API_KEY` | Linear (somente leitura): alimenta Tarefas › Entregas. Chave pessoal criada em Linear › Settings › API. |
+
 Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u gabi-brain-trabalho -n 20 --no-pager -o cat`. Concluir tarefa no painel registra o pedido (`tarefa.pedido_concluir_em`); a tarefa só aparece como concluída depois que o job conclui na origem.
 
 ## Comprovantes Pix {#comprovantes-ingestao}
 `gabi-brain-comprovantes.timer` (07h BRT) lê o texto dos documentos do Paperless pela ponte do serviço de fontes, grava o comprovante, **propõe** vínculos aos lançamentos (nunca confirma, R1) e acrescenta a etiqueta `gabi:comprovante`. Idempotente por documento. Rodar à mão: `sudo systemctl start gabi-brain-comprovantes`.
+
+## Saúde, Família e Rumo {#saude-familia}
+- **Chave da saúde:** crie `/etc/gabi/saude.key` (32 bytes crus, 64 hex ou base64; `root:gabibrain` 0640) e reinicie a api. Sem ela, `/api/v1/familia/*` responde 503. O cofre é `/var/lib/gabi-brain/saude.enc` (AES-256-GCM, ADR-014). **Guarde a chave fora da VPS: sem ela os exames não abrem.**
+- **Quem vê:** pela linha `saúde` da matriz de acesso (`total` = todos, `parcial` = só a própria pessoa, `nenhum`/sem linha = ninguém além do boss). Cadastre o login de cada familiar: `python -m gabi.acesso adicionar login pessoa_id familia_vip`.
+- **Laudo:** Família › "Ler laudo" (nº do documento no Paperless) grava só PROPOSTAS; "Confirmar e registrar" exige escolher de quem é o laudo.
+- **Rumo:** `GET /api/v1/rumo?ano=AAAA` (entradas, saídas, poupança, gasto por pessoa/frente, patrimônio mês a mês).
+- **Tailscale (G13):** convide cada familiar e limite por ACL ao `gabi:443` (sem SSH nem outras máquinas); confira o limite de usuários do plano.

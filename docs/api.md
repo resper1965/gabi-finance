@@ -61,6 +61,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/custo` | Custo do modelo (OpenRouter) no dia e no mês contra o teto. |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
+| GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
 | GET | `/api/v1/familia/exames/{pessoa_id}` | Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde. |
 | GET | `/api/v1/familia/exames/{pessoa_id}/resumo` | Texto "resumo para a consulta" só da pessoa escolhida. |
 | GET | `/api/v1/familia/exames/{pessoa_id}/serie` | Série no tempo de um marcador da pessoa, com a marca de fora da faixa de referência. |
@@ -83,6 +84,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/regras` | Regras de classificação. |
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
 | GET | `/api/v1/rodadas` | Últimas rodadas de ingestão e se foram conferidas. |
+| GET | `/api/v1/rumo` | Rumo do ano, mês a mês: entradas, saídas, poupança, gasto (por pessoa e por frente) e patrimônio das contas liberadas. |
 | GET | `/api/v1/sugestoes` | Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra. |
 | POST | `/api/v1/sugestoes/{sid}/aprovar` | Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado. |
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |

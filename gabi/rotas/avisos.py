@@ -30,6 +30,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return "Serviço falhou", f"{p.get('unidade', '?')} terminou com erro"
     if tipo == "exportacao_parada":
         return "Backup fora da VPS parado", p.get("motivo", "")
+    if tipo == "caixa_reconectar" and p.get("provedor") == "linear":
+        return "Reconectar a Linear", "a chave foi recusada ou não está configurada; as entregas não estão sendo lidas"
     if tipo == "caixa_reconectar":
         return f"Reconectar a caixa {p.get('endereco', '?')}", "a credencial foi recusada ou não está configurada; a caixa não está sendo lida"
     return tipo, json.dumps(p, ensure_ascii=False)

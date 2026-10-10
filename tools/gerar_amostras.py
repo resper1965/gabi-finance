@@ -18,7 +18,7 @@ ROTAS = {
     "destino-pessoa": "/api/v1/destino/agrupado?periodo=mes&por=pessoa", "cartoes": "/api/v1/cartoes", "parcelas": "/api/v1/parcelas",
     "assinaturas": "/api/v1/assinaturas", "sugestoes": "/api/v1/sugestoes", "regras": "/api/v1/regras", "custo": "/api/v1/custo", "contagens": "/api/v1/contagens", "rodadas": "/api/v1/rodadas", "cobrar-reembolsos": "/api/v1/cobrar/reembolsos", "cobrar-comprovantes": "/api/v1/cobrar/comprovantes", "cobrar-pedidos": "/api/v1/cobrar/pedidos", "cobrar-cobrancas": "/api/v1/cobrar/cobrancas", "cadastros-nibo": "/api/v1/cadastros/nibo", "cadastros-liberacoes": "/api/v1/cadastros/liberacoes",
     "hoje": "/api/v1/hoje", "frentes": "/api/v1/frentes", "frente-1": "/api/v1/frentes/1", "agenda": "/api/v1/agenda", "mensagens": "/api/v1/mensagens",
-    "tarefas": "/api/v1/tarefas", "caixas-email": "/api/v1/caixas-email", "avisos": "/api/v1/avisos", "caixa-projecao": "/api/v1/caixa/projecao?dias=30", "cobrar-previsao": "/api/v1/cobrar/previsao", "cobrar-notas": "/api/v1/cobrar/notas", "cobrar-recebimentos": "/api/v1/cobrar/recebimentos",
+    "tarefas": "/api/v1/tarefas", "entregas": "/api/v1/entregas", "caixas-email": "/api/v1/caixas-email", "avisos": "/api/v1/avisos", "caixa-projecao": "/api/v1/caixa/projecao?dias=30", "cobrar-previsao": "/api/v1/cobrar/previsao", "cobrar-notas": "/api/v1/cobrar/notas", "cobrar-recebimentos": "/api/v1/cobrar/recebimentos",
     "cadastros-contas": "/api/v1/cadastros/contas", "cadastros-pessoas": "/api/v1/cadastros/pessoas",
     "cadastros-categorias": "/api/v1/cadastros/categorias", "cadastros-empresas": "/api/v1/cadastros/empresas",
     "familia-pessoas": "/api/v1/familia/pessoas", "familia-exames": "/api/v1/familia/exames/p-hel",
