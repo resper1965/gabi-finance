@@ -34,7 +34,7 @@ def sugerir_por_favorecido(con, minimo: int = 3) -> int:
                 regras.append(re.compile(r["padrao"], re.I))
         except (ValueError, re.error):
             continue
-    abertas = {json.loads(r["payload"]).get("padrao") for r in con.execute("select payload from sugestao where tipo='regra' and estado='pendente'")}
+    abertas = {json.loads(r["payload"]).get("padrao") for r in con.execute("select payload from sugestao where tipo='regra' and estado in ('pendente','rejeitada')")}
     novas = 0
     for nome, qtd in sorted(sem.items(), key=lambda x: -x[1]):
         irmaos = cats.get(nome, set())

@@ -114,3 +114,16 @@ def test_fatura_vencida_ha_mais_de_45_dias_e_nao_paga_nao_vira_saida_de_hoje(con
     con.execute("insert into fatura(id, account_id, vencimento, total_centavos, pagamento_status, conta_id) values ('recente','cc1','2026-10-05',528055,'PAST_DUE_UNCONFIRMED',2)")
     r = projetar(con, HOJE, 3)
     assert dia(r, "2026-10-16")["saidas_centavos"] == 528055     # só a recente (vencida há 11 dias) conta
+
+
+def test_fatura_reivindicada_por_linha_da_planilha_nao_conta_duas_vezes(con):
+    con.execute("insert into fatura(id, account_id, vencimento, total_centavos, pagamento_status, conta_id) values ('f1','cc1','2026-10-20',250000,'OPEN',2)")
+    con.execute("insert into compromisso(id, origem, nome, vencimento, valor_centavos, estado, dados) values (?,?,?,?,?,?,?)",
+                ("cartao-itau:2026-10", "planilha", "Cartão Itaú", "2026-10-20", 250000, "aberto", '{"cartao_account_id": "cc1"}'))
+    assert dia(projetar(con, HOJE, 7), "2026-10-22")["saldo_centavos"] == 750000
+
+
+def test_compromisso_de_fatura_sem_valor_nao_esconde_a_fatura_real(con):
+    con.execute("insert into fatura(id, account_id, vencimento, total_centavos, pagamento_status, conta_id) values ('f1','cc1','2026-10-20',250000,'OPEN',2)")
+    con.execute("insert into compromisso(id, origem, nome, vencimento, valor_centavos, estado) values ('fatura:cc1:2026-10','fatura','F','2026-10-20',NULL,'aberto')")
+    assert dia(projetar(con, HOJE, 7), "2026-10-22")["saldo_centavos"] == 750000

@@ -5,6 +5,7 @@ Saídas: compromissos aberto/atrasado/previsto (atrasados saem hoje) e débito a
 for um compromisso (não conta duas vezes). Entradas: SÓ o `a_vencer` e o `projetado` da previsão de NFS-e (valor líquido); nota vencida
 e não baixada fica na fila de conferência e nunca entra aqui (o Nibo é defasado). Tudo em centavos inteiros (R7)."""
 import datetime as dt
+import json
 
 from gabi.cobrar.previsao import previsao
 from gabi.dinheiro import contas_pagar
@@ -22,11 +23,17 @@ def projetar(con, hoje: dt.date, dias: int = 30) -> list[dict]:
         if hoje <= dia < fim:
             d[dia] = d.get(dia, 0) + v
 
-    ids = set()
-    for c in con.execute("select id, vencimento, valor_centavos, estado from compromisso"):
-        ids.add(c["id"])
+    ids = set()  # faturas que já estão contadas como compromisso (id `fatura:...` ou linha da planilha que reivindicou o cartão)
+    for c in con.execute("select id, vencimento, valor_centavos, estado, dados from compromisso"):
         if c["valor_centavos"] is None:
             continue
+        ids.add(c["id"])
+        try:
+            cartao = json.loads(c["dados"] or "{}").get("cartao_account_id")
+        except ValueError:
+            cartao = None
+        if cartao:
+            ids.add(f"fatura:{cartao}:{c['vencimento'][:7]}")
         venc = dt.date.fromisoformat(c["vencimento"][:10])
         if c["estado"] in SAIDA_COM_ATRASO:
             somar(saidas, max(venc, hoje), c["valor_centavos"])

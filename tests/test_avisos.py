@@ -114,3 +114,24 @@ def test_servico_falhou_registra_aviso_com_o_nome_da_unidade(con):
     registrar_servico_falhou(con, "gabi-brain-saldos.service", AGORA)          # idempotente no dia
     p = json.loads(con.execute("select payload from aviso where tipo='servico_falhou'").fetchone()[0])
     assert p["unidade"] == "gabi-brain-saldos.service" and con.execute("select count(*) from aviso").fetchone()[0] == 1
+
+
+def test_conta_atrasada_lida_nao_volta_no_dia_seguinte_e_nao_acumula_enquanto_nao_lida(con):
+    _comp(con, "a:2026-10", "Cristina Yabe", "2026-10-14", "atrasado")
+    gerar_avisos(con, AGORA)
+    assert gerar_avisos(con, AGORA + dt.timedelta(days=1)) == []            # ainda não lido: não empilha outro igual
+    con.execute("update aviso set entregue_em='x'")
+    assert gerar_avisos(con, AGORA + dt.timedelta(days=2)) == []            # lido: silêncio por 7 dias
+    assert len(gerar_avisos(con, AGORA + dt.timedelta(days=9))) == 1        # persiste depois disso: lembra de novo
+
+
+def test_exportacao_parada_avisa_quando_passa_de_9_dias_sem_pacote(con):
+    _rodada(con, 24 * 12, 1, fonte="backup")
+    gerar_avisos(con, AGORA)
+    assert "exportacao_parada" in _tipos(con)
+
+
+def test_exportacao_recente_nao_avisa(con):
+    _rodada(con, 24 * 12, 1, fonte="backup"); _rodada(con, 24 * 3, 0, fonte="exportacao")
+    gerar_avisos(con, AGORA)
+    assert "exportacao_parada" not in _tipos(con)

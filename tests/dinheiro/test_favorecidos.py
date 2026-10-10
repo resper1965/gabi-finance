@@ -70,3 +70,11 @@ def test_so_pix_enviado_entra_e_o_nome_com_numeros_ou_espacos_e_normalizado(con)
     con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (1,'x1','2026-09-01',-100,'Pagamento de boleto X','posted')")
     pix(con, "ANA   LIMA", n=2); pix(con, "ana lima", n=1)
     assert sugerir_por_favorecido(con) == 1 and len(pendentes(con)) == 1
+
+
+def test_sugestao_rejeitada_nao_volta_na_rodada_seguinte(con):
+    pix(con, "CARLA NOCE", n=3)
+    assert sugerir_por_favorecido(con) == 1
+    con.execute("update sugestao set estado='rejeitada'")
+    assert sugerir_por_favorecido(con) == 0
+    assert con.execute("select count(*) from sugestao where estado='pendente'").fetchone()[0] == 0

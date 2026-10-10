@@ -23,7 +23,16 @@ def _inicio_do_dia_utc(agora: dt.datetime) -> str:
     return dt.datetime(d.year, d.month, d.day, tzinfo=BRT).astimezone(dt.timezone.utc).isoformat()
 
 
+SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
+DIAS_SILENCIO = 7
+HORAS_EXPORTACAO = 9 * 24
+
+
 def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | None:
+    if tipo in SEMANAL and con.execute(
+            "select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and (entregue_em is null or criado_em>=?)",
+            (tipo, str(chave), (agora - dt.timedelta(days=DIAS_SILENCIO)).astimezone(dt.timezone.utc).isoformat())).fetchone():
+        return None
     ja = con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and criado_em>=?", (tipo, str(chave), _inicio_do_dia_utc(agora))).fetchone()
     if ja:
         return None
@@ -51,6 +60,10 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
         conf = con.execute("select max(fim) from rodada where fonte='open-finance' and conferida=1").fetchone()[0]
         if conf is None or agora - dt.datetime.fromisoformat(conf) > dt.timedelta(hours=HORAS_DADOS_ANTIGOS):
             novo("rodada_parada", "dados_antigos", {"motivo": f"nenhuma rodada conferida nas últimas {HORAS_DADOS_ANTIGOS} horas"})
+
+    ref = con.execute("select coalesce((select max(fim) from rodada where fonte='exportacao' and status='ok'), min(inicio)) from rodada").fetchone()[0]
+    if ref and agora - dt.datetime.fromisoformat(ref) > dt.timedelta(hours=HORAS_EXPORTACAO):
+        novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):
         novo("conta_atrasada", c["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"])})
