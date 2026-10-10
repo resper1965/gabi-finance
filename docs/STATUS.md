@@ -108,3 +108,13 @@ Plano: `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md` (execução
 - **Job do Trabalho** (`python -m gabi.trabalho`, `gabi-brain-trabalho.timer` 15 min, 06h–22h): lê e-mail/agenda/tarefas das caixas `sim`, tokens do ambiente (`gabi/fontes/tokens.py`, `/etc/gabi/trabalho.env`), aviso **"Reconectar a caixa"** no sino (fecha sozinho), conclui na origem a tarefa pedida no painel (migração **0015**: `tarefa.pedido_concluir_em`; a API não tem rede). Esquema novo = 0016+.
 - 1046 pytest + 70 vitest verdes; instalado (commit 7adad28); sem credenciais e com todas as caixas `a_decidir` o job não faz nada (rodou, `Result=success`).
 - **Não escrito por falta de spec/decisão (não por dado):** regras com condição (cartão/valor/dia: só proposta oral, sem spec), Fase 4 (T4.1–T4.6, cada uma abre com mini-spec aprovado), aviso por Telegram (G15, exceção à R2), Canal/Hermes (depois do gabi.brain).
+
+## 10/10/2026 (noite): Fase 4 codificada (T4.1–T4.6) e regras com condição
+- **Regras com condição** (migração 0016): `regra.condicao` JSON (conta, faixa de valor absoluto em centavos, dias da semana); vale no classificador, prévia, aprovação e tela Regras.
+- **T4.1/T4.2 saúde e exames:** `gabi/familia/{saude,exames,ambiente}.py`, cofre `saude.enc` AES-256-GCM só em memória (ADR-014), exame só com a pessoa confirmada, log de leitura, rotas `/api/v1/familia/*` por `matriz_acesso` (total/parcial/nenhum), tela Família. **Falta:** `/etc/gabi/saude.key` (você cria; sem ela 503).
+- **T4.3:** `GET /api/v1/rumo` (entradas, saídas, poupança, gasto por pessoa/frente, patrimônio); cliente Linear só leitura + tabela `entrega` (0017) + tela Entregas; `LINEAR_API_KEY` em `/etc/gabi/trabalho.env`.
+- **T4.4:** `identidade.grau`/`exigir_informacao`; teste de que nenhuma rota do app abre para familiar/terceiro. **Falta (seu):** G13, ACL e convites no Tailscale.
+- **T4.5:** `/api/v1/setup` (7 passos, teste na hora, progresso em `setup_passo` 0019) e tela Configuração (ADR-015).
+- **T4.6:** `python -m gabi.familia.obsidian --destino X --para p1` (pasta por pessoa, determinística, edição externa vira `edicao_externa` 0018) + rotas de edições.
+- Esquema novo = **0020+**. 1143 pytest + 78 vitest verdes; instalado (ae4a763).
+- **Sem código restante no módulo, exceto o que depende de decisão:** aviso por Telegram (G15), Canal/Hermes (depois do gabi.brain), Fase 3 segue descongelada só no que foi feito (job + credenciais).

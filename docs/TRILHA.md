@@ -13,7 +13,7 @@ Criada: 09/10/2026. Fonte de verdade da ordem; detalhe de cada tarefa em `/home/
 | A5 ✅ | **T3.6** telas Hoje, Frentes, Agenda, Mensagens, Tarefas + capturas | A4 | vitest verde, capturas lado a lado geradas p/ G14 |
 | A6 | Fase 2: aba "Notas a receber" (NFS-e ✅ importadas do Nibo, 10/10) e job de ingestão de comprovantes do Paperless | comprovantes precisam de documento real (G18) | escrito contra fake; validado no aceite T2.10 (`docs/aceite-fase-2.md`) |
 | A9 | **Finalização do gabi.brain** (plano `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md`): donos padrão, avisos, previsão, recebimentos, exportação, `comparar_agenda` | — | tarefas 1–8, 11–14 feitas; 9 e 10 esperam G18/G19; ver `docs/STATUS.md` |
-| A7 | Fase 4 (T4.1–T4.6): cada item abre com mini-spec aprovado | pedido do Ricardo | só por pedido |
+| A7 ✅ | Fase 4 (T4.1–T4.6) codificada em 10/10 (ver STATUS) | — | falta só o que é seu: chave da saúde, Tailscale (G13), LINEAR_API_KEY |
 | A8 | **Canal TC.1–TC.6** | Fases 0–4 aceitas | por último; `--dry-run` antes de desligar o OpenClaw |
 
 Ciclo de cada item: teste vermelho → mínimo → `pytest -q` + `npm test` → doc → commit → instalar (`sudo bash deploy/instalar.sh --confirmo-backup-exportado`) → atualizar `STATUS.md` e o ledger.

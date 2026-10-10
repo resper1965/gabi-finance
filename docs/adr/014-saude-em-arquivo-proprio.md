@@ -8,3 +8,5 @@ Data: 10/10/2026 · Estado: aceito (T4.1; o plano mestre a chamava de ADR-008)
 **Consequências.** Simples e sem dependência nativa; o arquivo inteiro é regravado a cada alteração (volume pequeno: exames de 6 pessoas) e há um escritor por vez (o chamador serializa; a API usa um lock de processo). Trocar por SQLCipher depois só muda `gabi/familia/saude.py`. Perder a chave = perder os dados: a chave entra no mesmo cofre do `backup.pub`/restic, e o arquivo cifrado entra no backup.
 
 **Acesso.** `grau(matriz_acesso, 'saúde', nível)`: `total` vê todos; `parcial` só a própria pessoa (`pode_ver`); `nenhum` nunca. O laudo só entra com a pessoa confirmada por alguém (`confirmado_por`).
+
+**Fora do MCP (decisão de projeto, 10/10).** O plano previa um "pessoas_dado com liberação única" também para exames. Não foi feito de propósito: o servidor MCP é alcançável por agentes externos e não recebe a chave da saúde. Exames só saem pela API do painel (Tailscale + matriz de acesso) e pela exportação Obsidian. Para liberar a um agente no futuro, é preciso um ADR novo.
