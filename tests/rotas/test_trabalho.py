@@ -84,10 +84,13 @@ def test_concluir_tarefa_chama_a_origem(banco):
     assert get(c, "/api/v1/tarefas").json()["dados"]["itens"][0]["estado"] == "concluida"
 
 
-def test_concluir_sem_origem_configurada_da_503_e_nao_marca(cli, banco):
+def test_concluir_sem_rede_registra_o_pedido_e_nao_marca_ate_o_job_agir(cli, banco):
     _semear(banco)
-    assert post(cli, "/api/v1/tarefas/1/concluir").status_code == 503
+    r = post(cli, "/api/v1/tarefas/1/concluir")
+    assert r.status_code == 200 and r.json()["dados"]["pendente"] is True
     assert get(cli, "/api/v1/tarefas").json()["dados"]["itens"][0]["estado"] == "aberta"
+    c = conectar(banco)
+    assert c.execute("select pedido_concluir_em from tarefa where id=1").fetchone()[0] is not None
 
 
 def test_caixas_de_email_cadastro_nasce_a_decidir_e_so_boss(cli):

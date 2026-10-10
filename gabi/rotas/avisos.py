@@ -28,6 +28,10 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return "Vence hoje", "; ".join(f"{i['nome']} {_brl(i.get('valor'))}" for i in itens) or "nada"
     if tipo == "servico_falhou":
         return "Serviço falhou", f"{p.get('unidade', '?')} terminou com erro"
+    if tipo == "exportacao_parada":
+        return "Backup fora da VPS parado", p.get("motivo", "")
+    if tipo == "caixa_reconectar":
+        return f"Reconectar a caixa {p.get('endereco', '?')}", "a credencial foi recusada ou não está configurada; a caixa não está sendo lida"
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

@@ -1,5 +1,7 @@
 """Rotas /api/v1 da Fase 3: Hoje, Frentes, Agenda, Mensagens e Tarefas. Lê só de tabelas prontas; concluir tarefa age NA ORIGEM (R2: sem envio/exclusão).
 Consome: trabalho.*, envelope, fontes (`concluir_tarefa` em app.state.fontes)."""
+from datetime import timezone
+
 from fastapi import APIRouter, Depends, Request
 
 from gabi.envelope import envelope
@@ -135,8 +137,9 @@ def concluir(request: Request, tarefa_id: int):
             return envelope(con, {"ok": True}, agora=_agora(request))
         fn = request.app.state.fontes.get("concluir_tarefa")
         fn = fn() if fn else None
-        if fn is None:
-            raise erro(503, "fonte_indisponivel", "a origem da tarefa não está configurada")
+        if fn is None:  # a API não tem rede: registra o pedido e o job do Trabalho conclui na origem (rodada seguinte)
+            con.execute("update tarefa set pedido_concluir_em=coalesce(pedido_concluir_em, ?) where id=?", (_agora(request).astimezone(timezone.utc).isoformat(), tarefa_id))
+            return envelope(con, {"ok": True, "pendente": True}, agora=_agora(request))
         fn(t["origem"], t["externo_id"])                       # age na origem primeiro; só então marca aqui
         con.execute("update tarefa set estado='concluida' where id=?", (tarefa_id,))
         return envelope(con, {"ok": True}, agora=_agora(request))

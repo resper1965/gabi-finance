@@ -29,9 +29,10 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-backup.timer "$AQUI"/deploy/gabi-brain-saldos.service "$AQUI"/deploy/gabi-brain-saldos.timer \
   "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer "$AQUI"/deploy/gabi-brain-notas.service \
   "$AQUI"/deploy/gabi-brain-notas.timer "$AQUI"/deploy/gabi-brain-avisos.service "$AQUI"/deploy/gabi-brain-avisos.timer "$AQUI"/deploy/gabi-brain-falha@.service "$AQUI"/deploy/gabi-brain-exportacao.service "$AQUI"/deploy/gabi-brain-exportacao.timer \
-  "$AQUI"/deploy/gabi-brain-comprovantes.service "$AQUI"/deploy/gabi-brain-comprovantes.timer /etc/systemd/system/
+  "$AQUI"/deploy/gabi-brain-comprovantes.service "$AQUI"/deploy/gabi-brain-comprovantes.timer \
+  "$AQUI"/deploy/gabi-brain-trabalho.service "$AQUI"/deploy/gabi-brain-trabalho.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer
+systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer gabi-brain-trabalho.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).

@@ -100,3 +100,17 @@ Despesa da **Bekaa** (`empresa.relacao='pj_titular'`) paga em conta PF vira um a
 - **Ler avisos:** sino do painel; por linha de comando `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.avisos`. Tipos: `rodada_parada`, `conta_atrasada`, `cobrada_apos_cancelar`, `vence_hoje`, `servico_falhou` (qualquer unit com `OnFailure`), `exportacao_parada` (sem pacote há mais de 9 dias).
 - **Restaurar backup:** ver "Backup e restauração" e "Backup fora da VPS".
 - **Comparar com o gabi-financeiro (G21):** `python -m tools.comparar_agenda --mes AAAA-MM`; saída vazia por 7 dias é o critério de corte.
+
+## Trabalho: credenciais e rodada {#trabalho-credenciais}
+O job `gabi-brain-trabalho.timer` (a cada 15 min, 06h–22h BRT) lê e-mail, agenda e tarefas das caixas com estado `sim` (Cadastros › Caixas de e-mail) e conclui na origem as tarefas que você mandou concluir no painel. Só lê; nunca envia nem apaga (R2). As credenciais ficam **só** em `/etc/gabi/trabalho.env` (0600, legível pelo usuário `gabibrain`; colocadas por você, R5). Sem elas, cada caixa vira o aviso **"Reconectar a caixa …"** no sino, que fecha sozinho quando a leitura volta.
+
+| Variável | Para quê |
+|---|---|
+| `GRAPH_TENANT`, `GRAPH_CLIENT_ID`, `GRAPH_CERT_KEY_FILE`, `GRAPH_CERT_X5T` | Graph (IONIC; ness depois da migração). `GRAPH_CERT_KEY_FILE` = caminho da chave privada PEM. Aprovação do admin: `link_aprovacao_admin` (docs/fontes/graph.md). |
+| `GOOGLE_SA_EMAIL`, `GOOGLE_SA_KEY_FILE`, `GOOGLE_SA_DOMINIOS` | Conta de serviço com delegação (ex.: `bekaa.eu,esper.ws`); a caixa é o `sub`. |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_REFRESH_<ENDEREÇO>` | OAuth próprio (ness, Gmail). O nome é o endereço em maiúsculas com `_` (ex.: `GOOGLE_REFRESH_RICARDO_NESS_COM_BR`). |
+
+Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u gabi-brain-trabalho -n 20 --no-pager -o cat`. Concluir tarefa no painel registra o pedido (`tarefa.pedido_concluir_em`); a tarefa só aparece como concluída depois que o job conclui na origem.
+
+## Comprovantes Pix {#comprovantes-ingestao}
+`gabi-brain-comprovantes.timer` (07h BRT) lê o texto dos documentos do Paperless pela ponte do serviço de fontes, grava o comprovante, **propõe** vínculos aos lançamentos (nunca confirma, R1) e acrescenta a etiqueta `gabi:comprovante`. Idempotente por documento. Rodar à mão: `sudo systemctl start gabi-brain-comprovantes`.

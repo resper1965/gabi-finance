@@ -78,3 +78,9 @@ def test_contagens_inclui_os_avisos_abertos_no_sino(cli, banco):
     _aviso(banco, "vence_hoje", {"chave": "c", "itens": []}, entregue="2026-10-16T10:30:00+00:00")
     depois = cli.get("/api/v1/contagens", headers=BOSS).json()["dados"]
     assert depois["menu"]["avisos"] == 2 and depois["sino"] == antes["sino"] + 2
+
+
+def test_descrever_aviso_de_caixa_para_reconectar():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("caixa_reconectar", {"endereco": "a@ionic.health"})
+    assert "a@ionic.health" in titulo and "credencial" in texto
