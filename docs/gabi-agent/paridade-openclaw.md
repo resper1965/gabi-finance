@@ -27,6 +27,15 @@ Fonte: `openclaw cron list` (21 automações), `systemctl` (units `gabi-*`), `/v
 ## 2. Units e timers fora do gateway (independem do OpenClaw)
 `gabi-brain-*` (api, mcp, fontes, saldos, extratos, notas, comprovantes, trabalho, avisos, telegram, backup, exportação), `gabi-financeiro`, `gabi-fluxos-diario/mensal`, `gabi-drive`, `gabi-backup`, `gabi-vigia`, `gabi-guarda-sessoes`, `gabi-reembolso(.path/-segunda)`, `gabi-wa-docs.path`. **Status: OK**, exceto os que chamam o gateway do OpenClaw — a verificar linha a linha (Task 9 passo 2): `gabi-reembolso*` (fila `fila-reembolso`, escuta), `gabi-wa-docs.path` (PDF recebido no WhatsApp → Paperless), `gabi-guarda-sessoes` e `gabi-vigia` (vigiam sessões e gateway do OpenClaw).
 
+**Resultado da verificação (10/10, `ExecStart` e `Path*` das units):**
+| Unit | Dependência do OpenClaw | Ação no corte |
+|---|---|---|
+| `gabi-vigia` (`vigia_gateway.py`) | vigia o gateway do OpenClaw | trocar o alvo para `hermes-gateway` **antes** de desligar, senão alerta "gateway parado" para sempre (Task 10) |
+| `gabi-guarda-sessoes` (`sessoes.py`) | sessões do OpenClaw | descartar no corte (Hermes tem `sessions/` próprio) |
+| `gabi-wa-docs.path` | observa `.openclaw/media/inbound` e `workspace/media/inbound` (PDF/foto recebido no WhatsApp → Paperless) | apontar para o diretório de mídia do Hermes (`~/.hermes/image_cache` e documentos) ou DECIDIR descartar |
+| `gabi-reembolso.path` | observa `.openclaw/fila-reembolso` (escrita pelo agente `escuta`) | DECIDIR junto com o agente `escuta` |
+| `gabi-financeiro`, `gabi-fluxos-*`, `gabi-contas-cartoes`, `gabi-reembolso-segunda` | só usam `HOME`/dados do usuário `gabi`; enviam ao Telegram pelo token do OpenClaw (`TELEGRAM_BOSS`, `financeiro.env`) | OK, mas o token usado para enviar muda se o bot do OpenClaw sair (Task 15 passo extra) |
+
 ## 3. Canais e agentes
 | Item | Hoje | No Hermes | Status |
 |---|---|---|---|
