@@ -95,3 +95,89 @@ def test_aviso_novo_remetente_uma_vez_e_sem_texto(con):
     assert len(linhas) == 1 and linhas[0][0] == "escuta_novo_remetente"
     assert json.loads(linhas[0][1]) == {"numero": N, "nome": None}
     assert "ZZSEGREDO" not in linhas[0][1]
+
+
+def _pessoa(con, pid, dados, excl=None):
+    con.execute("insert into pessoa(id, nome, dados, excluido_em) values (?,?,?,?)", (pid, pid, json.dumps(dados), excl))
+
+
+def test_ignorar_so_apaga_arquivo_dentro_do_spool(con, tmp_path):
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    dentro, fora = spool / "a.bin", tmp_path / "fora.bin"
+    dentro.write_text("x")
+    fora.write_text("x")
+    registrar_remetente_visto(con, N, AGORA)
+    _msg(con, anexo=str(dentro))
+    _msg(con, anexo=str(fora))
+    _msg(con, anexo=str(spool / ".." / "fora.bin"))
+    ignorar(con, N, "ricardo", spool=spool)
+    assert not dentro.exists() and fora.exists()
+    assert con.execute("select count(*) from escuta_msg where anexo_caminho is not null").fetchone()[0] == 0
+
+
+def test_sem_spool_nao_apaga_arquivo(con, tmp_path):
+    f = tmp_path / "a.bin"
+    f.write_text("x")
+    registrar_remetente_visto(con, N, AGORA)
+    _msg(con, anexo=str(f))
+    bloquear(con, N, "ricardo")
+    assert f.exists()
+    assert con.execute("select anexo_caminho from escuta_msg").fetchone()[0] is None
+
+
+def test_reaprovar_depois_de_bloquear(con):
+    registrar_remetente_visto(con, N, AGORA)
+    bloquear(con, N, "ricardo")
+    pid = aprovar(con, N, "familia", "Fulano", "ricardo")
+    assert estado_remetente(con, N) == ("aprovado", pid)
+
+
+def test_ignorar_nao_rebaixa_bloqueado(con):
+    registrar_remetente_visto(con, N, AGORA)
+    bloquear(con, N, "ricardo")
+    ignorar(con, N, "ricardo")
+    assert estado_remetente(con, N) == ("bloqueado", None)
+
+
+def test_bloquear_e_ignorar_desaprovam_a_pessoa(con):
+    for acao in (bloquear, ignorar):
+        con.execute("delete from pessoa")
+        pid = aprovar(con, N, "familia", "Fulano", "ricardo")
+        con.execute("update escuta_remetente set estado='aprovado' where numero=?", (N,))
+        acao(con, N, "ricardo")
+        assert json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])["escuta_aprovada"] is False
+        assert estado_remetente(con, N)[0] != "aprovado"
+
+
+def test_aprovado_sem_pessoa_aprovada_volta_para_a_fila(con):
+    registrar_remetente_visto(con, N, AGORA)
+    pid = aprovar(con, N, "familia", "Fulano", "ricardo")
+    assert fila(con) == []
+    con.execute("update pessoa set excluido_em='2026-10-11' where id=?", (pid,))
+    assert estado_remetente(con, N) == ("pendente", None)
+    assert [f["numero"] for f in fila(con)] == [N]
+
+
+def test_telefone_em_outros_formatos_casa(con):
+    _pessoa(con, "p1", {"canais": ["whatsapp:55 (11) 91234-5678"], "escuta_aprovada": True, "papel_escuta": "familia"})
+    assert estado_remetente(con, N) == ("aprovado", "p1")
+    _pessoa(con, "p0", {"canais": ["whatsapp:5511912345678"]})
+    assert estado_remetente(con, N) == ("aprovado", "p1")  # a aprovada vence
+    assert aprovar(con, N, "prestador", None, "r") == "p1"
+    assert con.execute("select count(*) from pessoa where id like 'wa-%'").fetchone()[0] == 0
+
+
+def test_entradas_invalidas_nao_aprovam(con):
+    _pessoa(con, "a", {"canais": f"whatsapp:{N}", "escuta_aprovada": True, "papel_escuta": "familia"})
+    _pessoa(con, "b", {"canais": [f"whatsapp:{N}"], "escuta_aprovada": True, "papel_escuta": "chefe"})
+    _pessoa(con, "c", {"canais": [f"whatsapp:{N}"], "escuta_aprovada": 1, "papel_escuta": "familia"})
+    _pessoa(con, "d", {"canais": [f"whatsapp:{N}"], "escuta_aprovada": True, "papel_escuta": "familia"}, excl="2026-01-01")
+    assert estado_remetente(con, N) == ("pendente", None)
+
+
+def test_aprovar_reativa_pessoa_excluida(con):
+    pid = aprovar(con, N, "familia", "Fulano", "r")
+    con.execute("update pessoa set excluido_em='2026-10-11' where id=?", (pid,))
+    assert aprovar(con, N, "familia", "Fulano", "r") == pid
+    assert estado_remetente(con, N) == ("aprovado", pid)
