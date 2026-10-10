@@ -61,6 +61,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/custo` | Custo do modelo (OpenRouter) no dia e no mês contra o teto. |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
+| GET | `/api/v1/familia/exames/{pessoa_id}` | Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde. |
+| GET | `/api/v1/familia/exames/{pessoa_id}/resumo` | Texto "resumo para a consulta" só da pessoa escolhida. |
+| GET | `/api/v1/familia/exames/{pessoa_id}/serie` | Série no tempo de um marcador da pessoa, com a marca de fora da faixa de referência. |
+| GET | `/api/v1/familia/laudos` | Laudos lidos do Paperless esperando a confirmação de quem é o laudo (só boss). |
+| POST | `/api/v1/familia/laudos` | Lê o texto de um documento do Paperless e grava PROPOSTAS de marcador (não entram até confirmar de quem é o laudo). |
+| POST | `/api/v1/familia/laudos/{paperless_id}/confirmar` | Confirma DE QUEM é o laudo (pessoa_id); só então as propostas viram exames. |
+| POST | `/api/v1/familia/laudos/{paperless_id}/rejeitar` | Descarta as propostas de um laudo sem registrar nenhum exame. |
+| GET | `/api/v1/familia/pessoas` | Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria). |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/frentes` | Frentes de trabalho com a contagem de itens confirmados. |
 | POST | `/api/v1/frentes` | Abre uma frente (nome, tipo, empresa e regra vêm do Ricardo). |

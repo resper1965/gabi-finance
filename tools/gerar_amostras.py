@@ -21,13 +21,31 @@ ROTAS = {
     "tarefas": "/api/v1/tarefas", "caixas-email": "/api/v1/caixas-email", "avisos": "/api/v1/avisos", "caixa-projecao": "/api/v1/caixa/projecao?dias=30", "cobrar-previsao": "/api/v1/cobrar/previsao", "cobrar-notas": "/api/v1/cobrar/notas", "cobrar-recebimentos": "/api/v1/cobrar/recebimentos",
     "cadastros-contas": "/api/v1/cadastros/contas", "cadastros-pessoas": "/api/v1/cadastros/pessoas",
     "cadastros-categorias": "/api/v1/cadastros/categorias", "cadastros-empresas": "/api/v1/cadastros/empresas",
+    "familia-pessoas": "/api/v1/familia/pessoas", "familia-exames": "/api/v1/familia/exames/p-hel",
+    "familia-serie": "/api/v1/familia/exames/p-hel/serie?marcador=Colesterol%20total", "familia-resumo": "/api/v1/familia/exames/p-hel/resumo", "familia-laudos": "/api/v1/familia/laudos",
 }
+
+
+def _cofre_demo(caminho: Path) -> tuple[Path, bytes]:
+    """Saúde sintética (nenhum dado real): 2 exames da Helena e 1 laudo esperando confirmação."""
+    import datetime as dt
+    from gabi.familia.exames import propor_exames
+    from gabi.familia.saude import abrir_saude, registrar_exame
+    chave = bytes(range(32))
+    with abrir_saude(caminho, chave) as s:
+        registrar_exame(s, "p-hel", "Colesterol total", "190", "mg/dL", dt.date(2026, 1, 10), ("0", "200"), 11, "boss@x.com")
+        registrar_exame(s, "p-hel", "Colesterol total", "215", "mg/dL", dt.date(2026, 7, 10), ("0", "200"), 12, "boss@x.com")
+        registrar_exame(s, "p-hel", "Glicose em jejum", "92", "mg/dL", dt.date(2026, 7, 10), ("70", "99"), 12, "boss@x.com")
+        propor_exames(s, 55, "Data da coleta: 05/10/2026\nHemoglobina 13,5 g/dL\nGlicose: 88 mg/dL (Ref.: 70 - 99)\n", "p-lia")
+    return caminho, chave
 
 
 def gerar() -> dict[str, dict]:
     pasta = Path(tempfile.mkdtemp(prefix="gabi-amostras-"))
     semear(pasta / "a.db")
-    cli = TestClient(criar_app(pasta / "a.db", permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    app = criar_app(pasta / "a.db", permite_tcp_local=True, relogio=lambda: AGORA)
+    app.state.saude = _cofre_demo(pasta / "saude.enc")
+    cli = TestClient(app, client=("127.0.0.1", 50000))
     saida = {}
     for nome, url in ROTAS.items():
         r = cli.get(url, headers={"Tailscale-User-Login": "boss@x.com"})

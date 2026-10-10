@@ -144,3 +144,11 @@ def pode_ver(ident: Identidade, grau: str, pessoa_id: str) -> bool:
     if grau == "total":
         return True
     return grau == "parcial" and ident.pessoa_id is not None and ident.pessoa_id == pessoa_id
+
+
+def marcadores(s: Cofre, pessoa_id: str, quem: str) -> list[dict]:
+    """Último valor de cada marcador da pessoa (para a tela Família)."""
+    _log(s, quem, pessoa_id, "lista")
+    return [{"marcador": r["marcador"], "valor": r["valor"], "unidade": r["unidade"], "em": r["em"], "fora_da_faixa": _fora(r["valor"], r["ref_min"], r["ref_max"])}
+            for r in s.con.execute("select * from exame e where pessoa_id=? and em=(select max(em) from exame where pessoa_id=e.pessoa_id and marcador=e.marcador) "
+                                   "group by marcador order by marcador", (pessoa_id,))]

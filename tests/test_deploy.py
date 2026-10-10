@@ -306,3 +306,9 @@ def test_job_do_trabalho_roda_de_15_em_15_min_com_credenciais_so_do_ambiente_e_a
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert ligadas and "gabi-brain-trabalho.timer" in ligadas[0]
+
+
+def test_api_le_a_chave_da_saude_so_de_arquivo_e_grava_o_cofre_na_pasta_do_banco():
+    api = _ler("gabi-brain-api.service")
+    assert "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in api and "ReadWritePaths=/var/lib/gabi-brain" in api
+    assert "saude.key" not in INSTALAR or "chmod" in INSTALAR  # a chave nunca é criada pelo instalador

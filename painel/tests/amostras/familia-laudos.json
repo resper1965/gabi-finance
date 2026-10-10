@@ -1,0 +1,38 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "marcadores": [
+     {
+      "em": "2026-10-05",
+      "marcador": "Hemoglobina",
+      "ref_max": null,
+      "ref_min": null,
+      "unidade": "g/dL",
+      "valor": "13,5"
+     },
+     {
+      "em": "2026-10-05",
+      "marcador": "Glicose",
+      "ref_max": "99",
+      "ref_min": "70",
+      "unidade": "mg/dL",
+      "valor": "88"
+     }
+    ],
+    "paperless_id": 55,
+    "pessoa_sugerida": "p-lia"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

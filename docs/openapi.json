@@ -1787,6 +1787,254 @@
     "summary": "Destino Agrupado"
    }
   },
+  "/api/v1/familia/exames/{pessoa_id}": {
+   "get": {
+    "description": "Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde.",
+    "operationId": "lista_api_v1_familia_exames__pessoa_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pessoa_id",
+      "required": true,
+      "schema": {
+       "title": "Pessoa Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Lista"
+   }
+  },
+  "/api/v1/familia/exames/{pessoa_id}/resumo": {
+   "get": {
+    "description": "Texto \"resumo para a consulta\" só da pessoa escolhida.",
+    "operationId": "resumo_api_v1_familia_exames__pessoa_id__resumo_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pessoa_id",
+      "required": true,
+      "schema": {
+       "title": "Pessoa Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Resumo"
+   }
+  },
+  "/api/v1/familia/exames/{pessoa_id}/serie": {
+   "get": {
+    "description": "Série no tempo de um marcador da pessoa, com a marca de fora da faixa de referência.",
+    "operationId": "serie_do_marcador_api_v1_familia_exames__pessoa_id__serie_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pessoa_id",
+      "required": true,
+      "schema": {
+       "title": "Pessoa Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "marcador",
+      "required": true,
+      "schema": {
+       "title": "Marcador",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Serie Do Marcador"
+   }
+  },
+  "/api/v1/familia/laudos": {
+   "get": {
+    "description": "Laudos lidos do Paperless esperando a confirmação de quem é o laudo (só boss).",
+    "operationId": "laudos_api_v1_familia_laudos_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Laudos"
+   },
+   "post": {
+    "description": "Lê o texto de um documento do Paperless e grava PROPOSTAS de marcador (não entram até confirmar de quem é o laudo).",
+    "operationId": "ler_laudo_api_v1_familia_laudos_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Ler Laudo"
+   }
+  },
+  "/api/v1/familia/laudos/{paperless_id}/confirmar": {
+   "post": {
+    "description": "Confirma DE QUEM é o laudo (pessoa_id); só então as propostas viram exames.",
+    "operationId": "confirmar_api_v1_familia_laudos__paperless_id__confirmar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "paperless_id",
+      "required": true,
+      "schema": {
+       "title": "Paperless Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Confirmar"
+   }
+  },
+  "/api/v1/familia/laudos/{paperless_id}/rejeitar": {
+   "post": {
+    "description": "Descarta as propostas de um laudo sem registrar nenhum exame.",
+    "operationId": "rejeitar_api_v1_familia_laudos__paperless_id__rejeitar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "paperless_id",
+      "required": true,
+      "schema": {
+       "title": "Paperless Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Rejeitar"
+   }
+  },
+  "/api/v1/familia/pessoas": {
+   "get": {
+    "description": "Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria).",
+    "operationId": "pessoas_api_v1_familia_pessoas_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Pessoas"
+   }
+  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",
