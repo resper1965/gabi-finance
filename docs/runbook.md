@@ -126,3 +126,6 @@ Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u g
 
 ## Cofre Obsidian {#obsidian}
 `python -m gabi.familia.obsidian --destino /pasta/do/cofre --para p1` exporta os `.md` (família com CPF, saúde, frentes, decisões, memória) **de uma pessoa**, na pasta `<destino>/<id da pessoa>/`; cada um recebe só o que a matriz de acesso libera (`parcial` = só o que é dele). Saída idêntica se nada mudou. Se você editar um arquivo no Obsidian, a próxima exportação grava a edição como pendente (`edicao_externa`) e **não** sobrescreve o arquivo nem muda o banco; ao rejeitar a edição, o arquivo volta ao exportado. Sincronize **só** por Tailscale/Syncthing ou nuvem criptografada ponta a ponta: a pasta contém CPF e saúde.
+
+## Avisos no Telegram (G15) {#telegram}
+Desligado por padrão. Para ligar (é a sua exceção à R2): crie `/etc/gabi/telegram.env` (0640 `root:gabibrain`) com `TELEGRAM_BOT_TOKEN=...` e `TELEGRAM_CHAT_ID=...` (o bot vem do BotFather; o chat, do `getUpdates` depois de mandar uma mensagem ao bot). O `gabi-brain-telegram.timer` (5 min) envia os avisos ainda não lidos dos últimos 2 dias, no máximo 10 por rodada, em português, só com nome, valor e datas; marca `aviso.telegram_em` só depois do 200 e nunca reenvia. Para desligar: apague o arquivo. Teste à mão: `sudo systemctl start gabi-brain-telegram`.

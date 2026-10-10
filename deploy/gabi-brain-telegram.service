@@ -1,0 +1,28 @@
+[Unit]
+Description=gabi.brain avisos ao Telegram (G15): desligado até existir /etc/gabi/telegram.env
+After=network-online.target
+OnFailure=gabi-brain-falha@%n.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gabibrain
+Group=gabibrain
+WorkingDirectory=/opt/gabi-brain
+Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
+# TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID (colocados por você: é a exceção à R2); sem o arquivo o serviço sobe e não envia nada.
+EnvironmentFile=-/etc/gabi/telegram.env
+ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.telegram
+TimeoutStartSec=120
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-brain

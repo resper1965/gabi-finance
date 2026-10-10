@@ -31,6 +31,14 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin
                        **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS}
 
 
+ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
+
+
+def ferramentas_do_token(escopos) -> list[str]:
+    """Ferramentas que um token com estes escopos pode chamar, em ordem alfabética (é a lista explícita `tools.include` do Hermes, sem curinga)."""
+    return sorted(n for n, e in ESCOPOS_FERRAMENTAS.items() if e in set(escopos))
+
+
 def _registrar(banco: Path, token: Token | None, ferramenta: str | None, escopo: str | None, status: str) -> None:
     try:
         con = conectar(banco)

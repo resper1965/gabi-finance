@@ -115,8 +115,8 @@ def _decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None, ben
 
 
 def avisos_pendentes(con, desde: dt.datetime | None) -> list[dict]:
-    """Avisos que o canal ainda não entregou (do mais antigo ao mais novo)."""
-    q, args = "select * from aviso where entregue_em is null", []
+    """Avisos que o canal ainda não entregou (do mais antigo ao mais novo); o que o envio direto ao Telegram já mandou (telegram_em) não volta."""
+    q, args = "select * from aviso where entregue_em is null and telegram_em is null", []
     if desde:
         q += " and criado_em>=?"
         args.append(desde.astimezone(dt.timezone.utc).isoformat())

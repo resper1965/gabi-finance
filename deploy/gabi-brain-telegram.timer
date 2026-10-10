@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain avisos ao Telegram a cada 5 minutos
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=gabi-brain-telegram.service
+
+[Install]
+WantedBy=timers.target

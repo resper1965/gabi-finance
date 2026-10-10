@@ -312,3 +312,13 @@ def test_api_le_a_chave_da_saude_so_de_arquivo_e_grava_o_cofre_na_pasta_do_banco
     api = _ler("gabi-brain-api.service")
     assert "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in api and "ReadWritePaths=/var/lib/gabi-brain" in api
     assert "saude.key" not in INSTALAR or "chmod" in INSTALAR  # a chave nunca é criada pelo instalador
+
+
+def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_no_repositorio():
+    srv, t = _ler("gabi-brain-telegram.service"), _ler("gabi-brain-telegram.timer")
+    assert "-m gabi.telegram" in srv and "EnvironmentFile=-/etc/gabi/telegram.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "User=gabibrain" in srv and "NoNewPrivileges=yes" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    assert "OnUnitActiveSec=5min" in t and "Unit=gabi-brain-telegram.service" in t
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and "gabi-brain-telegram.timer" in ligadas[0]
+    assert "TELEGRAM_BOT_TOKEN=" not in srv + t + INSTALAR
