@@ -1,4 +1,5 @@
 import json
+import logging
 
 from gabi.dinheiro.modelo import Orcamento
 from gabi.escuta.classificar import Classificacao, classificar, interpretar
@@ -120,8 +121,51 @@ def test_sem_cliente_devolve_none():
     assert classificar("oi", None, _orc()) is None
 
 
-def test_falha_do_modelo_devolve_none():
+def test_falha_do_modelo_devolve_none(caplog):
     class Quebra:
         def completar(self, prompt, *, forte):
-            raise RuntimeError("segredo da mensagem")
-    assert classificar("oi", Quebra(), _orc()) is None
+            raise RuntimeError("erro generico")
+    with caplog.at_level(logging.DEBUG):
+        assert classificar("texto-secreto-xyz", Quebra(), _orc()) is None
+    assert "texto-secreto-xyz" not in caplog.text
+
+
+def test_none_nunca_e_classificacao_nos_tres_casos():
+    class Quebra:
+        def completar(self, prompt, *, forte):
+            raise RuntimeError("x")
+    for r in (classificar("oi", None, _orc()), classificar("oi", Falso(_resp()), _orc(dia=0.0)),
+              classificar("oi", Quebra(), _orc())):
+        assert r is None and not isinstance(r, Classificacao)
+
+
+def test_resposta_invalida_nao_repete_com_forte():
+    for ruim in ("lixo", "[1]", json.dumps({"tipo": "pedido", "confianca": "x", "campos": {}}),
+                 '{"tipo":"pedido","confianca":NaN,"campos":{}}', _resp("pedido", 1.5), _resp("pedido", -0.1)):
+        cli = Falso(ruim, _resp("pedido", 0.9))
+        assert classificar("oi", cli, _orc()) == NADA
+        assert len(cli.chamadas) == 1
+
+
+def test_strings_aparadas_vazias_descartadas_e_truncadas():
+    r = interpretar(_resp(favorecido="  Maria  ", forma="   ", motivo="", chave_ou_linha="k" * 700))
+    assert r.campos == {"favorecido": "Maria", "chave_ou_linha": "k" * 600}
+    r = interpretar(_resp(favorecido="a" * 301, motivo="m" * 300))
+    assert r.campos == {"favorecido": "a" * 300, "motivo": "m" * 300}
+    r = interpretar(_resp("saude", caso=" " + "c" * 400, paciente="\n\t"))
+    assert r.campos == {"caso": "c" * 300}
+
+
+def test_valor_limites():
+    for ruim in (-5, 0, 0.0, 1e308, 10_000_001, "1.200,50", [1], {"a": 1}, None):
+        assert "valor" not in interpretar(_resp(valor=ruim, forma="pix")).campos
+    for bom in (0.01, 10_000_000):
+        assert interpretar(_resp(valor=bom)).campos == {"valor": bom}
+    for txt in ('NaN', 'Infinity', '-Infinity'):
+        r = interpretar('{"tipo":"pedido","confianca":0.9,"campos":{"valor":%s,"forma":"pix"}}' % txt)
+        assert r.campos == {"forma": "pix"}
+
+
+def test_valor_de_campo_aninhado_descartado():
+    r = interpretar(_resp(favorecido={"a": 1}, forma=["pix"], motivo="ok"))
+    assert r.campos == {"motivo": "ok"}

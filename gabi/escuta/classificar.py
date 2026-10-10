@@ -42,47 +42,68 @@ def _prompt(texto: str) -> str:
     return f"{INSTRUCAO}<dados>{dados}</dados>\n"
 
 
-def _campo_ok(nome: str, v):
+VALOR_MAX = 10_000_000
+_LIMITE = {"chave_ou_linha": 600}   # Pix copia-e-cola é longo
+_LIMITE_PADRAO = 300
+
+
+def _campo(nome: str, v):
+    """Devolve o valor validado/normalizado, ou None para descartar só esse campo."""
     if nome == "valor":
-        return not isinstance(v, bool) and isinstance(v, (int, float)) and v == v and abs(v) != float("inf")
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 < v <= VALOR_MAX:
+            return None  # NaN também cai aqui (comparações falsas)
+        return v
+    if not isinstance(v, str):
+        return None
+    v = v.strip()
     if nome in _DATAS:
-        if not isinstance(v, str):
-            return False
         try:
             dt.date.fromisoformat(v)
         except ValueError:
-            return False
-        return True
-    return isinstance(v, str)
+            return None
+        return v
+    return v[:_LIMITE.get(nome, _LIMITE_PADRAO)] or None
 
 
-def interpretar(resposta: str) -> Classificacao:
+def _validar(resposta: str) -> Classificacao | None:
+    """None = resposta inválida (não é classificação)."""
     try:
         bruto = json.loads(resposta)
     except (ValueError, TypeError):
-        return _NADA
+        return None
     if not isinstance(bruto, dict):
-        return _NADA
+        return None
     tipo, conf, campos = bruto.get("tipo"), bruto.get("confianca"), bruto.get("campos", {})
     if not isinstance(tipo, str) or tipo not in TIPOS:
-        return _NADA
+        return None
     if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0 <= conf <= 1:
-        return _NADA
+        return None
     if not isinstance(campos, dict):
-        return _NADA
-    ok = {n: campos[n] for n in CAMPOS[tipo] if n in campos and _campo_ok(n, campos[n])}
+        return None
+    ok = {}
+    for n in CAMPOS[tipo]:
+        if n in campos and (v := _campo(n, campos[n])) is not None:
+            ok[n] = v
     return Classificacao(tipo, float(conf), ok)
 
 
+def interpretar(resposta: str) -> Classificacao:
+    return _validar(resposta) or _NADA
+
+
 def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento) -> Classificacao | None:
-    """None = sem cliente, teto estourado ou falha do modelo (a mensagem fica para depois)."""
+    """None = could not classify (no client, budget exhausted or model exception): the caller must leave the message
+    pending and retry later, NEVER treat it as 'nada'; crisis detection by palavras de risco runs separately and first.
+    Resposta inválida do modelo NÃO é None: vira 'nada' e não paga a repetição forte."""
     if cliente is None:
         return None
     prompt = _prompt(texto)
     resposta = _chamar(cliente, prompt, False, orcamento)
     if resposta is None:
         return None
-    c = interpretar(resposta)
+    c = _validar(resposta)
+    if c is None:
+        return _NADA
     if c.confianca < LIMIAR:
         resposta = _chamar(cliente, prompt, True, orcamento)
         if resposta is None:
