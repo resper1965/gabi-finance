@@ -2707,6 +2707,97 @@
     "summary": "Rumo"
    }
   },
+  "/api/v1/setup": {
+   "get": {
+    "description": "Os 7 passos do assistente de configuração, com o estado salvo de cada um (pendente, feito ou depois).",
+    "operationId": "passos_api_v1_setup_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Passos"
+   }
+  },
+  "/api/v1/setup/{passo}": {
+   "get": {
+    "description": "Um passo do assistente: explicação em português (o que o app lê, o que nunca faz e onde vai a credencial) e o estado salvo.",
+    "operationId": "um_passo_api_v1_setup__passo__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "passo",
+      "required": true,
+      "schema": {
+       "title": "Passo",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Um Passo"
+   },
+   "post": {
+    "description": "Testa a conexão do passo na hora (acao=testar; feito só se der certo) ou deixa para depois (acao=depois). Devolve {ok, detalhe, estado}.",
+    "operationId": "agir_api_v1_setup__passo__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "passo",
+      "required": true,
+      "schema": {
+       "title": "Passo",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Agir"
+   }
+  },
   "/api/v1/sugestoes": {
    "get": {
     "description": "Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra.",

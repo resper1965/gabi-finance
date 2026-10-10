@@ -87,6 +87,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
 | GET | `/api/v1/rodadas` | Últimas rodadas de ingestão e se foram conferidas. |
 | GET | `/api/v1/rumo` | Rumo do ano, mês a mês: entradas, saídas, poupança, gasto (por pessoa e por frente) e patrimônio das contas liberadas. |
+| GET | `/api/v1/setup` | Os 7 passos do assistente de configuração, com o estado salvo de cada um (pendente, feito ou depois). |
+| GET | `/api/v1/setup/{passo}` | Um passo do assistente: explicação em português (o que o app lê, o que nunca faz e onde vai a credencial) e o estado salvo. |
+| POST | `/api/v1/setup/{passo}` | Testa a conexão do passo na hora (acao=testar; feito só se der certo) ou deixa para depois (acao=depois). Devolve {ok, detalhe, estado}. |
 | GET | `/api/v1/sugestoes` | Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra. |
 | POST | `/api/v1/sugestoes/{sid}/aprovar` | Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado. |
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |

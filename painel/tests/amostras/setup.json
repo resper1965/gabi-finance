@@ -1,0 +1,65 @@
+{
+ "dados": {
+  "passos": [
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Lê e-mail, agenda e tarefas da IONIC (e da ness depois da migração). O administrador do tenant precisa aprovar o app (link em docs/fontes/graph.md). Só leitura e rascunho: nada é enviado nem apagado. Credenciais em /etc/gabi/trabalho.env (GRAPH_*).",
+    "passo": "microsoft",
+    "titulo": "Microsoft 365"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Saldos e extratos pelo Open Finance (mcp.ai), só leitura. A chave fica em /etc/gabi/brain.env (MCPAI_KEY); reconectar C6 e XP no mcp.ai quando pedir.",
+    "passo": "bancos",
+    "titulo": "Bancos"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Onde ficam notas, boletos e comprovantes. O app lê e só acrescenta etiquetas gabi:*; nunca apaga. Token em /etc/gabi/cobrar.env.",
+    "passo": "paperless",
+    "titulo": "Paperless"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Contabilidade da PJ. Lê notas e agendamentos; a única escrita é o lote 'Lançar na PJ', com a sua confirmação. Token em /etc/gabi/cobrar.env (NIBO_TOKEN).",
+    "passo": "nibo",
+    "titulo": "Nibo"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Saúde da família (chave em /etc/gabi/saude.key) e entregas da Linear (LINEAR_API_KEY em /etc/gabi/trabalho.env). Opcionais.",
+    "passo": "extras",
+    "titulo": "Extras"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Telegram e WhatsApp. Só entra depois que o gabi.brain terminar: deixe para depois.",
+    "passo": "canal",
+    "titulo": "Canal (Hermes)"
+   },
+   {
+    "detalhe": null,
+    "estado": "pendente",
+    "explicacao": "Confere se todos os passos acima estão feitos ou combinados para depois.",
+    "passo": "pronto",
+    "titulo": "Pronto"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}
