@@ -69,28 +69,34 @@ def _auditar(con, por: str, o_que: str) -> None:
     con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')", (_agora(), por, o_que))
 
 
+def garantir_pessoa(con, numero: str, nome: str | None) -> tuple[str, dict, str]:
+    """Única regra de qual `pessoa` tem este número (aprovar e trazer-dos-contatos caem na MESMA linha). Dentro de uma transação do chamador.
+    Reaproveita a que já tem o número (a aprovada primeiro); senão usa o id `wa-`+sha1[:10], reativando a excluída ou criando.
+    Devolve (id, dados, estado) com estado 'existente' | 'reativada' | 'criada'; nunca mexe em escuta_aprovada/papel_escuta."""
+    achadas = _pessoas_do_numero(con, numero)
+    if achadas:
+        return achadas[0]["id"], dados(achadas[0]), "existente"
+    pid = "wa-" + hashlib.sha1(numero.encode()).hexdigest()[:10]
+    antiga = con.execute("select dados from pessoa where id=?", (pid,)).fetchone()
+    if antiga is not None:  # a pessoa deste número foi excluída: reativa em vez de colidir na chave
+        d, estado = dados(antiga), "reativada"
+        con.execute("update pessoa set excluido_em=null where id=?", (pid,))
+    else:
+        d, estado = {}, "criada"
+        con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')", (pid, nome or _nome_contato(con, numero) or numero, "{}"))
+    canais = d.get("canais") if isinstance(d.get("canais"), list) else []
+    if not any(isinstance(c, str) and c.startswith("whatsapp:") and normalizar_telefone(c[9:]) == numero for c in canais):
+        d["canais"] = canais + [f"whatsapp:{numero}"]
+    return pid, d, estado
+
+
 def aprovar(con, numero: str, papel: str, nome: str | None, por: str) -> str:
     """Decisão explícita do Ricardo: pode reverter ignorado/bloqueado. Reaproveita a pessoa que já tem o número (a aprovada primeiro)."""
     if papel not in PAPEIS:
         raise ValueError(f"papel inválido: {papel!r}")
-    canal = f"whatsapp:{numero}"
     with transacao(con):
-        achadas = _pessoas_do_numero(con, numero)
-        if achadas:
-            pid, d = achadas[0]["id"], dados(achadas[0])
-        else:
-            pid = "wa-" + hashlib.sha1(numero.encode()).hexdigest()[:10]
-            antiga = con.execute("select dados from pessoa where id=?", (pid,)).fetchone()
-            if antiga is not None:  # a pessoa deste número foi excluída: reativa em vez de colidir na chave
-                d = dados(antiga)
-                con.execute("update pessoa set excluido_em=null where id=?", (pid,))
-            else:
-                con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')", (pid, nome or _nome_contato(con, numero) or numero, "{}"))
-                d = {}
-        canais = d.get("canais") if isinstance(d.get("canais"), list) else []
-        if not any(isinstance(c, str) and c.startswith("whatsapp:") and normalizar_telefone(c[9:]) == numero for c in canais):
-            canais = canais + [canal]
-        d.update({"canais": canais, "escuta_aprovada": True, "papel_escuta": papel})
+        pid, d, _ = garantir_pessoa(con, numero, nome)
+        d.update({"escuta_aprovada": True, "papel_escuta": papel})
         con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), pid))
         con.execute(
             "insert into escuta_remetente(numero, nome, estado, vista_em, qtd) values (?,?, 'aprovado', ?, 0) "

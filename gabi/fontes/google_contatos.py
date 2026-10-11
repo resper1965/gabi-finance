@@ -25,16 +25,24 @@ class ErroGoogleContatos(Exception):
 
 
 def _http_real(metodo, url, corpo=None, cabecalhos=None):
-    """(status, json). Corpo `bytes` vai como está (formulário do token); o corpo de erro NUNCA é lido (pode ecoar segredo)."""
+    """(status, json). Corpo `bytes` vai como está (formulário do token); o corpo de erro NUNCA é lido (pode ecoar segredo).
+    A falha é só registrada no `except` e o erro tipado sai DEPOIS do bloco (sem __context__)."""
     dados = corpo if isinstance(corpo, bytes) else (json.dumps(corpo).encode() if corpo is not None else None)
     req = urllib.request.Request(url, data=dados, method=metodo, headers=cabecalhos or {})
+    falha = None
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
-        return e.code, {}
+        codigo = e.code
+        try:
+            e.close()
+        except Exception:  # noqa: BLE001
+            pass
+        return codigo, {}
     except (OSError, ValueError) as e:
-        raise ErroGoogleContatos(f"Google indisponível: {type(e).__name__}") from None
+        falha = type(e).__name__
+    raise ErroGoogleContatos(f"Google indisponível: {falha}")
 
 
 def _chamar(http, metodo, url, corpo, cab):
@@ -63,8 +71,9 @@ def nome_da_variavel(conta: str) -> str:
 class TokenOAuth:
     """token(conta) -> access token. Troca o refresh token da conta em TOKEN_URL e guarda o access token em memória até ~60 s antes de expirar."""
 
-    def __init__(self, client_id: str, client_secret: str, ambiente, *, http=_http_real, relogio=time.time):
-        self._id, self._secret, self._env, self._http, self._relogio = client_id, client_secret, ambiente, http, relogio
+    def __init__(self, client_id: str, client_secret: str, ambiente, *, http=_http_real, relogio=None):
+        self._id, self._secret, self._env, self._http = client_id, client_secret, ambiente, http
+        self._relogio = relogio or time.monotonic
         self._cache: dict[str, tuple[str, float]] = {}
         self._trava = threading.Lock()
 
@@ -84,7 +93,7 @@ class TokenOAuth:
                                             "refresh_token": refresh}).encode()
             status, resp = _chamar(self._http, "POST", TOKEN_URL, corpo, {"Content-Type": "application/x-www-form-urlencoded"})
             if status in (400, 401):
-                raise ErroGoogleContatos(f"conta não autorizada: {conta}")
+                raise ErroGoogleContatos(f"token recusado: {conta}")
             if status >= 400:
                 raise ErroGoogleContatos(f"troca de token -> {status}")
             acc = resp.get("access_token") if isinstance(resp, dict) else None
@@ -95,16 +104,29 @@ class TokenOAuth:
             return acc
 
 
+    def invalidar(self, conta: str) -> None:
+        with self._trava:
+            self._cache.pop(conta, None)
+
+
+def _primeiro(lista):
+    itens = [x for x in (lista or []) if isinstance(x, dict)]
+    return sorted(itens, key=lambda x: not (isinstance(x.get("metadata"), dict) and x["metadata"].get("primary") is True))  # estável: o primário vem primeiro
+
+
 def listar_contatos(conta: str, token: Callable[[str], str], http=_http_real) -> list[dict]:
     """Todas as páginas de people/me/connections -> [{nome, telefone}] (telefone cru; um item por telefone)."""
     conta = _conta_valida(conta)
     saida, pagina, vistas = [], None, set()
     for _ in range(MAX_PAGINAS):
-        q = {"personFields": CAMPOS, "pageSize": "1000"}
+        q = {"personFields": CAMPOS, "sources": "READ_SOURCE_TYPE_CONTACT", "pageSize": "1000"}
         if pagina:
             q["pageToken"] = pagina
         url = URL_CONTATOS + "?" + urllib.parse.urlencode(q, safe=",")
         status, resp = _chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
+        if status == 401 and hasattr(token, "invalidar"):  # access token vencido/revogado: uma nova tentativa com token novo
+            token.invalidar(conta)
+            status, resp = _chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
         if status >= 400:
             raise ErroGoogleContatos(f"people.connections.list -> {status}")
         if not isinstance(resp, dict):
@@ -112,11 +134,14 @@ def listar_contatos(conta: str, token: Callable[[str], str], http=_http_real) ->
         for p in resp.get("connections") or []:
             if not isinstance(p, dict):
                 continue
-            nomes = p.get("names") or []
-            nome = nomes[0].get("displayName") if nomes and isinstance(nomes[0], dict) else None
-            for t in p.get("phoneNumbers") or []:
-                if isinstance(t, dict) and isinstance(t.get("value"), str) and t["value"].strip():
-                    saida.append({"nome": nome if isinstance(nome, str) and nome.strip() else None, "telefone": t["value"]})
+            nomes = _primeiro(p.get("names"))
+            nome = nomes[0].get("displayName") if nomes else None
+            for t in _primeiro(p.get("phoneNumbers")):
+                if isinstance(t.get("value"), str) and t["value"].strip():
+                    item = {"nome": nome if isinstance(nome, str) and nome.strip() else None, "telefone": t["value"]}
+                    if isinstance(t.get("canonicalForm"), str) and t["canonicalForm"].strip():
+                        item["canonico"] = t["canonicalForm"].strip()  # E.164 vindo do Google
+                    saida.append(item)
         pagina = resp.get("nextPageToken")
         if not pagina:
             return saida

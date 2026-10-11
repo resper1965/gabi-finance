@@ -1,9 +1,13 @@
 import json
 import threading
+import time
+import urllib.error
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from gabi.fontes import google_contatos as gc
 from gabi.fontes.google_contatos import (ESCOPO, ErroGoogleContatos, GoogleContatos, TokenOAuth, listar_contatos,
                                           google_contatos_do_ambiente)
 from gabi.fontes.ponte import ERROS, PERMITIDOS, Ponte, PonteContatos, Servidor
@@ -28,7 +32,7 @@ def test_listar_pagina_e_so_pede_nome_e_telefone():
         u = urlparse(url)
         q = parse_qs(u.query)
         assert u.path == "/v1/people/me/connections"
-        assert q["personFields"] == ["names,phoneNumbers"]
+        assert q["personFields"] == ["names,phoneNumbers"] and q["sources"] == ["READ_SOURCE_TYPE_CONTACT"]
         return 200, paginas[q.get("pageToken", [None])[0]]
 
     r = listar_contatos("a@gmail.com", lambda c: "TOK", http=http)
@@ -94,6 +98,104 @@ def test_token_oauth_troca_refresh_por_access_e_nao_loga_segredo():
     assert q == {"grant_type": ["refresh_token"], "client_id": ["cid"], "client_secret": [CLIENT_SEC], "refresh_token": [SEGREDO]}
     assert cab["Content-Type"] == "application/x-www-form-urlencoded"
     assert SEGREDO not in repr(t) and CLIENT_SEC not in repr(t) and SEGREDO not in str(vars(t).get("_http", ""))
+
+
+def test_token_400_diz_token_recusado_e_sem_refresh_continua_nao_autorizada():
+    t = TokenOAuth("cid", "s", {"GOOGLE_REFRESH_A_B_COM": "r"}, http=lambda *a, **k: (400, {}))
+    with pytest.raises(ErroGoogleContatos) as e:
+        t("a@b.com")
+    assert str(e.value) == "token recusado: a@b.com"
+    with pytest.raises(ErroGoogleContatos) as e:
+        t("outra@b.com")
+    assert str(e.value) == "conta não autorizada: outra@b.com"
+
+
+def test_cache_do_token_usa_relogio_monotonico(monkeypatch):
+    agora = [50.0]
+    monkeypatch.setattr(time, "monotonic", lambda: agora[0])
+    n = []
+    t = TokenOAuth("c", "s", {"GOOGLE_REFRESH_A_B_COM": "r"}, http=lambda *a, **k: (n.append(1) or (200, {"access_token": f"a{len(n)}", "expires_in": 3600})))
+    t("a@b.com"); t("a@b.com")
+    assert len(n) == 1
+    agora[0] += 3600
+    assert t("a@b.com") == "a2"
+
+
+def test_401_do_people_api_invalida_o_token_e_tenta_uma_vez_com_token_novo():
+    emitidos = []
+
+    def http_tok(m, url, corpo=None, cab=None):
+        emitidos.append(1)
+        return 200, {"access_token": f"acc{len(emitidos)}", "expires_in": 3600}
+    t = TokenOAuth("c", "s", {"GOOGLE_REFRESH_A_B_COM": "r"}, http=http_tok)
+    vistos = []
+
+    def http(m, url, corpo=None, cab=None):
+        vistos.append(cab["Authorization"])
+        return (401, {}) if len(vistos) == 1 else (200, _pagina([("A", "1")]))
+    assert listar_contatos("a@b.com", t, http=http) == [{"nome": "A", "telefone": "1"}]
+    assert vistos == ["Bearer acc1", "Bearer acc2"]
+    sempre401 = []
+    with pytest.raises(ErroGoogleContatos) as e:
+        listar_contatos("a@b.com", t, http=lambda m, u, c=None, h=None: (sempre401.append(1) or (401, {})))
+    assert len(sempre401) == 2 and "401" in str(e.value)
+
+
+def test_nome_e_telefone_primarios_e_canonical_form():
+    corpo = {"connections": [{
+        "names": [{"displayName": "Outro"}, {"displayName": "Principal", "metadata": {"primary": True}}],
+        "phoneNumbers": [{"value": "(11) 1111-1111"}, {"value": "+1 (415) 555-2671", "canonicalForm": "+14155552671", "metadata": {"primary": True}}]}]}
+    r = listar_contatos("a@b.com", lambda c: "T", http=lambda *a, **k: (200, corpo))
+    assert r == [{"nome": "Principal", "telefone": "+1 (415) 555-2671", "canonico": "+14155552671"},
+                 {"nome": "Principal", "telefone": "(11) 1111-1111"}]  # o primário vem primeiro; todos os telefones seguem listados
+
+
+class _Resp:
+    def __init__(self, status=200, corpo=b"{}"):
+        self.status, self._corpo = status, corpo
+
+    def read(self):
+        return self._corpo
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_http_real_falha_de_rede_levanta_fora_do_except_sem_contexto_e_sem_segredo(monkeypatch):
+    def urlopen(req, timeout=None):
+        raise urllib.error.URLError(f"falhou com {SEGREDO}")
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    with pytest.raises(ErroGoogleContatos) as e:
+        gc._http_real("GET", "https://x/", None, {"Authorization": f"Bearer {SEGREDO}"})
+    assert e.value.__context__ is None and e.value.__cause__ is None and SEGREDO not in str(e.value)
+
+
+def test_http_real_json_invalido_tambem_sem_contexto(monkeypatch):
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Resp(200, b"nao e json " + SEGREDO.encode()))
+    with pytest.raises(ErroGoogleContatos) as e:
+        gc._http_real("GET", "https://x/")
+    assert e.value.__context__ is None and SEGREDO not in str(e.value)
+
+
+def test_http_real_http_error_fecha_sem_ler_o_corpo(monkeypatch):
+    estado = {"lido": False, "fechado": False}
+
+    class Erro(urllib.error.HTTPError):
+        def read(self, *a):
+            estado["lido"] = True
+            return SEGREDO.encode()
+
+        def close(self):
+            estado["fechado"] = True
+
+    def urlopen(req, timeout=None):
+        raise Erro("https://x/", 403, "proibido", {}, None)
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    assert gc._http_real("GET", "https://x/") == (403, {})
+    assert estado == {"lido": False, "fechado": True}
 
 
 def test_token_fica_em_cache_ate_60s_antes_de_expirar():

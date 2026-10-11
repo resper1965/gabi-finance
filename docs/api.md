@@ -64,7 +64,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
 | DELETE | `/api/v1/escuta/contatos` | Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam). |
 | GET | `/api/v1/escuta/contatos` | Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado. |
-| POST | `/api/v1/escuta/contatos/sincronizar` | Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve só contagens. Ponte fora do ar = 503. |
+| POST | `/api/v1/escuta/contatos/sincronizar` | Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve contagens e o erro de cada conta que falhou. |
 | GET | `/api/v1/escuta/contatos/so-na-ness.csv` | CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino. |
 | POST | `/api/v1/escuta/contatos/trazer` | Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir. |
 | GET | `/api/v1/escuta/grupos` | Grupos de WhatsApp vistos pela escuta e se já foram aprovados. |

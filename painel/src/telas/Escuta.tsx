@@ -250,8 +250,10 @@ function Contatos({ acao }: { acao: Acao }) {
           <Aviso erro={erros.contatos} />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button className="btn btn-primary" disabled={ocupado} onClick={() => agir("contatos", async () => {
-              const r = await api.post<{ total: number; invalidos: number }>("/api/v1/escuta/contatos/sincronizar");
-              setResumo(`Sincronizado: ${r.dados.total} contatos, ${r.dados.invalidos} números inválidos pulados.`);
+              const r = await api.post<{ contas: Record<string, { lidos?: number; erro?: string }>; total: number; invalidos: number }>("/api/v1/escuta/contatos/sincronizar");
+              const falhas = Object.entries(r.dados.contas).filter(([, v]) => v.erro).map(([conta, v]) => `${conta} (${v.erro})`);
+              setResumo(`Sincronizado: ${r.dados.total} contatos, ${r.dados.invalidos} números inválidos pulados.` + (falhas.length ? ` Falharam: ${falhas.join("; ")}.` : ""));
+              setMarcados(new Set()); setPagina(0);
             }, "Contatos sincronizados.", leitura.recarregar)}>Sincronizar agora</button>
             <a className="btn btn-secondary" href="/api/v1/escuta/contatos/so-na-ness.csv" download>Baixar contatos só na ness (CSV)</a>
             <button ref={apagar} className="btn btn-secondary" disabled={ocupado} onClick={() => setApagando(true)}>Apagar contatos</button>
@@ -262,7 +264,7 @@ function Contatos({ acao }: { acao: Acao }) {
               <p style={{ margin: 0 }}>Apagar todos os contatos guardados? As pessoas já criadas a partir deles ficam.</p>
               <span style={{ display: "flex", gap: 8 }}>
                 <button ref={confirmar} className="btn btn-primary" disabled={ocupado} onClick={async () => {
-                  if (await agir("contatos", () => api.delete("/api/v1/escuta/contatos"), "Contatos apagados.", leitura.recarregar)) { setApagando(false); setMarcados(new Set()); setResumo(null); }
+                  if (await agir("contatos", () => api.delete("/api/v1/escuta/contatos"), "Contatos apagados.", leitura.recarregar)) { setApagando(false); setMarcados(new Set()); setResumo(null); setPagina(0); }
                 }}>Confirmar apagar contatos</button>
                 <button className="btn btn-secondary" disabled={ocupado} onClick={() => { voltar.current = true; setApagando(false); }}>Cancelar</button>
               </span>
@@ -275,10 +277,11 @@ function Contatos({ acao }: { acao: Acao }) {
             <ul style={lista}>
               {d.itens.map((c) => {
                 const quem = c.nome ?? c.telefone;
+                const rotulo = c.nome ? `${c.nome} ${c.telefone}` : c.telefone;
                 return (
                   <li key={c.telefone} style={linha}>
                     <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <input type="checkbox" aria-label={`Selecionar ${quem}`} disabled={ocupado || c.ja_e_pessoa} checked={marcados.has(c.telefone)} onChange={() => alternar(c.telefone)} />
+                      <input type="checkbox" aria-label={`Selecionar ${rotulo}`} disabled={ocupado || c.ja_e_pessoa} checked={marcados.has(c.telefone)} onChange={() => alternar(c.telefone)} />
                       <span><strong>{quem}</strong>{c.nome && <span style={suave}> · {c.telefone}</span>}</span>
                     </label>
                     <span style={suave}>{c.ja_e_pessoa ? "já é pessoa" : c.contas.join(", ")}</span>

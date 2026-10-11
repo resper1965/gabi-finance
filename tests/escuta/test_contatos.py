@@ -31,7 +31,7 @@ def _linhas(con):
 def test_mesmo_telefone_nas_duas_contas_e_um_contato(con):
     dados = {GMAIL: [{"nome": "Ana", "telefone": "(11) 91234-5678"}], NESS: [{"nome": "Ana S.", "telefone": "+55 11 91234-5678"}]}
     r = c.sincronizar(con, [GMAIL, NESS], _listar(dados))
-    assert r == {"contas": {GMAIL: 1, NESS: 1}, "total": 1, "invalidos": 0}
+    assert r == {"contas": {GMAIL: {"lidos": 1}, NESS: {"lidos": 1}}, "total": 1, "invalidos": 0}
     assert _linhas(con) == [(GMAIL, "+5511912345678", "Ana"), (NESS, "+5511912345678", "Ana S.")]
     assert [x["telefone"] for x in c.listar_unicos(con)] == ["+5511912345678"]
 
@@ -53,7 +53,7 @@ def test_nome_vazio_nao_vale(con):
 def test_numero_invalido_e_pulado_e_contado_e_duplicata_na_conta_vira_uma(con):
     dados = {GMAIL: [{"nome": "A", "telefone": "123"}, {"nome": "B", "telefone": "11912345678"}, {"nome": None, "telefone": "11912345678"}, {"nome": "C", "telefone": None}]}
     r = c.sincronizar(con, [GMAIL], _listar(dados))
-    assert r["invalidos"] == 2 and r["total"] == 1 and r["contas"] == {GMAIL: 4}
+    assert r["invalidos"] == 2 and r["total"] == 1 and r["contas"] == {GMAIL: {"lidos": 4}}
     assert _linhas(con) == [(GMAIL, "+5511912345678", "B")]
 
 
@@ -72,16 +72,71 @@ def test_sincronizar_conta_removida_do_parametro_some_da_lista(con):
     assert _linhas(con) == [(GMAIL, "+5511911111111", "A")] and r["total"] == 1
 
 
-def test_falha_em_uma_conta_nao_mexe_na_tabela(con):
-    c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "A", "telefone": "11911111111"}]}))
 
+def _com_falhas(dados, falhas):
     def listar(conta):
-        if conta == NESS:
-            raise RuntimeError("x")
-        return []
-    with pytest.raises(RuntimeError):
-        c.sincronizar(con, [GMAIL, NESS], listar)
-    assert _linhas(con) == [(GMAIL, "+5511911111111", "A")]
+        if conta in falhas:
+            raise falhas[conta]
+        return list(dados.get(conta, []))
+    return listar
+
+
+def test_ness_falha_gmail_sincroniza_e_linhas_antigas_da_ness_ficam(con):
+    c.sincronizar(con, [GMAIL, NESS], _listar({GMAIL: [{"nome": "Velho", "telefone": "11911111111"}], NESS: [{"nome": "Ness antigo", "telefone": "11922222222"}]}))
+    falhas = {NESS: c.ErroGoogleContatos(f"conta não autorizada: {NESS}")}
+    r = c.sincronizar(con, [GMAIL, NESS], _com_falhas({GMAIL: [{"nome": "Novo", "telefone": "11933333333"}]}, falhas))
+    assert r["contas"] == {GMAIL: {"lidos": 1}, NESS: {"erro": f"conta não autorizada: {NESS}"}}
+    assert _linhas(con) == [(GMAIL, "+5511933333333", "Novo"), (NESS, "+5511922222222", "Ness antigo")] and r["total"] == 2
+
+
+def test_falha_na_segunda_pagina_nao_grava_lista_parcial(con):
+    c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "A", "telefone": "11911111111"}]}))
+    r = c.sincronizar(con, [GMAIL], _com_falhas({}, {GMAIL: c.ErroGoogleContatos("people.connections.list -> 500")}))
+    assert _linhas(con) == [(GMAIL, "+5511911111111", "A")] and "erro" in r["contas"][GMAIL]
+
+
+def test_erro_nao_tipado_so_leva_o_nome_do_tipo(con):
+    r = c.sincronizar(con, [GMAIL], _com_falhas({}, {GMAIL: RuntimeError("segredo 912345678")}))
+    assert r["contas"][GMAIL] == {"erro": "RuntimeError"}
+
+
+def test_conta_malformada_no_parametro_falha_so_ela(con):
+    def listar(conta):
+        if "@" not in conta:
+            raise c.ErroGoogleContatos("conta inválida")
+        return [{"nome": "A", "telefone": "11911111111"}]
+    r = c.sincronizar(con, ["lixo", GMAIL], listar)
+    assert r["contas"] == {"lixo": {"erro": "conta inválida"}, GMAIL: {"lidos": 1}} and _linhas(con) == [(GMAIL, "+5511911111111", "A")]
+
+
+def test_todas_as_contas_falhando_nao_mexe_na_tabela_mas_conta_removida_e_purgada(con):
+    c.sincronizar(con, [GMAIL, NESS], _listar({GMAIL: [{"nome": "A", "telefone": "11911111111"}], NESS: [{"nome": "B", "telefone": "11922222222"}]}))
+    r = c.sincronizar(con, [GMAIL], _com_falhas({}, {GMAIL: c.ErroGoogleContatos("x")}))
+    assert _linhas(con) == [(GMAIL, "+5511911111111", "A")] and all("erro" in v for v in r["contas"].values())
+
+
+@pytest.mark.parametrize("item,esperado", [
+    ({"telefone": "+1 (415) 555-2671"}, None),
+    ({"telefone": "+44 20 7946 0958"}, None),
+    ({"telefone": "001 415 555 2671"}, None),
+    ({"telefone": "(11) 3456-7890 r.1"}, None),
+    ({"telefone": "11 3456-7890 ramal 12"}, None),
+    ({"telefone": "11912345678 x5"}, None),
+    ({"telefone": "11912345678 ext 5"}, None),
+    ({"telefone": "11912345678#2"}, None),
+    ({"telefone": "+55 11 91234-5678"}, "+5511912345678"),
+    ({"telefone": "0055 11 91234-5678"}, "+5511912345678"),
+    ({"telefone": "(11) 91234-5678"}, "+5511912345678"),
+    ({"telefone": "+1 (415) 555-2671", "canonico": "+14155552671"}, "+14155552671"),
+    ({"telefone": "(11) 91234-5678", "canonico": "+5511912345678"}, "+5511912345678"),
+    ({"telefone": "(11) 91234-5678", "canonico": "lixo"}, "+5511912345678"),
+])
+def test_telefones_internacionais_e_ramais(con, item, esperado):
+    r = c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "X", **item}]}))
+    if esperado is None:
+        assert r["invalidos"] == 0 + 1 and _linhas(con) == []
+    else:
+        assert _linhas(con) == [(GMAIL, esperado, "X")] and r["invalidos"] == 0
 
 
 def test_saida_so_com_contagens(con):
@@ -142,3 +197,26 @@ def test_main_imprime_so_contagens(tmp_path, capsys, monkeypatch):
 def test_main_sem_socket_e_erro(tmp_path, capsys, monkeypatch):
     monkeypatch.delenv("GABI_FONTES_SOCKET", raising=False)
     assert c.main(tmp_path / "m.db") == 2
+
+
+def _banco(tmp_path):
+    banco = tmp_path / "m.db"
+    k = conectar(banco); migrar(k, MIGR); k.close()
+    return banco
+
+
+def test_main_conta_nao_autorizada_com_outra_ok_sai_0_e_avisa_pelo_nome(tmp_path, capsys):
+    f = _com_falhas({GMAIL: [{"nome": "Segredo", "telefone": "11912345678"}]}, {NESS: c.ErroGoogleContatos(f"conta não autorizada: {NESS}")})
+    assert c.main(_banco(tmp_path), listar=f) == 0
+    cap = capsys.readouterr()
+    assert NESS in cap.err and "Segredo" not in cap.out + cap.err and "912345678" not in cap.out + cap.err and "total=1" in cap.out
+
+
+def test_main_todas_falham_sai_1(tmp_path, capsys):
+    f = _com_falhas({}, {GMAIL: c.ErroGoogleContatos(f"conta não autorizada: {GMAIL}"), NESS: c.ErroGoogleContatos(f"conta não autorizada: {NESS}")})
+    assert c.main(_banco(tmp_path), listar=f) == 1
+
+
+def test_main_falha_inesperada_de_uma_conta_sai_1(tmp_path):
+    f = _com_falhas({GMAIL: [{"nome": "A", "telefone": "11912345678"}]}, {NESS: c.ErroGoogleContatos("people.connections.list -> 500")})
+    assert c.main(_banco(tmp_path), listar=f) == 1

@@ -6,7 +6,7 @@ import { Escuta } from "../src/telas/Escuta";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
 interface Chamada { metodo: string; url: string; corpo: unknown }
-interface Opcoes { fila?: unknown[]; aprovados?: unknown[]; grupos?: unknown[]; parametros?: Record<string, unknown>; falha?: RegExp; segurar?: Promise<void>; negar?: boolean; contatos?: unknown[]; aposPut?: Record<string, unknown> }
+interface Opcoes { fila?: unknown[]; aprovados?: unknown[]; grupos?: unknown[]; parametros?: Record<string, unknown>; falha?: RegExp; segurar?: Promise<void>; negar?: boolean; contatos?: unknown[]; contasFalhas?: Record<string, unknown>; total?: number; aposPut?: Record<string, unknown> }
 
 function fake(o: Opcoes = {}) {
   const chamadas: Chamada[] = [];
@@ -21,10 +21,10 @@ function fake(o: Opcoes = {}) {
       if (o.falha?.test(url)) return { ok: false, status: 400, json: async () => ({ erro: "requisicao_invalida", mensagem: "papel inválido" }) } as Response;
       if (metodo === "PUT") { parametros = { ...parametros, ...JSON.parse(String(init!.body)) }; const resposta = parametros; if (o.aposPut) parametros = { ...parametros, ...o.aposPut }; return ok(env(resposta)); }
       if (/contatos\/trazer/.test(url)) return ok(env({ criadas: 2, ignoradas: 1 }));
-      if (/contatos\/sincronizar/.test(url)) return ok(env({ contas: {}, total: 7, invalidos: 1 }));
+      if (/contatos\/sincronizar/.test(url)) return ok(env({ contas: { "a@x.com": { lidos: 7 }, ...(o.contasFalhas ?? {}) }, total: 7, invalidos: 1 }));
       return ok(env({}));
     }
-    if (/contatos/.test(url)) return ok(env({ itens: o.contatos ?? [], total: (o.contatos ?? []).length, limite: 50, offset: 0 }));
+    if (/contatos/.test(url)) return ok(env({ itens: o.contatos ?? [], total: o.total ?? (o.contatos ?? []).length, limite: 50, offset: 0 }));
     if (/remetentes/.test(url)) return ok(env({ fila: o.fila ?? [], aprovados: o.aprovados ?? [] }));
     if (/grupos/.test(url)) return ok(env({ grupos: o.grupos ?? [] }));
     return ok(env(parametros));
@@ -307,13 +307,13 @@ test('botao "Trazer dos contatos" so envia os selecionados e fica desabilitado s
   montar();
   const trazer = await screen.findByRole("button", { name: "Trazer dos contatos" });
   expect((trazer as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Ana" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Ana +5511912345678" }));
   expect((trazer as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(trazer);
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/trazer", corpo: { telefones: ["+5511912345678"] } });
   expect(await screen.findByText(/Criadas 2 pessoas, 1 ignoradas/)).toBeTruthy();
-  expect((screen.getByRole("checkbox", { name: "Selecionar Ana" }) as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByRole("checkbox", { name: "Selecionar Ana +5511912345678" }) as HTMLInputElement).checked).toBe(false);
 });
 
 test("quem ja e pessoa nao pode ser selecionado e o link do CSV aponta para a exportacao", async () => {
@@ -363,5 +363,32 @@ test("erro ao sincronizar aparece na secao e a lista continua", async () => {
   montar();
   fireEvent.click(await screen.findByRole("button", { name: "Sincronizar agora" }));
   expect((await screen.findAllByText(/Erro: papel inválido/)).length).toBeGreaterThan(0);
-  expect(screen.getByRole("checkbox", { name: "Selecionar Ana" })).toBeTruthy();
+  expect(screen.getByRole("checkbox", { name: "Selecionar Ana +5511912345678" })).toBeTruthy();
+});
+
+test("contatos com o mesmo nome se distinguem pelo telefone no rotulo da caixa", async () => {
+  fake({ contatos: [{ nome: "Ana", telefone: "+5511911111111", contas: [], ja_e_pessoa: false }, { nome: "Ana", telefone: "+5511922222222", contas: [], ja_e_pessoa: false }] });
+  montar();
+  expect(await screen.findByRole("checkbox", { name: "Selecionar Ana +5511911111111" })).toBeTruthy();
+  expect(screen.getByRole("checkbox", { name: "Selecionar Ana +5511922222222" })).toBeTruthy();
+});
+
+test("sincronizar mostra as contas que falharam e limpa a selecao", async () => {
+  fake({ contatos: CONTATOS, contasFalhas: { "ness@x.com": { erro: "conta não autorizada: ness@x.com" } } });
+  montar();
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Selecionar Ana +5511912345678" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sincronizar agora" }));
+  expect(await screen.findByText(/Falharam: ness@x.com \(conta não autorizada: ness@x.com\)/)).toBeTruthy();
+  await waitFor(() => expect((screen.getByRole("checkbox", { name: "Selecionar Ana +5511912345678" }) as HTMLInputElement).checked).toBe(false));
+});
+
+test.each([["Sincronizar agora", null], ["Apagar contatos", "Confirmar apagar contatos"]])("%s volta para a primeira pagina", async (botao, confirmar) => {
+  const c = fake({ contatos: CONTATOS, total: 120 });
+  montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Próxima" }));
+  await waitFor(() => expect(c.some((x) => /offset=50/.test(x.url))).toBe(true));
+  const antes = c.length;
+  fireEvent.click(screen.getByRole("button", { name: botao }));
+  if (confirmar) fireEvent.click(await screen.findByRole("button", { name: confirmar }));
+  await waitFor(() => expect(c.slice(antes).some((x) => /offset=0/.test(x.url))).toBe(true));
 });

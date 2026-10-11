@@ -2,7 +2,6 @@
 A API NÃO toca o spool: ignorar/bloquear só anulam ponteiros no banco; o timer da escuta apaga os arquivos órfãos.
 Número, nome e palavras de risco nunca vão para log; a auditoria de parâmetros leva só os nomes das chaves. Contatos do Google: só nome e telefone, lidos pela ponte do serviço de fontes (a API não tem rede). Consome: escuta.remetentes, escuta.caixa, escuta.contatos."""
 import datetime as dt
-import hashlib
 import json
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -209,21 +208,20 @@ def _numeros_de_pessoas(con) -> set[str]:
 
 @router.post("/contatos/sincronizar")
 def sincronizar_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve só contagens. Ponte fora do ar = 503."""
+    """Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve contagens e o erro de cada conta que falhou.
+    200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar."""
     fabrica = request.app.state.fontes.get("google_contatos")
     fonte = fabrica() if fabrica else None
     if fonte is None:
         raise erro(503, "fonte_indisponivel", "os contatos do Google não estão configurados")
     con = _con(request)
     try:
-        try:
-            r = ct.sincronizar(con, ct.contas_contatos(con), fonte.listar)
-        except ErroGoogleContatos as e:
-            falha = str(e)
-        else:
-            _audit(con, ident.login, f"escuta: sincronizou contatos (total {r['total']}, inválidos {r['invalidos']})")
-            return envelope(con, r, agora=_agora(request))
-        raise erro(503, "fonte_indisponivel", falha)
+        r = ct.sincronizar(con, ct.contas_contatos(con), fonte.listar)
+        falhas = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
+        if r["contas"] and len(falhas) == len(r["contas"]):  # nenhuma conta sincronizou (ou a ponte está fora do ar)
+            raise erro(503, "fonte_indisponivel", "nenhuma conta sincronizou: " + "; ".join(f"{k}: {m}" for k, m in falhas.items()))
+        _audit(con, ident.login, f"escuta: sincronizou contatos (total {r['total']}, inválidos {r['invalidos']}, contas com erro {len(falhas)})")
+        return envelope(con, r, agora=_agora(request))
     finally:
         con.close()
 
@@ -245,7 +243,8 @@ def listar_contatos(request: Request, busca: str = "", limite: int = 50, offset:
         con.close()
 
 
-@router.get("/contatos/so-na-ness.csv")
+@router.get("/contatos/so-na-ness.csv", response_class=Response,
+            responses={200: {"description": "CSV do importador do Google (Name, Phone 1 - Value)", "content": {"text/csv": {"schema": {"type": "string"}}}}})
 def contatos_so_na_ness(request: Request):
     """CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino."""
     con = _con(request)
@@ -276,11 +275,13 @@ async def trazer_contatos(request: Request, ident: Identidade = Depends(exigir("
                 if n is None or n not in nomes or n in existentes or n in vistos:
                     continue
                 vistos.add(n)
-                pid = "ct-" + hashlib.sha1(n.encode()).hexdigest()[:12]
-                if con.execute("select 1 from pessoa where id=?", (pid,)).fetchone():
-                    continue  # id de uma pessoa excluída: não ressuscita
-                con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')",
-                            (pid, nomes[n] or n, json.dumps({"canais": [f"whatsapp:{n}"]}, ensure_ascii=False)))
+                pid, d, estado = rem.garantir_pessoa(con, n, nomes[n])
+                if estado == "existente":
+                    continue
+                if estado == "reativada":  # trazer nunca aprova: o que a pessoa excluída tinha de aprovação não volta
+                    d.pop("escuta_aprovada", None)
+                    d.pop("pode_pedir", None)
+                con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), pid))
                 criadas += 1
             ignoradas = len(tels) - criadas
             _audit(con, ident.login, f"escuta: trouxe {criadas} contato(s) como pessoa ({ignoradas} ignorado(s))")

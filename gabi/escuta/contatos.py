@@ -12,10 +12,13 @@ from typing import Callable
 
 from gabi.db import conectar, migrar, transacao
 from gabi.escuta.caixa import normalizar_telefone
+from gabi.fontes.google_contatos import ErroGoogleContatos
 
 CONTAS_PADRAO = ["resper@gmail.com", "resper@ness.com.br"]
 DESTINO_PADRAO, ORIGEM_PADRAO = "resper@gmail.com", "resper@ness.com.br"
 _E164 = re.compile(r"^\+\d{10,15}$")
+_CANONICO = re.compile(r"^\+[1-9]\d{7,14}$")
+_RAMAL = re.compile(r"(?i)(ramal|\bext|\br\.|\bx\s*\d|#|;|,)")
 
 
 def _parametro(con, chave: str, padrao):
@@ -49,16 +52,49 @@ def conta_origem(con) -> str:
     return _conta(con, "escuta.conta_origem_contatos", ORIGEM_PADRAO)
 
 
+def _telefone(item) -> str | None:
+    """E.164 de um contato. Prefere o `canonico` (canonicalForm do Google); sem ele, recusa o que normalizar_telefone (que só entende
+    Brasil e antepõe 55) transformaria em número brasileiro errado: DDI diferente de 55 e ramal."""
+    if not isinstance(item, dict):
+        return None
+    canon = item.get("canonico")
+    if isinstance(canon, str) and _CANONICO.match(canon.strip()):
+        return canon.strip()
+    bruto = item.get("telefone")
+    if not isinstance(bruto, str):
+        return None
+    t = bruto.strip()
+    if _RAMAL.search(t):
+        return None
+    if t.startswith("00"):
+        t = "+" + t[2:]
+    if t.startswith("+") and not re.sub(r"\D", "", t).startswith("55"):
+        return None
+    return normalizar_telefone(t)
+
+
+def _erro(e: Exception) -> str:
+    return str(e) if isinstance(e, ErroGoogleContatos) else type(e).__name__
+
+
 def sincronizar(con, contas: list[str], listar: Callable[[str], list[dict]]) -> dict:
-    """Lê todas as contas ANTES de gravar (falha em uma não mexe na tabela). Uma linha por (conta, telefone); conta fora da lista é apagada.
-    Devolve só contagens: lidos por conta, total de telefones distintos e inválidos."""
+    """Resultado por conta: cada `listar` roda no seu try; sucesso substitui SÓ as linhas daquela conta (a falha na paginação levanta antes de
+    devolver, então nunca se grava lista parcial); falha deixa as linhas dela como estão. Só contas fora do parâmetro são apagadas.
+    Devolve só contagens e o erro tipado por conta: {"contas": {conta: {"lidos": n} | {"erro": msg}}, "total", "invalidos"}."""
     contas = list(dict.fromkeys(contas))
-    lidas, invalidos = {}, 0
+    resultado, lidas, invalidos = {}, {}, 0
     for conta in contas:
-        itens = listar(conta)
+        try:
+            itens = listar(conta)
+            falha = None
+        except Exception as e:  # noqa: BLE001 - uma conta ruim não derruba as outras
+            itens, falha = None, _erro(e)
+        if falha is not None:
+            resultado[conta] = {"erro": falha}
+            continue
         linhas: dict[str, str | None] = {}
         for it in itens:
-            tel = normalizar_telefone(it.get("telefone")) if isinstance(it, dict) else None
+            tel = _telefone(it)
             if tel is None:
                 invalidos += 1
                 continue
@@ -66,15 +102,16 @@ def sincronizar(con, contas: list[str], listar: Callable[[str], list[dict]]) -> 
             nome = nome.strip()[:200] if isinstance(nome, str) and nome.strip() else None
             if tel not in linhas or (linhas[tel] is None and nome):
                 linhas[tel] = nome
-        lidas[conta] = (len(itens), linhas)
+        lidas[conta] = linhas
+        resultado[conta] = {"lidos": len(itens)}
     with transacao(con):
         marcas = ",".join("?" * len(contas))
         con.execute(f"delete from contato_google where conta not in ({marcas})" if contas else "delete from contato_google", contas)
-        for conta, (_, linhas) in lidas.items():
+        for conta, linhas in lidas.items():
             con.execute("delete from contato_google where conta=?", (conta,))
             con.executemany("insert into contato_google(conta, telefone, nome) values (?,?,?)", [(conta, t, n) for t, n in linhas.items()])
     total = con.execute("select count(distinct telefone) from contato_google").fetchone()[0]
-    return {"contas": {k: v[0] for k, v in lidas.items()}, "total": total, "invalidos": invalidos}
+    return {"contas": resultado, "total": total, "invalidos": invalidos}
 
 
 def nome_do_numero(con, numero: str) -> str | None:
@@ -122,13 +159,14 @@ def csv_google(contatos: list[dict]) -> str:
 
 
 def main(banco: Path | None = None, *, listar=None) -> int:
+    """Só contagens e as contas que falharam (pelo nome). Sai com erro quando TODAS falham ou quando alguma falha não é "não autorizada"
+    (conta ainda sem refresh token é esperado e não deve acionar o aviso de falha todo dia)."""
     banco = Path(banco or os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
     sock = os.environ.get("GABI_FONTES_SOCKET")
     if listar is None:
         if not sock:
             print("ERRO: GABI_FONTES_SOCKET não configurado", file=sys.stderr)
             return 2
-        from gabi.fontes.google_contatos import ErroGoogleContatos
         from gabi.fontes.ponte import PonteContatos
         ponte = PonteContatos(sock)
         if not ponte.configurada():
@@ -138,15 +176,18 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     try:
-        r = sincronizar(con, contas_contatos(con), listar)
-    except Exception as e:  # noqa: BLE001 - só o tipo e, se for erro tipado da fonte, a mensagem (só cita a conta)
-        from gabi.fontes.google_contatos import ErroGoogleContatos
-        print(f"ERRO: {e if isinstance(e, ErroGoogleContatos) else type(e).__name__}", file=sys.stderr)
-        return 1
+        contas = contas_contatos(con)
+        r = sincronizar(con, contas, listar)
     finally:
         con.close()
-    print(f"contatos: total={r['total']} invalidos={r['invalidos']} " + " ".join(f"contas[{i}]={n}" for i, (_, n) in enumerate(r["contas"].items())))
-    return 0
+    ok = {k: v for k, v in r["contas"].items() if "lidos" in v}
+    erros = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
+    print(f"contatos: total={r['total']} invalidos={r['invalidos']} contas_ok={len(ok)} lidos={sum(v['lidos'] for v in ok.values())}")
+    for conta, msg in erros.items():
+        print(f"AVISO: conta {conta} falhou: {msg}", file=sys.stderr)
+    todas = bool(contas) and not ok
+    inesperado = any(not m.startswith("conta não autorizada") for m in erros.values())
+    return 1 if todas or inesperado else 0
 
 
 if __name__ == "__main__":
