@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Callable
 
-from gabi.avisos import VALE, triar
+from gabi.avisos import VALE, consolidar_duplicados, triar
 from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
@@ -133,6 +133,7 @@ def _decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None, ben
 
 def avisos_pendentes(con, desde: dt.datetime | None) -> list[dict]:
     """Avisos que o canal ainda não entregou (do mais antigo ao mais novo); o que o envio direto ao Telegram já mandou (telegram_em) não volta."""
+    consolidar_duplicados(con, dt.datetime.now(dt.timezone.utc))  # um aviso por conta: o mais recente
     q, args = "select * from aviso where entregue_em is null and telegram_em is null", []
     if desde:
         q += " and criado_em>=?"

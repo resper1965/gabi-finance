@@ -186,3 +186,17 @@ def test_hermes_vence_hoje_devolve_payload_atual_so_com_itens_abertos(con):
                                                             {"id": "b:1", "nome": "Luz", "valor": "2", "vencimento": "2026-10-10"}]})
     r = avisos_pendentes(con, None)
     assert [i["id"] for i in r[0]["payload"]["itens"]] == ["b:1"]
+
+
+def test_hermes_devolve_um_aviso_por_conta_e_superados_nao_aparecem(con):
+    for i in range(3):
+        _comp(con, f"c{i}", "atrasado", nome=f"Conta{i}")
+    ids = {}
+    for dia in (1, 2, 3):
+        for i in range(3):
+            ids[(dia, i)] = _av(con, "conta_atrasada", {"chave": f"c{i}", "nome": f"Conta{i}", "vencimento": "2026-10-10", "valor": "1.00"}, quando=f"2026-10-0{dia}T10:00:00+00:00")
+    r = avisos_pendentes(con, None)
+    assert sorted(a["id"] for a in r) == sorted(ids[(3, i)] for i in range(3))
+    antigos = [ids[(d, i)] for d in (1, 2) for i in range(3)]
+    q = ",".join("?" * 6)
+    assert con.execute(f"select count(*) from aviso where id in ({q}) and telegram_em is not null and telegram_em=entregue_em", antigos).fetchone()[0] == 6

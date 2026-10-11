@@ -39,13 +39,14 @@ def enviar_avisos_contagem(con, env, agora: dt.datetime, http=_http_real) -> tup
     """-> (enviados, obsoletos descartados, incertos). Aviso cuja condição já não é verdade (avisos.triar) não é enviado: fecha com telegram_em+entregue_em
     (nesse caso telegram_em significa "fechado", não "enviado"). Incerto (a_conferir/compromisso ausente): não envia e não fecha; reavalia na próxima rodada.
     Descartados e incertos não contam no limite de 10 por rodada (só as tentativas de envio contam)."""
-    from gabi.avisos import INCERTO, RESOLVIDO, triar
+    from gabi.avisos import INCERTO, RESOLVIDO, consolidar_duplicados, triar
     from gabi.rotas.avisos import descrever
     token, chat = env.get("TELEGRAM_BOT_TOKEN"), env.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
         return 0, 0, 0
     desde = (agora - JANELA).astimezone(dt.timezone.utc).isoformat()
     agora_utc = agora.astimezone(dt.timezone.utc).isoformat()
+    consolidar_duplicados(con, agora)  # uma conta repetida vira um aviso só: o mais recente
     enviados = obsoletos = incertos = tentativas = 0
     # escuta_atencao (possível crise) vai primeiro e nunca é descartada por idade enquanto não lida (I1c)
     for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null "

@@ -277,3 +277,64 @@ def test_silencio_semanal_vale_para_aviso_realmente_entregue(con):
     # e o aviso ainda aberto mas já enviado ao Telegram também segura
     con.execute("update aviso set entregue_em=null")
     assert gerar_avisos(con, AGORA) == []
+
+
+# ---- round 3: enviado-e-resolvido fecha; duplicados consolidados ----
+def test_aviso_enviado_e_depois_pago_e_fechado_so_com_entregue_em(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=6))
+    enviado = (AGORA - dt.timedelta(hours=5)).isoformat()
+    con.execute("update aviso set telegram_em=?", (enviado,))
+    con.execute("update compromisso set estado='pago'")
+    gerar_avisos(con, AGORA)
+    r = con.execute("select telegram_em, entregue_em from aviso").fetchone()
+    assert r["entregue_em"] and r["telegram_em"] == enviado  # telegram_em segue significando "enviado"
+
+
+def test_aviso_incerto_enviado_e_nao_lido_fica_aberto_mesmo_fora_da_janela(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(days=4))
+    con.execute("update aviso set telegram_em=?", ((AGORA - dt.timedelta(days=4)).isoformat(),))
+    con.execute("update compromisso set estado='a_conferir'")
+    gerar_avisos(con, AGORA)
+    assert _abertos(con) == 1
+
+
+def _tres_contas(con):
+    for i in range(3):
+        _comp(con, f"c{i}:2026-10", f"Conta{i}", "2026-10-05", "atrasado")
+
+
+def _por_conta_abertos(con):
+    r = {}
+    for x in con.execute("select payload from aviso where entregue_em is null"):
+        k = json.loads(x[0])["chave"]
+        r[k] = r.get(k, 0) + 1
+    return r
+
+
+def test_telegram_desligado_5_dias_no_maximo_um_aberto_por_conta(con):
+    _tres_contas(con)
+    t = AGORA - dt.timedelta(days=5)
+    while t <= AGORA:
+        gerar_avisos(con, t)
+        t += dt.timedelta(hours=6)
+    assert con.execute("select count(*) from aviso").fetchone()[0] > 3  # houve renovação...
+    assert _por_conta_abertos(con) == {"c0:2026-10": 1, "c1:2026-10": 1, "c2:2026-10": 1}  # ...mas só o mais recente fica aberto
+    # superados fechados sem envio: telegram_em == entregue_em
+    from gabi.telegram import enviar_avisos_contagem
+    chamadas = []
+    assert enviar_avisos_contagem(con, {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}, AGORA, lambda u, c: chamadas.append(c) or 200) == (3, 0, 0)
+    assert len(chamadas) == 3
+
+
+def test_sem_produtor_o_telegram_tambem_consolida_duplicados(con):
+    from gabi.telegram import enviar_avisos_contagem
+    _tres_contas(con)
+    for dias in (1, 0.5, 0.1):   # três avisos por conta, todos dentro da janela
+        for i in range(3):
+            con.execute("insert into aviso(tipo, payload, criado_em) values ('conta_atrasada', ?, ?)",
+                        (json.dumps({"chave": f"c{i}:2026-10", "nome": f"Conta{i}", "vencimento": "2026-10-05", "valor": "1"}), (AGORA - dt.timedelta(days=dias)).isoformat()))
+    chamadas = []
+    assert enviar_avisos_contagem(con, {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}, AGORA, lambda u, c: chamadas.append(c) or 200) == (3, 0, 0)
+    assert con.execute("select count(*) from aviso where telegram_em is not null").fetchone()[0] == 9  # 3 enviados + 6 superados

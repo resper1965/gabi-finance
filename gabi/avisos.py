@@ -45,8 +45,11 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
     ja = con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and criado_em>=?", (tipo, str(chave), _inicio_do_dia_utc(agora))).fetchone()
     if ja:
         return None
-    return con.execute("insert into aviso(tipo, payload, criado_em) values (?,?,?)",
-                       (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
+    novo_id = con.execute("insert into aviso(tipo, payload, criado_em) values (?,?,?)",
+                          (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
+    if tipo in TIPOS_REVALIDADOS:
+        consolidar_duplicados(con, agora)  # o recém-criado é o mais recente: os velhos da mesma conta ficam superados
+    return novo_id
 
 
 VALE, RESOLVIDO, INCERTO = "vale", "resolvido", "incerto"
@@ -99,15 +102,36 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
 TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar")
 
 
+def _fechar(con, aviso_id: int, enviado: bool, ts: str) -> None:
+    """Nunca enviado: telegram_em+entregue_em = fechado sem envio. Já enviado e não lido: só entregue_em (telegram_em segue significando "enviado")."""
+    if enviado:
+        con.execute("update aviso set entregue_em=? where id=?", (ts, aviso_id))
+    else:
+        con.execute("update aviso set telegram_em=?, entregue_em=? where id=?", (ts, ts, aviso_id))
+
+
+def consolidar_duplicados(con, agora: dt.datetime) -> None:
+    """Avisos repetidos da mesma conta (mesmo tipo e chave) são consolidados no mais recente: os mais velhos abertos são fechados como superados."""
+    ts = agora.astimezone(dt.timezone.utc).isoformat()
+    vistos: dict = {}
+    for r in con.execute("select id, tipo, payload, telegram_em from aviso where entregue_em is null and tipo in (?,?,?) order by id desc", TIPOS_REVALIDADOS).fetchall():
+        k = (r["tipo"], json.loads(r["payload"]).get("chave"))
+        if k in vistos:
+            _fechar(con, r["id"], r["telegram_em"] is not None, ts)
+        else:
+            vistos[k] = r["id"]
+
+
 def _fechar_obsoletos(con, agora: dt.datetime) -> None:
-    """Fecha (telegram_em+entregue_em = fechado, não enviado) o aviso aberto cuja condição JÁ RESOLVEU, e o INCERTO mais velho que a janela de entrega
-    (o Telegram não o enviará mais; fechá-lo deixa nascer um aviso novo quando a conta voltar a `atrasado`). Incerto dentro da janela fica aberto."""
+    """Aviso aberto cuja condição JÁ RESOLVEU: fecha (nunca enviado: telegram_em+entregue_em; enviado e não lido: só entregue_em). O INCERTO nunca enviado e mais velho
+    que a janela de entrega também fecha (o Telegram não o enviará mais; deixa nascer um aviso novo quando a conta voltar a `atrasado`). Incerto enviado ou dentro da janela fica."""
     ts = agora.astimezone(dt.timezone.utc).isoformat()
     limite = (agora - JANELA_ENTREGA).astimezone(dt.timezone.utc).isoformat()
-    for r in con.execute("select id, tipo, payload, criado_em from aviso where entregue_em is null and telegram_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
+    for r in con.execute("select id, tipo, payload, criado_em, telegram_em from aviso where entregue_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
         estado = ainda_vale(con, r["tipo"], json.loads(r["payload"]))
-        if estado == RESOLVIDO or (estado == INCERTO and r["criado_em"] < limite):
-            con.execute("update aviso set telegram_em=?, entregue_em=? where id=?", (ts, ts, r["id"]))
+        enviado = r["telegram_em"] is not None
+        if estado == RESOLVIDO or (estado == INCERTO and not enviado and r["criado_em"] < limite):
+            _fechar(con, r["id"], enviado, ts)
 
 
 def _valor(c) -> str | None:
