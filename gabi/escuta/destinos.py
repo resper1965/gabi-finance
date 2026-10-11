@@ -102,7 +102,7 @@ class DestinosReais:
                 r = self.paperless.enviar(c, nome, [TAG_ENTRADA])
                 return r if isinstance(r, int) else None  # o Paperless devolve a tarefa de consumo; o id do documento só existe depois
         self._registrar(
-            con, solicitante=f"whatsapp:{numero}", canal="whatsapp", mensagem_original=msg.get("texto") or "", descricao=descricao,
+            con, solicitante=f"whatsapp:{numero}", canal=pedidos.CANAL_ESCUTA, mensagem_original=msg.get("texto") or "", descricao=descricao,
             valor=valor, vencimento=campos.get("vence") or None, anexo_base64=b64, anexo_paperless_id=None,
             pix_chave=pix, linha_digitavel=linha, para_quem=None, enviar_ao_paperless=enviar)
 

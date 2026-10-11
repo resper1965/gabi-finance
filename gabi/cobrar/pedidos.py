@@ -10,6 +10,9 @@ from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
 from gabi.cobrar.util import agora as _agora
+from gabi.escuta.caixa import normalizar_telefone
+
+CANAL_ESCUTA = "escuta"  # pedido lido pela escuta do WhatsApp: a Gabi nunca responde ao terceiro (R2)
 
 
 class SemEscopo(Exception):
@@ -23,10 +26,20 @@ class RegistroPedido:
     texto_para_responder: str
 
 
+def _mesmo_canal(canal, solicitante: str, numero: str | None) -> bool:
+    """`whatsapp:` compara o telefone normalizado (canal digitado no Cadastros com espaço/hífen casa); os demais canais, exatos."""
+    if not isinstance(canal, str):
+        return False
+    if canal == solicitante:
+        return True
+    return numero is not None and canal.startswith("whatsapp:") and normalizar_telefone(canal[len("whatsapp:"):]) == numero
+
+
 def _pessoa_autorizada(con, solicitante: str):
+    numero = normalizar_telefone(solicitante[len("whatsapp:"):]) if solicitante.startswith("whatsapp:") else None
     for p in con.execute("select id, nome, dados from pessoa where excluido_em is null"):
         d = cadastro.dados(p)  # permissão e canais ficam no cadastro da pessoa (dados.pode_pedir, dados.canais)
-        if d.get("pode_pedir") is True and solicitante in (d.get("canais") or []):
+        if d.get("pode_pedir") is True and any(_mesmo_canal(c, solicitante, numero) for c in (d.get("canais") or [])):
             return p
     return None
 
@@ -71,7 +84,7 @@ def _aviso(con, tipo: str, payload: dict) -> None:
 
 
 def decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None = None, beneficiario_id: str | None = None, mensagem: str | None = None) -> None:
-    """aprovar | recusar | pedir_info. Aprovar exige conta e beneficiário, cria o compromisso do mês e avisa o canal. Tudo ou nada."""
+    """aprovar | recusar | pedir_info. Aprovar exige conta e beneficiário, cria o compromisso do mês e avisa o canal (exceto canal 'escuta'). Tudo ou nada."""
     with transacao(con):
         _decidir(con, pedido_id, acao, por, conta_id, beneficiario_id, mensagem)
 
@@ -109,9 +122,12 @@ def _decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None, ben
     else:
         estado_novo = "recusado" if acao == "recusar" else "info_pedida"
         mensagem = mensagem or ("O Ricardo não vai seguir com esse pedido." if acao == "recusar" else "O Ricardo precisa de mais informação sobre esse pedido.")
-    con.execute("update pedido set estado=?, decidido_em=?, decidido_por=?, mensagem_ao_solicitante=? where id=?", (estado_novo, _agora(), por, mensagem, pedido_id))
+    escuta = p["canal"] == CANAL_ESCUTA  # I11: só o registro no painel; nada vai ao solicitante
+    con.execute("update pedido set estado=?, decidido_em=?, decidido_por=?, mensagem_ao_solicitante=? where id=?",
+                (estado_novo, _agora(), por, None if escuta else mensagem, pedido_id))
     con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')", (_agora(), por, f"pedido {pedido_id} {estado_novo}"))
-    _aviso(con, f"pedido_{estado_novo}", {"pedido_id": pedido_id, "canal": p["canal"], "solicitante": ident, "mensagem": mensagem})
+    if not escuta:
+        _aviso(con, f"pedido_{estado_novo}", {"pedido_id": pedido_id, "canal": p["canal"], "solicitante": ident, "mensagem": mensagem})
 
 
 def avisos_pendentes(con, desde: dt.datetime | None) -> list[dict]:
@@ -120,7 +136,13 @@ def avisos_pendentes(con, desde: dt.datetime | None) -> list[dict]:
     if desde:
         q += " and criado_em>=?"
         args.append(desde.astimezone(dt.timezone.utc).isoformat())
-    return [{"id": r["id"], "tipo": r["tipo"], "payload": json.loads(r["payload"]), "criado_em": r["criado_em"]} for r in con.execute(q + " order by id", args)]
+    saida = []
+    for r in con.execute(q + " order by id", args):
+        payload = json.loads(r["payload"])
+        if r["tipo"].startswith("pedido_") and isinstance(payload, dict) and payload.get("canal") == CANAL_ESCUTA:
+            continue  # I11: resposta a pedido da escuta nunca é entregue no canal
+        saida.append({"id": r["id"], "tipo": r["tipo"], "payload": payload, "criado_em": r["criado_em"]})
+    return saida
 
 
 def marcar_entregue(con, aviso_id: int) -> None:

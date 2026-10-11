@@ -30,6 +30,8 @@ def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
         return f"Mensagem de saúde de {_quem(p)}: abra a conversa", ""
     if tipo == "escuta_pedido_incompleto":
         return f"Pedido incompleto de {_quem(p)}", "faltou valor ou vencimento; abra a conversa e peça o que falta"
+    if tipo == "escuta_sem_permissao":
+        return f"Pedido de {_quem(p)} sem permissão: libere em Cadastros", "a mensagem fica retida até a pessoa poder pedir (pode_pedir)"
     if tipo == "escuta_parada":
         return "Escuta do WhatsApp parada", p.get("motivo", "")
     if tipo == "escuta_sem_modelo":

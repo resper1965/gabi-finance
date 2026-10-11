@@ -121,3 +121,28 @@ def test_pedido_aprovado_aparece_nas_contas_a_pagar_do_mes(con):
     itens = [i for g in contas_a_pagar(con, hoje, None).values() for i in g]
     p = next(i for i in itens if i["id"].startswith(f"pedido:{r.pedido_id}"))
     assert p["valor_centavos"] == 123456 and p["vencimento"] == "2026-10-20" and p["forma"] == "pix"
+
+
+def test_i2_canal_digitado_com_espacos_e_hifen_casa_normalizado(con):
+    con.execute("insert into pessoa(id, nome, dados) values ('bia','Bia',?)", (json.dumps({"canais": ["whatsapp:+55 11 92222-3333"], "pode_pedir": True}),))
+    r = _pedir(con, solicitante="whatsapp:+5511922223333")
+    assert estado(con, r.pedido_id)["solicitante_pessoa_id"] == "bia"
+    with pytest.raises(SemEscopo):
+        _pedir(con, solicitante="telegram:@LIA")   # outros canais seguem exatos
+
+
+@pytest.mark.parametrize("acao,kw", [("aprovar", {"conta_id": 1, "beneficiario_id": "ana"}), ("recusar", {}), ("pedir_info", {})])
+def test_i11_canal_escuta_nunca_gera_mensagem_nem_aviso_ao_solicitante(con, acao, kw):
+    r = _pedir(con, canal="escuta")
+    decidir(con, r.pedido_id, acao, "boss@x.com", **kw)
+    p = estado(con, r.pedido_id)
+    assert p["estado"] in ("aprovado", "recusado", "info_pedida") and p["mensagem_ao_solicitante"] is None
+    assert avisos_pendentes(con, None) == []
+    assert any(f"pedido {r.pedido_id}" in o[0] for o in con.execute("select o_que from decisao"))
+
+
+def test_i11_aviso_antigo_de_pedido_da_escuta_nao_sai_em_avisos_pendentes(con):
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('pedido_aprovado', ?, '2026-10-11T10:00:00+00:00')",
+                (json.dumps({"pedido_id": 9, "canal": "escuta", "solicitante": "whatsapp:+5511911110000", "mensagem": "Anotado"}),))
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('conta_atrasada', '{}', '2026-10-11T10:00:00+00:00')")
+    assert [a["tipo"] for a in avisos_pendentes(con, None)] == ["conta_atrasada"]

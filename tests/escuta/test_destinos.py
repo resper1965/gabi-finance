@@ -43,7 +43,7 @@ def _avisos(con, tipo):
 def test_pedido_vira_registro_pendente_e_nao_diz_que_pagou(con, d):
     d.pedido(con, "p1", N, _msg("paga a Maria 100"), {"favorecido": "Maria", "motivo": "diarista", "valor": 100, "vence": "2026-10-20", "chave_ou_linha": "maria@x.com"})
     p = con.execute("select * from pedido").fetchone()
-    assert p["estado"] == "pendente" and p["valor_centavos"] == 10000 and p["canal"] == "whatsapp"
+    assert p["estado"] == "pendente" and p["valor_centavos"] == 10000 and p["canal"] == "escuta"   # I11: nunca responde ao terceiro
     assert p["solicitante_ident"] == f"whatsapp:{N}" and p["mensagem_original"] == "paga a Maria 100"
     assert p["pix_chave"] == "maria@x.com" and p["linha_digitavel"] is None and p["vencimento"] == "2026-10-20"
     assert "Maria" in p["descricao"] and "diarista" in p["descricao"] and p["para_quem_id"] is None

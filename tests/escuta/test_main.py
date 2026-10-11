@@ -72,6 +72,7 @@ def _param(con, chave, valor):
 
 def test_main_ingere_e_processa_com_cliente_falso(amb, capsys):
     banco, spool, con = amb
+    con.execute("update pessoa set dados=json_set(dados,'$.pode_pedir',json('true'))")  # sem pode_pedir o pedido fica retido (I3)
     _spool(spool)
     m = Modelo()
     assert prog.main(cliente=m, agora=AGORA) == 0

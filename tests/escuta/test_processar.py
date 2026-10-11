@@ -232,12 +232,15 @@ def test_aprovar_reprocessa_retidas(con):
     assert len(d.pedidos) == 1 and _msg_row(con)["estado"] == "processada" and r["novas"] == 0
 
 
-def test_pedido_sem_pode_pedir_vira_nada(con):
+def test_i3_pedido_sem_pode_pedir_fica_retida_com_texto_e_avisa(con):
     _aprovado(con, pode_pedir=False)
     _msg(con)
     d = FakeDestinos()
     r = _rodar(con, d, _ped())
-    assert d.pedidos == [] and r["falhas"] == 1 and _msg_row(con)["tipo"] == "nada" and _msg_row(con)["texto"] is None
+    m = _msg_row(con)
+    assert d.pedidos == [] and m["estado"] == "retida" and m["texto"] == "paga a Maria 100" and m["tipo"] == "pedido"
+    assert r["falhas"] == 0 and r["classificadas"] == 0 and r["retidas"] == 1
+    assert _avisos(con, "escuta_sem_permissao") == [{"numero": N, "nome": "Joana"}]
 
 
 def test_pedido_incompleto_falha_e_avisa(con):
@@ -397,11 +400,30 @@ def test_crise_aprovado_teto_estourado_com_cliente(con):
     assert SEGREDO not in json.dumps([dict(r) for r in con.execute("select * from aviso")])
 
 
-def test_pedido_sem_pode_pedir_estado_e_contadores(con):
-    _aprovado(con, pode_pedir=False)
+def test_i3_sem_permissao_nao_repaga_o_modelo_avisa_uma_vez_por_dia_e_processa_ao_liberar(con):
+    pid = _aprovado(con, pode_pedir=False)
     _msg(con)
-    r = _rodar(con, FakeDestinos(), _ped())
-    assert _msg_row(con)["estado"] == "processada" and r["falhas"] == 1 and r["classificadas"] == 0
+    d, cli = FakeDestinos(), _ped()
+    _rodar(con, d, cli)
+    _rodar(con, d, cli)
+    assert cli.chamadas == 1 and len(_avisos(con, "escuta_sem_permissao")) == 1 and _msg_row(con)["estado"] == "retida"
+    processar(con, d, cli, _orc(), "2026-10-12T10:00:00", "ativo")
+    assert len(_avisos(con, "escuta_sem_permissao")) == 2   # um por dia por remetente
+    dd = json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])
+    dd["pode_pedir"] = True
+    con.execute("update pessoa set dados=? where id=?", (json.dumps(dd), pid))
+    r = _rodar(con, d, cli)
+    assert cli.chamadas == 1 and d.pedidos == [(pid, N, "m1", {"favorecido": "Maria", "valor": 100})]
+    assert _msg_row(con)["estado"] == "processada" and _msg_row(con)["tipo"] == "pedido" and r["classificadas"] == 1
+
+
+def test_i2_sem_escopo_do_destino_vira_retida_e_nao_falha(con):
+    from gabi.cobrar.pedidos import SemEscopo
+    _aprovado(con)
+    _msg(con)
+    r = _rodar(con, FakeDestinos(erro=SemEscopo("x")), _ped())
+    assert _msg_row(con)["estado"] == "retida" and _msg_row(con)["texto"] and r["falhas"] == 0
+    assert len(_avisos(con, "escuta_sem_permissao")) == 1 and _avisos(con, "servico_falhou") == []
 
 
 def test_retidas_conta_so_as_novas_retidas(con):

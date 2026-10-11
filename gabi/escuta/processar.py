@@ -11,7 +11,8 @@ from pathlib import Path
 from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.dinheiro.modelo import ModeloCliente, Orcamento
-from gabi.escuta.classificar import classificar
+from gabi.cobrar.pedidos import SemEscopo
+from gabi.escuta.classificar import Classificacao, classificar
 from gabi.escuta.crise import palavras_risco, tem_risco
 from gabi.escuta.destinos import Destinos
 from gabi.escuta import spool_seguro
@@ -119,14 +120,13 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
     if r is None:  # fica nova e tenta de novo na próxima rodada
         _aviso_sem_modelo(con, agora)
         return
-    tipo, campos, negado = r.tipo, r.campos, False
+    tipo, campos = r.tipo, r.campos
     if tipo == "pedido" and not (pid and dados(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()).get("pode_pedir") is True):
-        tipo, campos = "nada", {}
-        c["falhas"] += 1  # conta só em falhas
-        negado = True
+        _reter_pedido(con, m, numero, nome, r, agora, c)  # I3: nunca 'nada'; espera o dono liberar pode_pedir
+        return
     if tipo == "nada":
         _nada(con, destinos, m, agora, ativo, c, apagar, r.confianca, spool)
-        c["classificadas"] += 0 if negado else 1
+        c["classificadas"] += 1
         return
     if tipo == "saude":  # o texto e os campos de saúde não ficam no banco da escuta
         sinais["saude"] = True  # se falhar daqui em diante, o texto de saúde é apagado (ADR-014)
@@ -141,12 +141,38 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
             _exigir_dentro(m, spool)  # RuntimeError: vira falhou (não "pedido incompleto"), destino não é chamado
             try:
                 destinos.pedido(con, pid, numero, dict(m), campos)
+            except SemEscopo:  # I2: cadastro não casou (não é falha de serviço): retida, como o I3
+                _reter_pedido(con, m, numero, nome, r, agora, c)
+                return
             except ValueError as e:
                 raise _PedidoIncompleto() from e
         elif tipo == "crise":
             destinos.crise(con, numero, nome, agora)
     _fechar(con, id_, agora, tipo=tipo, confianca=r.confianca, campos=campos)
     c["classificadas"] += 1
+
+
+def _reter_pedido(con, m, numero: str, nome: str | None, r, agora: str, c) -> None:
+    """Pedido de quem não pode pedir: fica `retida` com o texto (é pedido, não saúde) e a classificação guardada (a próxima rodada não
+    paga o modelo de novo); aviso `escuta_sem_permissao` 1 vez por dia por remetente. Quando o dono marcar pode_pedir, a rodada processa."""
+    con.execute("update escuta_msg set estado='retida', tipo='pedido', confianca=?, campos=? where id=?",
+                (r.confianca, json.dumps(r.campos or {}, ensure_ascii=False), m["id"]))
+    if m["estado"] == "nova":
+        c["retidas"] += 1
+    if not con.execute("select 1 from aviso where tipo='escuta_sem_permissao' and json_extract(payload,'$.numero')=? and substr(criado_em,1,10)=?",
+                       (numero, agora[:10])).fetchone():
+        _aviso(con, "escuta_sem_permissao", {"numero": numero, "nome": nome}, agora)
+
+
+def _classificacao_guardada(m):
+    """Pedido retido por falta de permissão (I3) já tem a classificação: não chama o modelo de novo."""
+    if m["estado"] != "retida" or m["tipo"] != "pedido" or m["campos"] is None:
+        return None
+    try:
+        campos = json.loads(m["campos"])
+    except (TypeError, ValueError):
+        return None
+    return Classificacao("pedido", m["confianca"] or 0.0, campos) if isinstance(campos, dict) else None
 
 
 def _exigir_dentro(m, spool) -> None:
@@ -195,7 +221,10 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             if m is None:
                 continue
             # Fase 1, SEM transação: o modelo (lento, pago, o custo é commitado em outra conexão) nunca roda com lock ou snapshot aberto.
-            r = classificar(m["texto"], cliente, orcamento) if _precisa_modelo(con, m, palavras) else _SEM
+            if not _precisa_modelo(con, m, palavras):
+                r = _SEM
+            else:
+                r = _classificacao_guardada(m) or classificar(m["texto"], cliente, orcamento)
             # Fase 2: escrita imediata; relê a linha e o remetente (pode ter mudado enquanto o modelo rodava).
             # O lock de escrita fica preso durante as chamadas dos destinos (upload no Paperless): aceitável neste volume.
             try:

@@ -426,3 +426,9 @@ def test_i5_grupo_visto_no_spool_aparece_aprova_e_e_classificado(cli, banco, tmp
     assert M.n == 1 and r["classificadas"] == 1
     assert c.execute("select estado, tipo from escuta_msg").fetchone()[:] == ("processada", "nada")
     c.close()
+
+
+def test_i3_descrever_escuta_sem_permissao_so_numero_e_nome():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("escuta_sem_permissao", {"numero": N, "nome": "Joana"})
+    assert "Pedido de Joana sem permissão" in t and "Cadastros" in (t + x)
