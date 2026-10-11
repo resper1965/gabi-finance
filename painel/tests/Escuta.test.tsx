@@ -6,7 +6,7 @@ import { Escuta } from "../src/telas/Escuta";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
 interface Chamada { metodo: string; url: string; corpo: unknown }
-interface Opcoes { fila?: unknown[]; aprovados?: unknown[]; grupos?: unknown[]; parametros?: Record<string, unknown>; falha?: RegExp; segurar?: Promise<void>; negar?: boolean }
+interface Opcoes { fila?: unknown[]; aprovados?: unknown[]; grupos?: unknown[]; parametros?: Record<string, unknown>; falha?: RegExp; segurar?: Promise<void>; negar?: boolean; aposPut?: Record<string, unknown> }
 
 function fake(o: Opcoes = {}) {
   const chamadas: Chamada[] = [];
@@ -19,7 +19,7 @@ function fake(o: Opcoes = {}) {
     if (metodo !== "GET") {
       if (o.segurar) await o.segurar;
       if (o.falha?.test(url)) return { ok: false, status: 400, json: async () => ({ erro: "requisicao_invalida", mensagem: "papel inválido" }) } as Response;
-      if (metodo === "PUT") { parametros = { ...parametros, ...JSON.parse(String(init!.body)) }; return ok(env(parametros)); }
+      if (metodo === "PUT") { parametros = { ...parametros, ...JSON.parse(String(init!.body)) }; const resposta = parametros; if (o.aposPut) parametros = { ...parametros, ...o.aposPut }; return ok(env(resposta)); }
       return ok(env({}));
     }
     if (/remetentes/.test(url)) return ok(env({ fila: o.fila ?? [], aprovados: o.aprovados ?? [] }));
@@ -246,7 +246,9 @@ test("400 no PUT mostra a mensagem do servidor e a UI fica com a lista salva", a
   fireEvent.change(await screen.findByLabelText("Nova palavra de risco"), { target: { value: "nova" } });
   fireEvent.click(screen.getByRole("button", { name: "Adicionar palavra" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect((await screen.findAllByText(/papel inválido/)).length).toBeGreaterThan(0);
+  const alertas = await screen.findAllByRole("alert");
+  expect(alertas.filter((a) => /papel inválido/.test(a.textContent ?? ""))).toHaveLength(1);
+  expect(alertas).toHaveLength(1);
   expect(screen.queryByText("nova", { selector: "span" })).toBeNull();
   expect(screen.getByRole("button", { name: "Remover urgente" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Remover nova" })).toBeNull();
@@ -278,4 +280,14 @@ test("sem ser o dono (403) mostra uma unica mensagem", async () => {
   expect(await screen.findByText("Só o dono acessa a escuta.")).toBeTruthy();
   expect(screen.queryAllByRole("alert")).toHaveLength(0);
   expect(screen.queryByText(/Novos remetentes/)).toBeNull();
+});
+
+test("o servidor prevalece sobre o ultimo PUT: depois da releitura a tela mostra a lista do servidor", async () => {
+  fake({ aposPut: { palavras_risco: ["externo"] } });
+  montar();
+  fireEvent.change(await screen.findByLabelText("Nova palavra de risco"), { target: { value: "processo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Adicionar palavra" }));
+  expect(await screen.findByRole("button", { name: "Remover externo" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Remover processo" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Remover urgente" })).toBeNull();
 });

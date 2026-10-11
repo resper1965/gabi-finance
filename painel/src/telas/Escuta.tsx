@@ -52,7 +52,6 @@ function Fila({ leitura, acao }: { leitura: Leitura<{ fila: Remetente[]; aprovad
       {(d) => (
         <>
           <Bloco titulo={`Novos remetentes · ${d.fila.length}`} nota="Quem escreveu e a Gabi ainda não conhece.">
-            <Aviso erro={erros.geral} />
             {d.fila.length === 0 ? <Vazio frase="Nenhum remetente novo na fila." /> : (
               <ul style={lista}>
                 {d.fila.map((r) => {
@@ -144,8 +143,11 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
     if (confirmando) confirmar.current?.focus();
     else if (voltar.current) { ativo.current?.focus(); voltar.current = false; }
   }, [confirmando]);
-  const gravar = (corpo: Partial<Parametros>, ok: string) =>
-    agir("geral", async () => { setSalvo((await api.put<Parametros>("/api/v1/escuta/parametros", corpo)).dados); }, ok, leitura.recarregar);
+  const gravar = async (corpo: Partial<Parametros>, ok: string) => {
+    const deu = await agir("geral", async () => { setSalvo((await api.put<Parametros>("/api/v1/escuta/parametros", corpo)).dados); }, ok, leitura.recarregar);
+    if (deu) setSalvo(null); // a releitura terminou: o servidor prevalece sobre a resposta do PUT
+    return deu;
+  };
   return (
     <Painel leitura={leitura} arquivo="escuta-parametros">
       {(servidor) => {
