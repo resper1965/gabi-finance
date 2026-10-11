@@ -20,7 +20,7 @@ export const GRUPOS: Grupo[] = [
   ] },
   { titulo: "Casa", areas: [
     { id: "familia", rotulo: "Família", pergunta: "Como está a saúde de cada um?", abas: [["familia", "Família"]] },
-    { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["setup", "Configuração", "Está tudo conectado?"]] },
+    { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["escuta", "Escuta", "Quem a Gabi escuta no WhatsApp?"], ["setup", "Configuração", "Está tudo conectado?"]] },
     { id: "gabi", rotulo: "Gabi", pergunta: "A Gabi está saudável e barata?", abas: [["saude", "Saúde e custo", "A Gabi está saudável e barata?"], ["ingestao", "Ingestão", "Os dados chegaram certos?"], ["conectores", "Integrações", "De onde a Gabi lê?"], ["seguranca", "Segurança", "Quem entra, por onde, e com quê?"], ["mcp", "Servidor MCP", "O que agentes externos podem fazer?"], ["receitas", "Receitas", "Como conecto meu agente?"], ["llm", "Modelos", "Quem classifica, e quanto custa?"]] },
   ] },
 ];

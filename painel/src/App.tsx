@@ -21,6 +21,7 @@ import { Parcelas } from "./telas/Gastos/Parcelas";
 import { Assinaturas } from "./telas/Gastos/Assinaturas";
 import { Regras } from "./telas/Regras";
 import { Cadastros } from "./telas/Cadastros";
+import { Escuta } from "./telas/Escuta";
 import { Hoje } from "./telas/Trabalho/Hoje";
 import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
@@ -36,7 +37,7 @@ import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
 const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
-  regras: Regras, cadastros: Cadastros, setup: Configuracao,
+  regras: Regras, cadastros: Cadastros, escuta: Escuta, setup: Configuracao,
   hoje: Hoje, temas: Frentes, familia: Familia, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
 };
 
