@@ -1,6 +1,7 @@
 """Leitura do correio (`email_msg`) para as superfícies: Hoje, resumo da manhã, MCP `email_listar`, painel (spec 2026-10-11-email-design, §3.7).
 Só lê. Só fontes liberadas; nunca o que está na lixeira nem o que o modelo chamou de lixo. Assunto, remetente e trecho só saem pelos canais do dono."""
 import datetime as dt
+import json
 
 CAMPOS = "m.id, f.conta, m.remetente, m.assunto, m.recebida_em, m.classe, m.prioridade, m.motivo"
 _ORDEM = "case m.classe when 'emergencial' then 0 else 1 end, coalesce(m.prioridade, 0) desc, m.recebida_em desc, m.id desc"
@@ -11,11 +12,26 @@ def _utc(agora) -> dt.datetime:
     return agora if agora.tzinfo else agora.replace(tzinfo=dt.timezone.utc)
 
 
-def importantes(con, limite: int = 10) -> list[dict]:
-    """Emergenciais e importantes ainda em aberto (classificadas ou alertadas): o emergencial primeiro, depois prioridade e data."""
+DIAS_EM_ABERTO_PADRAO = 7
+
+
+def dias_em_aberto(con) -> int:
+    """Por quantos dias um e-mail emergencial ou importante segue na fila (`email.dias_em_aberto`, 1 a 30; padrão 7): o resolvido há semanas não ofusca o novo."""
+    r = con.execute("select valor from parametro where chave='email.dias_em_aberto'").fetchone()
+    try:
+        v = json.loads(r[0]) if r else DIAS_EM_ABERTO_PADRAO
+    except (ValueError, TypeError):
+        return DIAS_EM_ABERTO_PADRAO
+    return v if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 30 else DIAS_EM_ABERTO_PADRAO
+
+
+def importantes(con, limite: int = 10, agora=None, dias: int | None = None) -> list[dict]:
+    """Emergenciais e importantes em aberto (classificadas ou alertadas) dos últimos `dias_em_aberto`: o emergencial primeiro, depois prioridade e data."""
+    corte = (_utc(agora) - dt.timedelta(days=dias or dias_em_aberto(con))).astimezone(dt.timezone.utc).isoformat()
     return [dict(r) for r in con.execute(
         f"select {CAMPOS} from email_msg m join email_fonte f on f.id=m.fonte_id "
-        f"where f.estado='sim' and m.estado in ('classificada','alertada') and m.classe in ('emergencial','importante') order by {_ORDEM} limit ?", (limite,))]
+        f"where f.estado='sim' and m.estado in ('classificada','alertada') and m.classe in ('emergencial','importante') and m.recebida_em>=? "
+        f"order by {_ORDEM} limit ?", (corte, limite))]
 
 
 def listar(con, agora, prioridade_min: int = 1, dias: int = 7, limite: int = 50) -> list[dict]:

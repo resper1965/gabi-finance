@@ -79,7 +79,7 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
         causa = f" ({', '.join(causa)})" if causa else ""
         linhas.append(f"⚠ Dados desatualizados{causa} (último conferido: {env['dados_ate'] or 'nunca'}). Confira antes de agir.")
     linhas.append(_linha_agenda(d["agenda"]))
-    correio = consulta_correio.importantes(con, limite=50)
+    correio = consulta_correio.importantes(con, limite=50, agora=agora)
     n = len(d["emails_importantes"])
     if correio:
         linhas.append(_linha_correio(correio))

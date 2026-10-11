@@ -2,12 +2,18 @@
 Sem texto de e-mail em log nem exceção."""
 import json
 import re
+import unicodedata
 from email.utils import parseaddr
 
 from gabi.cobrar.cadastro import dados
 
 _ENDERECO = re.compile(r"^[a-z0-9._%+'-]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,}$")
 SEM_REMETENTE = "sem_remetente"
+# E-mail transacional/financeiro quase sempre vem com sinal de lista (List-Unsubscribe, Auto-Submitted): sem esta guarda só o modelo, com a confiança
+# que ele mesmo declara, decidiria sobre fatura, boleto ou cobrança. O dono troca a lista pelo painel (`email.palavras_protegidas`); a de baixo é o padrão.
+PALAVRAS_PADRAO = ["fatura", "boleto", "vencimento", "cobrança", "pagamento", "nota fiscal", "nfs-e", "nf-e", "dae", "darf", "imposto", "receita federal",
+                   "intimação", "contrato", "senha", "código de verificação", "token", "extrato", "cancelamento", "multa"]
+PALAVRA_MAX = 60
 
 
 def endereco(texto) -> str | None:
@@ -49,3 +55,31 @@ def protegido(con, fonte_id: int, remetente) -> str | None:
     if con.execute("select 1 from email_respondido where fonte_id=? and endereco=?", (fonte_id, a)).fetchone():
         return "respondido"
     return None
+
+
+def _normal(texto) -> str:
+    """Minúsculas e sem acento: 'COBRANÇA' e 'cobranca' são a mesma palavra."""
+    d = unicodedata.normalize("NFKD", str(texto or ""))
+    return "".join(c for c in d if not unicodedata.combining(c)).casefold()
+
+
+def palavras(con) -> list[str]:
+    """Palavras que protegem o e-mail de ir para a lixeira: o parâmetro do dono (lista vazia vale) ou, se ausente ou corrompido, o padrão."""
+    r = con.execute("select valor from parametro where chave='email.palavras_protegidas'").fetchone()
+    try:
+        v = json.loads(r[0]) if r else None
+    except (ValueError, TypeError):
+        v = None
+    if not isinstance(v, list):
+        v = PALAVRAS_PADRAO
+    return [_normal(x.strip()) for x in v if isinstance(x, str) and x.strip() and len(x) <= PALAVRA_MAX]
+
+
+def texto_protegido(con, remetente, assunto, trecho) -> str | None:
+    """`palavra` se remetente, assunto ou trecho começam alguma palavra protegida (fatura, boleto, cobrança...); a busca ignora acento e caixa."""
+    texto = _normal(" ".join(str(x or "") for x in (remetente, assunto, trecho)))
+    for p in palavras(con):
+        if re.search(r"(?<![a-z0-9])" + re.escape(p), texto):
+            return "palavra"
+    return None
+

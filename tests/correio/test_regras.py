@@ -65,3 +65,29 @@ def test_vips_corrompido_nao_derruba(con):
     f = _fonte(con)
     con.execute("insert into parametro(chave, valor) values ('email.vips', 'nao-e-json')")
     assert regras.protegido(con, f, "x@y.com") is None
+
+
+@pytest.mark.parametrize("assunto,trecho,remetente", [
+    ("Sua fatura vence em 3 dias", "", "cobranca@banco.com"), ("Boleto disponível", "", "x@y.com"), ("Re: contrato", "", "x@y.com"),
+    ("Aviso", "o vencimento é amanhã", "x@y.com"), ("AVISO IMPORTANTE", "Nota Fiscal emitida", "x@y.com"), ("Intimação judicial", "", "x@y.com"),
+    ("Seu código de verificação", "", "x@y.com"), ("COBRANÇA em aberto", "", "x@y.com"), ("cobranca em aberto", "", "x@y.com"),  # acento e caixa não contam
+    ("Oi", "", "dae@sefaz.gov")])
+def test_texto_com_palavra_protegida_nunca_vira_candidato(con, assunto, trecho, remetente):
+    assert regras.texto_protegido(con, remetente, assunto, trecho) == "palavra"
+
+
+@pytest.mark.parametrize("assunto,trecho,remetente", [
+    ("Oferta imperdível: 50% de desconto", "só hoje", "promo@loja.com"), ("Newsletter da semana", "as novidades", "news@blog.com"), ("", "", ""), (None, None, None)])
+def test_texto_comum_de_promocao_nao_e_protegido(con, assunto, trecho, remetente):
+    assert regras.texto_protegido(con, remetente, assunto, trecho) is None
+
+
+def test_palavras_protegidas_vem_do_parametro_e_o_dono_pode_trocar_a_lista(con):
+    con.execute("insert into parametro(chave, valor) values ('email.palavras_protegidas', ?)", (json.dumps(["Pedido", "  ", 3]),))
+    assert regras.texto_protegido(con, "x@y.com", "Seu PEDIDO saiu", "") == "palavra"
+    assert regras.texto_protegido(con, "x@y.com", "Sua fatura", "") is None  # a lista do dono substitui a padrão
+
+
+def test_parametro_de_palavras_corrompido_cai_na_lista_padrao(con):
+    con.execute("insert into parametro(chave, valor) values ('email.palavras_protegidas', 'nao-e-json')")
+    assert regras.texto_protegido(con, "x@y.com", "Sua fatura", "") == "palavra"

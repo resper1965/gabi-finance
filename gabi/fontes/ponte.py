@@ -24,7 +24,7 @@ PERMITIDOS = {
     "openrouter": frozenset({"completar"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
-    "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes"}),
+    "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
 }
@@ -229,3 +229,10 @@ class PonteEmail:
         if not isinstance(r, list) or not all(isinstance(x, str) for x in r):
             raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
         return r
+
+    def respondeu_a(self, conta: str, enderecos: list[str]) -> dict:
+        r = self._ponte._chamar("respondeu_a", (conta, list(enderecos)))
+        if not isinstance(r, dict) or not all(isinstance(k, str) and isinstance(v, bool) for k, v in r.items()):
+            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+        return r
+

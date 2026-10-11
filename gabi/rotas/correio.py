@@ -104,7 +104,7 @@ def prioridades(request: Request):
     """Emergenciais e importantes em aberto, o emergencial primeiro (só de contas liberadas)."""
     con = _con(request)
     try:
-        return envelope(con, {"mensagens": consulta.importantes(con, limite=50)}, agora=_agora(request))
+        return envelope(con, {"mensagens": consulta.importantes(con, limite=50, agora=_agora(request))}, agora=_agora(request))
     finally:
         con.close()
 

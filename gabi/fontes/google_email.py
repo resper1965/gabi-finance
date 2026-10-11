@@ -19,7 +19,9 @@ from gabi.fontes.google_oauth import (ErroGoogleOAuth, TokenOAuth, _http_real, c
 ESCOPO = "https://www.googleapis.com/auth/gmail.modify"
 BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
 MAX_PAGINAS = 50
-MAX_ENVIADOS_MSGS = 500   # só os enviados mais recentes entram no "já respondi" (500 cabeçalhos; o resto é custo sem ganho)
+MAX_CARGA_MSGS = 200      # a ponte espera 130 s por chamada: uma carga lê no máximo as 200 mais recentes da janela (1 GET por mensagem)
+MAX_ENVIADOS_MSGS = 200   # só os enviados mais recentes entram na lista de "já respondi" (o resto é conferido ao vivo por `respondeu_a`)
+MAX_ENDERECOS_CONSULTA = 20
 MAX_ENDERECOS = 5000
 MAX_IDS_POR_CHAMADA = 100
 TAM_TRECHO = 280
@@ -151,7 +153,7 @@ def _carga(conta, janela_dias: int, token, http) -> ResultadoEmail:
     hid = perfil.get("historyId")
     q = urllib.parse.quote(f"in:inbox newer_than:{int(janela_dias)}d")
     try:
-        ids, _ = _ids_paginados(conta, f"{BASE}/messages?q={q}&maxResults=100", "messages", token, http)
+        ids, _ = _ids_paginados(conta, f"{BASE}/messages?q={q}&maxResults=100", "messages", token, http, maximo=MAX_CARGA_MSGS)
     except _HistoricoExpirado:
         raise ErroGoogleOAuth("messages.list -> 404") from None
     msgs = [m for m in (_mensagem(x) for x in _metadados(conta, ids, token, http)) if m]
@@ -177,6 +179,10 @@ def listar_novos(conta: str, history_id: str | None, janela_dias: int, token: Ca
         return r
     novo = ultima.get("historyId")
     unicos = list(dict.fromkeys(ids))
+    if len(unicos) > MAX_CARGA_MSGS:  # chegou muita coisa de uma vez: lê só as mais recentes da janela (cabe no tempo da ponte) e avisa que recarregou
+        r = _carga(conta, janela_dias, token, http)
+        r.recarga_completa = True
+        return r
     msgs = [m for m in (_mensagem(x) for x in _metadados(conta, unicos, token, http)) if m]
     return ResultadoEmail(msgs, str(novo) if novo is not None else history_id, False)
 
@@ -228,6 +234,28 @@ def enviados_recentes(conta: str, dias: int, token: Callable[[str], str], http=_
     return list(vistos)[:MAX_ENDERECOS]
 
 
+def respondeu_a(conta: str, enderecos, token: Callable[[str], str], http=_http_real) -> dict[str, bool]:
+    """O dono já escreveu (To, Cc ou Bcc) para cada endereço? Consulta exata ao Gmail (`in:sent to:<endereço>`), sem o limite da lista dos enviados
+    recentes. Erro do Gmail é erro tipado: quem chama trata como "não confirmado" (na dúvida o e-mail fica na caixa), nunca como "não respondeu"."""
+    conta = conta_valida(conta)
+    if not isinstance(enderecos, (list, tuple)) or not 1 <= len(enderecos) <= MAX_ENDERECOS_CONSULTA:
+        raise ErroGoogleOAuth(f"de 1 a {MAX_ENDERECOS_CONSULTA} endereços por chamada")
+    normais = []
+    for e in enderecos:
+        a = _endereco(e) if isinstance(e, str) and e.strip().lower() == _endereco(e) else ""
+        if not a:
+            raise ErroGoogleOAuth("endereço inválido")
+        normais.append(a)
+    saida = {}
+    for a in normais:
+        q = urllib.parse.quote(f"in:sent to:{a}")
+        status, resp = _pegar(http, token, conta, "GET", f"{BASE}/messages?q={q}&maxResults=1")
+        if status >= 400 or not isinstance(resp, dict):
+            raise ErroGoogleOAuth(f"messages.list -> {status}")
+        saida[a] = bool(resp.get("messages"))
+    return saida
+
+
 class GoogleEmail:
     """Objeto da ponte (JSON puro). Sem o token provider nada sai."""
 
@@ -248,6 +276,9 @@ class GoogleEmail:
 
     def enviados_recentes(self, conta: str, dias: int) -> list[str]:
         return enviados_recentes(conta, dias, self._token, self._http)
+
+    def respondeu_a(self, conta: str, enderecos) -> dict:
+        return respondeu_a(conta, enderecos, self._token, self._http)
 
 
 def google_email_do_ambiente(env) -> GoogleEmail | None:

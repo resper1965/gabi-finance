@@ -55,6 +55,8 @@ def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
         return f"{total} e-mail(s) foram para a lixeira hoje", f"{lista}{mais}. Se faltou algo, restaure no painel (Mensagens › Prioridades): a lixeira esvazia sozinha em 30 dias."
     if tipo == "email_sem_modelo":
         return "Correio sem modelo de leitura", f"o e-mail está sem modelo disponível agora (nada vai para a lixeira): {p.get('motivo') or 'motivo desconhecido'}"
+    if tipo == "email_falhou":
+        return f"{p.get('total', '?')} e-mail(s) não puderam ser lidos pela Gabi", "esgotaram as tentativas (modelo ou serviço fora do ar); não foram para a lixeira e não geram alerta"
     if tipo == "email_reconectar":
         return f"Reconectar o e-mail {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; o e-mail não está sendo lido"
     return tipo, json.dumps(p, ensure_ascii=False)

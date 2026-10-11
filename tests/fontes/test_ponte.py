@@ -334,6 +334,13 @@ class _FalsaEmail:
             return [1, 2]
         return ["bia@x.com"]
 
+    def respondeu_a(self, conta, enderecos):
+        if conta == "malformada@x.com":
+            return {"bia@x.com": "sim"}
+        if conta == "ruim@x.com":
+            raise ErroGoogleOAuth("messages.list -> 500")
+        return {a: a.startswith("bia") for a in enderecos}
+
     def segredo(self):
         return SEGREDO_EM
 
@@ -346,8 +353,8 @@ def sock_email(tmp_path):
     srv.shutdown(); srv.server_close()
 
 
-def test_ponte_permite_so_os_quatro_metodos_do_email(sock_email):
-    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes"})
+def test_ponte_permite_so_os_cinco_metodos_do_email(sock_email):
+    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"})
     assert ERROS["google_email"] is ErroGoogleOAuth
     with pytest.raises(ErroGoogleOAuth) as e:
         Ponte(sock_email, "google_email")._chamar("segredo")
@@ -416,3 +423,14 @@ def test_ambiente_com_socket_tem_a_fabrica_do_email(tmp_path, monkeypatch):
         assert isinstance(fonte, PonteEmail) and fonte.enviados_recentes("a@x.com", 30) == ["bia@x.com"]
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_ponte_email_respondeu_a_cruza_e_valida_a_forma(sock_email):
+    p = PonteEmail(sock_email)
+    assert p.respondeu_a("a@x.com", ["bia@x.com", "c@y.com"]) == {"bia@x.com": True, "c@y.com": False}
+    with pytest.raises(ErroGoogleOAuth) as e:
+        p.respondeu_a("malformada@x.com", ["bia@x.com"])
+    assert "resposta inválida" in str(e.value)
+    with pytest.raises(ErroGoogleOAuth) as e:
+        p.respondeu_a("ruim@x.com", ["bia@x.com"])
+    assert str(e.value) == "messages.list -> 500"

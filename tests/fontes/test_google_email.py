@@ -173,12 +173,12 @@ def test_enviados_recentes_junta_to_e_cc_sem_repetir():
     assert f.chamadas[1][2]["metadataHeaders"] == ["To", "Cc"]
 
 
-def test_enviados_recentes_le_no_maximo_500_cabecalhos():
+def test_enviados_recentes_le_no_maximo_200_cabecalhos():
     ids = [{"id": ID(i)} for i in range(1, 601)]
     paginas = [(200, {"messages": ids[i:i + 100], "nextPageToken": f"P{i}"}) for i in range(0, 600, 100)]
     f = Falso({("GET", "/messages"): paginas, ("GET", "/messages/{id}"): [(200, {"id": ID(1), "payload": {"headers": []}})]})
     ge.enviados_recentes("a@x.com", 365, Token(), http=f)
-    assert sum(1 for c in f.chamadas if "/messages/" in c[1]) == 500
+    assert sum(1 for c in f.chamadas if "/messages/" in c[1]) == 200  # trabalho limitado: a ponte tem 130 s por chamada
 
 
 def test_entradas_invalidas_sao_erro_tipado_sem_chamar_o_google():
@@ -204,7 +204,7 @@ def test_cliente_so_faz_get_e_post_de_trash_untrash():
     for proibido in (r"\.send\b", r"/send\b", r"drafts", r"batchDelete", r"batchModify", r"/delete", r"\.delete\b", r"\.modify\b", r"/modify\b", r"labels"):
         assert not re.search(proibido, codigo, re.I), proibido
     assert not [n for n in dir(ge.GoogleEmail) if n.lstrip("_").startswith(("enviar", "responder", "apagar", "rascunho", "rotular"))]
-    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "listar_novos", "lixeira", "restaurar"]
+    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "listar_novos", "lixeira", "respondeu_a", "restaurar"]
 
 
 def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
@@ -214,3 +214,42 @@ def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
     assert ge.google_email_do_ambiente({}) is None
     assert ge.google_email_do_ambiente({"GOOGLE_CLIENT_ID": "i", "GOOGLE_CLIENT_SECRET": "s"}) is not None
     assert "SEGREDO" not in repr(g) and "TOK" not in repr(g)
+
+
+def test_carga_grande_le_so_as_mais_recentes_para_caber_no_tempo_da_ponte():
+    ids = [{"id": ID(i)} for i in range(1, 451)]  # o Gmail lista a mais nova primeiro
+    paginas = [(200, {"messages": ids[i:i + 100], **({"nextPageToken": f"P{i}"} if i < 400 else {})}) for i in range(0, 450, 100)]
+    f = Falso({("GET", "/profile"): [(200, {"historyId": "9"})], ("GET", "/messages"): paginas, ("GET", "/messages/{id}"): [(200, _msg(1))]})
+    r = ge.listar_novos("a@x.com", None, 14, Token(), http=f)
+    lidas = [c[1] for c in f.chamadas if re.search(r"/messages/[0-9a-f]+$", c[1])]
+    assert len(lidas) == ge.MAX_CARGA_MSGS == 200 and lidas[0].endswith(ID(1)) and lidas[-1].endswith(ID(200))
+    assert r.novo_history_id == "9"
+
+
+def test_incremental_com_mais_de_200_novas_cai_na_carga_limitada_e_avisa_que_recarregou():
+    hist = {"history": [{"messagesAdded": [{"message": {"id": ID(i)}} for i in range(1, 251)]}], "historyId": "777"}
+    f = Falso({("GET", "/history"): [(200, hist)], ("GET", "/profile"): [(200, {"historyId": "900"})],
+               ("GET", "/messages"): [(200, {"messages": [{"id": ID(i)} for i in range(1, 51)]})], ("GET", "/messages/{id}"): [(200, _msg(1))]})
+    r = ge.listar_novos("a@x.com", "500", 14, Token(), http=f)
+    assert r.recarga_completa is True and r.novo_history_id == "900"
+    assert not any(c[1].endswith(ID(201)) for c in f.chamadas)  # nunca passou do teto
+
+
+def test_respondeu_a_pergunta_ao_gmail_endereco_por_endereco():
+    f = Falso({("GET", "/messages"): [(200, {"messages": [{"id": ID(1)}]}), (200, {"resultSizeEstimate": 0})]})
+    r = ge.respondeu_a("a@x.com", ["Bia@X.com", "c@y.com"], Token(), http=f)
+    assert r == {"bia@x.com": True, "c@y.com": False}
+    assert f.chamadas[0][2]["q"] == ["in:sent to:bia@x.com"] and f.chamadas[0][2]["maxResults"] == ["1"]
+
+
+def test_respondeu_a_erro_do_gmail_e_erro_tipado_nunca_falso():
+    f = Falso({("GET", "/messages"): [(500, {})]})
+    with pytest.raises(ErroGoogleOAuth):
+        ge.respondeu_a("a@x.com", ["bia@x.com"], Token(), http=f)
+
+
+def test_respondeu_a_recusa_endereco_invalido_e_lote_grande_sem_chamar_o_google():
+    nunca = lambda *a, **k: pytest.fail("não deveria chamar")  # noqa: E731
+    for ruim in (["nao e email"], ['a@x.com" OR in:inbox'], [3], "bia@x.com", ["a@x.com"] * 0 + [f"u{i}@x.com" for i in range(21)]):
+        with pytest.raises(ErroGoogleOAuth):
+            ge.respondeu_a("a@x.com", ruim, Token(), http=nunca)

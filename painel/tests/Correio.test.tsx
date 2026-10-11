@@ -15,7 +15,7 @@ const MSG = { id: 7, conta: "a@x.com", remetente: "banco@x.com", assunto: "Bolet
 function fake(o: Opcoes = {}) {
   const chamadas: Chamada[] = [];
   let lixeira = o.lixeira ?? [];
-  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, ...o.parametros };
+  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], ...o.parametros };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
     chamadas.push({ metodo, url, corpo: init?.body ? JSON.parse(String(init.body)) : undefined });
@@ -167,4 +167,32 @@ test("prioridades para quem não é o dono", async () => {
   fake({ negar: true });
   montar(<Prioridades />);
   expect(await screen.findByText("Só o dono vê o e-mail.")).toBeTruthy();
+});
+
+
+test("ajustes mostram as palavras que protegem e salvam a lista, os dias em aberto e o teto de alertas", async () => {
+  const c = fake();
+  montar();
+  const palavras = (await screen.findByLabelText("Palavras protegidas")) as HTMLTextAreaElement;
+  expect(palavras.value).toBe("fatura\nboleto");
+  expect((screen.getByLabelText(/Dias em aberto/) as HTMLInputElement).value).toBe("7");
+  expect((screen.getByLabelText(/Alertas por dia/) as HTMLInputElement).value).toBe("5");
+  fireEvent.change(palavras, { target: { value: "fatura\n\n boleto \ncontrato" } });
+  fireEvent.change(screen.getByLabelText(/Dias em aberto/), { target: { value: "10" } });
+  fireEvent.change(screen.getByLabelText(/Alertas por dia/), { target: { value: "3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "PUT", url: "/api/v1/correio/parametros", corpo: { palavras_protegidas: ["fatura", "boleto", "contrato"], dias_em_aberto: 10, max_alertas_dia: 3 } }]));
+});
+
+test("dias em aberto e alertas por dia fora da faixa são recusados antes de enviar", async () => {
+  const c = fake();
+  montar();
+  fireEvent.change(await screen.findByLabelText(/Dias em aberto/), { target: { value: "45" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("de 1 a 30");
+  fireEvent.change(screen.getByLabelText(/Dias em aberto/), { target: { value: "7" } });
+  fireEvent.change(screen.getByLabelText(/Alertas por dia/), { target: { value: "0" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("de 1 a 50"));
+  expect(mudancas(c)).toEqual([]);
 });

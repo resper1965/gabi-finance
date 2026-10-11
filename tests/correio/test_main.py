@@ -52,6 +52,9 @@ class Ponte:
             raise self.erro_enviados
         return self.enviados
 
+    def respondeu_a(self, conta, enderecos):
+        return {a: False for a in enderecos}
+
     def lixeira(self, conta, ids):
         self.lixeiras.append((conta, list(ids)))
         return {i: "ok" for i in ids}

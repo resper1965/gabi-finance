@@ -36,22 +36,22 @@ def test_importantes_ordena_emergencial_depois_prioridade_depois_data(con):
     _msg(con, f, "b", "importante", 3, recebida="2026-10-12T07:00:00+00:00")
     _msg(con, f, "c", "emergencial", 3, estado="alertada", recebida="2026-10-12T06:00:00+00:00")
     _msg(con, f, "d", "importante", 2, recebida="2026-10-12T09:30:00+00:00")
-    assert [m["id"] for m in consulta.importantes(con)] == [3, 2, 4, 1]
-    assert set(consulta.importantes(con)[0]) == {"id", "conta", "remetente", "assunto", "recebida_em", "classe", "prioridade", "motivo"}
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == [3, 2, 4, 1]
+    assert set(consulta.importantes(con, agora=AGORA)[0]) == {"id", "conta", "remetente", "assunto", "recebida_em", "classe", "prioridade", "motivo"}
 
 
 def test_lixeira_lixo_normal_e_fonte_desligada_nao_entram_nos_importantes(con):
     f, g = _fonte(con), _fonte(con, "b@x.com", estado="nao")
     _msg(con, f, "na_lixeira", "lixo", 0, estado="na_lixeira"); _msg(con, f, "lixo", "lixo", 0); _msg(con, f, "normal", "normal", 1)
     _msg(con, f, "nova", None, None, estado="nova"); _msg(con, f, "restaurada", "importante", 2, estado="restaurada"); _msg(con, g, "desligada")
-    assert consulta.importantes(con) == []
+    assert consulta.importantes(con, agora=AGORA) == []
 
 
 def test_importantes_respeita_o_limite(con):
     f = _fonte(con)
     for i in range(15):
         _msg(con, f, f"m{i}")
-    assert len(consulta.importantes(con)) == 10 and len(consulta.importantes(con, limite=3)) == 3
+    assert len(consulta.importantes(con, agora=AGORA)) == 10 and len(consulta.importantes(con, limite=3, agora=AGORA)) == 3
 
 
 def test_na_lixeira_lista_so_os_ultimos_30_dias_da_fonte_liberada(con):
@@ -113,3 +113,22 @@ def test_hoje_traz_emergencial_nas_prioridades_antes_dos_outros(con):
     assert d["prioridades"][0] == {"tipo": "email_emergencial", "titulo": "banco@x.com — Boleto vence hoje", "motivo": "prazo hoje", "ref": 1}
     assert [m["assunto"] for m in d["correio_importantes"]] == ["Boleto vence hoje", "Proposta"]
     assert modulo_hoje.hoje(con, AGORA, "e1")["prioridades"] == [] and modulo_hoje.hoje(con, AGORA, "e1")["correio_importantes"] == []
+
+
+def test_importantes_so_olha_os_ultimos_dias_em_aberto_e_o_parametro_manda(con):
+    f = _fonte(con)
+    _msg(con, f, "hoje", "importante", 2, recebida="2026-10-12T08:00:00+00:00")
+    _msg(con, f, "seis_dias", "emergencial", 3, estado="alertada", recebida="2026-10-06T12:00:00+00:00")
+    _msg(con, f, "oito_dias", "emergencial", 3, estado="alertada", recebida="2026-10-04T08:00:00+00:00")
+    _msg(con, f, "tres_semanas", "importante", 3, recebida="2026-09-21T08:00:00+00:00")
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == [2, 1]  # padrão 7 dias: o resolvido há semanas não ofusca o novo
+    con.execute("insert into parametro(chave, valor) values ('email.dias_em_aberto', '30')")
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == [2, 3, 4, 1]  # emergenciais (mais recente primeiro), depois as importantes
+    con.execute("update parametro set valor='\"muitos\"' where chave='email.dias_em_aberto'")
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == [2, 1]  # parâmetro inválido cai no padrão
+
+
+def test_resumo_e_hoje_nao_trazem_emergencial_antigo(con):
+    f = _fonte(con)
+    _msg(con, f, "velho", "emergencial", 3, estado="alertada", recebida="2026-09-01T08:00:00+00:00")
+    assert modulo_hoje.hoje(con, AGORA)["prioridades"] == [] and all(not l.startswith("E-mail:") for l in resumo_da_manha(con, AGORA)["linhas"])

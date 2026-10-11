@@ -13,7 +13,7 @@ Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # O Gmail e o modelo chegam pela ponte do serviço de fontes (único com rede e segredos, R5): aqui não há token nem rede.
 Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.correio
-TimeoutStartSec=300
+TimeoutStartSec=600
 UMask=0077
 NoNewPrivileges=yes
 ProtectSystem=strict

@@ -491,6 +491,7 @@ def test_unidades_do_correio_seguem_o_padrao_e_nao_sao_habilitadas():
     for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
         assert dur in srv, dur
     assert "EnvironmentFile" not in srv  # segredo só no serviço de fontes
+    assert "TimeoutStartSec=600" in srv  # sincronizar (até 130 s) + conferência (até 130 s) + processar (210 s) + lixeira cabem
     assert "OnCalendar=*-*-* 06..22:00,15,30,45:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-correio.service" in t
     assert hasattr(importlib.import_module("gabi.correio.__main__"), "main")
     for nome in ("gabi-brain-correio.service", "gabi-brain-correio.timer"):

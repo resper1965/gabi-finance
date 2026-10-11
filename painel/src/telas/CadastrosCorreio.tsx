@@ -7,7 +7,7 @@ import { Aviso, useAcao, type Acao } from "../lib/useAcao";
 import { useApi, type Leitura } from "../lib/useApi";
 
 interface Fonte { id: number; conta: string; provedor: "google" | "graph"; estado: "sim" | "nao" | "a_decidir"; lixeira: 0 | 1; sincronizada_em: string | null; ultimo_erro: string | null; mensagens: number; na_lixeira: number }
-interface Parametros { criterios_emergencia: string; vips: string[]; lixeira_confianca: number; janela_dias: number; retencao_dias: number }
+interface Parametros { criterios_emergencia: string; vips: string[]; lixeira_confianca: number; janela_dias: number; retencao_dias: number; dias_em_aberto: number; max_alertas_dia: number; palavras_protegidas: string[] }
 
 const ESTADO = { sim: "Lendo", nao: "Desligada", a_decidir: "A decidir" } as const;
 const suave = { color: "var(--ink2)" } as const;
@@ -71,6 +71,9 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
   const [limiar, setLimiar] = useState<string | null>(null);
   const [janela, setJanela] = useState<string | null>(null);
   const [retencao, setRetencao] = useState<string | null>(null);
+  const [palavras, setPalavras] = useState<string | null>(null);
+  const [emAberto, setEmAberto] = useState<string | null>(null);
+  const [alertas, setAlertas] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <Painel leitura={leitura} arquivo="correio-parametros">
@@ -86,14 +89,23 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
             if (limiar !== null) { const v = decimal(limiar); if (!(v >= 0.5 && v <= 1)) { setMsg("Confiança da lixeira: informe um número de 0,5 a 1."); return; } corpo.lixeira_confianca = v; }
             if (janela !== null) { const v = inteiro(janela, 1, 60); if (v === null) { setMsg("Janela: informe um inteiro de 1 a 60 dias."); return; } corpo.janela_dias = v; }
             if (retencao !== null) { const v = inteiro(retencao, 1, 365); if (v === null) { setMsg("Retenção do trecho: informe um inteiro de 1 a 365 dias."); return; } corpo.retencao_dias = v; }
+            if (palavras !== null) corpo.palavras_protegidas = palavras.split("\n").map((x) => x.trim()).filter(Boolean);
+            if (emAberto !== null) { const v = inteiro(emAberto, 1, 30); if (v === null) { setMsg("Dias em aberto: informe um inteiro de 1 a 30."); return; } corpo.dias_em_aberto = v; }
+            if (alertas !== null) { const v = inteiro(alertas, 1, 50); if (v === null) { setMsg("Alertas por dia: informe um inteiro de 1 a 50."); return; } corpo.max_alertas_dia = v; }
             setMsg(null);
             if (Object.keys(corpo).length === 0) return;
-            if (await agir("ajustes", () => api.put("/api/v1/correio/parametros", corpo), "Ajustes salvos.", leitura.recarregar)) { setCriterios(null); setVips(null); setLimiar(null); setJanela(null); setRetencao(null); }
+            if (await agir("ajustes", () => api.put("/api/v1/correio/parametros", corpo), "Ajustes salvos.", leitura.recarregar)) { setCriterios(null); setVips(null); setLimiar(null); setJanela(null); setRetencao(null); setPalavras(null); setEmAberto(null); setAlertas(null); }
           }}>
             <label>O que é emergencial para você<br />
               <textarea aria-label="Critérios de emergência" rows={4} style={{ width: "100%" }} value={criterios ?? p.criterios_emergencia} onChange={(e) => { setCriterios(e.target.value); setMsg(null); }} /></label>
             <label>VIPs (um e-mail por linha; nunca vão para a lixeira)<br />
               <textarea aria-label="VIPs" rows={4} style={{ width: "100%" }} value={vips ?? p.vips.join("\n")} onChange={(e) => { setVips(e.target.value); setMsg(null); }} /></label>
+            <label>Palavras que protegem da lixeira (uma por linha; fatura, boleto, cobrança... nunca vão)<br />
+              <textarea aria-label="Palavras protegidas" rows={5} style={{ width: "100%" }} value={palavras ?? p.palavras_protegidas.join("\n")} onChange={(e) => { setPalavras(e.target.value); setMsg(null); }} /></label>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
+              <label>Dias em aberto na fila<br /><input inputMode="numeric" value={emAberto ?? String(p.dias_em_aberto)} onChange={(e) => { setEmAberto(e.target.value); setMsg(null); }} /></label>
+              <label>Alertas por dia (máximo)<br /><input inputMode="numeric" value={alertas ?? String(p.max_alertas_dia)} onChange={(e) => { setAlertas(e.target.value); setMsg(null); }} /></label>
+            </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
               <label>Confiança mínima da lixeira (0,5 a 1)<br /><input inputMode="decimal" value={limiar ?? String(p.lixeira_confianca).replace(".", ",")} onChange={(e) => { setLimiar(e.target.value); setMsg(null); }} /></label>
               <label>Janela de leitura (dias)<br /><input inputMode="numeric" value={janela ?? String(p.janela_dias)} onChange={(e) => { setJanela(e.target.value); setMsg(null); }} /></label>

@@ -40,11 +40,13 @@ def _json(classe="lixo", prioridade=0, motivo="promoção", confianca=0.95):
 class Modelo:
     """Responde conforme o assunto que aparece no prompt; `padrao` quando nenhum casa."""
 
-    def __init__(self, por_assunto=None, padrao=None, erro=None):
-        self.por_assunto, self.padrao, self.erro, self.n = por_assunto or {}, padrao or _json(), erro, 0
+    def __init__(self, por_assunto=None, padrao=None, erro=None, ao_completar=None):
+        self.por_assunto, self.padrao, self.erro, self.n, self.ao_completar = por_assunto or {}, padrao or _json(), erro, 0, ao_completar
 
     def completar(self, prompt, *, forte):
         self.n += 1
+        if self.ao_completar:
+            self.ao_completar()
         if self.erro:
             raise self.erro
         for assunto, resp in self.por_assunto.items():
@@ -54,8 +56,15 @@ class Modelo:
 
 
 class Ponte:
-    def __init__(self, erro_ids=(), levanta=None):
+    def __init__(self, erro_ids=(), levanta=None, respondeu=(), erro_respondeu=None):
         self.chamadas, self.erro_ids, self.levanta = [], set(erro_ids), levanta
+        self.respondeu, self.erro_respondeu, self.consultas = set(respondeu), erro_respondeu, []
+
+    def respondeu_a(self, conta, enderecos):
+        self.consultas.append((conta, list(enderecos)))
+        if self.erro_respondeu:
+            raise self.erro_respondeu
+        return {a: a in self.respondeu for a in enderecos}
 
     def lixeira(self, conta, ids):
         self.chamadas.append((conta, list(ids)))
@@ -289,3 +298,106 @@ def test_limites_do_banco_usa_parametros_com_padrao_e_ignora_lixo(con):
     assert pr.limites_do_banco(con) == pr.Limites(60, 210)
     con.execute("insert into parametro(chave, valor) values ('email.max_por_rodada', '10'), ('email.tempo_max_s', '\"muito\"')")
     assert pr.limites_do_banco(con) == pr.Limites(10, 210)
+
+
+# ---------------- passada de correções da revisão final ----------------
+def test_remetente_que_o_dono_respondeu_fora_da_lista_nao_e_movido(con):
+    f = _fonte(con); _msg(con, f, "a1", de="suporte@fornecedor.com")
+    p = Ponte(respondeu={"suporte@fornecedor.com"})
+    r = pr.processar(con, Modelo(), _orc(), p, AGORA)
+    assert p.chamadas == [] and r["lixeira"] == 0 and _estado(con, "a1")[:2] == ("classificada", "lixo")
+
+
+def test_conferencia_ao_vivo_pergunta_uma_vez_por_remetente(con):
+    f = _fonte(con)
+    for i in range(3):
+        _msg(con, f, f"a{i}", de="promo@loja.com")
+    _msg(con, f, "b1", de="outra@loja.com")
+    p = Ponte()
+    pr.processar(con, Modelo(), _orc(), p, AGORA)
+    assert len(p.consultas) == 1 and p.consultas[0][0] == "a@x.com" and sorted(p.consultas[0][1]) == ["outra@loja.com", "promo@loja.com"]
+    assert len(p.chamadas) == 1 and len(p.chamadas[0][1]) == 4
+
+
+def test_falha_na_conferencia_ao_vivo_adia_e_nao_move(con):
+    f = _fonte(con); _msg(con, f, "a1")
+    p = Ponte(erro_respondeu=ErroGoogleOAuth("messages.list -> 500"))
+    r = pr.processar(con, Modelo(), _orc(), p, AGORA)
+    assert p.chamadas == [] and r["adiadas"] == 1 and _estado(con, "a1")[:3] == ("nova", "lixo", 1)  # na dúvida fica na caixa e tenta de novo
+
+
+def test_palavra_protegida_nunca_vai_e_nao_gasta_consulta(con):
+    f = _fonte(con); _msg(con, f, "a1", "Sua fatura vence amanhã"); _msg(con, f, "b2", "Aviso", trecho="o boleto está disponível")
+    p = Ponte()
+    pr.processar(con, Modelo(padrao=_json("lixo", 0, "x", 1.0)), _orc(), p, AGORA)
+    assert p.chamadas == [] and p.consultas == [] and {_estado(con, e)[0] for e in ("a1", "b2")} == {"classificada"}
+
+
+def test_desligar_a_lixeira_no_meio_da_rodada_nao_move(con):
+    f = _fonte(con); _msg(con, f, "a1")
+    m = Modelo(ao_completar=lambda: con.execute("update email_fonte set lixeira=0"))
+    p = Ponte()
+    r = pr.processar(con, m, _orc(), p, AGORA)
+    assert p.chamadas == [] and r["lixeira"] == 0 and _estado(con, "a1")[:2] == ("classificada", "lixo")
+
+
+def test_desligar_a_conta_no_meio_da_rodada_nao_move(con):
+    f = _fonte(con); _msg(con, f, "a1")
+    m = Modelo(ao_completar=lambda: con.execute("update email_fonte set estado='nao'"))
+    p = Ponte()
+    pr.processar(con, m, _orc(), p, AGORA)
+    assert p.chamadas == [] and _estado(con, "a1")[0] == "classificada"
+
+
+def test_alerta_so_para_mensagem_recente_a_antiga_continua_visivel_sem_alertar(con):
+    f = _fonte(con)
+    _msg(con, f, "velha", lista=0, thread="T1", recebida="2026-10-07T10:00:00+00:00")  # 5 dias
+    _msg(con, f, "nova1", lista=0, thread="T2", recebida="2026-10-12T10:00:00+00:00")
+    r = pr.processar(con, Modelo(padrao=_json("emergencial", 3, "x", 0.9)), _orc(), Ponte(), AGORA)
+    assert r["emergenciais"] == 1 and [a["chave"] for a in _avisos(con, "email_emergencial")] == ["T2"]
+    assert _estado(con, "velha")[:2] == ("classificada", "emergencial")  # fica na fila de prioridades, sem notificar o celular
+
+
+def test_teto_diario_de_alertas_agrupa_o_excesso_num_aviso_so(con):
+    f = _fonte(con)
+    con.execute("insert into parametro(chave, valor) values ('email.max_alertas_dia', '2')")
+    for i in range(5):
+        _msg(con, f, f"e{i}", lista=0, thread=f"T{i}")
+    r = pr.processar(con, Modelo(padrao=_json("emergencial", 3, "x", 0.9)), _orc(), Ponte(), AGORA)
+    chaves = sorted(a["chave"] for a in _avisos(con, "email_emergencial"))
+    assert r["emergenciais"] == 2 and len(chaves) == 3 and sum(1 for c in chaves if c.startswith("excesso-")) == 1
+    estados = sorted(_estado(con, f"e{i}")[0] for i in range(5))
+    assert estados == ["alertada", "alertada", "classificada", "classificada", "classificada"]  # o excesso continua nas prioridades
+    pr.processar(con, Modelo(padrao=_json("emergencial", 3, "x", 0.9)), _orc(), Ponte(), "2026-10-12T12:30:00+00:00")
+    assert len(_avisos(con, "email_emergencial")) == 3  # o aviso de excesso não se repete no mesmo dia
+
+
+def test_mensagem_que_vira_falhou_gera_um_aviso_com_a_contagem(con):
+    f = _fonte(con); _msg(con, f, "a1"); _msg(con, f, "b2")
+    m = Modelo(erro=RuntimeError("boom"))
+    agora = dt.datetime(2026, 10, 12, 12, 0, tzinfo=dt.timezone.utc)
+    for _ in range(8):
+        pr.processar(con, m, _orc(), Ponte(), agora.isoformat())
+        agora += dt.timedelta(hours=7)
+    avisos = _avisos(con, "email_falhou")
+    assert len(avisos) == 1 and avisos[0]["total"] == 2 and set(avisos[0]) == {"chave", "total"}  # só a contagem, nunca texto
+
+
+def test_resumo_cobre_o_que_veio_depois_do_ultimo_resumo(con):
+    f = _fonte(con)
+    for i in range(3):
+        _msg(con, f, f"a{i}", estado="na_lixeira")
+    con.execute("update email_msg set atualizado_em='2026-10-12T15:00:00+00:00'")
+    assert pr.resumo_do_dia(con, dt.datetime(2026, 10, 12, 21, 30, tzinfo=dt.timezone.utc)) is not None
+    for i in range(12):
+        _msg(con, f, f"b{i}", estado="na_lixeira")
+    con.execute("update email_msg set atualizado_em='2026-10-12T23:00:00+00:00' where externo_id like 'b%'")  # 20h BRT: depois do resumo
+    assert pr.resumo_do_dia(con, dt.datetime(2026, 10, 13, 21, 30, tzinfo=dt.timezone.utc)) is not None
+    totais = sorted(a["total"] for a in _avisos(con, "email_lixeira_resumo"))
+    assert totais == [3, 12]  # nada se perde: o que veio depois das 18h entra no resumo do dia seguinte, sem repetir o que já foi dito
+
+
+def test_limites_novos_do_banco_alertas_e_dias(con):
+    assert pr.alertas_por_dia(con) == 5
+    con.execute("insert into parametro(chave, valor) values ('email.max_alertas_dia', '0')")
+    assert pr.alertas_por_dia(con) == 5  # inválido cai no padrão

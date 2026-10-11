@@ -102,3 +102,5 @@ def test_descrever_avisos_do_correio():
     assert "teto de custo do modelo" in descrever("email_sem_modelo", {"chave": "modelo", "motivo": "teto de custo do modelo"})[1]
     titulo, texto = descrever("email_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
     assert "a@x.com" in titulo and "credencial" in texto
+    titulo, texto = descrever("email_falhou", {"chave": "falhou", "total": 3})
+    assert "3" in titulo and "tentativas" in texto

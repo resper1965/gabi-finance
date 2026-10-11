@@ -4,15 +4,17 @@ Nenhum segredo aqui: o refresh token vive só no serviço de fontes. Critérios 
 import json
 import sqlite3
 
-from gabi.correio.regras import endereco
+from gabi.correio.regras import PALAVRA_MAX, PALAVRAS_PADRAO, endereco
 from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida
 
 PROVEDORES = ("google", "graph")
 ESTADOS = ("sim", "nao", "a_decidir")
-PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30}
+PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
+           "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO)}
 CHAVES = {k: f"email.{k}" for k in PADROES}
 CRITERIOS_MAX = 2000
 VIPS_MAX = 200
+PALAVRAS_MAX = 200
 
 
 class ErroFonte(ValueError):
@@ -106,6 +108,18 @@ def validar_parametros(corpo) -> dict:
             _inteiro(v, k, 1, 60)
         elif k == "retencao_dias":
             _inteiro(v, k, 1, 365)
+        elif k == "dias_em_aberto":
+            _inteiro(v, k, 1, 30)
+        elif k == "max_alertas_dia":
+            _inteiro(v, k, 1, 50)
+        elif k == "palavras_protegidas":
+            if not isinstance(v, list) or len(v) > PALAVRAS_MAX or not all(isinstance(x, str) and len(x.strip()) <= PALAVRA_MAX for x in v):
+                raise ErroFonte(f"palavras_protegidas deve ser uma lista de até {PALAVRAS_MAX} palavras de até {PALAVRA_MAX} caracteres")
+            vistas: dict[str, str] = {}
+            for x in v:
+                if x.strip():
+                    vistas.setdefault(x.strip().casefold(), x.strip())
+            v = list(vistas.values())
         saida[k] = v
     return saida
 

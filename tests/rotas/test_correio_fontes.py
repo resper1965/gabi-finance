@@ -103,7 +103,10 @@ def test_liberar_leitura_e_lixeira_sao_chaves_separadas_e_a_lixeira_exige_leitur
 
 
 def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
-    assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"] == {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30}
+    padrao = cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]
+    assert {k: v for k, v in padrao.items() if k != "palavras_protegidas"} == {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
+                                                                                "dias_em_aberto": 7, "max_alertas_dia": 5}
+    assert "fatura" in padrao["palavras_protegidas"] and "boleto" in padrao["palavras_protegidas"]  # a lista padrão aparece para o dono editar
     r = _put(cli, {"vips": ["Chefe@Ionic.com", "chefe@ionic.com", " bia@x.com "], "criterios_emergencia": "banco ou cobrança com prazo", "lixeira_confianca": 0.95})
     assert r.status_code == 200
     d = r.json()["dados"]
@@ -113,7 +116,9 @@ def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
 @pytest.mark.parametrize("corpo", [{}, {"outra": 1}, {"vips": "chefe@x.com"}, {"vips": ["nao-e-email"]}, {"vips": [3]}, {"vips": ["a@x.com"] * 0 + [f"u{i}@x.com" for i in range(201)]},
                                    {"criterios_emergencia": 5}, {"criterios_emergencia": "x" * 2001}, {"lixeira_confianca": 0.49}, {"lixeira_confianca": 1.01},
                                    {"lixeira_confianca": "0.9"}, {"lixeira_confianca": True}, {"janela_dias": 0}, {"janela_dias": 61}, {"janela_dias": 1.5},
-                                   {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_dias": True}])
+                                   {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_dias": True},
+                                   {"dias_em_aberto": 0}, {"dias_em_aberto": 31}, {"dias_em_aberto": True}, {"max_alertas_dia": 0}, {"max_alertas_dia": 51}, {"max_alertas_dia": 2.5},
+                                   {"palavras_protegidas": "fatura"}, {"palavras_protegidas": [3]}, {"palavras_protegidas": ["x" * 61]}, {"palavras_protegidas": ["a"] * 0 + [f"p{i}" for i in range(201)]}])
 def test_parametros_validam_faixas(cli, corpo):
     assert _put(cli, corpo).status_code == 400
     assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]["lixeira_confianca"] == 0.9
@@ -197,3 +202,16 @@ def test_restaurada_nunca_volta_sozinha_a_lixeira_depois_de_restaurar_pelo_paine
     pr.processar(c, None, Orcamento(1.0, 10.0), p, "2026-10-16T12:00:00+00:00")
     c.close()
     assert p.chamadas == []
+
+
+def test_parametros_novos_gravam_e_normalizam_as_palavras(cli):
+    r = _put(cli, {"palavras_protegidas": ["Fatura", " BOLETO ", "fatura", ""], "dias_em_aberto": 10, "max_alertas_dia": 3})
+    assert r.status_code == 200
+    d = r.json()["dados"]
+    assert d["palavras_protegidas"] == ["Fatura", "BOLETO"] and d["dias_em_aberto"] == 10 and d["max_alertas_dia"] == 3  # aparadas e sem repetir (caixa não conta); vazia some
+    assert _put(cli, {"palavras_protegidas": []}).json()["dados"]["palavras_protegidas"] == []  # o dono pode esvaziar a lista
+
+
+def test_palavras_protegidas_nao_aparecem_na_auditoria(cli, banco):
+    _put(cli, {"palavras_protegidas": ["PALAVRA-SECRETA"]})
+    assert "PALAVRA-SECRETA" not in " | ".join(_decisoes(banco)) and "email.palavras_protegidas" in " | ".join(_decisoes(banco))

@@ -42,7 +42,7 @@ def hoje(con, agora: dt.datetime, filtro: str = "all", *, painel: bool = False) 
     mails = emails_importantes(con, filtro)
     # compromisso não tem empresa nem frente: a agenda (e os conflitos) só vão no 'all'
     agenda = consulta.agenda_do_dia(con, dia_agenda, fuso, painel=painel) if filtro == "all" else []
-    correio = consulta_correio.importantes(con) if filtro == "all" else []  # caixa de e-mail não tem empresa nem frente: só no 'all'
+    correio = consulta_correio.importantes(con, agora=agora) if filtro == "all" else []  # caixa de e-mail não tem empresa nem frente: só no 'all'
     prioridades = [{"tipo": "email_emergencial", "titulo": f"{m['remetente'] or '?'} — {m['assunto'] or '(sem assunto)'}", "motivo": m["motivo"], "ref": m["id"]}
                    for m in correio if m["classe"] == "emergencial"]
     prioridades += [{"tipo": "email", "titulo": m["assunto"], "motivo": m["motivo"], "ref": m["id"]} for m in mails[:3]]
