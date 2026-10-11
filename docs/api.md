@@ -64,6 +64,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/contagens` | Itens que pedem decisão por área do menu (caixa, gastos, regras) e o total do sino. |
 | GET | `/api/v1/contas-pagar` | Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas. |
 | POST | `/api/v1/contas-pagar/{id_compromisso}/paga` | Baixa manual de um compromisso (vale só se não houver lançamento no extrato). |
+| GET | `/api/v1/correio/fontes` | Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens. |
+| POST | `/api/v1/correio/fontes` | Cadastra uma conta (e-mail e provedor google|graph). Nasce `a_decidir` e sem lixeira: nada é lido nem movido até liberar. |
+| PATCH | `/api/v1/correio/fontes/{fonte_id}` | Libera ou desliga a leitura (`estado`) e liga ou desliga a lixeira (`lixeira`); a lixeira exige a leitura liberada. |
+| GET | `/api/v1/correio/lixeira` | O que a Gabi mandou para a lixeira nos últimos 30 dias, para restaurar. |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/restaurar` | Tira da lixeira (pela ponte) e marca `restaurada`: a Gabi nunca a move de novo. Idempotente. 503 `fonte_indisponivel` se a ponte ou o Gmail não confirmar. |
+| GET | `/api/v1/correio/parametros` | Critérios de emergência, VIPs, limiar da lixeira, janela de leitura e retenção do trecho (padrões se não definidos). |
+| PUT | `/api/v1/correio/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves (nunca critérios nem VIPs). |
+| GET | `/api/v1/correio/prioridades` | Emergenciais e importantes em aberto, o emergencial primeiro (só de contas liberadas). |
 | GET | `/api/v1/custo` | Custo do modelo (OpenRouter) no dia e no mês contra o teto. |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |

@@ -1822,6 +1822,180 @@
     "summary": "Marcar Paga"
    }
   },
+  "/api/v1/correio/fontes": {
+   "get": {
+    "description": "Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens.",
+    "operationId": "fontes_api_v1_correio_fontes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Fontes"
+   },
+   "post": {
+    "description": "Cadastra uma conta (e-mail e provedor google|graph). Nasce `a_decidir` e sem lixeira: nada é lido nem movido até liberar.",
+    "operationId": "criar_fonte_api_v1_correio_fontes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar Fonte"
+   }
+  },
+  "/api/v1/correio/fontes/{fonte_id}": {
+   "patch": {
+    "description": "Libera ou desliga a leitura (`estado`) e liga ou desliga a lixeira (`lixeira`); a lixeira exige a leitura liberada.",
+    "operationId": "alterar_fonte_api_v1_correio_fontes__fonte_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fonte_id",
+      "required": true,
+      "schema": {
+       "title": "Fonte Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Alterar Fonte"
+   }
+  },
+  "/api/v1/correio/lixeira": {
+   "get": {
+    "description": "O que a Gabi mandou para a lixeira nos últimos 30 dias, para restaurar.",
+    "operationId": "lixeira_api_v1_correio_lixeira_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Lixeira"
+   }
+  },
+  "/api/v1/correio/mensagens/{mensagem_id}/restaurar": {
+   "post": {
+    "description": "Tira da lixeira (pela ponte) e marca `restaurada`: a Gabi nunca a move de novo. Idempotente. 503 `fonte_indisponivel` se a ponte ou o Gmail não confirmar.",
+    "operationId": "restaurar_api_v1_correio_mensagens__mensagem_id__restaurar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Restaurar"
+   }
+  },
+  "/api/v1/correio/parametros": {
+   "get": {
+    "description": "Critérios de emergência, VIPs, limiar da lixeira, janela de leitura e retenção do trecho (padrões se não definidos).",
+    "operationId": "parametros_api_v1_correio_parametros_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Parametros"
+   },
+   "put": {
+    "description": "Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves (nunca critérios nem VIPs).",
+    "operationId": "gravar_parametros_api_v1_correio_parametros_put",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Gravar Parametros"
+   }
+  },
+  "/api/v1/correio/prioridades": {
+   "get": {
+    "description": "Emergenciais e importantes em aberto, o emergencial primeiro (só de contas liberadas).",
+    "operationId": "prioridades_api_v1_correio_prioridades_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Prioridades"
+   }
+  },
   "/api/v1/custo": {
    "get": {
     "description": "Custo do modelo (OpenRouter) no dia e no mês contra o teto.",
