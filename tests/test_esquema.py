@@ -95,3 +95,50 @@ def test_escuta_remetente_rejeita_estado_invalido(con):
     con.execute("insert into escuta_remetente(numero, estado) values ('+55', 'pendente')")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into escuta_remetente(numero, estado) values ('+56', 'xis')")
+
+
+def _fonte(con, conta="resper@gmail.com", cal="primary"):
+    return con.execute("insert into agenda_fonte(conta, provedor, calendario_id) values (?, 'google', ?)", (conta, cal)).lastrowid
+
+
+def _evento(con, fonte_id, externo_id="e1"):
+    con.execute(
+        "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local) "
+        "values (?, ?, '2026-10-12T18:00:00+00:00', '2026-10-12T19:00:00+00:00', '2026-10-12', '2026-10-12')", (fonte_id, externo_id))
+
+
+def test_agenda_tabelas_existem(con):
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert {"agenda_fonte", "agenda_evento"} <= nomes
+    cols = {r["name"] for r in con.execute("pragma table_info(agenda_evento)")}
+    assert {"inicio_utc", "fim_utc", "dia_local", "dia_fim_local", "dia_inteiro", "titulo", "link_reuniao",
+            "participantes_qtd", "status", "etag", "atualizado_origem", "privado"} <= cols
+    assert "participantes" not in cols and "local" not in cols  # privacidade: só a contagem, sem e-mail nem local
+    fonte = {r["name"] for r in con.execute("pragma table_info(agenda_fonte)")}
+    assert {"conta", "provedor", "calendario_id", "nome", "estado", "auth", "sync_token", "sincronizada_em", "recarga_em", "ultimo_erro"} <= fonte
+
+
+def test_agenda_fonte_estado_e_provedor_validados(con):
+    fid = _fonte(con)
+    assert con.execute("select estado, auth, calendario_id from agenda_fonte where id=?", (fid,)).fetchone()[:] == ("a_decidir", "oauth", "primary")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("update agenda_fonte set estado='talvez' where id=?", (fid,))
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into agenda_fonte(conta, provedor) values ('x@y.com', 'icloud')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into agenda_fonte(conta, provedor, auth) values ('x@y.com', 'google', 'senha')")
+    with pytest.raises(sqlite3.IntegrityError):
+        _fonte(con)  # mesma conta + mesmo calendário
+
+
+def test_agenda_evento_unico_por_fonte_e_externo_id(con):
+    f1, f2 = _fonte(con), _fonte(con, "resper@ness.com.br")
+    _evento(con, f1, "e1")
+    _evento(con, f2, "e1")  # o mesmo id em outra fonte é outro evento
+    with pytest.raises(sqlite3.IntegrityError):
+        _evento(con, f1, "e1")
+
+
+def test_agenda_evento_exige_fonte_existente(con):
+    with pytest.raises(sqlite3.IntegrityError):
+        _evento(con, 999)
