@@ -1,6 +1,6 @@
 """Programa da escuta (timer de 5 min e gatilho por arquivo): ingere o spool do ouvinte, processa e imprime SÓ contagens.
 O modelo e o Paperless chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem chave.
-Todo parâmetro é DADO em `parametro` (JSON): escuta.modo, escuta.anexo_max_mb, escuta.tempo_max_s.
+Todo parâmetro é DADO em `parametro` (JSON): escuta.modo, escuta.anexo_max_mb, escuta.tempo_max_s, escuta.retida_dias, escuta.retencao_dias.
 Uso: python -m gabi.escuta  |  python -m gabi.escuta --teste-crise (grava um aviso de crise de teste, nome TESTE)"""
 import datetime as dt
 import json
@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
-from gabi.escuta.caixa import ingerir_spool, limpar_orfaos
+from gabi.escuta.caixa import ingerir_spool, limpar_orfaos, purgar_antigas
 from gabi.escuta.classificar import recusa_sem_envio
 from gabi.escuta.crise import escrever_palavras_risco
 from gabi.escuta.destinos import DestinosReais
@@ -119,6 +119,11 @@ def _tempo_max_s(con) -> float:
     return v if not isinstance(v, bool) and isinstance(v, (int, float)) and v > 0 else TEMPO_MAX_S
 
 
+def _dias(con, chave: str, padrao: int) -> int:
+    v = _parametro(con, chave, padrao)
+    return int(v) if not isinstance(v, bool) and isinstance(v, (int, float)) and v >= 1 else padrao
+
+
 TEMPO_MAX_S = 420  # abaixo do TimeoutStartSec=600 da unit: a rodada para limpa antes de ser morta
 
 
@@ -166,12 +171,14 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
     novas = ingerir_spool(con, spool, agora_s)
     try:
         r = processar(con, destinos, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora_s, modo=_modo(con), spool=spool,
-                      tempo_max_s=_tempo_max_s(con))
+                      tempo_max_s=_tempo_max_s(con), retida_dias=_dias(con, "escuta.retida_dias", 14))
     finally:
         if isinstance(cliente, ModeloComCusto):
             cliente.fechar()
+    purgadas = purgar_antigas(con, agora_s, dias=_dias(con, "escuta.retencao_dias", 30))  # M6: grupo/nada processadas antigas
     orfaos = limpar_orfaos(con, spool)  # último passo: anexo que nenhuma mensagem aponta mais (a API só anula o ponteiro)
-    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()) + f" orfaos={orfaos} palavras_erro={palavras_erro}")
+    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items())
+          + f" purgadas={purgadas} orfaos={orfaos} palavras_erro={palavras_erro}")
     return 0
 
 

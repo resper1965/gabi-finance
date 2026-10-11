@@ -423,3 +423,18 @@ def test_i5_grupo_visto_entra_em_escuta_grupo_nao_aprovado(con, tmp_path):
     _msg(pasta, "g2", grupo=True, id_grupo="123@g.us", de="5511900000002@s.whatsapp.net")
     ingerir_spool(con, pasta, AGORA)
     assert [tuple(r) for r in con.execute("select id_grupo, nome, aprovado from escuta_grupo")] == [("123@g.us", None, 0)]
+
+
+def test_m6_purga_processadas_de_grupo_ou_nada_mais_velhas_que_retencao(con):
+    from gabi.escuta.caixa import purgar_antigas
+    def ins(ext, rec, estado="processada", tipo="nada", grupo=0, anexo=None):
+        con.execute("insert into escuta_msg(id_externo, de, grupo, recebida_em, estado, tipo, anexo_caminho) values (?,?,?,?,?,?,?)",
+                    (ext, "+5511912345678", grupo, rec, estado, tipo, anexo))
+    ins("velha-nada", "2026-09-01T10:00:00+00:00")
+    ins("velha-grupo", "2026-09-01T10:00:00+00:00", tipo="pedido", grupo=1)
+    ins("velha-pedido", "2026-09-01T10:00:00+00:00", tipo="pedido")
+    ins("velha-retida", "2026-09-01T10:00:00+00:00", estado="retida", tipo=None)
+    ins("velha-anexo", "2026-09-01T10:00:00+00:00", anexo="/x/anexos/a.pdf")
+    ins("recente", "2026-10-01T10:00:00+00:00")
+    assert purgar_antigas(con, "2026-10-11T13:00:00+00:00", dias=30) == 2
+    assert sorted(r[0] for r in con.execute("select id_externo from escuta_msg")) == ["recente", "velha-anexo", "velha-pedido", "velha-retida"]

@@ -1,14 +1,18 @@
 // Ouvinte do WhatsApp: aparelho vinculado SOMENTE LEITURA. Grava cada mensagem recebida no spool da escuta; não envia nada,
 // não marca como lida, não anuncia presença. Sem acesso a banco nem a segredos do brain.
 // Log: só contadores e estado. Nunca texto, número, nome ou payload do QR (o QR só aparece no terminal em --parear).
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gravarMensagem, tocarGatilho, nomeAnexo } from './spool.js';
 import { criarRecarregador, temRisco } from './palavras.js';
 
-const ANEXO_MAX_MB_PADRAO = 50;
+const ANEXO_MAX_MB_PADRAO = 25; // o mesmo teto do brain (escuta.anexo_max_mb)
+const ESPACO_MIN_MB_PADRAO = 2048;
 const DOWNLOAD_TIMEOUT_S_PADRAO = 60;
-const MIDIAS = ['documentMessage', 'imageMessage', 'audioMessage', 'videoMessage'];
+// Só documento e imagem são baixados (I8): áudio e vídeo enchem o disco e o brain não os usa; com legenda, só o texto é gravado.
+const MIDIAS = ['documentMessage', 'imageMessage'];
+const SO_LEGENDA = ['audioMessage', 'videoMessage'];
 const EMBRULHOS = ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'viewOnceMessageV2Extension', 'documentWithCaptionMessage'];
 const IGNORADOS = ['protocolMessage', 'reactionMessage', 'editedMessage', 'pollUpdateMessage', 'keepInChatMessage'];
 const EXTENSOES = {
@@ -25,6 +29,19 @@ export function extensaoDoMime(mime) {
 export function downloadTimeoutMs(env = process.env) {
   const s = Number(env.OUVINTE_DOWNLOAD_TIMEOUT_S);
   return (Number.isFinite(s) && s > 0 ? s : DOWNLOAD_TIMEOUT_S_PADRAO) * 1000;
+}
+
+export function espacoMinBytes(env = process.env) {
+  const mb = Number(env.OUVINTE_ESPACO_MIN_MB);
+  return (Number.isFinite(mb) && mb >= 0 && env.OUVINTE_ESPACO_MIN_MB !== undefined && env.OUVINTE_ESPACO_MIN_MB !== '' ? mb : ESPACO_MIN_MB_PADRAO) * 1024 * 1024;
+}
+
+// Bytes livres para o usuário na partição do spool; erro = 0 (na dúvida, não baixa).
+export function espacoLivreBytes(pasta) {
+  try {
+    const st = fs.statfsSync(pasta);
+    return Number(st.bavail) * Number(st.bsize);
+  } catch { return 0; }
 }
 
 export function anexoMaxBytes(env = process.env) {
@@ -67,8 +84,10 @@ export function extrair(m) {
   if (!de || typeof de !== 'string') return null;
   const lid = de.endsWith('@lid');
   const midiaChave = MIDIAS.find((k) => conteudo[k]);
-  const midia = midiaChave ? conteudo[midiaChave] : null;
-  const texto = conteudo.conversation ?? conteudo.extendedTextMessage?.text ?? midia?.caption ?? null;
+  const baixavel = midiaChave ? conteudo[midiaChave] : null;
+  const legendada = baixavel ?? conteudo[SO_LEGENDA.find((k) => conteudo[k])] ?? null;
+  const texto = conteudo.conversation ?? conteudo.extendedTextMessage?.text ?? legendada?.caption ?? null;
+  const midia = grupo ? null : baixavel; // I8: mídia de grupo nunca é baixada (só o texto/legenda)
   if (texto == null && !midia) return null;
   return {
     msg: { id_externo: key.id, de, grupo, id_grupo: grupo ? remoto : null, ...(lid ? { lid: true } : {}), recebida_em: isoComOffset(m.messageTimestamp), texto: texto === '' ? null : texto, anexo: null },
@@ -136,7 +155,7 @@ function gatilhoPadrao(pasta) {
 
 /**
  * ev: evento `messages.upsert` do Baileys. deps: {pasta, baixar(msg)->Readable|Buffer, palavras()->string[], anexoMaxBytes?,
- * downloadTimeoutMs?, contadores?, gravar?, gatilho?}. Só `notify` (mensagem nova). Erro em uma mensagem não impede as demais.
+ * downloadTimeoutMs?, contadores?, gravar?, gatilho?, espacoLivre?(pasta)->bytes, espacoMinBytes?}. Só `notify` (mensagem nova). Erro em uma mensagem não impede as demais.
  */
 export async function processarEvento(ev, deps) {
   const c = deps.contadores ?? {};
@@ -151,7 +170,9 @@ export async function processarEvento(ev, deps) {
       const x = extrair(m);
       if (!x) { soma('ignoradas'); continue; }
       let anexo = null;
-      if (x.midia) {
+      if (x.midia && (deps.espacoLivre ?? espacoLivreBytes)(deps.pasta) < (deps.espacoMinBytes ?? espacoMinBytes())) {
+        soma('anexo_sem_espaco'); // I8: disco abaixo do mínimo: grava a mensagem sem baixar
+      } else if (x.midia) {
         const tam = Number(x.midia.fileLength?.toString?.() ?? x.midia.fileLength);
         if (Number.isFinite(tam) && tam > max) soma('anexo_grande'); // tamanho ausente/0/estranho = desconhecido: o fluxo limita
         else {
@@ -233,7 +254,7 @@ export async function conectar(opts) {
   const palavras = criarRecarregador(path.join(pasta, 'palavras-risco.json'));
   const prazo = downloadTimeoutMs(env);
   const deps = {
-    pasta, palavras, contadores, anexoMaxBytes: anexoMaxBytes(env), downloadTimeoutMs: prazo,
+    pasta, palavras, contadores, anexoMaxBytes: anexoMaxBytes(env), downloadTimeoutMs: prazo, espacoMinBytes: espacoMinBytes(env),
     baixar: (m) => downloadMediaMessage(m, 'stream', { options: { timeout: prazo } }), // fluxo: o teto é aplicado durante a leitura
   };
   const est = { badSession: 0, tentativa: 0 };

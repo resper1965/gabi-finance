@@ -107,3 +107,23 @@ def test_arquivo_symlink_fifo_e_teto(spool, tmp_path):
     finally:
         signal.alarm(0)
     assert fora.read_bytes() == b"SEGREDO"
+
+
+def test_m8_leitura_limitada_recusa_arquivo_que_cresce_depois_do_fstat(spool, monkeypatch):
+    a = _arq(spool, dados=b"x" * 5)
+    real_fstat = os.fstat
+
+    class St:
+        def __init__(self, st):
+            self.st_mode, self.st_size = st.st_mode, 1   # fstat mente (arquivo cresceu depois)
+    monkeypatch.setattr(os, "fstat", lambda fd: St(real_fstat(fd)))
+    with pytest.raises(ss.AnexoGrande):
+        ss.abrir_anexo(spool, str(a), max_bytes=4)
+    assert ss.abrir_anexo(spool, str(a), max_bytes=5) == (b"x" * 5, "a.pdf")
+
+
+def test_i7_anexo_grande_e_runtimeerror_tipado(spool):
+    a = _arq(spool, dados=b"x" * 11)
+    with pytest.raises(ss.AnexoGrande):
+        ss.abrir_anexo(spool, str(a), max_bytes=10)
+    assert issubclass(ss.AnexoGrande, RuntimeError)

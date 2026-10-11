@@ -410,3 +410,18 @@ def test_i9_recusa_antes_do_envio_nao_grava_custo(amb, msg):
     with pytest.raises(ErroOpenRouter):
         w.completar("p", forte=False)
     assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 0
+
+
+def test_m6_i8_main_le_retencao_e_retida_dias_e_imprime_purgadas(amb, capsys, monkeypatch):
+    banco, spool, con = amb
+    vistos = []
+    real = prog.processar
+
+    def espia(*a, **kw):
+        vistos.append(kw.get("retida_dias"))
+        return real(*a, **kw)
+    monkeypatch.setattr(prog, "processar", espia)
+    con.execute("insert into escuta_msg(id_externo, de, grupo, recebida_em, estado, tipo) values ('v', ?, 0, '2026-08-01T10:00:00+00:00', 'processada', 'nada')", (N,))
+    _param(con, "escuta.retida_dias", 7)
+    assert prog.main(cliente=None, agora=AGORA) == 0
+    assert vistos == [7] and "purgadas=1" in capsys.readouterr().out

@@ -784,3 +784,47 @@ def test_i13_resposta_invalida_vira_nada_e_conta_falha(con):
     _msg(con)
     r = _rodar(con, FakeDestinos(), Quebra(resposta="isto não é json"))
     assert _msg_row(con)["tipo"] == "nada" and r["falhas"] == 1 and r["classificadas"] == 0
+
+
+# ---- I7: anexo acima do teto; I8: anexo apagado depois do envio e retidas antigas; ----
+def test_i7_anexo_grande_falha_terminal_avisa_e_apaga_o_anexo(con, tmp_path):
+    from gabi.escuta.spool_seguro import AnexoGrande
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    r = _rodar(con, FakeDestinos(erro_doc=AnexoGrande("anexo maior que o teto")), None, spool=spool)
+    m = _msg_row(con)
+    assert m["estado"] == "falhou" and m["anexo_caminho"] is None and not arq.exists() and r["falhas"] == 1
+    assert _avisos(con, "escuta_anexo_grande") == [{"numero": N, "nome": "Joana"}] and _avisos(con, "servico_falhou") == []
+
+
+@pytest.mark.parametrize("resp", [{"tipo": "saude", "confianca": 0.95, "campos": {}},
+                                  {"tipo": "pedido", "confianca": 0.95, "campos": {"favorecido": "Maria", "valor": 100}}])
+def test_i8_ativo_apaga_o_anexo_depois_de_enviar_pedido_e_saude(con, tmp_path, resp):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="segue", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(resp), spool=spool)
+    assert _msg_row(con)["estado"] == "processada" and _msg_row(con)["anexo_caminho"] is None and not arq.exists()
+
+
+def test_i8_registro_mantem_o_anexo_de_pedido(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="segue", anexo=str(arq))
+    _rodar(con, FakeDestinos(), _ped(), modo="registro", spool=spool)
+    assert arq.exists() and _msg_row(con)["anexo_caminho"] == str(arq)
+
+
+def test_i8_retida_de_nao_aprovado_mais_velha_que_retida_dias_e_apagada(con, tmp_path):
+    spool, arq = _anexo(tmp_path)
+    _msg(con, ext="velha", texto="SEGREDO", anexo=str(arq), rec="2026-09-20T09:00:00", estado="retida")
+    _msg(con, ext="nova", texto="oi", rec="2026-10-10T09:00:00", estado="retida")
+    _rodar(con, FakeDestinos(), None, spool=spool)
+    v = _msg_row(con, "velha")
+    assert (v["estado"], v["tipo"], v["texto"], v["anexo_caminho"]) == ("processada", "nada", None, None) and not arq.exists()
+    assert _msg_row(con, "nova")["estado"] == "retida" and _msg_row(con, "nova")["texto"] == "oi"
+    _msg(con, ext="v2", texto="x", rec="2026-10-05T09:00:00", estado="retida")
+    processar(con, FakeDestinos(), None, _orc(), AGORA, "ativo", retida_dias=3)
+    assert _msg_row(con, "v2")["estado"] == "processada"

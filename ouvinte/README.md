@@ -29,7 +29,7 @@ node src/ouvinte.js                     # roda para sempre (systemd: escuta-ouvi
 node --test                             # testes; não precisam do Baileys instalado
 ```
 
-Ambiente: `OUVINTE_SPOOL` (padrão `/var/lib/gabi-escuta-spool`), `OUVINTE_AUTH_DIR` (padrão `/var/lib/escuta-ouvinte/auth`), `OUVINTE_ANEXO_MAX_MB` (padrão 50) e `OUVINTE_DOWNLOAD_TIMEOUT_S` (padrão 60). O download é em fluxo: passou do teto (ou do prazo, ou tamanho declarado acima do teto) grava a mensagem sem anexo; nunca guarda o arquivo inteiro em memória antes de checar.
+Ambiente: `OUVINTE_SPOOL` (padrão `/var/lib/gabi-escuta-spool`), `OUVINTE_AUTH_DIR` (padrão `/var/lib/escuta-ouvinte/auth`), `OUVINTE_ANEXO_MAX_MB` (padrão 25, o mesmo teto do brain), `OUVINTE_ESPACO_MIN_MB` (padrão 2048) e `OUVINTE_DOWNLOAD_TIMEOUT_S` (padrão 60). O download é em fluxo: passou do teto (ou do prazo, ou tamanho declarado acima do teto) grava a mensagem sem anexo; nunca guarda o arquivo inteiro em memória antes de checar. Só documento e imagem de conversa privada são baixados: áudio e vídeo não (com legenda, só o texto), mídia de grupo nunca, e com menos de `OUVINTE_ESPACO_MIN_MB` livres na partição do spool nenhum anexo é baixado (contador `anexo_sem_espaco`). O `gatilho` é tocado no máximo 1 vez a cada 60 s. O brain apaga cada `<nome>.json` depois de gravá-lo no banco (não há `lidos/`): só a raiz do spool conta para "já gravado".
 O estado de pareamento fica em `OUVINTE_AUTH_DIR` (0700); apagar essa pasta despareia.
 
 ## Privacidade e limites

@@ -3,6 +3,8 @@ Description=Ouvinte do WhatsApp (aparelho vinculado, SOMENTE LEITURA): grava cad
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=0
+# Saída 78 (sessão encerrada, sem religar) põe a unit em failed: o template grava o aviso servico_falhou (escuta-ouvinte.service).
+OnFailure=gabi-brain-falha@%n.service
 
 [Service]
 Type=simple
@@ -13,7 +15,9 @@ UMask=0007
 WorkingDirectory=/opt/escuta-ouvinte
 Environment=OUVINTE_SPOOL=/var/lib/gabi-escuta-spool
 Environment=OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth
-Environment=OUVINTE_ANEXO_MAX_MB=50
+# Mesmo teto do brain (escuta.anexo_max_mb = 25); abaixo de OUVINTE_ESPACO_MIN_MB livres no spool, não baixa anexo.
+Environment=OUVINTE_ANEXO_MAX_MB=25
+Environment=OUVINTE_ESPACO_MIN_MB=2048
 ExecStart=/usr/bin/node /opt/escuta-ouvinte/src/ouvinte.js
 Restart=always
 RestartSec=10

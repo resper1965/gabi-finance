@@ -440,3 +440,10 @@ def test_instalar_instala_o_comparador_da_escuta():
     linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
     assert '"$AQUI/tools/comparar_escuta.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
     assert "PYTHONPATH=/opt/gabi-brain" in (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
+
+
+def test_i7_i8_m4_ouvinte_teto_25_espaco_minimo_e_onfailure():
+    u = (DEPLOY / "escuta-ouvinte.service").read_text()
+    assert "Environment=OUVINTE_ANEXO_MAX_MB=25\n" in u and "Environment=OUVINTE_ESPACO_MIN_MB=2048\n" in u
+    assert "OnFailure=gabi-brain-falha@%n.service\n" in u
+    assert "ReadWritePaths=/var/lib/gabi-brain\n" in (DEPLOY / "gabi-brain-falha@.service").read_text()   # o template grava no banco, como para os gabi-brain-*

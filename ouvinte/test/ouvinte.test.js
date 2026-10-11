@@ -17,7 +17,7 @@ const msg = (message, key = {}, extra = {}) => ({
   key: { remoteJid: PRIV, fromMe: false, id: 'ID' + Math.random().toString(36).slice(2), ...key }, messageTimestamp: TS, message, ...extra,
 });
 const ev = (...ms) => ({ type: 'notify', messages: ms });
-const deps = (p, o = {}) => ({ pasta: p, baixar: async () => Buffer.from('dados'), palavras: () => [], ...o });
+const deps = (p, o = {}) => ({ pasta: p, baixar: async () => Buffer.from('dados'), palavras: () => [], espacoLivre: () => Infinity, ...o });
 
 test('texto de conversation vira mensagem com recebida_em com offset', async () => {
   const p = pasta();
@@ -333,4 +333,50 @@ test('I6: rajada de mensagens de risco toca o gatilho uma vez só', async () => 
   assert.equal(c.gatilhos, 1);
   assert.equal(c.gatilhos_limitados, 2);
   assert.equal(lista(p).length, 3);
+});
+
+test('I7: teto padrão do anexo é 25 MB (igual ao brain)', async () => {
+  const { anexoMaxBytes } = await import('../src/ouvinte.js');
+  assert.equal(anexoMaxBytes({}), 25 * 1024 * 1024);
+});
+
+test('I8: áudio e vídeo não são baixados (sem legenda: ignorados; com legenda: só o texto)', async () => {
+  const p = pasta();
+  let chamadas = 0;
+  const d = deps(p, { baixar: async () => { chamadas++; return Buffer.from('x'); } });
+  await processarEvento(ev(msg({ audioMessage: { mimetype: 'audio/ogg', fileLength: 5 } }, { id: 'AU' }),
+    msg({ videoMessage: { mimetype: 'video/mp4', fileLength: 5, caption: 'olha' } }, { id: 'VI' })), d);
+  assert.equal(chamadas, 0);
+  const js = lista(p);
+  assert.deepEqual(js.map((j) => [j.id_externo, j.texto, j.anexo]), [['VI', 'olha', null]]);
+});
+
+test('I8: mídia de grupo não é baixada; o texto/legenda é gravado', async () => {
+  const p = pasta();
+  let chamadas = 0;
+  await processarEvento(ev(msg({ documentMessage: { mimetype: 'application/pdf', fileLength: 5, caption: 'ata' } },
+    { remoteJid: GRUPO, participant: PART, id: 'GD' })), deps(p, { baixar: async () => { chamadas++; return Buffer.from('x'); } }));
+  assert.equal(chamadas, 0);
+  const [j] = lista(p);
+  assert.equal(j.anexo, null);
+  assert.equal(j.texto, 'ata');
+});
+
+test('I8: abaixo do espaço livre mínimo não baixa e conta', async () => {
+  const p = pasta();
+  let chamadas = 0;
+  const c = {};
+  await processarEvento(ev(msg({ documentMessage: { mimetype: 'application/pdf', fileLength: 5 } }, { id: 'SP' })),
+    deps(p, { contadores: c, espacoLivre: () => 100 * 1024 * 1024, espacoMinBytes: 2048 * 1024 * 1024,
+      baixar: async () => { chamadas++; return Buffer.from('x'); } }));
+  assert.equal(chamadas, 0);
+  assert.equal(lista(p)[0].anexo, null);
+  assert.equal(c.anexo_sem_espaco, 1);
+});
+
+test('I8: espaço mínimo padrão é 2048 MB e statfs real é usado', async () => {
+  const { espacoMinBytes, espacoLivreBytes } = await import('../src/ouvinte.js');
+  assert.equal(espacoMinBytes({}), 2048 * 1024 * 1024);
+  assert.equal(espacoMinBytes({ OUVINTE_ESPACO_MIN_MB: '10' }), 10 * 1024 * 1024);
+  assert.ok(espacoLivreBytes(os.tmpdir()) > 0);
 });

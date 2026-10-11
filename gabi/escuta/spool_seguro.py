@@ -9,6 +9,10 @@ from pathlib import Path
 _FLAGS_DIR = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
+class AnexoGrande(RuntimeError):
+    """Anexo acima do teto: nunca poderá ser processado (a rodada marca `falhou`, avisa e apaga o arquivo)."""
+
+
 def _gancho() -> None:
     """Ponto de teste: roda depois de `anexos` aberto e antes de tocar no arquivo (simula a troca do ouvinte)."""
 
@@ -39,8 +43,9 @@ def _abrir_anexos(spool, anexo_caminho) -> tuple[int, str]:
 
 
 def abrir_anexo(spool, anexo_caminho, max_bytes: int | None = None) -> tuple[bytes, str]:
-    """Lê o anexo: só arquivo regular (O_NOFOLLOW; FIFO não bloqueia), tamanho checado no fd antes de ler. Devolve (bytes, nome).
-    RuntimeError: caminho inesperado, não regular ou acima do teto. OSError: não abriu."""
+    """Lê o anexo: só arquivo regular (O_NOFOLLOW; FIFO não bloqueia), tamanho checado no fd antes de ler e leitura limitada a
+    max_bytes+1. Devolve (bytes, nome). AnexoGrande (RuntimeError): acima do teto. RuntimeError: caminho inesperado ou não regular.
+    OSError: não abriu."""
     dfd, nome = _abrir_anexos(spool, anexo_caminho)
     fd = -1
     try:
@@ -50,10 +55,15 @@ def abrir_anexo(spool, anexo_caminho, max_bytes: int | None = None) -> tuple[byt
         if not stat.S_ISREG(st.st_mode):
             raise RuntimeError("anexo não é arquivo regular")
         if max_bytes is not None and st.st_size > max_bytes:
-            raise RuntimeError("anexo maior que o teto")
+            raise AnexoGrande("anexo maior que o teto")
         with os.fdopen(fd, "rb") as f:
             fd = -1
-            return f.read(), nome
+            if max_bytes is None:
+                return f.read(), nome
+            dados = f.read(max_bytes + 1)  # leitura limitada: o arquivo pode crescer depois do fstat (M8)
+        if len(dados) > max_bytes:
+            raise AnexoGrande("anexo maior que o teto")
+        return dados, nome
     finally:
         if fd >= 0:
             os.close(fd)

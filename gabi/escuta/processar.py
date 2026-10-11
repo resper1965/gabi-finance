@@ -116,7 +116,7 @@ def _precisa_modelo(con, m, palavras) -> bool:
     return estado_remetente(con, m["de"])[0] == "aprovado"
 
 
-def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, spool, sinais: dict, r=_SEM) -> None:
+def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, spool, sinais: dict, r=_SEM, retida_dias: int = 14) -> None:
     """Fase 2: roda dentro da transação da mensagem (begin immediate, relendo linha e remetente). `r` = classificação feita na fase 1. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
     Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
     id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
@@ -150,6 +150,11 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
         c["classificadas"] += 1
         return
     if not aprovado:
+        if _quando(m["recebida_em"]) < _quando(agora) - dt.timedelta(days=retida_dias):
+            # I8: retida de quem nunca foi aprovado não fica para sempre: texto e anexo saem, a mensagem vira 'nada'
+            _fechar(con, id_, agora, tipo="nada", apagar_texto=True, apagar_anexo=True)
+            apagar.append(anexo)
+            return
         avisar_novo(con, numero, agora)
         if m["estado"] == "nova":
             c["retidas"] += 1
@@ -182,7 +187,8 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
         if ativo:
             _exigir_dentro(m, spool)
             destinos.saude(con, dict(m), campos)
-        _fechar(con, id_, agora, tipo="saude", confianca=r.confianca, apagar_texto=True)
+            apagar.append(anexo)  # I8: enviado ao Paperless, a cópia local sai
+        _fechar(con, id_, agora, tipo="saude", confianca=r.confianca, apagar_texto=True, apagar_anexo=ativo)
         c["classificadas"] += 1
         return
     if ativo:
@@ -195,6 +201,10 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
                 return
             except ValueError as e:
                 raise _PedidoIncompleto() from e
+            apagar.append(anexo)  # I8: o anexo do pedido já foi ao Paperless
+            _fechar(con, id_, agora, tipo=tipo, confianca=r.confianca, campos=campos, apagar_anexo=True)
+            c["classificadas"] += 1
+            return
         elif tipo == "crise":
             destinos.crise(con, numero, nome, agora)
     _fechar(con, id_, agora, tipo=tipo, confianca=r.confianca, campos=campos)
@@ -245,7 +255,7 @@ def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca, spoo
 
 def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento: Orcamento, agora: str,
               modo: str = "registro", spool: Path | None = None, *, tempo_max_s: float | None = None,
-              monotonico=time.monotonic) -> dict:
+              monotonico=time.monotonic, retida_dias: int = 14) -> dict:
     """`tempo_max_s`: orçamento de tempo da rodada (I1b). Estourado, a rodada para limpa (`tempo=1`) e as demais ficam como estão.
     As mensagens com palavra de risco são fechadas PRIMEIRO, sem modelo, antes de qualquer chamada ao modelo (backlog não atrasa crise)."""
     if modo not in ("registro", "ativo"):
@@ -288,7 +298,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
                 m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
                 if m is None:
                     continue
-                _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais, r)
+                _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais, r, retida_dias)
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)
@@ -296,6 +306,20 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             m = con.execute("select de from escuta_msg where id=?", (id_,)).fetchone()
             numero = m["de"]
             _falhou(con, id_, agora, ("escuta_pedido_incompleto", {"numero": numero, "nome": _nome(con, numero, estado_remetente(con, numero)[1])}))
+            continue
+        except spool_seguro.AnexoGrande:
+            # I7: acima do teto nunca será processado: falhou terminal, aviso próprio e o arquivo sai do spool
+            log.warning("escuta: mensagem %s falhou (anexo acima do teto)", id_)
+            c["falhas"] += 1
+            row = con.execute("select de, grupo, anexo_caminho from escuta_msg where id=?", (id_,)).fetchone()
+            numero = row["de"]
+            with transacao(con):
+                con.execute("update escuta_msg set estado='falhou', processada_em=?, anexo_caminho=null"
+                            + (", texto=null" if sinais.get("saude") else "") + " where id=?", (agora, id_))
+                _aviso(con, "escuta_anexo_grande",
+                       {"numero": numero, "nome": None if row["grupo"] else _nome(con, numero, estado_remetente(con, numero)[1])}, agora)
+            if spool is not None and row["anexo_caminho"]:
+                spool_seguro.apagar_anexo(spool, row["anexo_caminho"])
             continue
         except TEMPORARIAS as e:
             # Paperless/ponte/rede fora: a transação foi desfeita (nada apagado, nada enviado ao banco); tenta de novo com espera.

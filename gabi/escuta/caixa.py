@@ -193,3 +193,15 @@ def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
     limite = time.time() - idade_h * 3600
     referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
     return _limpar_pasta(spool, "anexos", referenciados, limite, True) + _limpar_pasta(spool, "invalidos", set(), limite, False)
+
+
+def purgar_antigas(con, agora: str, *, dias: int = 30) -> int:
+    """M6: apaga linhas `processada` de grupo ou tipo 'nada' com recebida_em mais velha que `dias` (escuta_msg não cresce para sempre).
+    Linha que ainda aponta anexo fica (o anexo é tratado pelo runbook/limpeza de órfãos). Devolve só a contagem."""
+    d = dt.datetime.fromisoformat(agora)
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=BRT)
+    corte = (d - dt.timedelta(days=dias)).astimezone(dt.timezone.utc).replace(microsecond=0).isoformat()
+    with transacao(con):
+        return con.execute("delete from escuta_msg where estado='processada' and (grupo=1 or tipo='nada') and anexo_caminho is null "
+                           "and recebida_em < ?", (corte,)).rowcount
