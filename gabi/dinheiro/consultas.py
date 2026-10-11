@@ -18,6 +18,13 @@ def _m(centavos):
 
 
 def lancamento_dict(r) -> dict:
+    d = _lancamento_base(r)
+    if r["moeda"]:  # só quando a compra foi em moeda estrangeira
+        d.update({"moeda": r["moeda"], "valor_original": _m(r["valor_original_centavos"]), "convertido": bool(r["convertido"])})
+    return d
+
+
+def _lancamento_base(r) -> dict:
     return {"id": r["id"], "data": r["data"], "estabelecimento": r["estabelecimento"], "descricao": r["descricao_original"],
             "valor": _m(r["valor_centavos"]), "forma": r["forma"], "status": r["status"], "natureza": r["natureza"], "conta": r["conta_nome"],
             "categoria": {"id": r["categoria_id"], "nome": r["cat_nome"], "origem": r["categoria_origem"]},

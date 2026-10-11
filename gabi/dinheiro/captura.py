@@ -12,6 +12,7 @@ from pathlib import Path
 
 from gabi.bruto import gravar_bruto
 from gabi.dinheiro import caixa
+from gabi.dinheiro.moeda import valor_lancamento
 from gabi.dinheiro.valor import para_centavos
 from gabi.rodada import registrar_rodada
 
@@ -217,28 +218,25 @@ def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -
         data = (t.get("date") or "")[:10]
         if not data or data > hoje.isoformat():  # sem data ou parcela futura: não é lançamento
             continue
-        v = caixa.num(t.get("amount")) or 0
-        typ = str(t.get("type", "")).upper()
-        if typ == "DEBIT" and v > 0:
-            v = -v
-        if tipo == "CREDIT" and typ == "CREDIT" and v < 0:
-            v = -v
+        val = valor_lancamento(t, tipo)
         cc = t.get("creditCardMetadata") or {}
-        nat = caixa.natureza(tipo, t.get("description"), t.get("category"), v, donos)
+        nat = caixa.natureza(tipo, t.get("description"), t.get("category"), val.reais, donos)
         existia = con.execute("select 1 from lancamento where externo_id=?", (t["id"],)).fetchone() is not None
         con.execute(
             "insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, forma, fatura_id, "
-            "parcela, parcelas, data_compra, status, natureza, operacao, bruto_ref, categoria_banco) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "parcela, parcelas, data_compra, status, natureza, operacao, bruto_ref, categoria_banco, moeda, valor_original_centavos, convertido) "
+            "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "on conflict(externo_id) do update set conta_id=excluded.conta_id, data=excluded.data, valor_centavos=excluded.valor_centavos, "
             "descricao_original=excluded.descricao_original, estabelecimento=excluded.estabelecimento, forma=excluded.forma, "
             "fatura_id=excluded.fatura_id, parcela=excluded.parcela, parcelas=excluded.parcelas, data_compra=excluded.data_compra, "
             "status=excluded.status, natureza=excluded.natureza, operacao=excluded.operacao, "
-            "categoria_banco=excluded.categoria_banco",  # bruto_ref: onde foi visto pela 1ª vez
-            (conta_id, t["id"], data, para_centavos(round(v, 2)), t.get("description"), caixa.norm(t.get("description")) or None,
+            "categoria_banco=excluded.categoria_banco, moeda=excluded.moeda, valor_original_centavos=excluded.valor_original_centavos, "
+            "convertido=excluded.convertido",  # bruto_ref: onde foi visto pela 1ª vez
+            (conta_id, t["id"], data, val.centavos, t.get("description"), caixa.norm(t.get("description")) or None,
              (t.get("paymentData") or {}).get("paymentMethod"), cc.get("billId"), cc.get("installmentNumber"),
              cc.get("totalInstallments"), (cc.get("purchaseDate") or "")[:10] or None,
              "pending" if str(t.get("status") or "").upper() == "PENDING" else "posted", nat, t.get("operationType"), bruto_ref,
-             t.get("category")))
+             t.get("category"), val.moeda, val.original_centavos, 1 if val.convertido else 0))
         lidos += 1
         novos += 0 if existia else 1
     for f in faturas:

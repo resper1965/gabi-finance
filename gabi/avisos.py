@@ -78,6 +78,9 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
         "select nome, vencimento, valor_centavos from compromisso where vencimento=? and estado in ('aberto','previsto') order by nome", (hoje.isoformat(),))]
     if itens:
         novo("vence_hoje", hoje.isoformat(), {"itens": itens})
+    n = con.execute("select count(*) from lancamento where convertido=0").fetchone()[0]
+    if n:  # só a contagem: nunca valor nem descrição
+        novo("lancamento_sem_conversao", hoje.isoformat(), {"quantidade": n})
     return criados
 
 

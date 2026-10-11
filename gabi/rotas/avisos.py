@@ -49,6 +49,10 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return "Vence hoje", "; ".join(f"{i['nome']} {_brl(i.get('valor'))}" for i in itens) or "nada"
     if tipo == "servico_falhou":
         return "Serviço falhou", f"{p.get('unidade', '?')} terminou com erro"
+    if tipo == "lancamento_sem_conversao":
+        n = p.get("quantidade", 0)
+        return ("Compra em moeda estrangeira sem valor em reais",
+                f"{n} lançamento(s) em moeda estrangeira entraram pelo valor original, sem conversão; o valor em reais não veio do banco")
     if tipo == "exportacao_parada":
         return "Backup fora da VPS parado", p.get("motivo", "")
     if tipo == "caixa_reconectar" and p.get("provedor") == "linear":

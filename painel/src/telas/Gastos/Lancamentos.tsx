@@ -3,12 +3,13 @@ import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { api } from "../../lib/api";
 import { useFiltros } from "../../lib/filtros";
-import { dataCurta } from "../../lib/formato";
+import { dataCurta, originalEmReais } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
 import { useApi } from "../../lib/useApi";
+import { useOcultar } from "../../lib/ocultar";
 
 interface Campo { id: number | string | null; nome: string | null; origem: string | null }
-interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo }
+interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo; moeda?: string; valor_original?: string | null; convertido?: boolean }
 interface Sug { id: number; tipo: string; lancamento_id: number | null; payload: Record<string, number | string>; motivo: string }
 interface Pessoa { id: number | string; nome: string; papel?: string | null; dados?: Record<string, unknown> }
 interface ContaUso { apelido: string; usuarios?: string[] }
@@ -19,6 +20,7 @@ const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "
 export function Lancamentos() {
   const { conta } = useFiltros();
   const avisar = useToast();
+  const oculto = useOcultar();
   const [filtro, setFiltro] = useState<"esperando" | "todos">("esperando");
   const url = `/api/v1/lancamentos?limite=100${filtro === "esperando" ? "&pendente=para_quem" : ""}${conta ? `&conta=${encodeURIComponent(conta)}` : ""}`;
   const leitura = useApi<{ itens: Lanc[]; total: number }>(url);
@@ -80,7 +82,10 @@ export function Lancamentos() {
                       <strong style={{ fontSize: 14.5 }}>{l.estabelecimento}</strong>
                       <span style={{ fontSize: 12, color: "var(--ink2)" }}>{l.conta} · {l.categoria.nome ?? "sem categoria"}{l.empresa.nome ? ` · reembolso ${l.empresa.nome}` : ""}</span>
                     </span>
-                    <span style={{ font: "600 16px var(--font-heading)", fontVariantNumeric: "tabular-nums" }}><Valor valor={l.valor} /></span>
+                    <span style={{ font: "600 16px var(--font-heading)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
+                      <Valor valor={l.valor} />
+                      {!oculto && originalEmReais(l) && <span style={{ display: "block", font: "500 11.5px var(--font-body)", color: "var(--ink2)" }}>{originalEmReais(l)}</span>}
+                    </span>
                   </div>
                   <div role="group" aria-label={`Para quem: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {opcoesPara(l).map((p) => {
