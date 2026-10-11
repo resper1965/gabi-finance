@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Callable
 
+from gabi.avisos import VALE, triar
 from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
@@ -141,6 +142,9 @@ def avisos_pendentes(con, desde: dt.datetime | None) -> list[dict]:
         payload = json.loads(r["payload"])
         if r["tipo"].startswith("pedido_") and isinstance(payload, dict) and payload.get("canal") == CANAL_ESCUTA:
             continue  # I11: resposta a pedido da escuta nunca é entregue no canal
+        estado, payload = triar(con, r["id"], r["tipo"], payload, dt.datetime.now(dt.timezone.utc))  # mesma revalidação do Telegram
+        if estado != VALE:
+            continue  # resolvido (fechado) ou incerto (fica aberto): nunca vai ao Hermes
         saida.append({"id": r["id"], "tipo": r["tipo"], "payload": payload, "criado_em": r["criado_em"]})
     return saida
 

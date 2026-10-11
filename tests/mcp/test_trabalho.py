@@ -57,7 +57,7 @@ def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
 def test_aviso_so_e_marcado_entregue_apos_confirmacao_do_canal(tmp_path):
     from gabi.cobrar import pedidos
     c = _banco(tmp_path)
-    c.execute("insert into aviso(tipo, payload, criado_em) values ('conta_atrasada','{}','2026-10-10T05:00:00+00:00')")
+    c.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada','{}','2026-10-10T05:00:00+00:00')")
     assert len(pedidos.avisos_pendentes(c, None)) == 1 and len(pedidos.avisos_pendentes(c, None)) == 1  # ler não tira da fila
     pedidos.marcar_entregue(c, 1)
     assert pedidos.avisos_pendentes(c, None) == []
@@ -66,5 +66,5 @@ def test_aviso_so_e_marcado_entregue_apos_confirmacao_do_canal(tmp_path):
 def test_aviso_ja_enviado_pelo_telegram_direto_nao_volta_para_o_canal(tmp_path):
     from gabi.cobrar import pedidos
     c = _banco(tmp_path)
-    c.execute("insert into aviso(tipo, payload, criado_em, telegram_em) values ('conta_atrasada','{}','2026-10-10T05:00:00+00:00','2026-10-10T05:01:00+00:00')")
+    c.execute("insert into aviso(tipo, payload, criado_em, telegram_em) values ('rodada_parada','{}','2026-10-10T05:00:00+00:00','2026-10-10T05:01:00+00:00')")
     assert pedidos.avisos_pendentes(c, None) == []

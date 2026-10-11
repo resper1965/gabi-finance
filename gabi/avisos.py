@@ -40,33 +40,58 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
                        (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
 
 
-def ainda_vale(con, tipo: str, payload: dict) -> bool:
+VALE, RESOLVIDO, INCERTO = "vale", "resolvido", "incerto"
+
+
+def _item_aberto(con, i: dict) -> bool:
+    if i.get("id") is not None:
+        r = con.execute("select 1 from compromisso where id=? and estado in ('aberto','previsto')", (str(i["id"]),)).fetchone()
+    else:  # payload anterior à gravação do id: casa por nome+vencimento
+        r = con.execute("select 1 from compromisso where nome=? and vencimento=? and estado in ('aberto','previsto')", (i.get("nome"), i.get("vencimento"))).fetchone()
+    return r is not None
+
+
+def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     """Releitura (só leitura) da condição do aviso NO MOMENTO da entrega: o gabi.brain nunca anuncia o que deixou de ser verdade.
-    conta_atrasada: vale só se o compromisso (payload.chave) ainda existe e segue 'atrasado' (mesma condição do produtor; pago, a_conferir etc. = resolvido).
-    vence_hoje: vale se algum item (nome+vencimento) ainda está 'aberto'/'previsto'. cobrada_apos_cancelar: vale se a assinatura segue com status 'cancelar'.
-    Demais tipos: sempre valem."""
+    -> (estado, payload_atual). Estados: "vale" (pode enviar), "resolvido" (condição acabou: fechar SEM enviar), "incerto" (não enviar e NÃO fechar: reavalia na próxima rodada).
+    conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, debito_automatico, aberto/previsto por vencimento movido) = resolvido.
+    vence_hoje: o payload atual traz só os itens ainda 'aberto'/'previsto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
+    `atrasado` sai (resolvido): quem assume é o conta_atrasada. cobrada_apos_cancelar: vale se a assinatura segue em `cancelar`. Demais tipos: sempre valem."""
     if tipo == "conta_atrasada":
         r = con.execute("select estado from compromisso where id=?", (str(payload.get("chave")),)).fetchone()
-        return r is not None and r[0] == "atrasado"
+        if r is None or r[0] == "a_conferir":
+            return INCERTO, payload
+        return (VALE if r[0] == "atrasado" else RESOLVIDO), payload
     if tipo == "vence_hoje":
-        for i in payload.get("itens") or []:
-            r = con.execute("select 1 from compromisso where nome=? and vencimento=? and estado in ('aberto','previsto')", (i.get("nome"), i.get("vencimento"))).fetchone()
-            if r:
-                return True
-        return False
+        itens = [i for i in payload.get("itens") or [] if _item_aberto(con, i)]
+        return (VALE, {**payload, "itens": itens}) if itens else (RESOLVIDO, payload)
     if tipo == "cobrada_apos_cancelar":
-        return con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
-    return True
+        ok = con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
+        return (VALE if ok else RESOLVIDO), payload
+    return VALE, payload
+
+
+def ainda_vale(con, tipo: str, payload: dict) -> str:
+    return revalidar(con, tipo, payload)[0]
+
+
+def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> tuple[str, dict]:
+    """Passo único dos canais de entrega (Telegram e Hermes): revalida e, se "resolvido", fecha o aviso (telegram_em+entregue_em = fechado, NÃO enviado)."""
+    estado, atual = revalidar(con, tipo, payload)
+    if estado == RESOLVIDO:
+        ts = agora.astimezone(dt.timezone.utc).isoformat()
+        con.execute("update aviso set telegram_em=?, entregue_em=? where id=?", (ts, ts, aviso_id))
+    return estado, atual
 
 
 TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar")
 
 
 def _fechar_obsoletos(con, agora: dt.datetime) -> None:
-    """Fecha (entregue_em) o aviso ainda aberto cuja condição já resolveu: o painel não o mostra como pendente para sempre."""
+    """Fecha (entregue_em) o aviso ainda aberto cuja condição JÁ RESOLVEU; o incerto fica aberto. O painel não o mostra como pendente para sempre."""
     ts = agora.astimezone(dt.timezone.utc).isoformat()
     for r in con.execute("select id, tipo, payload from aviso where entregue_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
-        if not ainda_vale(con, r["tipo"], json.loads(r["payload"])):
+        if ainda_vale(con, r["tipo"], json.loads(r["payload"])) == RESOLVIDO:
             con.execute("update aviso set entregue_em=? where id=?", (ts, r["id"]))
 
 
@@ -136,8 +161,8 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
         if d:
             novo("cobrada_apos_cancelar", a["id"], {"nome": a["estabelecimento"], "ultimo_debito": d["data"], "valor": formatar(d["v"])})
 
-    itens = [{"nome": c["nome"], "valor": _valor(c["valor_centavos"]), "vencimento": c["vencimento"]} for c in con.execute(
-        "select nome, vencimento, valor_centavos from compromisso where vencimento=? and estado in ('aberto','previsto') order by nome", (hoje.isoformat(),))]
+    itens = [{"id": c["id"], "nome": c["nome"], "valor": _valor(c["valor_centavos"]), "vencimento": c["vencimento"]} for c in con.execute(
+        "select id, nome, vencimento, valor_centavos from compromisso where vencimento=? and estado in ('aberto','previsto') order by nome", (hoje.isoformat(),))]
     if itens:
         novo("vence_hoje", hoje.isoformat(), {"itens": itens})
     n = con.execute("select count(*) from lancamento where convertido=0").fetchone()[0]

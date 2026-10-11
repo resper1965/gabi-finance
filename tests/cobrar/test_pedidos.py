@@ -144,5 +144,45 @@ def test_i11_canal_escuta_nunca_gera_mensagem_nem_aviso_ao_solicitante(con, acao
 def test_i11_aviso_antigo_de_pedido_da_escuta_nao_sai_em_avisos_pendentes(con):
     con.execute("insert into aviso(tipo, payload, criado_em) values ('pedido_aprovado', ?, '2026-10-11T10:00:00+00:00')",
                 (json.dumps({"pedido_id": 9, "canal": "escuta", "solicitante": "whatsapp:+5511911110000", "mensagem": "Anotado"}),))
-    con.execute("insert into aviso(tipo, payload, criado_em) values ('conta_atrasada', '{}', '2026-10-11T10:00:00+00:00')")
-    assert [a["tipo"] for a in avisos_pendentes(con, None)] == ["conta_atrasada"]
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada', '{}', '2026-10-11T10:00:00+00:00')")
+    assert [a["tipo"] for a in avisos_pendentes(con, None)] == ["rodada_parada"]
+
+
+# ---- Hermes: avisos obsoletos não voltam (mesma revalidação do Telegram) ----
+def _av(con, tipo, payload, quando="2026-10-10T10:00:00+00:00"):
+    return con.execute("insert into aviso(tipo, payload, criado_em) values (?,?,?)", (tipo, json.dumps(payload), quando)).lastrowid
+
+
+def _comp(con, id_, estado, nome="Luz"):
+    con.execute("insert into compromisso(id, nome, vencimento, valor_centavos, estado) values (?,?, '2026-10-10', 100, ?)", (id_, nome, estado))
+
+
+def test_hermes_conta_resolvida_nao_volta_e_e_fechada(con):
+    _comp(con, "x:1", "pago")
+    i = _av(con, "conta_atrasada", {"chave": "x:1", "nome": "Luz", "vencimento": "2026-10-10", "valor": "1.00"})
+    assert avisos_pendentes(con, None) == []
+    r = con.execute("select telegram_em, entregue_em from aviso where id=?", (i,)).fetchone()
+    assert r["telegram_em"] and r["entregue_em"]
+
+
+def test_hermes_conta_incerta_nao_volta_e_fica_aberta(con):
+    _comp(con, "x:1", "a_conferir")
+    i = _av(con, "conta_atrasada", {"chave": "x:1", "nome": "Luz", "vencimento": "2026-10-10", "valor": "1.00"})
+    _av(con, "conta_atrasada", {"chave": "sumiu", "nome": "Y", "vencimento": "2026-10-10", "valor": "1.00"})
+    assert avisos_pendentes(con, None) == []
+    assert tuple(con.execute("select telegram_em, entregue_em from aviso where id=?", (i,)).fetchone()) == (None, None)
+
+
+def test_hermes_conta_ainda_atrasada_volta_e_escuta_atencao_nao_e_afetada(con):
+    _comp(con, "x:1", "atrasado")
+    _av(con, "conta_atrasada", {"chave": "x:1", "nome": "Luz", "vencimento": "2026-10-10", "valor": "1.00"})
+    _av(con, "escuta_atencao", {"numero": "+5511900000001", "nome": "Ana"})
+    assert [a["tipo"] for a in avisos_pendentes(con, None)] == ["conta_atrasada", "escuta_atencao"]
+
+
+def test_hermes_vence_hoje_devolve_payload_atual_so_com_itens_abertos(con):
+    _comp(con, "a:1", "pago"); _comp(con, "b:1", "aberto")
+    _av(con, "vence_hoje", {"chave": "2026-10-10", "itens": [{"id": "a:1", "nome": "Luz", "valor": "1", "vencimento": "2026-10-10"},
+                                                            {"id": "b:1", "nome": "Luz", "valor": "2", "vencimento": "2026-10-10"}]})
+    r = avisos_pendentes(con, None)
+    assert [i["id"] for i in r[0]["payload"]["itens"]] == ["b:1"]

@@ -97,6 +97,7 @@ def test_vence_hoje_agrupa_em_um_aviso(con):
     _comp(con, "c:2026-10", "Pago", "2026-10-16", "pago")
     gerar_avisos(con, AGORA)
     p = json.loads(con.execute("select payload from aviso where tipo='vence_hoje'").fetchone()[0])
+    assert [i["id"] for i in p["itens"]] == ["b:2026-10", "a:2026-10"]  # o produtor grava o id do compromisso em cada item
     assert [i["nome"] for i in p["itens"]] == ["Suzana", "Thiago"] and p["itens"][1]["valor"] == "3500.00"
 
 
@@ -218,3 +219,14 @@ def test_produtor_fecha_aviso_aberto_cuja_condicao_resolveu(con):
     gerar_avisos(con, AGORA)
     abertos = [json.loads(r[0])["nome"] for r in con.execute("select payload from aviso where entregue_em is null")]
     assert abertos == ["Outra"]
+
+
+def test_produtor_nao_fecha_aviso_incerto_a_conferir(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=6))
+    con.execute("update compromisso set estado='a_conferir'")
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where entregue_em is null").fetchone()[0] == 1
+    con.execute("delete from compromisso")
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where entregue_em is null").fetchone()[0] == 1
