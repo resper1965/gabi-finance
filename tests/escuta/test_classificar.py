@@ -169,3 +169,9 @@ def test_valor_limites():
 def test_valor_de_campo_aninhado_descartado():
     r = interpretar(_resp(favorecido={"a": 1}, forma=["pix"], motivo="ok"))
     assert r.campos == {"motivo": "ok"}
+
+
+def test_i1_crise_do_rapido_com_confianca_baixa_nao_vai_ao_forte():
+    cli = Falso(_resp("crise", 0.3), _resp("nada", 0.99))
+    r = classificar("oi", cli, _orc())
+    assert r.tipo == "crise" and len(cli.chamadas) == 1

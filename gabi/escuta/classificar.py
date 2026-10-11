@@ -104,9 +104,12 @@ def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento)
     c = _validar(resposta)
     if c is None:
         return _NADA
+    if c.tipo == "crise":  # spec §3.3: crise não depende da confiança; nunca vai ao forte (que poderia rebaixá-la a 'nada')
+        return c
     if c.confianca < LIMIAR:
         resposta = _chamar(cliente, prompt, True, orcamento)
         if resposta is None:
             return None
-        c = interpretar(resposta)
+        forte = interpretar(resposta)
+        c = c if (c.tipo == "crise" and forte.tipo == "nada") else forte  # defesa: crise do rápido nunca vira 'nada'
     return c

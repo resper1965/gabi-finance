@@ -1,6 +1,7 @@
 """Programa da escuta (timer de 5 min e gatilho por arquivo): ingere o spool do ouvinte, processa e imprime SÓ contagens.
 O modelo e o Paperless chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem chave.
-Todo parâmetro é DADO em `parametro` (JSON): escuta.modo, escuta.anexo_max_mb. Uso: python -m gabi.escuta"""
+Todo parâmetro é DADO em `parametro` (JSON): escuta.modo, escuta.anexo_max_mb, escuta.tempo_max_s.
+Uso: python -m gabi.escuta  |  python -m gabi.escuta --teste-crise (grava um aviso de crise de teste, nome TESTE)"""
 import datetime as dt
 import json
 import math
@@ -94,7 +95,32 @@ def cliente_da_ponte(socket_path: str | None):
         return None
 
 
-def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.datetime | None = None, relogio=None) -> int:
+def _tempo_max_s(con) -> float:
+    v = _parametro(con, "escuta.tempo_max_s", TEMPO_MAX_S)
+    return v if not isinstance(v, bool) and isinstance(v, (int, float)) and v > 0 else TEMPO_MAX_S
+
+
+TEMPO_MAX_S = 420  # abaixo do TimeoutStartSec=600 da unit: a rodada para limpa antes de ser morta
+
+
+def teste_crise(banco: Path, agora: dt.datetime) -> None:
+    """Grava UM aviso `escuta_atencao` de teste (número e nome "TESTE", sem texto) para conferir que a crise chega ao Telegram/Hermes."""
+    con = conectar(banco)
+    migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('escuta_atencao', ?, ?)",
+                (json.dumps({"numero": "TESTE", "nome": "TESTE"}), agora.astimezone(dt.timezone.utc).isoformat()))
+    con.close()
+
+
+def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.datetime | None = None, relogio=None,
+         argv: list[str] | None = None) -> int:
+    if argv and argv[0] == "--teste-crise":
+        teste_crise(Path(banco or os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db")), agora or dt.datetime.now(dt.timezone.utc))
+        print("escuta: aviso de crise de teste gravado (nome TESTE)")
+        return 0
+    if argv:
+        print("uso: python -m gabi.escuta [--teste-crise]", file=sys.stderr)
+        return 2
     spool = os.environ.get("GABI_ESCUTA_SPOOL")
     if not spool:
         print("ERRO: GABI_ESCUTA_SPOOL não configurado (pasta do spool do ouvinte)", file=sys.stderr)
@@ -120,7 +146,8 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
         palavras_erro = 1
     novas = ingerir_spool(con, spool, agora_s)
     try:
-        r = processar(con, destinos, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora_s, modo=_modo(con), spool=spool)
+        r = processar(con, destinos, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora_s, modo=_modo(con), spool=spool,
+                      tempo_max_s=_tempo_max_s(con))
     finally:
         if isinstance(cliente, ModeloComCusto):
             cliente.fechar()
@@ -130,4 +157,4 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(argv=sys.argv[1:]))

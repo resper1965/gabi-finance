@@ -361,3 +361,29 @@ def test_c1_depois_da_rodada_nenhum_texto_de_mensagem_fica_em_arquivo_do_spool(a
     for f in spool.rglob("*"):
         if f.is_file():
             assert b"SEGREDO" not in f.read_bytes(), f.name
+
+
+def test_i1_main_passa_o_orcamento_de_tempo_do_parametro(amb, monkeypatch):
+    banco, spool, con = amb
+    vistos = []
+    real = prog.processar
+
+    def espia(*a, **kw):
+        vistos.append(kw.get("tempo_max_s"))
+        return real(*a, **kw)
+    monkeypatch.setattr(prog, "processar", espia)
+    prog.main(cliente=None, agora=AGORA)
+    _param(con, "escuta.tempo_max_s", 100)
+    prog.main(cliente=None, agora=AGORA)
+    assert vistos == [420, 100]
+
+
+def test_i1_teste_crise_grava_um_aviso_de_teste_sem_spool(amb, monkeypatch, capsys):
+    banco, spool, con = amb
+    monkeypatch.delenv("GABI_ESCUTA_SPOOL")
+    assert prog.main(argv=["--teste-crise"]) == 0
+    r = con.execute("select tipo, payload from aviso").fetchall()
+    assert [(x["tipo"], json.loads(x["payload"])["nome"]) for x in r] == [("escuta_atencao", "TESTE")]
+    from gabi.rotas.avisos import descrever
+    assert "TESTE" in descrever("escuta_atencao", json.loads(r[0]["payload"]))[0]
+    assert "teste" in capsys.readouterr().out

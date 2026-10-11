@@ -1,6 +1,6 @@
 """Entrega dos avisos ao Telegram (G15): DESLIGADA por padrão. Só envia se TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID estiverem no ambiente
 (/etc/gabi/telegram.env, colocado pelo Ricardo: é a exceção à R2). Envia o texto em pt-BR do aviso (só nome, valor e datas: nunca CPF, conta ou chave PIX),
-no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos; marca `telegram_em` somente depois do 200. O token nunca entra na mensagem nem no log.
+no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos (exceto `escuta_atencao`, que vai primeiro e não expira); marca `telegram_em` somente depois do 200. O token nunca entra na mensagem nem no log.
 Uso: python -m gabi.telegram (timer). Consome: aviso, rotas.avisos.descrever."""
 import datetime as dt
 import json
@@ -34,7 +34,9 @@ def enviar_avisos(con, env, agora: dt.datetime, http=_http_real) -> int:
         return 0
     desde = (agora - JANELA).astimezone(dt.timezone.utc).isoformat()
     enviados = 0
-    for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null and criado_em>=? order by id limit ?", (desde, MAX_POR_RODADA)).fetchall():
+    # escuta_atencao (possível crise) vai primeiro e nunca é descartada por idade enquanto não lida (I1c)
+    for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null "
+                         "and (criado_em>=? or tipo='escuta_atencao') order by tipo!='escuta_atencao', id limit ?", (desde, MAX_POR_RODADA)).fetchall():
         titulo, texto = descrever(r["tipo"], json.loads(r["payload"]))
         if http(f"https://api.telegram.org/bot{token}/sendMessage", {"chat_id": chat, "text": f"{titulo}\n{texto}"}) == 200:
             con.execute("update aviso set telegram_em=? where id=?", (agora.astimezone(dt.timezone.utc).isoformat(), r["id"]))

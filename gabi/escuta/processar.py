@@ -1,9 +1,11 @@
-"""Rodada da escuta: uma passada ordenada por recebida_em, uma transação por mensagem.
+"""Rodada da escuta: mensagens com palavra de risco primeiro (sem modelo), depois as demais por recebida_em; uma transação por mensagem;
+orçamento de tempo por rodada (escuta.tempo_max_s).
 Ordem de decisão: grupo não aprovado, bloqueado/ignorado, palavra de risco (sem modelo, para todo não-bloqueado),
 fora da lista (retida, sem modelo), aprovado (modelo). Texto de mensagem nunca vai a log, exceção ou aviso."""
 import json
 import logging
 import sqlite3
+import time
 from pathlib import Path
 
 from gabi.cobrar.cadastro import dados
@@ -167,15 +169,23 @@ def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca, spoo
 
 
 def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento: Orcamento, agora: str,
-              modo: str = "registro", spool: Path | None = None) -> dict:
+              modo: str = "registro", spool: Path | None = None, *, tempo_max_s: float | None = None,
+              monotonico=time.monotonic) -> dict:
+    """`tempo_max_s`: orçamento de tempo da rodada (I1b). Estourado, a rodada para limpa (`tempo=1`) e as demais ficam como estão.
+    As mensagens com palavra de risco são fechadas PRIMEIRO, sem modelo, antes de qualquer chamada ao modelo (backlog não atrasa crise)."""
     if modo not in ("registro", "ativo"):
         raise ValueError(f"modo inválido: {modo!r}")
-    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0, "ocupado": 0}
+    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0, "ocupado": 0, "tempo": 0}
     erro_geral = False
     palavras = palavras_risco(con)
-    ids = [(r["id"], r["estado"]) for r in con.execute(
-        "select id, estado from escuta_msg where estado in ('nova','retida') order by recebida_em, id")]
-    for id_, estado_ini in ids:
+    inicio = monotonico()
+    linhas = [(r["id"], r["estado"], tem_risco(r["texto"] or "", palavras)) for r in con.execute(
+        "select id, estado, texto from escuta_msg where estado in ('nova','retida') order by recebida_em, id")]
+    linhas.sort(key=lambda x: not x[2])  # estável: passada de risco (sem modelo) primeiro, depois a ordem de chegada
+    for id_, estado_ini, risco in linhas:
+        if not risco and tempo_max_s is not None and monotonico() - inicio > tempo_max_s:
+            c["tempo"] = 1  # orçamento de tempo da rodada: o resto fica para o próximo disparo
+            break
         if estado_ini == "nova":
             c["novas"] += 1
         apagar: list = []

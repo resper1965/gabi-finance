@@ -647,3 +647,39 @@ def test_operationalerror_dentro_do_corpo_continua_virando_falhou(con):
     r = _rodar(con, D(), _ped())
     assert r["falhas"] == 1 and r["ocupado"] == 0 and _msg_row(con)["estado"] == "falhou"
     assert _avisos(con, "servico_falhou") == [{"unidade": "gabi-brain-escuta"}]
+
+
+class _Relogio:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_i1_crise_vem_antes_do_backlog_e_orcamento_de_tempo_para_limpo(con):
+    _aprovado(con)
+    _risco(con, "socorro")
+    for i in range(3):
+        _msg(con, ext=f"b{i}", texto="paga a Maria 100", rec=f"2026-10-11T0{i}:00:00")
+    _msg(con, ext="crise", texto="socorro", rec="2026-10-11T09:30:00")
+    rel = _Relogio()
+
+    class Lento(FakeModelo):
+        def completar(self, prompt, *, forte):
+            rel.t += 300
+            return super().completar(prompt, forte=forte)
+    cli, d = Lento(), FakeDestinos()
+    r = processar(con, d, cli, _orc(), AGORA, "ativo", tempo_max_s=420, monotonico=rel)
+    assert d.crises == [(N, "Joana")] and _msg_row(con, "crise")["tipo"] == "crise"
+    assert r["tempo"] == 1 and cli.chamadas == 2   # 0 s → chama; 300 s → chama; 600 s > 420 → para
+    estados = [_msg_row(con, f"b{i}")["estado"] for i in range(3)]
+    assert estados == ["processada", "processada", "nova"]
+
+
+def test_i1_sem_orcamento_de_tempo_processa_tudo(con):
+    _aprovado(con)
+    for i in range(3):
+        _msg(con, ext=f"b{i}", texto="oi")
+    r = _rodar(con, FakeDestinos(), FakeModelo())
+    assert r["tempo"] == 0 and r["classificadas"] == 3
