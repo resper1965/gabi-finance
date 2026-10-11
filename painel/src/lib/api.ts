@@ -27,4 +27,5 @@ export const api = {
   post: <T>(url: string, corpo: unknown = {}) => chamar<T>("POST", url, corpo),
   patch: <T>(url: string, corpo: unknown) => chamar<T>("PATCH", url, corpo),
   put: <T>(url: string, corpo: unknown) => chamar<T>("PUT", url, corpo),
+  delete: <T>(url: string) => chamar<T>("DELETE", url),
 };

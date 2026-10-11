@@ -4,6 +4,7 @@ import argparse
 import os
 
 from gabi.fontes.ambiente import fontes_do_ambiente
+from gabi.fontes.google_contatos import google_contatos_do_ambiente
 from gabi.fontes.openrouter import MODELO_FORTE_PADRAO, Limites, MODELO_RAPIDO_PADRAO, OpenRouter
 from gabi.fontes.ponte import Servidor
 
@@ -24,6 +25,7 @@ def main(argv=None):
     os.environ.pop("GABI_FONTES_SOCKET", None)  # aqui as fontes são as reais
     fontes = {n: f() for n, f in fontes_do_ambiente().items()}
     fontes["openrouter"] = openrouter_do_ambiente()
+    fontes["google_contatos"] = google_contatos_do_ambiente(os.environ)
     print("fontes configuradas:", {n: o is not None for n, o in fontes.items()}, "chave do modelo:", bool(os.environ.get("OPENROUTER_API_KEY")), flush=True)  # nunca os valores
     with Servidor(args.socket, fontes) as srv:
         srv.serve_forever()

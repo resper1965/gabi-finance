@@ -1,16 +1,19 @@
 """Painel da escuta (/api/v1/escuta): fila de remetentes, grupos e parâmetros. Só o boss.
 A API NÃO toca o spool: ignorar/bloquear só anulam ponteiros no banco; o timer da escuta apaga os arquivos órfãos.
-Número, nome e palavras de risco nunca vão para log; a auditoria de parâmetros leva só os nomes das chaves. Consome: escuta.remetentes, escuta.caixa."""
+Número, nome e palavras de risco nunca vão para log; a auditoria de parâmetros leva só os nomes das chaves. Contatos do Google: só nome e telefone, lidos pela ponte do serviço de fontes (a API não tem rede). Consome: escuta.remetentes, escuta.caixa, escuta.contatos."""
 import datetime as dt
+import hashlib
 import json
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.envelope import envelope
+from gabi.escuta import contatos as ct
 from gabi.escuta import remetentes as rem
 from gabi.escuta.caixa import normalizar_telefone
+from gabi.fontes.google_contatos import ErroGoogleContatos
 from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
@@ -183,5 +186,117 @@ async def gravar_parametros(request: Request, ident: Identidade = Depends(exigir
             con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')",
                         (dt.datetime.now(dt.timezone.utc).isoformat(), ident.login, "escuta: alterou parâmetros " + ", ".join(sorted(CHAVES[k] for k in novos))))
         return envelope(con, _parametros(con), agora=_agora(request))
+    finally:
+        con.close()
+
+
+# ---------------- contatos do Google (só nome e telefone) ----------------
+MAX_TRAZER = 100
+
+
+def _audit(con, quem: str, o_que: str) -> None:
+    con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')", (dt.datetime.now(dt.timezone.utc).isoformat(), quem, o_que))
+
+
+def _numeros_de_pessoas(con) -> set[str]:
+    saida = set()
+    for p in con.execute("select dados from pessoa where excluido_em is null"):
+        for c in dados(p).get("canais") or []:
+            if isinstance(c, str) and c.startswith("whatsapp:") and (n := normalizar_telefone(c[9:])):
+                saida.add(n)
+    return saida
+
+
+@router.post("/contatos/sincronizar")
+def sincronizar_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve só contagens. Ponte fora do ar = 503."""
+    fabrica = request.app.state.fontes.get("google_contatos")
+    fonte = fabrica() if fabrica else None
+    if fonte is None:
+        raise erro(503, "fonte_indisponivel", "os contatos do Google não estão configurados")
+    con = _con(request)
+    try:
+        try:
+            r = ct.sincronizar(con, ct.contas_contatos(con), fonte.listar)
+        except ErroGoogleContatos as e:
+            falha = str(e)
+        else:
+            _audit(con, ident.login, f"escuta: sincronizou contatos (total {r['total']}, inválidos {r['invalidos']})")
+            return envelope(con, r, agora=_agora(request))
+        raise erro(503, "fonte_indisponivel", falha)
+    finally:
+        con.close()
+
+
+@router.get("/contatos")
+def listar_contatos(request: Request, busca: str = "", limite: int = 50, offset: int = 0):
+    """Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado."""
+    limite, offset = min(max(limite, 1), 200), max(offset, 0)
+    con = _con(request)
+    try:
+        itens, q = ct.listar_unicos(con), busca.strip().casefold()
+        if q:
+            digitos = "".join(ch for ch in q if ch.isdigit())
+            itens = [i for i in itens if q in (i["nome"] or "").casefold() or (digitos and digitos in i["telefone"])]
+        pessoas = _numeros_de_pessoas(con)
+        pagina = [{**i, "ja_e_pessoa": i["telefone"] in pessoas} for i in itens[offset:offset + limite]]
+        return envelope(con, {"itens": pagina, "total": len(itens), "limite": limite, "offset": offset}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.get("/contatos/so-na-ness.csv")
+def contatos_so_na_ness(request: Request):
+    """CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino."""
+    con = _con(request)
+    try:
+        texto = ct.csv_google(ct.so_na(con, ct.conta_origem(con), ct.conta_destino(con)))
+    finally:
+        con.close()
+    return Response(texto, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="contatos-so-na-ness.csv"', "Cache-Control": "no-store"})
+
+
+@router.post("/contatos/trazer")
+async def trazer_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir."""
+    corpo = _corpo(await _json(request))
+    tels = corpo.get("telefones")
+    if not isinstance(tels, list) or not tels or len(tels) > MAX_TRAZER or not all(isinstance(t, str) for t in tels):
+        raise erro(400, "requisicao_invalida", f"telefones deve ser uma lista de 1 a {MAX_TRAZER} textos")
+    con = _con(request)
+    try:
+        criadas = 0
+        with transacao(con):
+            existentes = _numeros_de_pessoas(con)
+            vistos: set[str] = set()
+            nomes = {i["telefone"]: i["nome"] for i in ct.listar_unicos(con)}
+            for bruto in tels:
+                n = normalizar_telefone(bruto)
+                if n is None or n not in nomes or n in existentes or n in vistos:
+                    continue
+                vistos.add(n)
+                pid = "ct-" + hashlib.sha1(n.encode()).hexdigest()[:12]
+                if con.execute("select 1 from pessoa where id=?", (pid,)).fetchone():
+                    continue  # id de uma pessoa excluída: não ressuscita
+                con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')",
+                            (pid, nomes[n] or n, json.dumps({"canais": [f"whatsapp:{n}"]}, ensure_ascii=False)))
+                criadas += 1
+            ignoradas = len(tels) - criadas
+            _audit(con, ident.login, f"escuta: trouxe {criadas} contato(s) como pessoa ({ignoradas} ignorado(s))")
+        return envelope(con, {"criadas": criadas, "ignoradas": ignoradas}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.delete("/contatos")
+def apagar_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam)."""
+    con = _con(request)
+    try:
+        with transacao(con):
+            n = con.execute("delete from contato_google").rowcount
+            _audit(con, ident.login, f"escuta: apagou contatos do Google ({n} linha(s))")
+        return envelope(con, {"apagados": n}, agora=_agora(request))
     finally:
         con.close()

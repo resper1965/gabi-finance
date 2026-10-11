@@ -181,3 +181,146 @@ def test_parametros_validos_e_auditoria_sem_palavras(cli, banco):
     assert len(linhas) == 2 and all(x["quem"] == "boss@x.com" for x in linhas)
     todo = " ".join(x["o_que"] for x in linhas)
     assert "palavras_risco" in todo and "me matar" not in todo and "sumir" not in todo
+
+
+# ---------------- contatos do Google ----------------
+from gabi.fontes.google_contatos import ErroGoogleContatos  # noqa: E402
+
+GMAIL, NESS = "resper@gmail.com", "resper@ness.com.br"
+U = "/api/v1/escuta/contatos"
+
+
+class _Contatos:
+    def __init__(self, dados=None, erro=None):
+        self.dados, self.erro = dados or {}, erro
+
+    def listar(self, conta):
+        if self.erro:
+            raise self.erro
+        return self.dados.get(conta, [])
+
+
+def _cli_contatos(banco, fonte):
+    return TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"google_contatos": (lambda: fonte)}),
+                      client=("127.0.0.1", 50000))
+
+
+DADOS = {GMAIL: [{"nome": "Ana", "telefone": "(11) 91234-5678"}],
+         NESS: [{"nome": "Zé", "telefone": "11 98888-7777"}, {"nome": "Ana ness", "telefone": "11912345678"}, {"nome": "Mau", "telefone": "12"}]}
+
+
+@pytest.fixture
+def cc(banco):
+    return _cli_contatos(banco, _Contatos(DADOS))
+
+
+def _sinc(cc):
+    r = cc.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}")
+    assert r.status_code == 200, r.text
+    return r.json()["dados"]
+
+
+def test_contatos_so_boss(cc):
+    for m, url in (("get", U), ("get", f"{U}/so-na-ness.csv"), ("post", f"{U}/sincronizar"), ("post", f"{U}/trazer"), ("delete", U)):
+        assert getattr(cc, m)(url, headers=VIP).status_code == 403
+        assert getattr(cc, m)(url).status_code == 401
+
+
+def test_sincronizar_devolve_so_contagens(cc):
+    d = _sinc(cc)
+    assert d == {"contas": {GMAIL: 1, NESS: 3}, "total": 2, "invalidos": 1}
+
+
+@pytest.mark.parametrize("fonte", [None, _Contatos(erro=ErroGoogleContatos("serviço de fontes indisponível"))])
+def test_sincronizar_503_quando_a_ponte_cai_ou_nao_ha_fonte(banco, fonte):
+    cli = _cli_contatos(banco, fonte)
+    r = cli.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}")
+    assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
+
+
+def test_sincronizar_sem_chave_google_contatos_nas_fontes_e_503(banco):
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={}), client=("127.0.0.1", 50000))
+    assert cli.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}").status_code == 503
+
+
+def test_listar_contatos_pagina_busca_e_ja_e_pessoa(cc, banco):
+    _sinc(cc)
+    c = conectar(banco)
+    c.execute("insert into pessoa(id, nome, dados) values ('p9','Ana',?)", (json.dumps({"canais": ["whatsapp:+5511912345678"]}),))
+    c.close()
+    d = cc.get(U, headers=BOSS).json()["dados"]
+    assert d["total"] == 2
+    assert d["itens"] == [{"nome": "Ana", "telefone": "+5511912345678", "contas": [GMAIL, NESS], "ja_e_pessoa": True},
+                          {"nome": "Zé", "telefone": "+5511988887777", "contas": [NESS], "ja_e_pessoa": False}]
+    assert [i["nome"] for i in cc.get(f"{U}?busca=zé", headers=BOSS).json()["dados"]["itens"]] == ["Zé"]
+    assert [i["nome"] for i in cc.get(f"{U}?busca=8888", headers=BOSS).json()["dados"]["itens"]] == ["Zé"]
+    p = cc.get(f"{U}?limite=1&offset=1", headers=BOSS).json()["dados"]
+    assert p["total"] == 2 and [i["nome"] for i in p["itens"]] == ["Zé"]
+
+
+def test_csv_so_na_ness(cc):
+    _sinc(cc)
+    r = cc.get(f"{U}/so-na-ness.csv", headers=BOSS)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert r.headers["content-disposition"] == 'attachment; filename="contatos-so-na-ness.csv"'
+    assert r.text == "Name,Phone 1 - Value\r\nZé,+5511988887777\r\n"
+
+
+def test_csv_usa_as_contas_dos_parametros(cc, banco):
+    _sinc(cc)
+    c = conectar(banco)
+    c.execute("insert into parametro(chave, valor) values ('escuta.conta_origem_contatos', ?), ('escuta.conta_destino_contatos', ?)",
+              (json.dumps(GMAIL), json.dumps(NESS)))
+    c.close()
+    assert cc.get(f"{U}/so-na-ness.csv", headers=BOSS).text == "Name,Phone 1 - Value\r\n"
+
+
+def _trazer(cc, tels):
+    return cc.post(f"{U}/trazer", headers={**BOSS, **JSON}, content=json.dumps({"telefones": tels}))
+
+
+def test_trazer_cria_pessoa_sem_aprovar(cc, banco):
+    _sinc(cc)
+    r = _trazer(cc, ["+5511988887777", "+5511900000000", "lixo"])
+    assert r.status_code == 200 and r.json()["dados"] == {"criadas": 1, "ignoradas": 2}
+    c = conectar(banco)
+    ps = c.execute("select nome, dados from pessoa").fetchall()
+    assert len(ps) == 1 and ps[0]["nome"] == "Zé"
+    d = json.loads(ps[0]["dados"])
+    assert d == {"canais": ["whatsapp:+5511988887777"]}
+    assert "escuta_aprovada" not in d and "pode_pedir" not in d
+    o = [x for x in _decisoes(banco) if "trouxe" in x]
+    assert len(o) == 1 and "9888" not in o[0] and "Zé" not in o[0]
+    assert c.execute("select count(*) from escuta_remetente").fetchone()[0] == 0
+    c.close()
+
+
+def test_trazer_pula_quem_ja_e_pessoa_e_duplicados(cc, banco):
+    _sinc(cc)
+    c = conectar(banco)
+    c.execute("insert into pessoa(id, nome, dados) values ('p9','Ana',?)", (json.dumps({"canais": ["whatsapp:11912345678"]}),))
+    c.close()
+    r = _trazer(cc, ["+5511912345678", "11 98888-7777", "+5511988887777"])
+    assert r.json()["dados"] == {"criadas": 1, "ignoradas": 2}
+
+
+@pytest.mark.parametrize("corpo", [{}, {"telefones": []}, {"telefones": "x"}, {"telefones": [1]}, {"telefones": ["+5511912345678"] * 101}])
+def test_trazer_corpo_invalido_400(cc, corpo):
+    r = cc.post(f"{U}/trazer", headers={**BOSS, **JSON}, content=json.dumps(corpo))
+    assert r.status_code == 400
+
+
+def test_trazer_100_cabe(cc, banco):
+    _sinc(cc)
+    assert _trazer(cc, ["+5511988887777"] * 100).json()["dados"] == {"criadas": 1, "ignoradas": 99}
+
+
+def test_delete_apaga_tudo_e_audita(cc, banco):
+    _sinc(cc)
+    r = cc.delete(U, headers=BOSS)
+    assert r.status_code == 200 and r.json()["dados"] == {"apagados": 3}
+    c = conectar(banco)
+    assert c.execute("select count(*) from contato_google").fetchone()[0] == 0
+    c.close()
+    assert sum("apagou contatos" in o for o in _decisoes(banco)) == 1
+    assert cc.get(U, headers=BOSS).json()["dados"]["itens"] == []

@@ -10,6 +10,7 @@ import socket
 import socketserver
 from pathlib import Path
 
+from gabi.fontes.google_contatos import ErroGoogleContatos
 from gabi.fontes.nibo import ErroNibo
 from gabi.fontes.openrouter import ErroOpenRouter
 from gabi.fontes.paperless import ErroPaperless
@@ -18,10 +19,11 @@ MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar"}),
     "openrouter": frozenset({"completar"}),
+    "google_contatos": frozenset({"listar"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
 }
-ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo, "openrouter": ErroOpenRouter}
+ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo, "openrouter": ErroOpenRouter, "google_contatos": ErroGoogleContatos}
 
 
 def _codificar(v):
@@ -74,8 +76,8 @@ def _atender(fontes: dict, bruto: bytes) -> dict:
         if hasattr(r, "__next__"):
             r = list(r)
         return {"ok": _codificar(r)}
-    except (ErroPaperless, ErroNibo, ErroOpenRouter) as e:
-        tipo = next(c.__name__ for c in (ErroPaperless, ErroNibo, ErroOpenRouter) if isinstance(e, c))  # subclasses (TagInvalida) cruzam como a base
+    except tuple(ERROS.values()) as e:
+        tipo = next(c.__name__ for c in ERROS.values() if isinstance(e, c))  # subclasses (TagInvalida) cruzam como a base
         return {"erro": {"tipo": tipo, "msg": str(e)}}
     except Exception as e:  # nunca vaza traço (pode conter URL/cabeçalho)
         return {"erro": {"tipo": "interno", "msg": type(e).__name__}}
@@ -126,7 +128,7 @@ class Ponte:
     def configurada(self) -> bool:
         try:
             return bool(self._chamar("estado").get(self._fonte))
-        except (ErroPaperless, ErroNibo, ErroOpenRouter):
+        except tuple(ERROS.values()):
             return False
 
     def __getattr__(self, nome):
@@ -147,3 +149,19 @@ class PonteModelo:
                 or isinstance(r[1], bool) or not isinstance(r[1], (int, float))):
             raise ErroOpenRouter("resposta inválida do serviço de fontes")
         return r[0], float(r[1])
+
+
+class PonteContatos:
+    """Contatos do Google lidos no serviço de fontes (único com rede e segredos). `listar(conta) -> [{nome, telefone}]`; sem credenciais a fonte não está configurada."""
+
+    def __init__(self, caminho):
+        self._ponte = Ponte(caminho, "google_contatos")
+
+    def configurada(self) -> bool:
+        return self._ponte.configurada()
+
+    def listar(self, conta: str) -> list[dict]:
+        r = self._ponte._chamar("listar", (conta,))
+        if not isinstance(r, list) or not all(isinstance(x, dict) for x in r):
+            raise ErroGoogleContatos("resposta inválida do serviço de fontes")
+        return r

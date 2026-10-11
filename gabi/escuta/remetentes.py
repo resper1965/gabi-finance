@@ -8,6 +8,7 @@ from pathlib import Path
 from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.escuta.caixa import normalizar_telefone
+from gabi.escuta.contatos import nome_do_numero
 
 PAPEIS = ("familia", "prestador", "cobranca")
 
@@ -51,8 +52,7 @@ def estado_remetente(con, numero: str) -> tuple[str, str | None]:
 
 
 def _nome_contato(con, numero: str) -> str | None:
-    r = con.execute("select nome from contato_google where telefone=? and nome is not null order by conta limit 1", (numero,)).fetchone()
-    return r["nome"] if r else None
+    return nome_do_numero(con, numero)
 
 
 def fila(con) -> list[dict]:

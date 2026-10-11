@@ -371,3 +371,25 @@ def test_spool_da_escuta_fica_fora_da_arvore_0700_com_setgid_e_grupo():
 
 def test_service_da_escuta_sem_limite_de_partidas_para_o_path_nao_se_desligar():
     assert "StartLimitIntervalSec=0" in _ler("gabi-brain-escuta.service").split("[Service]")[0]
+
+
+# ---------------- contatos do Google ----------------
+def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
+    srv, t = _ler("gabi-brain-contatos.service"), _ler("gabi-brain-contatos.timer")
+    assert "-m gabi.escuta.contatos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv
+    assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-contatos.service" in t
+    assert hasattr(importlib.import_module("gabi.escuta.contatos"), "main")
+    for nome in ("gabi-brain-contatos.service", "gabi-brain-contatos.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert not any("contatos" in l for l in ligadas)
+
+
+def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
+    assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in _ler("gabi-brain-fontes.service")

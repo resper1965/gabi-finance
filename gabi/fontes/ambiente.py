@@ -11,7 +11,7 @@ def fontes_do_ambiente() -> dict:
     """Com GABI_FONTES_SOCKET (API e MCP, sem rede) as fontes vivem no serviço gabi-brain-fontes; sem ela, direto do ambiente."""
     caminho = os.environ.get("GABI_FONTES_SOCKET")
     if caminho:
-        return {n: (lambda n=n: (lambda p: p if p.configurada() else None)(Ponte(caminho, n))) for n in ("nibo", "paperless")}
+        return {n: (lambda n=n: (lambda p: p if p.configurada() else None)(Ponte(caminho, n))) for n in ("nibo", "paperless", "google_contatos")}
     return {
         "nibo": lambda: NiboEscrita(os.environ["NIBO_TOKEN"]) if os.environ.get("NIBO_TOKEN") else None,
         "paperless": lambda: Paperless(os.environ["PAPERLESS_URL"], os.environ["PAPERLESS_TOKEN"])

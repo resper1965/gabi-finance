@@ -1804,6 +1804,131 @@
     "summary": "Entregas"
    }
   },
+  "/api/v1/escuta/contatos": {
+   "delete": {
+    "description": "Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam).",
+    "operationId": "apagar_contatos_api_v1_escuta_contatos_delete",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Apagar Contatos"
+   },
+   "get": {
+    "description": "Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado.",
+    "operationId": "listar_contatos_api_v1_escuta_contatos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "busca",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Busca",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limite",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "title": "Limite",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Contatos"
+   }
+  },
+  "/api/v1/escuta/contatos/sincronizar": {
+   "post": {
+    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve só contagens. Ponte fora do ar = 503.",
+    "operationId": "sincronizar_contatos_api_v1_escuta_contatos_sincronizar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Sincronizar Contatos"
+   }
+  },
+  "/api/v1/escuta/contatos/so-na-ness.csv": {
+   "get": {
+    "description": "CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino.",
+    "operationId": "contatos_so_na_ness_api_v1_escuta_contatos_so_na_ness_csv_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Contatos So Na Ness"
+   }
+  },
+  "/api/v1/escuta/contatos/trazer": {
+   "post": {
+    "description": "Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir.",
+    "operationId": "trazer_contatos_api_v1_escuta_contatos_trazer_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Trazer Contatos"
+   }
+  },
   "/api/v1/escuta/grupos": {
    "get": {
     "description": "Grupos de WhatsApp vistos pela escuta e se já foram aprovados.",

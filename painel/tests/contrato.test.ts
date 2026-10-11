@@ -12,7 +12,7 @@ test("telas so usam rotas que existem em docs/openapi.json", () => {
   for (const f of arquivos(join(__dirname, "..", "src")).filter((x) => /\.tsx?$/.test(x))) {
     for (const linha of readFileSync(f, "utf-8").split("\n")) {
       for (const m of linha.matchAll(/[`"'](\/api\/v1\/[^`"'?]*)/g)) {
-        const metodo = /api\.post/.test(linha) ? "POST" : /api\.patch/.test(linha) ? "PATCH" : /api\.put/.test(linha) ? "PUT" : "GET";
+        const metodo = /api\.post/.test(linha) ? "POST" : /api\.patch/.test(linha) ? "PATCH" : /api\.put/.test(linha) ? "PUT" : /api\.delete/.test(linha) ? "DELETE" : "GET";
         usos.push(`${metodo} ${m[1].replace(/\$\{[^}]*\}/g, "x")} (${f.split("/src/")[1]})`);
       }
     }
