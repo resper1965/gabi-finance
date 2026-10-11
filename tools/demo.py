@@ -68,7 +68,7 @@ def semear(caminho: Path) -> None:
         c.execute("insert into saldo(conta_id, em, saldo_centavos) values (1,?,?)", (em, v))
     c.execute("insert into saldo(conta_id, em, saldo_centavos) values (2,'2026-10-08T14:00:00', -47590)")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
-    for f in ('notas-nibo', 'comprovantes-paperless', 'trabalho'):  # fontes que o envelope espera (trabalho: há caixa liberada)
+    for f in ('notas-nibo', 'comprovantes-paperless', 'trabalho', 'agenda'):  # fontes que o envelope espera (trabalho: há caixa liberada; agenda: há fonte liberada)
         c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values ('UBER','{\"categoria_id\": 2}',1,'2026-10-01T10:00:00','boss@x.com')")
     c.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values ('PADARIA','{\"categoria_id\": 1}',0,'2026-10-02T10:00:00','boss@x.com')")

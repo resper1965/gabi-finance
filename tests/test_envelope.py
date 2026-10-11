@@ -184,3 +184,24 @@ def test_open_finance_conferida_ha_4_dias_manda_no_dados_ate(con):
     _r(con, "open-finance", 96, conferida=1)
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is True and e["dados_ate"] == "2026-10-07T12:00:00Z"
+
+
+# ---------------- agenda: fonte própria de frescor ----------------
+def test_agenda_conta_so_com_fonte_liberada_e_pela_propria_rodada(con):
+    _producao(con)
+    _r(con, "agenda", 1, status="ok")
+    assert "agenda" not in _estados(envelope(con, None, AGORA))  # ninguém liberado: não conta
+    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["agenda"] == "ok" and "trabalho" not in _estados(e)  # liberar agenda NÃO liga o 'trabalho' (e-mail)
+    con.execute("delete from rodada where fonte='agenda'")
+    _r(con, "agenda", 13, status="ok")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["agenda"] == "parada" and e["desatualizado"] is True
+
+
+def test_agenda_liberada_sem_nenhuma_rodada_aparece_nao_conferida(con):
+    _producao(con)
+    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["agenda"] == "nao_conferida" and e["desatualizado"] is True

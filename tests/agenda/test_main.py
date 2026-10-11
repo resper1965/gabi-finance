@@ -75,3 +75,27 @@ def test_main_uma_ok_e_outra_falha_sai_0(banco):
 def test_main_sem_socket_sai_2(banco, monkeypatch, capsys):
     monkeypatch.delenv("GABI_FONTES_SOCKET", raising=False)
     assert main(banco) == 2 and "GABI_FONTES_SOCKET" in capsys.readouterr().err
+
+
+def _rodadas(banco):
+    return [tuple(r) for r in conectar(banco).execute("select fonte, status, lidos, novos from rodada where fonte='agenda' order by id")]
+
+
+def test_main_registra_a_rodada_da_agenda_para_o_frescor(banco):
+    _fonte(banco, "a@x.com")
+    main(banco, listar=lambda *a: ResultadoEventos([_ev("1", "x"), _ev("2", "y")], [], "T", False))
+    assert _rodadas(banco) == [("agenda", "ok", 2, 2)]
+
+
+def test_main_todas_as_fontes_falhando_grava_rodada_em_erro_mesmo_saindo_0(banco):
+    _fonte(banco, "a@x.com")
+
+    def listar(conta, *a):
+        raise ErroGoogleOAuth(f"conta não autorizada: {conta}")
+    assert main(banco, listar=listar) == 0
+    assert _rodadas(banco) == [("agenda", "erro", 0, 0)]
+
+
+def test_main_sem_fonte_liberada_grava_rodada_ok(banco):
+    main(banco, listar=lambda *a: pytest.fail("não deveria listar"))
+    assert _rodadas(banco) == [("agenda", "ok", 0, 0)]

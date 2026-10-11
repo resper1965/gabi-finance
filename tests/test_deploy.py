@@ -472,3 +472,8 @@ def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
     assert not any("agenda" in l for l in ligadas)
+
+
+def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
+    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")

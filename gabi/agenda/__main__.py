@@ -9,6 +9,7 @@ from pathlib import Path
 
 from gabi.agenda.sincronizar import sincronizar
 from gabi.db import conectar, migrar
+from gabi.rodada import registrar_rodada
 
 
 def main(banco: Path | None = None, *, listar=None) -> int:
@@ -27,7 +28,15 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     try:
-        r = sincronizar(con, listar, dt.datetime.now(dt.timezone.utc).isoformat())
+        with registrar_rodada(con, "agenda") as rod:  # alimenta o frescor do envelope; rodada ok sem fonte liberada
+            r = sincronizar(con, listar, dt.datetime.now(dt.timezone.utc).isoformat())
+            rod.lidos = sum(v.get("lidos", 0) for v in r.values())
+            rod.novos = sum(v.get("gravados", 0) for v in r.values())
+            falhas = sum(1 for v in r.values() if "erro" in v)
+            if r and falhas == len(r):  # nenhuma fonte lida: não vale como "dados frescos"
+                rod.falha = f"todas as {len(r)} fonte(s) falharam"
+            elif falhas:
+                rod.aviso = f"{falhas} fonte(s) com falha"
         contas = {x["id"]: x["conta"] for x in con.execute("select id, conta from agenda_fonte")}
     finally:
         con.close()

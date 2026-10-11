@@ -15,6 +15,7 @@ FONTES = {
     "notas-nibo": dt.timedelta(hours=30),               # diária 06:40
     "comprovantes-paperless": dt.timedelta(hours=30),   # diária 07:00
     "trabalho": dt.timedelta(hours=12),                 # a cada 15 min, 06-22h (a pausa noturna chega a 8 h); só conta se estiver em uso
+    "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
 }
 COM_CONFERENCIA = ("open-finance",)
@@ -44,16 +45,24 @@ def proxima_rodada(agora: dt.datetime) -> str:
     raise AssertionError("inalcançável")
 
 
+def _em_uso(con, tabela: str) -> bool:
+    """Há linha liberada (estado 'sim') em `tabela`; a tabela pode faltar em bancos antigos."""
+    try:
+        return bool(con.execute(f"select 1 from {tabela} where estado='sim' limit 1").fetchone())
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
+        return False
+
+
 def _trabalho_em_uso(con) -> bool:
-    """`trabalho` só vale como fonte quando há caixa de e-mail ou fonte de agenda liberada (estado 'sim'); tabelas podem faltar em bancos antigos."""
-    for tabela in ("caixa_email", "agenda_fonte"):
-        try:
-            if con.execute(f"select 1 from {tabela} where estado='sim' limit 1").fetchone():
-                return True
-        except sqlite3.OperationalError as e:
-            if "no such table" not in str(e):
-                raise
-    return False
+    """`trabalho` (e-mail e tarefas) só vale como fonte com caixa de e-mail liberada."""
+    return _em_uso(con, "caixa_email")
+
+
+def _agenda_em_uso(con) -> bool:
+    """`agenda` só vale como fonte com alguma fonte de agenda liberada: liberar agenda não liga o `trabalho`."""
+    return _em_uso(con, "agenda_fonte")
 
 
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
@@ -62,6 +71,7 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     nomes = {r[0] for r in con.execute("select distinct fonte from rodada")}
     nomes |= set(ESPERADAS)
     nomes.add("trabalho") if _trabalho_em_uso(con) else nomes.discard("trabalho")
+    nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
     nomes = sorted(n for n in nomes if not (n in FONTES and FONTES[n] is None))
     for nome in nomes:
         conta = FONTES.get(nome) is not None

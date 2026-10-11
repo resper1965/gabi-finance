@@ -7,6 +7,11 @@
  "fontes": [
   {
    "estado": "ok",
+   "nome": "agenda",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
    "nome": "comprovantes-paperless",
    "ultima": "2026-10-08T17:00:30Z"
   },
