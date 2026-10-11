@@ -281,7 +281,7 @@ def test_ponte_agenda_valida_a_forma_da_resposta(sock_agenda, conta):
 
 
 def test_fonte_ausente_sem_credencial(tmp_path):
-    assert google_do_ambiente({}) == {"google_contatos": None, "google_agenda": None}
+    assert google_do_ambiente({}) == {"google_contatos": None, "google_agenda": None, "google_email": None}
     ok = google_do_ambiente({"GOOGLE_CLIENT_ID": "i", "GOOGLE_CLIENT_SECRET": "s"})
     assert ok["google_agenda"] is not None and ok["google_contatos"] is not None
     srv = Servidor(tmp_path / "n.sock", {"google_agenda": None})
@@ -298,3 +298,121 @@ def test_fonte_ausente_sem_credencial(tmp_path):
 def test_ponte_agenda_indisponivel_e_erro_tipado(tmp_path):
     with pytest.raises(ErroGoogleOAuth):
         PonteAgenda(tmp_path / "nada.sock").listar_eventos("a@x.com", "primary", None, JANELA_AG)
+
+
+# ---- e-mail (Gmail) do Google pela ponte ----
+from gabi.fontes.google_email import ResultadoEmail  # noqa: E402
+from gabi.fontes.ponte import PonteEmail  # noqa: E402
+
+SEGREDO_EM = "refresh-SEGREDO-email"
+
+
+class _FalsaEmail:
+    def listar_novos(self, conta, history_id, janela_dias):
+        if conta == "ruim@x.com":
+            raise ErroGoogleOAuth("conta não autorizada: ruim@x.com")
+        if conta == "boom@x.com":
+            raise RuntimeError(SEGREDO_EM)
+        if conta == "malformada@x.com":
+            return ["isto", "não", "é", "dict"]
+        if conta == "faltando@x.com":
+            return {"mensagens": []}
+        if conta == "tipo@x.com":
+            return {"mensagens": ["texto"], "novo_history_id": "1", "recarga_completa": False}
+        return {"mensagens": [{"externo_id": "a1"}], "novo_history_id": "H", "recarga_completa": False}
+
+    def lixeira(self, conta, ids):
+        if conta == "malformada@x.com":
+            return {"a1": "talvez"}
+        return {i: "ok" for i in ids}
+
+    def restaurar(self, conta, ids):
+        return {i: "ok" for i in ids}
+
+    def enviados_recentes(self, conta, dias):
+        if conta == "malformada@x.com":
+            return [1, 2]
+        return ["bia@x.com"]
+
+    def segredo(self):
+        return SEGREDO_EM
+
+
+@pytest.fixture
+def sock_email(tmp_path):
+    srv = Servidor(tmp_path / "em.sock", {"google_email": _FalsaEmail(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield tmp_path / "em.sock"
+    srv.shutdown(); srv.server_close()
+
+
+def test_ponte_permite_so_os_quatro_metodos_do_email(sock_email):
+    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes"})
+    assert ERROS["google_email"] is ErroGoogleOAuth
+    with pytest.raises(ErroGoogleOAuth) as e:
+        Ponte(sock_email, "google_email")._chamar("segredo")
+    assert SEGREDO_EM not in str(e.value) and "metodo_proibido" in str(e.value)
+
+
+def test_ponte_email_cruza_resultado_tipado(sock_email):
+    p = PonteEmail(sock_email)
+    r = p.listar_novos("a@x.com", None, 14)
+    assert isinstance(r, ResultadoEmail) and r.mensagens == [{"externo_id": "a1"}] and r.novo_history_id == "H" and r.recarga_completa is False
+    assert p.lixeira("a@x.com", ["a1", "b2"]) == {"a1": "ok", "b2": "ok"}
+    assert p.restaurar("a@x.com", ["a1"]) == {"a1": "ok"}
+    assert p.enviados_recentes("a@x.com", 365) == ["bia@x.com"]
+
+
+def test_erro_tipado_do_email_atravessa_sem_segredo(sock_email):
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteEmail(sock_email).listar_novos("ruim@x.com", None, 14)
+    assert str(e.value) == "conta não autorizada: ruim@x.com"
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteEmail(sock_email).listar_novos("boom@x.com", None, 14)
+    assert SEGREDO_EM not in str(e.value)
+
+
+@pytest.mark.parametrize("conta", ["malformada@x.com", "faltando@x.com", "tipo@x.com"])
+def test_ponte_email_valida_a_forma_da_resposta(sock_email, conta):
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteEmail(sock_email).listar_novos(conta, None, 14)
+    assert "resposta inválida" in str(e.value)
+
+
+def test_ponte_email_valida_lixeira_e_enviados(sock_email):
+    p = PonteEmail(sock_email)
+    for chamada in (lambda: p.lixeira("malformada@x.com", ["a1"]), lambda: p.enviados_recentes("malformada@x.com", 365)):
+        with pytest.raises(ErroGoogleOAuth) as e:
+            chamada()
+        assert "resposta inválida" in str(e.value)
+
+
+def test_fonte_de_email_ausente_sem_credencial(tmp_path):
+    assert google_do_ambiente({}) == {"google_contatos": None, "google_agenda": None, "google_email": None}
+    ok = google_do_ambiente({"GOOGLE_CLIENT_ID": "i", "GOOGLE_CLIENT_SECRET": "s"})
+    assert ok["google_email"] is not None
+    srv = Servidor(tmp_path / "n.sock", {"google_email": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        p = PonteEmail(tmp_path / "n.sock")
+        assert p.configurada() is False
+        with pytest.raises(ErroGoogleOAuth):
+            p.listar_novos("a@x.com", None, 14)
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ponte_email_indisponivel_e_erro_tipado(tmp_path):
+    with pytest.raises(ErroGoogleOAuth):
+        PonteEmail(tmp_path / "nada.sock").lixeira("a@x.com", ["a1"])
+
+
+def test_ambiente_com_socket_tem_a_fabrica_do_email(tmp_path, monkeypatch):
+    srv = Servidor(tmp_path / "f.sock", {"google_email": _FalsaEmail()})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("GABI_FONTES_SOCKET", str(tmp_path / "f.sock"))
+        fonte = fontes_do_ambiente()["google_email"]()
+        assert isinstance(fonte, PonteEmail) and fonte.enviados_recentes("a@x.com", 30) == ["bia@x.com"]
+    finally:
+        srv.shutdown(); srv.server_close()

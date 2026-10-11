@@ -5,6 +5,7 @@ import os
 
 from gabi.fontes.ambiente import fontes_do_ambiente
 from gabi.fontes.google_agenda import google_agenda_do_ambiente
+from gabi.fontes.google_email import google_email_do_ambiente
 from gabi.fontes.google_contatos import google_contatos_do_ambiente
 from gabi.fontes.openrouter import MODELO_FORTE_PADRAO, Limites, MODELO_RAPIDO_PADRAO, OpenRouter
 from gabi.fontes.ponte import Servidor
@@ -20,8 +21,9 @@ def openrouter_do_ambiente(env=None) -> OpenRouter | None:
 
 
 def google_do_ambiente(env) -> dict:
-    """Fontes do Google (contatos e agenda) compartilham o cliente OAuth; None = não configurada."""
-    return {"google_contatos": google_contatos_do_ambiente(env), "google_agenda": google_agenda_do_ambiente(env)}
+    """Fontes do Google (contatos, agenda e e-mail) compartilham o cliente OAuth; None = não configurada."""
+    return {"google_contatos": google_contatos_do_ambiente(env), "google_agenda": google_agenda_do_ambiente(env),
+            "google_email": google_email_do_ambiente(env)}
 
 
 def main(argv=None):
