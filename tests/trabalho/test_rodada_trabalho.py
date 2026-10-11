@@ -161,3 +161,19 @@ def test_linear_com_chave_recusada_pede_reconectar(con):
     r = rodar(con, lambda c: None, AGORA, LinearFalso(erro=ErroLinear("POST /graphql -> 401")))
     assert r.falhas == 1
     assert json.loads(con.execute("select payload from aviso").fetchone()[0])["endereco"] == "Linear"
+
+
+def test_todas_as_caixas_falhando_grava_a_rodada_como_erro(con):
+    _caixa(con, "a@ionic.health", "graph")
+    _caixa(con, "b@bekaa.eu", "graph")
+    r = rodar(con, lambda c: GraphFalso(ErroGraph("GET /x -> 503")), AGORA)
+    assert r.falhas == 2 and r.caixas == 2
+    row = con.execute("select status, erro from rodada").fetchone()
+    assert row["status"] == "erro" and "2" in row["erro"]
+
+
+def test_falha_parcial_continua_ok(con):
+    _caixa(con, "a@ionic.health", "graph")
+    _caixa(con, "b@bekaa.eu", "google")
+    rodar(con, lambda c: GraphFalso(ErroGraph("GET /x -> 503")) if c["provedor"] == "graph" else GoogleFalso(), AGORA)
+    assert con.execute("select status from rodada").fetchone()[0] == "ok"

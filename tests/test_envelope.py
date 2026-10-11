@@ -1,5 +1,6 @@
 import datetime as dt
 import pathlib
+import sqlite3
 import re
 
 from gabi.envelope import HORAS_RODADAS, proxima_rodada
@@ -111,3 +112,75 @@ def test_saldos_e_exportacao_nao_entram(con):
     _r(con, "open-finance-saldos", 99)
     _r(con, "exportacao", 99)
     assert "exportacao" not in _estados(envelope(con, None, AGORA))
+
+
+# ---------------- fontes esperadas, tabela única, minors ----------------
+def test_banco_novo_so_com_open_finance_lista_as_esperadas_como_nao_conferidas(con):
+    _r(con, "open-finance", 1, conferida=1)
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is True
+    assert _estados(e) == {"comprovantes-paperless": "nao_conferida", "notas-nibo": "nao_conferida", "open-finance": "ok"}
+    _r(con, "notas-nibo", 1)
+    _r(con, "comprovantes-paperless", 1)
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is False and set(_estados(e).values()) == {"ok"}
+
+
+def test_trabalho_em_uso_sem_nenhuma_rodada_aparece_nao_conferida(con):
+    _producao(con)
+    con.execute("delete from rodada where fonte='trabalho'")
+    con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["trabalho"] == "nao_conferida" and e["desatualizado"] is True
+
+
+def test_fonte_nao_declarada_aparece_mas_nunca_desatualiza(con):
+    _producao(con)
+    _r(con, "futura", 900)
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["futura"] == "ok" and e["desatualizado"] is False
+    _r(con, "futura", 1, status="erro")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["futura"] == "erro" and e["desatualizado"] is False
+
+
+def test_toda_fonte_registrada_no_codigo_esta_declarada_em_FONTES():
+    import ast
+    from gabi.envelope import FONTES
+    achadas = set()
+    for f in (pathlib.Path(__file__).parent.parent / "gabi").rglob("*.py"):
+        for n in ast.walk(ast.parse(f.read_text())):
+            if isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) == "registrar_rodada" \
+                    and len(n.args) >= 2 and isinstance(n.args[1], ast.Constant):
+                achadas.add(n.args[1].value)
+    assert achadas and achadas <= set(FONTES), achadas - set(FONTES)
+
+
+def test_trabalho_fora_com_tabelas_vazias_ou_agenda_fonte_ausente(con):
+    _producao(con)
+    assert "trabalho" not in _estados(envelope(con, None, AGORA))  # caixa_email vazia, agenda_fonte inexistente
+
+
+def test_erro_de_banco_que_nao_e_tabela_ausente_nao_e_engolido(con):
+    from gabi.envelope import _trabalho_em_uso
+
+    class Trava:
+        def execute(self, *a):
+            raise sqlite3.OperationalError("database is locked")
+    with pytest.raises(sqlite3.OperationalError):
+        _trabalho_em_uso(Trava())
+
+
+def test_limite_diario_e_30h(con):
+    _producao(con)
+    con.execute("delete from rodada where fonte='notas-nibo'")
+    _r(con, "notas-nibo", 31)
+    assert _estados(envelope(con, None, AGORA))["notas-nibo"] == "parada"
+
+
+def test_open_finance_conferida_ha_4_dias_manda_no_dados_ate(con):
+    _producao(con)
+    con.execute("delete from rodada where fonte='open-finance'")
+    _r(con, "open-finance", 96, conferida=1)
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is True and e["dados_ate"] == "2026-10-07T12:00:00Z"

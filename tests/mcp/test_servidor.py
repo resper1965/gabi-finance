@@ -43,6 +43,8 @@ def banco(tmp_path):
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'padrao', 'boleto', ?, '{}')", (cid, cid.split(':')[0], nome, vu, vu, v, est))
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
+    for f in ('notas-nibo', 'comprovantes-paperless'):  # fontes esperadas do envelope
+        c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.close()
     return p
 

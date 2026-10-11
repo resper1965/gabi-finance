@@ -69,7 +69,7 @@ def _concluir_pedidas(con, caixa: dict, cli) -> None:
 
 
 def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime, linear=None) -> ResumoTrabalho:
-    caixas = msgs = evs = ts = falhas = entregas = 0
+    caixas = msgs = evs = ts = falhas = entregas = falhas_caixa = 0
     with registrar_rodada(con, "trabalho") as r:
         for c in [dict(x) for x in con.execute("select * from caixa_email where estado='sim' and le=1 order by id")]:
             caixas += 1
@@ -77,6 +77,7 @@ def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime, 
                 m, e, t = _processar(con, c, cliente_de)
             except (ErroGraph, ErroGoogle, PermissionError) as ex:
                 falhas += 1
+                falhas_caixa += 1
                 if isinstance(ex, PermissionError) or CREDENCIAL.search(str(ex)):
                     _novo(con, agora, "caixa_reconectar", c["id"], {"endereco": c["endereco"], "provedor": c["provedor"]})
                 continue
@@ -93,4 +94,6 @@ def rodar(con, cliente_de: Callable[[dict], object | None], agora: dt.datetime, 
         r.lidos, r.novos = caixas, msgs
         if falhas:
             r.aviso = f"{falhas} caixa(s) com falha"
+        if caixas and falhas_caixa == caixas:  # nenhuma caixa lida: a rodada não vale como "dados frescos"
+            r.falha = f"todas as {caixas} caixa(s) falharam"
     return ResumoTrabalho(caixas, msgs, evs, ts, falhas, entregas)

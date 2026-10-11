@@ -2,17 +2,24 @@
 import datetime as dt
 import sqlite3
 
-IGNORADAS = ("backup", "importacao-staging", "open-finance-saldos", "exportacao")  # não são fontes que se "confere" (saldos têm rodada própria; exportação é semanal)
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
-# Fontes COM conceito de conferência: só rodada `conferida=1` avança o frescor (hoje, só os extratos; ver dinheiro/conferencia.marcar_conferida).
-# As demais nunca recebem conferida=1: valem pela última rodada `status='ok'`, contra o limite da própria agenda (timers em deploy/).
-COM_CONFERENCIA = ("open-finance",)
-LIMITE_FONTE = {
-    "notas-nibo": dt.timedelta(hours=36),               # diária 06:40
-    "comprovantes-paperless": dt.timedelta(hours=36),   # diária 07:00
-    "trabalho": dt.timedelta(hours=12),                 # a cada 15 min, 06-22h (a pausa noturna chega a 8 h)
+# FONTE ÚNICA de verdade do frescor: {fonte (nome em rodada.fonte): limite | None}. Toda fonte passada a registrar_rodada() DEVE estar aqui
+# (tests/test_envelope.py varre o código): quem adiciona uma fonte escolhe o limite.
+#   limite  -> conta em dados_ate/desatualizado; estado "parada" se a última rodada válida for mais velha que o limite.
+#   None    -> ignorada (não é dado servido: backup, exportação semanal, saldos com rodada própria, staging).
+#   ausente -> listada (ultima/estado ok|erro) mas NUNCA conta em dados_ate/desatualizado.
+# Só as fontes em COM_CONFERENCIA têm conceito de conferência: valem pela última rodada `conferida=1` (dinheiro/conferencia.marcar_conferida).
+# As demais valem pela última rodada `status='ok'`, contra o limite da própria agenda (timers em deploy/).
+FONTES = {
+    "open-finance": LIMITE_DESATUALIZADO,
+    "notas-nibo": dt.timedelta(hours=30),               # diária 06:40
+    "comprovantes-paperless": dt.timedelta(hours=30),   # diária 07:00
+    "trabalho": dt.timedelta(hours=12),                 # a cada 15 min, 06-22h (a pausa noturna chega a 8 h); só conta se estiver em uso
+    "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
 }
-LIMITE_PADRAO_SEM_CONFERENCIA = dt.timedelta(hours=36)
+COM_CONFERENCIA = ("open-finance",)
+# Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
+ESPERADAS = ("notas-nibo", "comprovantes-paperless")
 BRT = dt.timezone(dt.timedelta(hours=-3))
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
 
@@ -43,18 +50,21 @@ def _trabalho_em_uso(con) -> bool:
         try:
             if con.execute(f"select 1 from {tabela} where estado='sim' limit 1").fetchone():
                 return True
-        except sqlite3.OperationalError:
-            continue
+        except sqlite3.OperationalError as e:
+            if "no such table" not in str(e):
+                raise
     return False
 
 
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     agora = agora or dt.datetime.now(dt.timezone.utc)
-    fontes, ultimas, falta = [], [], False
-    nomes = [r[0] for r in con.execute(f"select distinct fonte from rodada where fonte not in ({','.join('?' * len(IGNORADAS))}) order by fonte", IGNORADAS)]
-    if "trabalho" in nomes and not _trabalho_em_uso(con):
-        nomes.remove("trabalho")
+    fontes, ultimas, falta, atrasada = [], [], False, False
+    nomes = {r[0] for r in con.execute("select distinct fonte from rodada")}
+    nomes |= set(ESPERADAS)
+    nomes.add("trabalho") if _trabalho_em_uso(con) else nomes.discard("trabalho")
+    nomes = sorted(n for n in nomes if not (n in FONTES and FONTES[n] is None))
     for nome in nomes:
+        conta = FONTES.get(nome) is not None
         tent = con.execute("select status, conferida from rodada where fonte=? order by id desc limit 1", (nome,)).fetchone()
         if nome in COM_CONFERENCIA:
             conf = con.execute("select max(fim) from rodada where fonte=? and conferida=1", (nome,)).fetchone()[0]
@@ -63,31 +73,31 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
                 estado = "erro"
             elif not tent["conferida"]:
                 estado = "nao_conferida"
-            elif ultima is None or agora - ultima > LIMITE_DESATUALIZADO:
+            elif ultima is None or agora - ultima > FONTES[nome]:
                 estado = "parada"
             else:
                 estado = "ok"
+            # extrato com última tentativa em erro segue valendo pela última conferida até o limite (comportamento antigo, coberto por teste)
         else:
             ok = con.execute("select max(fim) from rodada where fonte=? and status='ok'", (nome,)).fetchone()[0]
             ultima = _utc(ok) if ok else None
-            limite = LIMITE_FONTE.get(nome, LIMITE_PADRAO_SEM_CONFERENCIA)
-            if tent["status"] == "erro":
+            if tent is not None and tent["status"] == "erro":
                 estado = "erro"
             elif ultima is None:
-                estado = "nao_conferida"  # nunca rodou com sucesso
-            elif agora - ultima > limite:
+                estado = "nao_conferida"  # nunca rodou com sucesso (ou nunca rodou)
+            elif conta and agora - ultima > FONTES[nome]:
                 estado = "parada"
             else:
                 estado = "ok"
-        if ultima is None:
-            falta = True
-        else:
-            ultimas.append(ultima)
+            atrasada = atrasada or (conta and estado in ("erro", "parada"))
+        if conta:
+            if ultima is None:
+                falta = True
+            else:
+                ultimas.append(ultima)
+            atrasada = atrasada or (nome in COM_CONFERENCIA and estado == "parada")
         fontes.append({"nome": nome, "estado": estado, "ultima": _z(ultima) if ultima else None})
-    # a fonte mais velha manda; erro/parada desatualizam (fontes sem conferência); nunca-ok (`ultima` None) desatualiza via `falta`. Extrato com rodada nova ainda não conferida segue valendo pela última conferida
-    # (extrato com última tentativa em erro segue valendo pela última conferida até o limite de 3 dias: comportamento antigo, coberto por teste)
-    atrasada = any(f["estado"] in ("erro", "parada") and f["nome"] not in COM_CONFERENCIA for f in fontes)
-    dados_ate = None if (falta or not ultimas) else min(ultimas)
+    dados_ate = None if (falta or not ultimas) else min(ultimas)  # a fonte mais velha manda
     return {"dados_ate": _z(dados_ate) if dados_ate else None,
             "desatualizado": dados_ate is None or atrasada or agora - dados_ate > LIMITE_DESATUALIZADO,
             "proxima_rodada": proxima_rodada(agora), "fontes": fontes, "dados": dados}

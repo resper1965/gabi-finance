@@ -12,6 +12,7 @@ class _Contagens:
     alterados: int = 0
     aviso: str | None = None  # rodada ok mas incompleta (ex.: uma conta falhou): fica visível em rodada.erro
     id: int = 0
+    falha: str | None = None  # a rodada terminou sem exceção mas não serviu para nada (ex.: todas as caixas falharam): grava status='erro'
 
 
 def _agora() -> str:
@@ -29,5 +30,5 @@ def registrar_rodada(con: sqlite3.Connection, fonte: str):
         con.execute("update rodada set fim=?, status='erro', erro=?, lidos=?, novos=?, alterados=? where id=?",
                     (_agora(), f"{type(e).__name__}: {e}", r.lidos, r.novos, r.alterados, rid))
         raise
-    con.execute("update rodada set fim=?, status='ok', lidos=?, novos=?, alterados=?, erro=? where id=?",
-                (_agora(), r.lidos, r.novos, r.alterados, r.aviso, rid))
+    con.execute("update rodada set fim=?, status=?, lidos=?, novos=?, alterados=?, erro=? where id=?",
+                (_agora(), "erro" if r.falha else "ok", r.lidos, r.novos, r.alterados, r.falha or r.aviso, rid))

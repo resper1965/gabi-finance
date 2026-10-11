@@ -68,3 +68,11 @@ def test_aviso_ja_enviado_pelo_telegram_direto_nao_volta_para_o_canal(tmp_path):
     c = _banco(tmp_path)
     c.execute("insert into aviso(tipo, payload, criado_em, telegram_em) values ('rodada_parada','{}','2026-10-10T05:00:00+00:00','2026-10-10T05:01:00+00:00')")
     assert pedidos.avisos_pendentes(c, None) == []
+
+
+def test_resumo_desatualizado_nomeia_a_fonte_que_causa(tmp_path):
+    c = _banco(tmp_path)
+    c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
+    c.execute("insert into rodada(fonte, inicio, fim, status) values ('notas-nibo','2026-10-01T05:00:00+00:00','2026-10-01T05:00:30+00:00','ok')")
+    c.execute("insert into rodada(fonte, inicio, fim, status) values ('comprovantes-paperless','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
+    assert "(notas-nibo parada)" in resumo_da_manha(c, AGORA)["linhas"][0]

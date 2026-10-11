@@ -150,8 +150,10 @@ def test_saldos_nao_aparece_como_fonte_nem_atrapalha_o_dados_ate(con, tmp_path):
     from gabi.envelope import envelope
     _rodar_ext(con, FakeFin([BANCO], _boa_historia()), tmp_path)
     rodar_saldos(con, FakeFin([BANCO], {}), AGORA + dt.timedelta(hours=1), tmp_path / "locks")
+    for f in ("notas-nibo", "comprovantes-paperless"):  # esperadas do envelope
+        con.execute("insert into rodada(fonte, inicio, fim, status) values (?,?,?,'ok')", (f, AGORA.astimezone(dt.timezone.utc).isoformat(), AGORA.astimezone(dt.timezone.utc).isoformat()))
     e = envelope(con, {}, agora=AGORA.astimezone(dt.timezone.utc))
-    assert [f["nome"] for f in e["fontes"]] == ["open-finance"] and e["desatualizado"] is False
+    assert "open-finance-saldos" not in [f["nome"] for f in e["fontes"]] and e["desatualizado"] is False
 
 
 def test_saldos_preserva_estado_da_conta_e_apelido(con, tmp_path):

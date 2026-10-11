@@ -14,7 +14,9 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
     d = modulo_hoje.hoje(con, agora)
     linhas = []
     if env["desatualizado"]:
-        linhas.append(f"⚠ Dados desatualizados (último conferido: {env['dados_ate'] or 'nunca'}). Confira antes de agir.")
+        causa = [f"{f['nome']} {f['estado'].replace('_', ' ')}" for f in env["fontes"] if f["estado"] != "ok"]
+        causa = f" ({', '.join(causa)})" if causa else ""
+        linhas.append(f"⚠ Dados desatualizados{causa} (último conferido: {env['dados_ate'] or 'nunca'}). Confira antes de agir.")
     ag = d["agenda"]
     linhas.append(f"Agenda: {len(ag)} compromisso(s) hoje" + (f"; o primeiro às {ag[0]['inicio'][11:16]}, {ag[0]['titulo']}." if ag else "."))
     n = len(d["emails_importantes"])
