@@ -17,10 +17,12 @@ Só o serviço `gabi-brain-fontes` tem rede e a chave (R5). API, MCP e escuta ch
 |---|---|---|
 | `OPENROUTER_MAX_TOKENS_FAST` / `_STRONG` | 1024 / 2048 | `max_tokens` enviado em cada chamada |
 | `OPENROUTER_MAX_PROMPT_CHARS` | 50000 | maior prompt aceito; acima, `ErroOpenRouter("prompt grande demais")` antes de qualquer rede |
-| `OPENROUTER_TETO_DIA_USD` | 3.0 | gasto diário (dia em America/Sao_Paulo); ao somar o teto, `ErroOpenRouter("teto diário")` |
-| `OPENROUTER_MAX_CHAMADAS_MIN` | 30 | chamadas por minuto; acima, `ErroOpenRouter("muitas chamadas")` |
+| `OPENROUTER_TETO_DIA_USD` | 3.0 | gasto diário (dia em America/Sao_Paulo); se gasto + reserva da chamada passar do teto, `ErroOpenRouter("teto diário")`. 0 bloqueia tudo |
+| `OPENROUTER_MAX_CHAMADAS_MIN` | 30 | chamadas por minuto (relógio monotônico); acima, `ErroOpenRouter("muitas chamadas")`. 0 bloqueia tudo |
 
 O contador do teto diário fica na memória: **reiniciar o serviço o zera**. Por isso, defina também um **limite de crédito na própria chave** no painel do OpenRouter (o teto real).
+
+Reserva: antes de cada chamada o serviço reserva, sob trava, o pior caso (`max_tokens` x preço de saída + prompt a len/3 tokens x preço de entrada, no mínimo `OPENROUTER_CUSTO_PADRAO_USD`) e recusa se gasto + reserva passar do teto (vale para chamadas paralelas). Sucesso troca a reserva pelo custo real; falha depois do envio (erro HTTP, 200 sem texto, timeout) mantém a reserva cobrada, porque pode ter sido faturada; recusa antes da rede não cobra. Sem `completion_tokens` mas com `prompt_tokens`, a saída é estimada em `max_tokens`. Valores não numéricos, NaN/inf ou negativos caem no padrão (0 só vale nos dois tetos acima).
 
 ## Custo e segredos
 - Chamada: `POST https://openrouter.ai/api/v1/chat/completions` com `usage: {include: true}`; o custo (USD) vem de `usage.cost`.
