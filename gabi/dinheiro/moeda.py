@@ -3,7 +3,6 @@
 Regra: `amount` está na moeda da compra (`currencyCode`); em compra no exterior, `amountInAccountCurrency` é o valor em REAIS cobrado.
 Moeda estrangeira com esse valor numérico: usa-se ele (convertido=True). Sem ele (ausente, vazio, não numérico): grava-se o original
 em valor_centavos com convertido=False, e o produtor de avisos conta esses casos. Nunca se estima câmbio. Consome: caixa, valor."""
-import math
 from typing import NamedTuple
 
 from gabi.dinheiro import caixa
@@ -18,29 +17,31 @@ class ValorLancamento(NamedTuple):
     reais: float              # `centavos` como float (para a classificação de natureza)
 
 
-def _num(v) -> float | None:
-    n = caixa.num(v) if v is not None else None
-    return n if n is not None and math.isfinite(n) else None
+def _centavos(v) -> int | None:
+    """Centavos a partir do texto/número (meio-para-cima, sem passar por float); vazio, não numérico, nan e inf viram None."""
+    try:
+        return para_centavos(v if isinstance(v, (int, float)) else str(v).strip().replace(" ", "")) if v is not None else None
+    except (ValueError, ArithmeticError):
+        return None
 
 
-def _sinal(v: float, typ: str, tipo_conta: str) -> float:
-    if typ == "DEBIT" and v > 0:
-        v = -v
-    if tipo_conta == "CREDIT" and typ == "CREDIT" and v < 0:
-        v = -v
-    return v
+def _sinal(c: int, typ: str, tipo_conta: str) -> int:
+    if typ == "DEBIT" and c > 0:
+        c = -c
+    if tipo_conta == "CREDIT" and typ == "CREDIT" and c < 0:
+        c = -c
+    return c
 
 
 def valor_lancamento(t: dict, tipo_conta: str) -> ValorLancamento:
     typ = str(t.get("type", "")).upper()
-    original = _sinal(_num(t.get("amount")) or 0, typ, tipo_conta)
+    original = _sinal(_centavos(t.get("amount")) or 0, typ, tipo_conta)
     moeda = str(t.get("currencyCode") or "").strip().upper() or None
     if moeda in (None, "BRL"):
-        c = para_centavos(round(original, 2))
-        return ValorLancamento(c, None, None, True, original)
-    em_reais = _num(t.get("amountInAccountCurrency"))
-    orig_c = para_centavos(round(original, 2))
-    if em_reais is None:
-        return ValorLancamento(orig_c, moeda, orig_c, False, original)
-    reais = _sinal(em_reais, typ, tipo_conta)
-    return ValorLancamento(para_centavos(round(reais, 2)), moeda, orig_c, True, reais)
+        return ValorLancamento(original, None, None, True, original / 100)
+    em_reais = _centavos(t.get("amountInAccountCurrency"))
+    if em_reais is None or (em_reais == 0 and original != 0):  # ausente, inválido ou zero: não vira R$ 0,00
+        return ValorLancamento(original, moeda, original, False, original / 100)
+    # grandeza vem do valor em reais; o sinal, do original já normalizado (as duas colunas sempre têm o mesmo sinal)
+    reais = abs(em_reais) if original > 0 else -abs(em_reais) if original < 0 else _sinal(em_reais, typ, tipo_conta)
+    return ValorLancamento(reais, moeda, original, True, reais / 100)

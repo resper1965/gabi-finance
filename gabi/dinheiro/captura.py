@@ -118,8 +118,10 @@ def unificar_pending(con, conta_id: int) -> int:
     """O POSTED substitui o PENDING equivalente (mesmo valor, descrição equivalente, +-3 dias), 1 para 1: cada POSTED
     absorve no máximo um PENDING (o de data mais próxima). O vínculo de conciliação do PENDING passa para o POSTED.
     Devolve quantos PENDING apagou."""
-    rows = [(r["id"], _dia(r["data"]), r["descricao_original"], r["valor_centavos"], r["status"] == "pending", r["externo_id"])
-            for r in con.execute("select id, data, descricao_original, valor_centavos, status, externo_id from lancamento where conta_id=?", (conta_id,))]
+    # Chave de valor: em moeda estrangeira o valor em reais muda entre PENDING e POSTED, então vale (moeda, valor original); BRL: o valor.
+    rows = [(r["id"], _dia(r["data"]), r["descricao_original"], (r["moeda"], r["valor_original_centavos"]) if r["moeda"] else (None, r["valor_centavos"]),
+             r["status"] == "pending", r["externo_id"])
+            for r in con.execute("select id, data, descricao_original, valor_centavos, moeda, valor_original_centavos, status, externo_id from lancamento where conta_id=?", (conta_id,))]
     pend = sorted((r for r in rows if r[4] and r[1]), key=lambda r: (r[1], r[0]))
     post = [r for r in rows if not r[4] and r[1]]
     usados, n = set(), 0

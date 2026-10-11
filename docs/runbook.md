@@ -129,3 +129,11 @@ Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u g
 
 ## Avisos no Telegram (G15) {#telegram}
 Desligado por padrão. Para ligar (é a sua exceção à R2): crie `/etc/gabi/telegram.env` (0640 `root:gabibrain`) com `TELEGRAM_BOT_TOKEN=...` e `TELEGRAM_CHAT_ID=...` (o bot vem do BotFather; o chat, do `getUpdates` depois de mandar uma mensagem ao bot). O `gabi-brain-telegram.timer` (5 min) envia os avisos ainda não lidos dos últimos 2 dias, no máximo 10 por rodada, em português, só com nome, valor e datas; marca `aviso.telegram_em` só depois do 200 e nunca reenvia. Para desligar: apague o arquivo. Teste à mão: `sudo systemctl start gabi-brain-telegram`.
+
+## Moeda estrangeira: corrigir o histórico {#moeda-historico}
+
+Depois da migração 0022, lançamentos antigos em USD/EUR/PEN continuam com o valor da moeda da compra gravado como reais até a ferramenta rodar. Passo de deploy **só com o OK do Ricardo**:
+
+1. `python -m tools.corrigir_moeda --dry-run`: só lê e imprime contagens (`mudariam`, `diferenca_centavos`, `sem_bruto`). Não migra: se a 0022 ainda não foi aplicada, avisa e sai com erro.
+2. `python -m tools.corrigir_moeda`: aplica, em transação única, a partir do bruto imutável (sem rede). Só toca lançamentos em moeda estrangeira, usando o bruto mais novo de cada um; BRL nunca muda. Pode rodar de novo (idempotente).
+3. Conferir `sem_bruto`: lançamentos sem transação no bruto não são corrigidos (ficam como estão). Depois, o aviso `lancamento_sem_conversao` mostra quantos entraram sem valor em reais.
