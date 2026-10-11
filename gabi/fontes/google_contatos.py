@@ -2,111 +2,18 @@
 brain chega aqui pela ponte (`PonteContatos`). Escopo `contacts.readonly`; `personFields=names,phoneNumbers` e nada mais (sem foto, e-mail,
 endereço ou nota). Token por conta: OAuth do usuário com refresh token (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_<CONTA> no
 ambiente do serviço). Segredo e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/google.md."""
-import json
-import re
-import threading
-import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Callable
+
+from gabi.fontes.google_oauth import (  # noqa: F401  (nomes reexportados: ponte, testes e escuta ainda os importam daqui)
+    ErroGoogleOAuth, FOLGA_S, TOKEN_URL, TokenOAuth, _http_real, chamar as _chamar, conta_valida as _conta_valida,
+    credenciais_do_ambiente, nome_da_variavel)
 
 ESCOPO = "https://www.googleapis.com/auth/contacts.readonly"
 URL_CONTATOS = "https://people.googleapis.com/v1/people/me/connections"
-TOKEN_URL = "https://oauth2.googleapis.com/token"
 CAMPOS = "names,phoneNumbers"
 MAX_PAGINAS = 200
-FOLGA_S = 60
-_CONTA = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,120}$")
-
-
-class ErroGoogleContatos(Exception):
-    pass
-
-
-def _http_real(metodo, url, corpo=None, cabecalhos=None):
-    """(status, json). Corpo `bytes` vai como está (formulário do token); o corpo de erro NUNCA é lido (pode ecoar segredo).
-    A falha é só registrada no `except` e o erro tipado sai DEPOIS do bloco (sem __context__)."""
-    dados = corpo if isinstance(corpo, bytes) else (json.dumps(corpo).encode() if corpo is not None else None)
-    req = urllib.request.Request(url, data=dados, method=metodo, headers=cabecalhos or {})
-    falha = None
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            return r.status, json.loads(r.read() or b"null")
-    except urllib.error.HTTPError as e:
-        codigo = e.code
-        try:
-            e.close()
-        except Exception:  # noqa: BLE001
-            pass
-        return codigo, {}
-    except (OSError, ValueError) as e:
-        falha = type(e).__name__
-    raise ErroGoogleContatos(f"Google indisponível: {falha}")
-
-
-def _chamar(http, metodo, url, corpo, cab):
-    """Erro de rede do http injetado vira o erro tipado, fora do `except` (sem causa nem contexto)."""
-    falha = None
-    try:
-        return http(metodo, url, corpo, cab)
-    except ErroGoogleContatos:
-        raise
-    except Exception as e:  # noqa: BLE001
-        falha = type(e).__name__
-    raise ErroGoogleContatos(f"Google indisponível: {falha}")
-
-
-def _conta_valida(conta) -> str:
-    if not isinstance(conta, str) or not _CONTA.match(conta):
-        raise ErroGoogleContatos("conta inválida")
-    return conta
-
-
-def nome_da_variavel(conta: str) -> str:
-    """resper@gmail.com -> GOOGLE_REFRESH_RESPER_GMAIL_COM"""
-    return "GOOGLE_REFRESH_" + re.sub(r"[^A-Za-z0-9]", "_", conta).upper()
-
-
-class TokenOAuth:
-    """token(conta) -> access token. Troca o refresh token da conta em TOKEN_URL e guarda o access token em memória até ~60 s antes de expirar."""
-
-    def __init__(self, client_id: str, client_secret: str, ambiente, *, http=_http_real, relogio=None):
-        self._id, self._secret, self._env, self._http = client_id, client_secret, ambiente, http
-        self._relogio = relogio or time.monotonic
-        self._cache: dict[str, tuple[str, float]] = {}
-        self._trava = threading.Lock()
-
-    def __repr__(self):
-        return "TokenOAuth(<oculto>)"
-
-    def __call__(self, conta: str) -> str:
-        conta = _conta_valida(conta)
-        with self._trava:
-            c = self._cache.get(conta)
-            if c and self._relogio() < c[1]:
-                return c[0]
-            refresh = self._env.get(nome_da_variavel(conta))
-            if not refresh:
-                raise ErroGoogleContatos(f"conta não autorizada: {conta}")
-            corpo = urllib.parse.urlencode({"grant_type": "refresh_token", "client_id": self._id, "client_secret": self._secret,
-                                            "refresh_token": refresh}).encode()
-            status, resp = _chamar(self._http, "POST", TOKEN_URL, corpo, {"Content-Type": "application/x-www-form-urlencoded"})
-            if status in (400, 401):
-                raise ErroGoogleContatos(f"token recusado: {conta}")
-            if status >= 400:
-                raise ErroGoogleContatos(f"troca de token -> {status}")
-            acc = resp.get("access_token") if isinstance(resp, dict) else None
-            exp = resp.get("expires_in") if isinstance(resp, dict) else None
-            if not isinstance(acc, str) or not acc or isinstance(exp, bool) or not isinstance(exp, (int, float)):
-                raise ErroGoogleContatos("resposta inválida na troca de token")
-            self._cache[conta] = (acc, self._relogio() + exp - FOLGA_S)
-            return acc
-
-
-    def invalidar(self, conta: str) -> None:
-        with self._trava:
-            self._cache.pop(conta, None)
+ErroGoogleContatos = ErroGoogleOAuth  # alias: a ponte e os testes de contatos usam este nome
 
 
 def _primeiro(lista):
@@ -166,6 +73,7 @@ class GoogleContatos:
 
 def google_contatos_do_ambiente(env) -> GoogleContatos | None:
     """None ("não configurada") sem GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET."""
-    if not env.get("GOOGLE_CLIENT_ID") or not env.get("GOOGLE_CLIENT_SECRET"):
+    cred = credenciais_do_ambiente(env)
+    if cred is None:
         return None
-    return GoogleContatos(TokenOAuth(env["GOOGLE_CLIENT_ID"], env["GOOGLE_CLIENT_SECRET"], env))
+    return GoogleContatos(TokenOAuth(cred[0], cred[1], env))
