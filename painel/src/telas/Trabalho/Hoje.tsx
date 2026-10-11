@@ -7,13 +7,15 @@ import { dataCurta } from "../../lib/formato";
 import { useApi } from "../../lib/useApi";
 
 interface Prioridade { tipo: string; titulo: string; motivo?: string; ref: number; sugestao?: string }
-interface Evento { id: number; inicio: string; fim: string; titulo: string | null; link_reuniao: string | null }
+export interface Evento { id: number; titulo: string | null; inicio_local: string | null; fim_local: string | null; dia_local: string; dia_fim_local: string; dia_inteiro: boolean; link_reuniao: string | null; fonte: string; privado: boolean }
 interface Email { id: number; remetente: string; assunto: string | null; recebido_em: string; motivo: string | null; frente_id: number | null; caixa: string }
 interface Dinheiro { saldo: string; atrasadas: { n: number; valor: string }; sai_hoje: string; pago_hoje: string; nibo: unknown }
 interface Dados { filtro: string; prioridades: Prioridade[]; agenda: Evento[]; emails_importantes: Email[]; dinheiro: Dinheiro | null }
 interface Empresa { id: string; nome: string }
 
 const hora = (iso: string) => iso.slice(11, 16);
+/** Horário LOCAL do compromisso (o servidor já converteu); dia inteiro não tem horário. */
+export const quando = (e: Evento) => (e.dia_inteiro || !e.inicio_local || !e.fim_local ? "dia inteiro" : `${hora(e.inicio_local)}–${hora(e.fim_local)}`);
 const ABAS = ["Fazer", "Agenda", "Dinheiro", "E-mails"] as const;
 
 /** Hoje: o que precisa de mim. Lê só de tabelas prontas; o filtro recorta a tela inteira. */
@@ -31,7 +33,7 @@ export function Hoje() {
           Fazer: <Bloco titulo="Fazer">{d.prioridades.length === 0 ? <Vazio t="Nada na fila." /> : d.prioridades.map((p, i) => (
             <li key={i} data-prioridade><strong>{p.titulo}</strong>{p.motivo && <small> · {p.motivo}</small>}{p.sugestao && <small> · a Gabi sugere {hora(p.sugestao)}</small>}</li>))}</Bloco>,
           Agenda: <Bloco titulo="Agenda">{d.agenda.length === 0 ? <Vazio t="Sem compromissos hoje." /> : d.agenda.map((e) => (
-            <li key={e.id}><span style={{ fontVariantNumeric: "tabular-nums" }}>{hora(e.inicio)}–{hora(e.fim)}</span> {e.titulo}{e.link_reuniao && <> · <a href={e.link_reuniao}>entrar</a></>}</li>))}</Bloco>,
+            <li key={e.id}><span style={{ fontVariantNumeric: "tabular-nums" }}>{quando(e)}</span> {e.titulo ?? "(sem título)"}{e.privado && <small> · privado</small>} <small style={{ color: "var(--ink2)" }}>· {e.fonte}</small>{e.link_reuniao && <> · <a href={e.link_reuniao}>entrar</a></>}</li>))}</Bloco>,
           Dinheiro: <Bloco titulo="Dinheiro">{d.dinheiro === null ? <Vazio t="O dinheiro aparece em “Tudo”." /> : <>
             <li>Caixa agora <Valor valor={d.dinheiro.saldo} /></li>
             <li>Em atraso: {d.dinheiro.atrasadas.n} · <Valor valor={d.dinheiro.atrasadas.valor} /></li>

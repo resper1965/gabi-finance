@@ -1,10 +1,10 @@
-"""Tela Hoje: lê SÓ de tabelas prontas (nenhuma chamada de rede no caminho da requisição). Consome item_email, evento, tarefa, frente e dinheiro.contas_pagar.
+"""Tela Hoje: lê SÓ de tabelas prontas (nenhuma chamada de rede no caminho da requisição). Consome item_email, agenda_evento, tarefa, frente e dinheiro.contas_pagar.
 Filtro: 'all', um id de empresa, ou 't-<id da frente>'. Com filtro, e-mails e agenda são recortados; o bloco `dinheiro` só vai em 'all' (compromisso não tem frente)."""
 import datetime as dt
 
+from gabi.agenda import consulta
 from gabi.dinheiro import contas_pagar as cp
 from gabi.dinheiro.valor import formatar
-from gabi.trabalho import email
 
 LIMITE_EMAILS = 10
 
@@ -24,17 +24,6 @@ def emails_importantes(con, filtro: str = "all", limite: int = LIMITE_EMAILS) ->
         f"where i.relevante=1 and i.estado='novo'{sql} order by i.recebido_em desc limit ?", [*args, limite])]
 
 
-def agenda_do_dia(con, dia: dt.date, filtro: str = "all") -> list[dict]:
-    sql, args = "", []
-    if filtro != "all" and not filtro.startswith("t-"):
-        sql, args = " and c.empresa_id=?", [filtro]
-    elif filtro.startswith("t-"):
-        return []  # evento ainda não se liga a frente
-    return [dict(r) for r in con.execute(
-        "select e.id, e.inicio, e.fim, e.titulo, e.link_reuniao from evento e join caixa_email c on c.id=e.caixa_id "
-        f"where date(e.inicio)=?{sql} order by e.inicio", [dia.isoformat(), *args])]
-
-
 def _dinheiro(con, hoje: dt.date) -> dict:
     g = cp.contas_a_pagar(con, hoje, hoje)
     soma = lambda itens: sum(i["valor_centavos"] or 0 for i in itens)  # noqa: E731
@@ -44,12 +33,16 @@ def _dinheiro(con, hoje: dt.date) -> dict:
             "nibo": None}  # sem backend até a Fase 2 aceitar o Nibo com dado real
 
 
-def hoje(con, agora: dt.datetime, filtro: str = "all") -> dict:
+def hoje(con, agora: dt.datetime, filtro: str = "all", *, painel: bool = False) -> dict:
+    """`painel=True` só na rota do painel: a política `agenda.privados=so_painel` mascara títulos privados para os demais canais."""
     dia = agora.date()
+    fuso = consulta.fuso_da_agenda(con)
+    dia_agenda = consulta.dia_local(agora, fuso).isoformat()
     mails = emails_importantes(con, filtro)
-    agenda = agenda_do_dia(con, dia, filtro)
+    # compromisso não tem empresa nem frente: a agenda (e os conflitos) só vão no 'all'
+    agenda = consulta.agenda_do_dia(con, dia_agenda, fuso, painel=painel) if filtro == "all" else []
     prioridades = [{"tipo": "email", "titulo": m["assunto"], "motivo": m["motivo"], "ref": m["id"]} for m in mails[:3]]
     prioridades += [{"tipo": "conflito", "titulo": "Conflito na agenda", "ref": c.evento_a, "sugestao": c.sugestao_inicio}
-                    for c in email.conflitos(con, f"{dia.isoformat()}T00:00:00", f"{dia.isoformat()}T23:59:59")] if filtro == "all" else []
+                    for c in consulta.conflitos(con, dia_agenda, dia_agenda, fuso)] if filtro == "all" else []
     return {"filtro": filtro, "prioridades": prioridades, "agenda": agenda, "emails_importantes": mails,
             "dinheiro": _dinheiro(con, dia) if filtro == "all" else None}

@@ -5,7 +5,7 @@ from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS
 
 
 def test_ferramentas_de_trabalho_tem_escopo_trabalho():
-    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}
+    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"agenda_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}
 
 
 def test_nenhuma_ferramenta_de_trabalho_envia_apaga_ou_confirma():
@@ -47,7 +47,8 @@ def test_resumo_comeca_por_desatualizado(tmp_path):
 def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
     c = _banco(tmp_path)
     c.execute("insert into caixa_email(endereco, provedor, estado) values ('a@x.com','graph','sim')")
-    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo) values (1,'e1','2026-10-10T14:00:00','2026-10-10T15:00:00','Reunião IONIC')")
+    c.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values (1,'e1','2026-10-10T17:00:00+00:00','2026-10-10T18:00:00+00:00','2026-10-10','2026-10-10','Reunião IONIC')")
     c.execute("insert into item_email(caixa_id, message_id, remetente, assunto, recebido_em, relevante, motivo) values (1,'<a>','c@x.com','Proposta','2026-10-10T05:00:00Z',1,'cliente')")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     txt = resumo_da_manha(c, AGORA)["texto"]

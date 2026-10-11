@@ -34,8 +34,11 @@ def _semear_trabalho(c) -> None:
     email.ingerir_email(c, 1, lambda cx, cur: (msgs, None))
     for i in c.execute("select * from item_email").fetchall():
         frentes.sugerir(c, i)
-    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo, participantes, link_reuniao) values (1,'ev1','2026-10-08T16:00:00','2026-10-08T17:00:00','Revisão Atlas','[\"joao@acme.exemplo\"]','https://meet.exemplo/a')")
-    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo, participantes) values (1,'ev2','2026-10-08T16:30:00','2026-10-08T17:30:00','Dentista','[]')")
+    c.execute("insert into agenda_fonte(id, conta, provedor, estado, nome) values (1,'ricardo@ness.exemplo','google','sim','Ricardo')")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo, link_reuniao, participantes_qtd) values "
+              "(1,'ev1','2026-10-08T19:00:00+00:00','2026-10-08T20:00:00+00:00','2026-10-08','2026-10-08','Revisão Atlas','https://meet.exemplo/a',1)")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values "
+              "(1,'ev2','2026-10-08T19:30:00+00:00','2026-10-08T20:30:00+00:00','2026-10-08','2026-10-08','Dentista')")
     c.execute("insert into tarefa(origem, externo_id, titulo, prazo) values ('graph','L/t1','Enviar proposta à Acme','2026-10-09')")
     c.execute("insert into tarefa(origem, externo_id, titulo, estado) values ('google','L/t2','Renovar domínio','concluida')")
 

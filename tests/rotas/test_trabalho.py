@@ -16,8 +16,9 @@ def _semear(banco, n_emails=3):
             for i in range(n_emails)]
     email.ingerir_email(c, 1, lambda cx, cur: (msgs, None))
     email.ingerir_email(c, 2, lambda cx, cur: ([dict(message_id="<b1>", remetente="z@z.com", assunto="Contrato B", recebido_em="2026-10-08T09:00:00Z", corpo="")], None))
-    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo) values (1,'e1','2026-10-08T14:00:00','2026-10-08T15:00:00','Reunião A')")
-    c.execute("insert into evento(caixa_id, externo_id, inicio, fim, titulo) values (1,'e2','2026-10-08T14:30:00','2026-10-08T15:30:00','Reunião B')")
+    c.execute("insert into agenda_fonte(id, conta, provedor, estado) values (1,'a@ness.com','google','sim')")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values (1,'e1','2026-10-08T17:00:00+00:00','2026-10-08T18:00:00+00:00','2026-10-08','2026-10-08','Reunião A')")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values (1,'e2','2026-10-08T17:30:00+00:00','2026-10-08T18:30:00+00:00','2026-10-08','2026-10-08','Reunião B')")
     c.execute("insert into tarefa(origem, externo_id, titulo) values ('graph','t1','Enviar proposta')")
     c.close()
 
@@ -122,3 +123,13 @@ def test_entregas_da_linear_so_leitura_e_so_boss(cli, banco):
     assert [i["identificador"] for i in get(cli, "/api/v1/entregas").json()["dados"]["itens"]] == ["ION-2", "ION-1", "ION-3"]
     assert get(cli, "/api/v1/entregas", VIP).status_code == 403
     assert post(cli, "/api/v1/entregas", {}).status_code == 405
+
+
+def test_rota_agenda_novo_formato(cli, banco):
+    _semear(banco)
+    d = get(cli, "/api/v1/agenda?de=2026-10-08&ate=2026-10-08").json()["dados"]
+    assert [e["titulo"] for e in d["eventos"]] == ["Reunião A", "Reunião B"]
+    e = d["eventos"][0]
+    assert e["inicio_local"] == "2026-10-08T14:00:00-03:00" and e["dia_inteiro"] is False and e["fonte"] == "a@ness.com"
+    assert e["inicio"] == e["inicio_local"] and e["fim"] == e["fim_local"]  # alias até o painel migrar (Task 8)
+    assert len(d["conflitos"]) == 1 and d["conflitos"][0]["sugestao_inicio"] == "2026-10-08T15:30:00-03:00"

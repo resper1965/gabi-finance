@@ -13,6 +13,7 @@ mcp_servers:
       Authorization: Bearer ${GABI_BRAIN_TOKEN}
     tools:
       include:
+      - agenda_listar
       - avisos_confirmar_entrega
       - avisos_pendentes
       - classificar_lancamento

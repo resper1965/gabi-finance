@@ -2,17 +2,27 @@
  "dados": {
   "agenda": [
    {
-    "fim": "2026-10-08T17:00:00",
+    "dia_fim_local": "2026-10-08",
+    "dia_inteiro": false,
+    "dia_local": "2026-10-08",
+    "fim_local": "2026-10-08T17:00:00-03:00",
+    "fonte": "ricardo@ness.exemplo",
     "id": 1,
-    "inicio": "2026-10-08T16:00:00",
+    "inicio_local": "2026-10-08T16:00:00-03:00",
     "link_reuniao": "https://meet.exemplo/a",
+    "privado": false,
     "titulo": "Revisão Atlas"
    },
    {
-    "fim": "2026-10-08T17:30:00",
+    "dia_fim_local": "2026-10-08",
+    "dia_inteiro": false,
+    "dia_local": "2026-10-08",
+    "fim_local": "2026-10-08T17:30:00-03:00",
+    "fonte": "ricardo@ness.exemplo",
     "id": 2,
-    "inicio": "2026-10-08T16:30:00",
+    "inicio_local": "2026-10-08T16:30:00-03:00",
     "link_reuniao": null,
+    "privado": false,
     "titulo": "Dentista"
    }
   ],
@@ -62,7 +72,7 @@
    },
    {
     "ref": 1,
-    "sugestao": "2026-10-08T17:30:00",
+    "sugestao": "2026-10-08T17:30:00-03:00",
     "tipo": "conflito",
     "titulo": "Conflito na agenda"
    }
