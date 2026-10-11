@@ -227,3 +227,19 @@ def test_teto_padrao_e_25_mib(srv):
 def test_quando_sem_offset_vale_brasilia():
     from gabi.escuta.destinos import _quando
     assert _quando("2026-10-11T09:00:00") == _quando("2026-10-11T12:00:00+00:00")
+
+
+def test_anexo_symlink_nao_e_seguido_nem_dentro_do_spool(con, d, tmp_path):
+    (tmp_path / "anexos").mkdir()
+    real = tmp_path / "anexos" / "real.pdf"
+    real.write_bytes(b"%PDF-real")
+    dentro = tmp_path / "anexos" / "link-dentro.pdf"
+    dentro.symlink_to(real)
+    fora = tmp_path.parent / f"fora-{tmp_path.name}.txt"
+    fora.write_bytes(b"SEGREDO")
+    ln = tmp_path / "anexos" / "link-fora.pdf"
+    ln.symlink_to(fora)
+    for alvo in (dentro, ln):
+        with pytest.raises(RuntimeError):
+            d.pedido(con, "p1", N, _msg(anexo=alvo), {"valor": 50})
+    assert real.exists() and fora.exists()

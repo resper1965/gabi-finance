@@ -31,3 +31,11 @@ test('opções do Baileys: sem presença, sem histórico, sem eco', () => {
   assert.equal(o.shouldSyncHistoryMessage(), false);
   assert.deepEqual(o.version, [2, 3000, 1]);
 });
+
+test('no socket só existem ev e end (nada de sendNode, query, ws, rejectCall, updateBlockStatus...)', () => {
+  const txt = fs.readFileSync(path.join(SRC, 'ouvinte.js'), 'utf8');
+  assert.ok(!/\bsock\s*\??\.?\[/.test(txt), 'acesso computado a sock[');
+  const membros = new Set([...txt.matchAll(/\bsock\s*\??\.\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+  assert.ok(membros.size > 0);
+  for (const m of membros) assert.ok(['ev', 'end'].includes(m), `membro proibido no socket: ${m}`);
+});

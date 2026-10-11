@@ -29,8 +29,9 @@ cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/
 install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" /opt/gabi-brain/tools/
 # App do ouvinte (código + package.json + lockfile). NÃO roda npm aqui: instalar dependência é passo do Ricardo (ver abaixo).
 install -d -o root -g root -m 755 /opt/escuta-ouvinte
-rm -rf /opt/escuta-ouvinte/src
+rm -rf /opt/escuta-ouvinte/src /opt/escuta-ouvinte/vendor
 cp -r "$AQUI/ouvinte/src" /opt/escuta-ouvinte/src
+cp -r "$AQUI/ouvinte/vendor" /opt/escuta-ouvinte/vendor  # libsignal vendorizado (o lockfile aponta para ele)
 install -m 644 "$AQUI/ouvinte/package.json" "$AQUI/ouvinte/package-lock.json" /opt/escuta-ouvinte/
 chown -R root:root /opt/escuta-ouvinte
 find /opt/gabi-brain -name __pycache__ -prune -exec rm -rf {} +
@@ -55,7 +56,7 @@ systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mc
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
 # O timer e o path da escuta (gabi-brain-escuta.timer, gabi-brain-escuta.path) ficam instalados mas DESLIGADOS até o Ricardo mandar ligar.
 # O ouvinte (escuta-ouvinte.service) fica instalado e DESLIGADO. Passos do Ricardo, nesta ordem (docs/runbook.md#escuta):
-#   cd /opt/escuta-ouvinte && sudo npm ci --ignore-scripts   (como root: node_modules fica só leitura para o serviço; confira antes o pacote/versão em ouvinte/README.md)
+#   cd /opt/escuta-ouvinte && sudo npm ci --ignore-scripts --legacy-peer-deps   (como root: node_modules fica só leitura para o serviço; confira antes o pacote/versão em ouvinte/README.md)
 #   sudo -u escuta-ouvinte node /opt/escuta-ouvinte/src/ouvinte.js --parear     (QR no terminal)
 #   sudo systemctl enable --now escuta-ouvinte
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).

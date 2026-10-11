@@ -16,13 +16,25 @@ function recusarSeInseguro(valor, rotulo) {
   }
 }
 
-// Nome de arquivo determinístico: caracteres fora de [A-Za-z0-9._-] viram "_" e, nesse caso, entra um sufixo de hash
-// do id original (ids diferentes nunca colidem no mesmo nome).
+const RESERVADOS = new Set(['palavras-risco', 'gatilho', 'lidos', 'invalidos', 'anexos']);
+const MAX_BASE = 100;
+const hash12 = (id) => crypto.createHash('sha256').update(id).digest('hex').slice(0, 12);
+
+// Nome de arquivo determinístico a partir do id: [A-Za-z0-9._-] passam; o resto (inclusive separadores, "..", NUL) vira "_" e
+// entra um sufixo de hash do id original, o mesmo vale para nome reservado, que começa com "." ou passa do limite.
+// Nunca recusa por causa do conteúdo do id (a mensagem não pode ser perdida): só id vazio/não texto é erro.
 export function nomeDoId(id) {
-  recusarSeInseguro(id, 'id_externo');
-  const limpo = id.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
-  if (limpo === id && id.length <= 120) return id;
-  return `${limpo}-${crypto.createHash('sha256').update(id).digest('hex').slice(0, 12)}`;
+  if (typeof id !== 'string' || id === '') throw new Error('id_externo inválido');
+  const limpo = id.replace(/[^A-Za-z0-9._-]/g, '_');
+  const sujo = limpo !== id || id.includes('..') || id.startsWith('.') || id.length > MAX_BASE || RESERVADOS.has(id.toLowerCase());
+  if (!sujo) return id;
+  const base = limpo.replace(/\.{2,}/g, '_').replace(/^\.+/, '_').slice(0, MAX_BASE);
+  return `${base}-${hash12(id)}`;
+}
+
+// Nome do anexo com a mesma regra do json (ext já vem da lista branca do chamador).
+export function nomeAnexo(id, ext) {
+  return `${nomeDoId(id)}.${ext}`;
 }
 
 function garantirPasta(d) {
@@ -30,12 +42,23 @@ function garantirPasta(d) {
   try { fs.chmodSync(d, MODO_DIR); } catch { /* sem dono da pasta: o instalador já criou 2770 */ }
 }
 
+function fsyncArquivo(caminho) {
+  const fd = fs.openSync(caminho, 'r');
+  try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+}
+
+function fsyncPasta(dir) {
+  try { fsyncArquivo(dir); } catch { /* melhor esforço */ }
+}
+
+// tmp aberto com wx (O_EXCL: não segue symlink plantado); fsync antes de publicar; tmp limpo em qualquer falha.
 function gravarAtomico(destino, dados, { naoSobrescrever }) {
   const tmp = `${destino}.tmp`;
   try { fs.unlinkSync(tmp); } catch { /* sem sobra */ }
-  fs.writeFileSync(tmp, dados, { mode: MODO_ARQ });
-  fs.chmodSync(tmp, MODO_ARQ); // não depende do umask
   try {
+    fs.writeFileSync(tmp, dados, { mode: MODO_ARQ, flag: 'wx' });
+    fs.chmodSync(tmp, MODO_ARQ); // não depende do umask
+    fsyncArquivo(tmp);
     if (naoSobrescrever) fs.linkSync(tmp, destino); // falha com EEXIST: nunca sobrescreve
     else fs.renameSync(tmp, destino);
   } catch (e) {
@@ -44,6 +67,7 @@ function gravarAtomico(destino, dados, { naoSobrescrever }) {
     throw e;
   }
   if (naoSobrescrever) { try { fs.unlinkSync(tmp); } catch { /* ignore */ } }
+  fsyncPasta(path.dirname(destino));
   return true;
 }
 
@@ -68,11 +92,12 @@ export function gravarMensagem(msg, pasta, opts = {}) {
   if (anexo) {
     const dirAnexos = path.join(pasta, 'anexos');
     garantirPasta(dirAnexos);
-    gravarAtomico(path.join(dirAnexos, anexo.nome), anexo.dados, { naoSobrescrever: false });
+    gravarAtomico(path.join(dirAnexos, anexo.nome), anexo.dados, { naoSobrescrever: true }); // já existe: mesmo id, mesmo nome
   }
   const corpo = JSON.stringify({
     id_externo: msg.id_externo, de: msg.de, grupo: Boolean(msg.grupo), id_grupo: msg.id_grupo ?? null,
     recebida_em: msg.recebida_em, texto: msg.texto ?? null, anexo: msg.anexo ?? null,
+    ...(msg.lid ? { lid: true } : {}),
   });
   const gravado = gravarAtomico(path.join(pasta, arquivo), corpo, { naoSobrescrever: true });
   return { gravado, arquivo };

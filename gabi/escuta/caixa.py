@@ -1,7 +1,9 @@
 """Caixa de entrada da escuta: lê o spool (um JSON por mensagem) e grava em escuta_msg."""
 import datetime as dt
 import json
+import os
 import re
+import stat
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -30,9 +32,40 @@ def registrar_remetente_visto(con, numero: str, agora: str) -> None:
         (numero, agora))
 
 
+LIMITE_JSON = 5 * 1024 * 1024  # uma mensagem de texto não chega perto; acima disso é lixo ou ataque
+
+
+def ler_regular(caminho, limite: int) -> bytes:
+    """O spool é gravável pelo ouvinte (não confiável): só lê arquivo REGULAR, sem seguir symlink (O_NOFOLLOW) e sem bloquear
+    em FIFO (O_NONBLOCK; o tipo é checado no fd aberto). OSError/ValueError se for outra coisa ou passar de `limite`."""
+    fd = os.open(caminho, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > limite:
+            raise ValueError("não é arquivo regular ou é grande demais")
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            return f.read(limite + 1)[:limite]
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 def _mover(arq: Path, destino: Path) -> None:
-    destino.mkdir(exist_ok=True)
-    arq.replace(destino / arq.name)
+    """Move para lidos/ ou invalidos/. Se a subpasta não for uma pasta de verdade (o ouvinte pode ter plantado um symlink), o
+    arquivo é apagado em vez de movido: nunca grava fora do spool."""
+    try:
+        if not destino.is_symlink():
+            destino.mkdir(exist_ok=True)
+            if destino.is_dir() and not destino.is_symlink():
+                arq.replace(destino / arq.name)
+                return
+    except OSError:
+        pass
+    try:
+        arq.unlink()
+    except OSError:
+        pass
 
 
 def _utc(quando: str) -> str:
@@ -44,7 +77,7 @@ def _utc(quando: str) -> str:
 
 
 def _ler(arq: Path) -> dict:
-    d = json.loads(arq.read_text(encoding="utf-8"))
+    d = json.loads(ler_regular(arq, LIMITE_JSON).decode("utf-8"))
     if not isinstance(d, dict):
         raise ValueError("spool não é objeto")
     for k in ("id_externo", "de", "recebida_em"):
@@ -92,25 +125,28 @@ def ingerir_spool(con, pasta: Path, agora: str) -> int:
 
 def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
     """Apaga anexo do spool que nenhuma linha de escuta_msg aponta e com mais de `idade_h` h (a API só anula o ponteiro; quem apaga é este timer).
-    Só arquivo regular direto em <spool>/anexos: nunca segue symlink, nunca entra em subpasta. Devolve só a contagem."""
-    import os
+    Só arquivo regular direto em <spool>/anexos: nunca segue symlink (nem a própria pasta `anexos`, que o ouvinte pode trocar),
+    nunca entra em subpasta. Devolve só a contagem."""
     import time
     pasta = Path(spool) / "anexos"
     try:
-        entradas = list(os.scandir(pasta))
+        dfd = os.open(pasta, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
     except OSError:
         return 0
-    referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
-    limite = time.time() - idade_h * 3600
-    removidos = 0
-    for e in entradas:
-        try:
-            if e.is_symlink() or not e.is_file(follow_symlinks=False) or e.name in referenciados:
+    try:
+        nomes = os.listdir(dfd)
+        referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
+        limite = time.time() - idade_h * 3600
+        removidos = 0
+        for nome in nomes:
+            try:
+                st = os.stat(nome, dir_fd=dfd, follow_symlinks=False)
+                if not stat.S_ISREG(st.st_mode) or nome in referenciados or st.st_mtime >= limite:
+                    continue
+                os.unlink(nome, dir_fd=dfd)
+                removidos += 1
+            except OSError:
                 continue
-            if e.stat(follow_symlinks=False).st_mtime >= limite:
-                continue
-            os.unlink(e.path)
-            removidos += 1
-        except OSError:
-            continue
-    return removidos
+        return removidos
+    finally:
+        os.close(dfd)

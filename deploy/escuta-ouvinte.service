@@ -27,6 +27,13 @@ PrivateDevices=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
 # Precisa da internet para falar com o WhatsApp; não precisa de socket Unix.
 RestrictAddressFamilies=AF_INET AF_INET6

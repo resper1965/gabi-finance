@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { processarEvento } from '../src/ouvinte.js';
 
 const PRIV = '5511912345678@s.whatsapp.net';
@@ -163,4 +164,124 @@ test('nada de texto, número ou nome vai para o console', async () => {
   } finally { Object.assign(console, orig); }
   const tudo = saidas.join('\n');
   for (const s of ['segredo-do-texto', 'Fulano', '5521987654321', '5511912345678', GRUPO]) assert.ok(!tudo.includes(s), s);
+});
+
+// ---------- @lid ----------
+test('privado com remoteJid @lid e senderPn: de é o telefone, sem lid', async () => {
+  const p = pasta();
+  await processarEvento(ev(msg({ conversation: 'oi' }, { remoteJid: '123456789@lid', senderPn: PRIV })), deps(p));
+  const [j] = lista(p);
+  assert.equal(j.de, PRIV);
+  assert.equal('lid' in j, false);
+});
+
+test('privado: remoteJidAlt (v7) quando não há senderPn', async () => {
+  const p = pasta();
+  await processarEvento(ev(msg({ conversation: 'oi' }, { remoteJid: '123456789@lid', remoteJidAlt: PRIV })), deps(p));
+  assert.equal(lista(p)[0].de, PRIV);
+});
+
+test('grupo: participantPn vence participant @lid', async () => {
+  const p = pasta();
+  await processarEvento(ev(msg({ conversation: 'g' }, { remoteJid: GRUPO, participant: '999@lid', participantPn: PART })), deps(p));
+  const [j] = lista(p);
+  assert.equal(j.de, PART);
+  assert.equal(j.id_grupo, GRUPO);
+  assert.equal('lid' in j, false);
+});
+
+test('só @lid: guarda como veio com lid:true (privado e grupo)', async () => {
+  const p = pasta();
+  await processarEvento(ev(
+    msg({ conversation: 'a' }, { remoteJid: '123456789@lid', id: 'L1' }),
+    msg({ conversation: 'b' }, { remoteJid: GRUPO, participant: '999@lid', id: 'L2' }),
+  ), deps(p));
+  const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
+  assert.equal(por.L1.de, '123456789@lid');
+  assert.equal(por.L1.lid, true);
+  assert.equal(por.L2.de, '999@lid');
+  assert.equal(por.L2.lid, true);
+});
+
+// ---------- download em fluxo com teto ----------
+const doc = (extra = {}) => ({ documentMessage: { mimetype: 'application/pdf', ...extra } });
+const MB = 1024 * 1024;
+
+test('declarou pequeno mas o fluxo é grande: corta no teto, sem bufferizar tudo e sem anexo', async () => {
+  const p = pasta();
+  let puxados = 0;
+  let fonte;
+  const baixar = async () => {
+    fonte = Readable.from((async function* () { for (let i = 0; i < 1000; i++) { puxados++; yield Buffer.alloc(MB); } })());
+    return fonte;
+  };
+  const c = {};
+  await processarEvento(ev(msg(doc({ fileLength: 10 }), { id: 'S1' }), msg({ conversation: 'depois' }, { id: 'S2' })),
+    deps(p, { baixar, anexoMaxBytes: 3 * MB, contadores: c }));
+  const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
+  assert.equal(por.S1.anexo, null);
+  assert.equal(por.S2.texto, 'depois');
+  assert.ok(puxados <= 10, `puxou ${puxados} MB`);
+  assert.equal(fonte.destroyed, true);
+  assert.equal(c.anexo_descartado, 1);
+});
+
+test('fluxo parado: estoura o prazo, grava sem anexo e a fila segue', async () => {
+  const p = pasta();
+  let fonte;
+  const baixar = async () => { fonte = new Readable({ read() {} }); return fonte; };
+  const t0 = Date.now();
+  await processarEvento(ev(msg(doc(), { id: 'P1' }), msg({ conversation: 'proxima' }, { id: 'P2' })),
+    deps(p, { baixar, downloadTimeoutMs: 80 }));
+  assert.ok(Date.now() - t0 < 2000);
+  const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
+  assert.equal(por.P1.anexo, null);
+  assert.equal(por.P2.texto, 'proxima');
+  assert.equal(fonte.destroyed, true);
+});
+
+test('fileLength ausente, 0 ou estranho: tamanho desconhecido, o fluxo é que limita', async () => {
+  const p = pasta();
+  const baixar = async () => Readable.from([Buffer.from('%PDF-ok')]);
+  let i = 0;
+  for (const fl of [undefined, 0, 'abc', null, -5, { low: 7, high: 0 }]) {
+    const id = `FL${i++}`;
+    await processarEvento(ev(msg(doc(fl === undefined ? {} : { fileLength: fl }), { id })), deps(p, { baixar }));
+  }
+  const l = lista(p);
+  assert.equal(l.length, 6);
+  for (const j of l) assert.match(j.anexo, /\.pdf$/);
+});
+
+test('fluxo parado acima do teto declarado nem é aberto', async () => {
+  const p = pasta();
+  let abriu = 0;
+  await processarEvento(ev(msg(doc({ fileLength: 100 * MB }), { id: 'G1' })), deps(p, { anexoMaxBytes: 50 * MB, baixar: async () => { abriu++; return Readable.from([]); } }));
+  assert.equal(abriu, 0);
+});
+
+// ---------- nomes de anexo ----------
+test('ids a:b e a_b geram anexos diferentes e o segundo nunca substitui o primeiro', async () => {
+  const p = pasta();
+  await processarEvento(ev(msg(doc(), { id: 'a:b' })), deps(p, { baixar: async () => Readable.from([Buffer.from('um')]) }));
+  await processarEvento(ev(msg(doc(), { id: 'a_b' })), deps(p, { baixar: async () => Readable.from([Buffer.from('dois')]) }));
+  const l = lista(p);
+  assert.equal(l.length, 2);
+  assert.notEqual(l[0].anexo, l[1].anexo);
+  const conteudos = l.map((j) => fs.readFileSync(path.join(p, 'anexos', j.anexo), 'utf8')).sort();
+  assert.deepEqual(conteudos, ['dois', 'um']);
+});
+
+// ---------- erros de gravação ----------
+test('disco cheio vira contador e não derruba as outras mensagens', async () => {
+  const p = pasta();
+  const c = {};
+  let n = 0;
+  const gravar = (m, pa, o) => {
+    if (n++ === 0) { const e = new Error('cheio'); e.code = 'ENOSPC'; throw e; }
+    return { gravado: true, arquivo: 'x.json' };
+  };
+  await processarEvento(ev(msg({ conversation: 'a' }), msg({ conversation: 'b' })), deps(p, { gravar, contadores: c }));
+  assert.equal(c.disco_cheio, 1);
+  assert.equal(c.gravadas, 1);
 });

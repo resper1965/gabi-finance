@@ -4,10 +4,17 @@
   "private": true,
   "type": "module",
   "description": "Ouvinte somente leitura do WhatsApp pessoal: grava cada mensagem recebida no spool da escuta do gabi.brain.",
-  "engines": { "node": ">=20" },
-  "scripts": { "test": "node --test" },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "6.7.24",
     "qrcode-terminal": "0.12.0"
+  },
+  "overrides": {
+    "libsignal": "file:vendor/libsignal-node-bcea72d.tgz"
   }
 }

@@ -202,3 +202,71 @@ def test_limpar_orfaos_sem_pasta_anexos(tmp_path):
     con = conectar(tmp_path / "o.db")
     migrar(con, Path(__file__).parent.parent.parent / "migrations")
     assert limpar_orfaos(con, tmp_path / "nada") == 0
+
+
+# ---- listener comprometido: o brain não segue symlink nem abre FIFO no spool ----
+def test_json_symlink_nao_e_lido_e_vai_para_invalidos(con, tmp_path):
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    vitima = tmp_path / "vitima.json"
+    vitima.write_text(json.dumps({"id_externo": "VAZOU", "de": "5511912345678@s.whatsapp.net", "recebida_em": "2026-10-11T09:00:00+00:00", "texto": "segredo"}))
+    (pasta / "x.json").symlink_to(vitima)
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
+    assert vitima.exists() and not (pasta / "x.json").exists() and (pasta / "invalidos" / "x.json").is_symlink()
+
+
+def test_json_fifo_nao_trava_nem_e_lido(con, tmp_path):
+    import os
+    import signal
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    os.mkfifo(pasta / "f.json")
+    signal.alarm(5)
+    try:
+        assert ingerir_spool(con, pasta, AGORA) == 0
+    finally:
+        signal.alarm(0)
+    assert (pasta / "invalidos" / "f.json").exists()
+
+
+def test_json_gigante_e_recusado(con, tmp_path):
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    (pasta / "g.json").write_bytes(b"[" + b"0," * (6 * 1024 * 1024) + b"0]")
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert (pasta / "invalidos" / "g.json").exists()
+
+
+def test_pasta_lidos_symlink_nao_recebe_arquivos_fora_do_spool(con, tmp_path):
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    fora = tmp_path / "fora"
+    fora.mkdir()
+    (pasta / "lidos").symlink_to(fora, target_is_directory=True)
+    _msg(pasta, "a1")
+    assert ingerir_spool(con, pasta, AGORA) == 1
+    assert list(fora.iterdir()) == []
+    assert not (pasta / "a1.json").exists()
+
+
+def test_json_com_chave_extra_lid_e_aceito(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "l1", de="123456789@lid", lid=True)
+    assert ingerir_spool(con, pasta, AGORA) == 1
+    assert con.execute("select de from escuta_msg").fetchone()[0] == "123456789@lid"
+
+
+def test_limpar_orfaos_pasta_anexos_symlink_nao_apaga_fora(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    alvo = tmp_path / "dados-do-brain"
+    alvo.mkdir()
+    (alvo / "backup.db").write_bytes(b"x")
+    _velho(alvo / "backup.db")
+    (pasta / "anexos").symlink_to(alvo, target_is_directory=True)
+    con = conectar(tmp_path / "o.db")
+    migrar(con, MIGR)
+    assert limpar_orfaos(con, pasta) == 0
+    assert (alvo / "backup.db").exists()

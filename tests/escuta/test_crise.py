@@ -96,3 +96,56 @@ def test_ingestao_nao_trata_palavras_risco_como_mensagem(con, tmp_path):
     escrever_palavras_risco(con, tmp_path)
     ingerir_spool(con, tmp_path, "2026-10-11T10:00:00")
     assert (tmp_path / "palavras-risco.json").exists() and not (tmp_path / "invalidos").exists()
+
+
+# ---------------- listener comprometido: symlink plantado no spool ----------------
+def test_symlink_plantado_no_tmp_nao_e_escrito_atraves(con, tmp_path):
+    import os
+    from gabi.escuta.crise import escrever_palavras_risco
+    vitima = tmp_path / "gabi.db"
+    vitima.write_bytes(b"BANCO-INTACTO")
+    os.chmod(vitima, 0o600)
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    (spool / "palavras-risco.json.tmp").symlink_to(vitima)
+    _define(con, ["matar"])
+    assert escrever_palavras_risco(con, spool) is True
+    assert vitima.read_bytes() == b"BANCO-INTACTO" and (vitima.stat().st_mode & 0o777) == 0o600
+    assert json.loads((spool / "palavras-risco.json").read_text(encoding="utf-8")) == ["matar"]
+
+
+def test_symlink_no_proprio_alvo_e_substituido_sem_tocar_na_vitima(con, tmp_path):
+    from gabi.escuta.crise import escrever_palavras_risco
+    vitima = tmp_path / "gabi.db"
+    vitima.write_bytes(b"BANCO-INTACTO")
+    (tmp_path / "palavras-risco.json").symlink_to(vitima)
+    _define(con, ["matar"])
+    escrever_palavras_risco(con, tmp_path)
+    assert vitima.read_bytes() == b"BANCO-INTACTO"
+    assert not (tmp_path / "palavras-risco.json").is_symlink()
+
+
+def test_fifo_no_alvo_nao_trava_a_rodada(con, tmp_path):
+    import os
+    import signal
+    from gabi.escuta.crise import escrever_palavras_risco
+    os.mkfifo(tmp_path / "palavras-risco.json")
+    _define(con, ["matar"])
+    signal.alarm(5)
+    try:
+        assert escrever_palavras_risco(con, tmp_path) is True
+    finally:
+        signal.alarm(0)
+    assert json.loads((tmp_path / "palavras-risco.json").read_text(encoding="utf-8")) == ["matar"]
+
+
+def test_falha_na_escrita_limpa_o_tmp(con, tmp_path, monkeypatch):
+    import os
+    from gabi.escuta import crise
+    _define(con, ["matar"])
+    monkeypatch.setattr(os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("falha")))
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    with pytest.raises(OSError):
+        crise.escrever_palavras_risco(con, spool)
+    assert list(spool.iterdir()) == []

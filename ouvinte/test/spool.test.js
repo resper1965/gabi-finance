@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gravarMensagem, tocarGatilho } from '../src/spool.js';
+import { gravarMensagem, tocarGatilho, nomeDoId, nomeAnexo } from '../src/spool.js';
 
 const nova = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spool-'));
 const base = (o = {}) => ({
@@ -80,15 +80,83 @@ test('anexo é gravado em anexos/ ANTES do json', () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(p, r.arquivo), 'utf8')).anexo, 'ABC123.pdf');
 });
 
-test('nomes com separadores ou .. são recusados', () => {
+test('anexo com separadores ou .. é recusado (nome vem de fora)', () => {
   const p = nova();
-  for (const id of ['../x', 'a/b', 'a\\b', '..', '', 'a\0b']) {
-    assert.throws(() => gravarMensagem(base({ id_externo: id }), p), /id_externo/);
-  }
   for (const nome of ['../x.pdf', 'a/b.pdf', 'a\\b.pdf', '..', '.', '']) {
     assert.throws(() => gravarMensagem(base({ anexo: nome }), p, { anexo: { nome, dados: Buffer.from('x') } }), /anexo/);
   }
   assert.deepEqual(fs.readdirSync(p), []);
+});
+
+test('id com separador ou .. nunca derruba a mensagem: vira nome seguro com hash', () => {
+  const p = nova();
+  const nomes = [];
+  for (const id of ['../x', 'a/b', 'a\\b', '..', 'x..y', '.oculto']) {
+    const r = gravarMensagem(base({ id_externo: id }), p);
+    assert.equal(r.gravado, true, id);
+    assert.match(r.arquivo, /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.json$/);
+    assert.ok(!r.arquivo.includes('..'));
+    nomes.push(r.arquivo);
+  }
+  assert.equal(new Set(nomes).size, nomes.length);
+  assert.deepEqual(fs.readdirSync(p).filter((n) => n.endsWith('.json')).sort(), nomes.sort());
+  assert.throws(() => gravarMensagem(base({ id_externo: '' }), p), /id_externo/);
+  assert.equal(gravarMensagem(base({ id_externo: 'a\0b' }), p).gravado, true);
+});
+
+test('nomes reservados (palavras-risco, gatilho) ganham sufixo de hash', () => {
+  const p = nova();
+  for (const id of ['palavras-risco', 'gatilho', 'Palavras-Risco']) {
+    const r = gravarMensagem(base({ id_externo: id }), p);
+    assert.notEqual(r.arquivo, `${id}.json`);
+    assert.match(r.arquivo, /-[0-9a-f]{12}\.json$/);
+  }
+});
+
+test('tmp é aberto com wx: symlink plantado em .json.tmp não é seguido', () => {
+  const p = nova();
+  const vitima = path.join(nova(), 'vitima.txt');
+  fs.writeFileSync(vitima, 'intacto');
+  const nome = nomeDoId('SYM1');
+  fs.symlinkSync(vitima, path.join(p, `${nome}.json.tmp`));
+  const r = gravarMensagem(base({ id_externo: 'SYM1' }), p);
+  assert.equal(r.gravado, true);
+  assert.equal(fs.readFileSync(vitima, 'utf8'), 'intacto');
+  assert.equal(fs.lstatSync(path.join(p, r.arquivo)).isFile(), true);
+});
+
+test('falha de escrita (disco cheio) limpa o tmp e propaga o erro', () => {
+  const p = nova();
+  const orig = fs.writeFileSync;
+  fs.writeFileSync = (f, ...a) => {
+    if (String(f).endsWith('.json.tmp')) { orig(f, 'parcial', { flag: 'wx' }); const e = new Error('cheio'); e.code = 'ENOSPC'; throw e; }
+    return orig(f, ...a);
+  };
+  try { assert.throws(() => gravarMensagem(base(), p), { code: 'ENOSPC' }); } finally { fs.writeFileSync = orig; }
+  assert.deepEqual(fs.readdirSync(p), []);
+});
+
+test('fsync do arquivo antes de publicar', () => {
+  const p = nova();
+  const eventos = [];
+  const of = fs.fsyncSync, ol = fs.linkSync;
+  fs.fsyncSync = (...a) => { eventos.push('fsync'); return of(...a); };
+  fs.linkSync = (...a) => { eventos.push('link'); return ol(...a); };
+  try { gravarMensagem(base(), p); } finally { fs.fsyncSync = of; fs.linkSync = ol; }
+  assert.ok(eventos.indexOf('fsync') >= 0 && eventos.indexOf('fsync') < eventos.indexOf('link'));
+});
+
+test('anexo existente nunca é sobrescrito', () => {
+  const p = nova();
+  gravarMensagem(base({ id_externo: 'U1', anexo: 'mesmo.pdf' }), p, { anexo: { nome: 'mesmo.pdf', dados: Buffer.from('primeiro') } });
+  gravarMensagem(base({ id_externo: 'U2', anexo: 'mesmo.pdf' }), p, { anexo: { nome: 'mesmo.pdf', dados: Buffer.from('segundo') } });
+  assert.equal(fs.readFileSync(path.join(p, 'anexos', 'mesmo.pdf'), 'utf8'), 'primeiro');
+});
+
+test('nomeAnexo: id estranho, nome distinto e limite de tamanho', () => {
+  assert.notEqual(nomeAnexo('a:b', 'pdf'), nomeAnexo('a_b', 'pdf'));
+  assert.equal(nomeAnexo('ABC', 'pdf'), 'ABC.pdf');
+  assert.ok(nomeAnexo('x'.repeat(500), 'pdf').length <= 140);
 });
 
 test('id com caracteres estranhos vira nome seguro e distinto', () => {

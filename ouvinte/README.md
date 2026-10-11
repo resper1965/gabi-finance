@@ -16,24 +16,26 @@ presença ou recibo, e confere `markOnlineOnConnect=false`, `syncFullHistory=fal
 
 **Verificação obrigatória do Ricardo antes de `npm ci --ignore-scripts` na VPS:**
 - O Baileys já teve typosquats maliciosos no npm. Use somente o nome com escopo `@whiskeysockets/baileys`; confira `npm view @whiskeysockets/baileys@6.7.24 dist.integrity` contra `package-lock.json` (`sha512-Ljq7si+gsNIE9d5dP69E99TTQp+BxxPgitWvmZMXExGc1Ctr0SCDLFZmxRLUDC5HB0/Itw5uk+HJeBONrLP99Q==`) e o repositório oficial WhiskeySockets/Baileys.
-- O Baileys traz um `install script` e uma dependência **git** (`libsignal` de `github.com/whiskeysockets/libsignal-node`, fixada por commit `bcea72d…`, sem hash de integridade do npm). Por isso `--ignore-scripts`. O lockfile referencia o git por `ssh://`; sem chave SSH do GitHub o `npm ci` falha, e o contorno é `git config --global url."https://github.com/".insteadOf ssh://git@github.com/` (como root, só para o `npm ci`).
-- Dependências opcionais do Baileys (sharp, jimp, audio-decode) NÃO são usadas: o ouvinte só baixa e grava bytes.
+- O Baileys declara `libsignal` como dependência git. Para não depender de git/ssh nem de código sem hash, o commit exato foi **vendorizado**: `vendor/libsignal-node-bcea72d.tgz` (código-fonte público de `WhiskeySockets/libsignal-node` no commit `bcea72df9ec34d9d9140ab30619cf479c7c144c7`, baixado de `https://codeload.github.com/WhiskeySockets/libsignal-node/tar.gz/bcea72df9ec34d9d9140ab30619cf479c7c144c7`; nada foi executado). `package.json` tem `"overrides": {"libsignal": "file:vendor/libsignal-node-bcea72d.tgz"}` e o lockfile guarda o integrity do tarball (teste confere). Tamanho 74615 bytes, sha256 `e8237ac721bdf8c622d2f13a4035b69acccb9f0c5999aa5e88944c4f171dd174`. **Passo do Ricardo:** baixe o mesmo commit do upstream, compare o sha256 e faça `diff -r` do conteúdo extraído contra o tarball (o gzip do GitHub pode variar, o conteúdo não).
+- O lockfile foi gerado com `--legacy-peer-deps`: `sharp` (peer dependency do Baileys, com binários nativos) e `@img/*` NÃO entram; `jimp`, `audio-decode` e `link-preview-js` são opcionais e também não entram. O ouvinte só baixa e grava bytes (um teste falha se o lock tiver git/ssh, entrada sem integrity ou `sharp`). Na VPS use `npm ci --ignore-scripts --legacy-peer-deps`.
+- O Baileys tem `install script`: por isso sempre `--ignore-scripts`.
 
 ## Uso
 
 ```
-npm ci --ignore-scripts                 # passo do Ricardo, em /opt/escuta-ouvinte
+npm ci --ignore-scripts --legacy-peer-deps  # passo do Ricardo, em /opt/escuta-ouvinte
 node src/ouvinte.js --parear            # QR no terminal; sai ao concluir
 node src/ouvinte.js                     # roda para sempre (systemd: escuta-ouvinte.service)
 node --test                             # testes; não precisam do Baileys instalado
 ```
 
-Ambiente: `OUVINTE_SPOOL` (padrão `/var/lib/gabi-escuta-spool`), `OUVINTE_AUTH_DIR` (padrão `/var/lib/escuta-ouvinte/auth`), `OUVINTE_ANEXO_MAX_MB` (padrão 50; acima disso grava a mensagem sem anexo).
+Ambiente: `OUVINTE_SPOOL` (padrão `/var/lib/gabi-escuta-spool`), `OUVINTE_AUTH_DIR` (padrão `/var/lib/escuta-ouvinte/auth`), `OUVINTE_ANEXO_MAX_MB` (padrão 50) e `OUVINTE_DOWNLOAD_TIMEOUT_S` (padrão 60). O download é em fluxo: passou do teto (ou do prazo, ou tamanho declarado acima do teto) grava a mensagem sem anexo; nunca guarda o arquivo inteiro em memória antes de checar.
 O estado de pareamento fica em `OUVINTE_AUTH_DIR` (0700); apagar essa pasta despareia.
 
 ## Privacidade e limites
 
 - Log só com contadores e estado; nunca texto, número, nome ou QR (o QR só aparece no terminal do `--parear`).
+- Quando o JID é `@lid` e o Baileys informa o telefone (`senderPn`/`participantPn`), `de` é o telefone; senão grava o id com `"lid": true`.
 - Mídia expirada no servidor do WhatsApp não é rebaixada (não há pedido de reenvio): a mensagem é gravada sem anexo.
 - O WhatsApp confirma entrega automaticamente (protocolo); o ouvinte nunca envia confirmação de leitura nem presença.
 - Clientes não oficiais podem levar a restrição/banimento da conta; o aparelho vinculado pode ser desconectado após longa inatividade do celular.

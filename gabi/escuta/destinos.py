@@ -70,18 +70,30 @@ def _nome(con, numero: str) -> str | None:
 
 
 def _ler(msg: dict, spool: Path | None, maximo: int) -> tuple[bytes, str]:
-    """Lê o anexo em modo leitura. Defesa em profundidade (o caminho vem do banco): só arquivo regular cujo caminho resolvido
-    está dentro do spool, e com tamanho até o teto (checado antes de ler). RuntimeError = a mensagem falha, o arquivo fica."""
+    """Lê o anexo em modo leitura. Defesa em profundidade (o caminho vem do banco e o spool é gravável pelo ouvinte): a pasta do
+    arquivo resolvida precisa estar dentro do spool e o arquivo em si tem de ser REGULAR e NÃO symlink (O_NOFOLLOW; FIFO não
+    bloqueia), com tamanho até o teto (checado no fd antes de ler). RuntimeError = a mensagem falha, o arquivo fica."""
+    import os
+    import stat
+    fd = -1
     try:
-        caminho = Path(msg["anexo_caminho"]).resolve(strict=True)
-        if spool is None or not caminho.is_relative_to(Path(spool).resolve()) or not caminho.is_file():
+        bruto = Path(msg["anexo_caminho"])
+        if spool is None or not bruto.parent.resolve(strict=True).is_relative_to(Path(spool).resolve()):
             raise RuntimeError("anexo fora do spool")
-        if caminho.stat().st_size > maximo:
+        fd = os.open(bruto, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError("anexo não é arquivo regular")
+        if st.st_size > maximo:
             raise RuntimeError("anexo maior que o teto")
-        with open(caminho, "rb") as f:
-            return f.read(), caminho.name
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            return f.read(), bruto.name
     except (OSError, ValueError) as e:
         raise RuntimeError("anexo ilegível") from e
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 class DestinosReais:

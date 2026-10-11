@@ -405,6 +405,9 @@ def test_unidade_do_ouvinte_segue_o_padrao_e_isola_o_brain():
                   "ProtectKernelTunables=yes", "ProtectKernelModules=yes", "ProtectControlGroups=yes", "CapabilityBoundingSet=\n",
                   "RestrictAddressFamilies=AF_INET AF_INET6\n", "ReadWritePaths=/var/lib/gabi-escuta-spool /var/lib/escuta-ouvinte\n",
                   "InaccessiblePaths=/var/lib/gabi-brain /etc/gabi", "MemoryMax=512M",
+                  "ProtectKernelLogs=yes", "ProtectClock=yes", "RestrictNamespaces=yes", "LockPersonality=yes",
+                  "RestrictSUIDSGID=yes", "SystemCallFilter=@system-service", "SystemCallErrorNumber=EPERM",
+                  "RestartPreventExitStatus=78",
                   "OUVINTE_SPOOL=/var/lib/gabi-escuta-spool", "OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth"):
         assert linha in u, linha
     assert "AF_UNIX" not in re.sub(r"(?m)^#.*$", "", u)
@@ -417,6 +420,7 @@ def test_instalar_cria_usuario_do_ouvinte_e_instala_sem_ligar_nem_rodar_npm():
     assert "gabibrain-escuta" in re.search(r"useradd .*escuta-ouvinte", INSTALAR).group(0)
     assert re.search(r"install -d -o escuta-ouvinte -g escuta-ouvinte -m 700 /var/lib/escuta-ouvinte", INSTALAR)
     assert "/opt/escuta-ouvinte" in INSTALAR
+    assert 'cp -r "$AQUI/ouvinte/vendor" /opt/escuta-ouvinte/vendor' in INSTALAR
     ativas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith(("#", "echo"))]
     assert not any("escuta-ouvinte" in l and ("enable" in l or "start" in l) for l in ativas)
     assert not any(re.search(r"\bnpm\b", l) for l in ativas)
