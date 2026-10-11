@@ -272,3 +272,12 @@ def test_revalidar_devolve_estado_e_payload_atual(con):
     itens = _itens(con)
     est, p = revalidar(con, "vence_hoje", {"chave": "k", "itens": itens})
     assert est == "vale" and [i["id"] for i in p["itens"]] == ["b:1", "c:1"]
+
+
+def test_vence_hoje_sem_item_aberto_mas_com_a_conferir_e_incerto(con):
+    _comp(con, "a:1", "Luz", "2026-10-10", "pago")
+    _comp(con, "b:1", "Gás", "2026-10-10", "a_conferir")
+    itens = [{"id": "a:1", "nome": "Luz", "valor": "1", "vencimento": "2026-10-10"}, {"id": "b:1", "nome": "Gás", "valor": "2", "vencimento": "2026-10-10"}]
+    assert ainda_vale(con, "vence_hoje", {"chave": "k", "itens": itens}) == "incerto"
+    con.execute("update compromisso set estado='pago' where id='b:1'")
+    assert ainda_vale(con, "vence_hoje", {"chave": "k", "itens": itens}) == "resolvido"

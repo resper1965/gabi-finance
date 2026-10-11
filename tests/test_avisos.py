@@ -230,3 +230,50 @@ def test_produtor_nao_fecha_aviso_incerto_a_conferir(con):
     con.execute("delete from compromisso")
     gerar_avisos(con, AGORA)
     assert con.execute("select count(*) from aviso where entregue_em is null").fetchone()[0] == 1
+
+
+# ---- incerto vencido (round 2) ----
+def _abertos(con):
+    return con.execute("select count(*) from aviso where entregue_em is null").fetchone()[0]
+
+
+def test_produtor_fecha_incerto_mais_velho_que_a_janela_sem_enviar_e_mantem_o_mais_novo(con):
+    _comp(con, "a:2026-10", "Velha", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(days=3))
+    con.execute("update compromisso set estado='a_conferir'")
+    _comp(con, "b:2026-10", "Nova", "2026-10-06", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=12))
+    con.execute("update compromisso set estado='a_conferir' where id='b:2026-10'")
+    gerar_avisos(con, AGORA)
+    r = {json.loads(x["payload"])["nome"]: x for x in con.execute("select * from aviso")}
+    assert r["Velha"]["entregue_em"] and r["Velha"]["telegram_em"] == r["Velha"]["entregue_em"]
+    assert r["Nova"]["entregue_em"] is None and r["Nova"]["telegram_em"] is None
+
+
+def test_a_conferir_por_3_dias_e_depois_atrasado_gera_aviso_novo_e_e_enviado(con):
+    from gabi.telegram import enviar_avisos_contagem
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(days=3))
+    con.execute("update compromisso set estado='a_conferir'")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=1))   # fecha o velho (incerto fora da janela)
+    con.execute("update compromisso set estado='atrasado'")
+    assert len(gerar_avisos(con, AGORA)) == 1
+    chamadas = []
+    env = {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}
+    assert enviar_avisos_contagem(con, env, AGORA, lambda u, c: chamadas.append(c) or 200) == (1, 0, 0) and len(chamadas) == 1
+
+
+def test_aviso_velho_aberto_nao_enviado_nao_bloqueia_um_novo(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(days=3))
+    assert len(gerar_avisos(con, AGORA)) == 1   # o velho (aberto, fora da janela, nunca enviado) não segura o novo
+
+
+def test_silencio_semanal_vale_para_aviso_realmente_entregue(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(days=3))
+    con.execute("update aviso set telegram_em=?, entregue_em=?", ((AGORA - dt.timedelta(days=3)).isoformat(), (AGORA - dt.timedelta(days=2)).isoformat()))
+    assert gerar_avisos(con, AGORA) == []
+    # e o aviso ainda aberto mas já enviado ao Telegram também segura
+    con.execute("update aviso set entregue_em=null")
+    assert gerar_avisos(con, AGORA) == []

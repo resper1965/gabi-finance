@@ -16,6 +16,7 @@ from gabi.dinheiro.valor import formatar
 
 BRT = ZoneInfo("America/Sao_Paulo")
 HORAS_DADOS_ANTIGOS = 72
+JANELA_ENTREGA = dt.timedelta(days=2)  # idade máxima para o Telegram enviar um aviso (telegram.py usa esta mesma constante)
 
 
 def _inicio_do_dia_utc(agora: dt.datetime) -> str:
@@ -29,10 +30,18 @@ HORAS_EXPORTACAO = 9 * 24
 
 
 def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | None:
-    if tipo in SEMANAL and con.execute(
-            "select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and (entregue_em is null or criado_em>=?)",
-            (tipo, str(chave), (agora - dt.timedelta(days=DIAS_SILENCIO)).astimezone(dt.timezone.utc).isoformat())).fetchone():
-        return None
+    if tipo in SEMANAL:
+        # aberto segura o novo; mas (tipos revalidados) aberto, nunca enviado e fora da janela de entrega não segura: ninguém o enviará mais.
+        # Aviso fechado sem envio (telegram_em == entregue_em: obsoleto/incerto vencido) também não segura; só o realmente entregue/lido vale o silêncio.
+        velho = ""
+        if tipo in TIPOS_REVALIDADOS:
+            velho = " and not (entregue_em is null and telegram_em is null and criado_em<?)"
+        args = [tipo, str(chave), (agora - dt.timedelta(days=DIAS_SILENCIO)).astimezone(dt.timezone.utc).isoformat()]
+        if velho:
+            args.append((agora - JANELA_ENTREGA).astimezone(dt.timezone.utc).isoformat())
+        if con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and (entregue_em is null or criado_em>=?)"
+                       " and not (telegram_em is not null and telegram_em is entregue_em)" + velho, args).fetchone():
+            return None
     ja = con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and criado_em>=?", (tipo, str(chave), _inicio_do_dia_utc(agora))).fetchone()
     if ja:
         return None
@@ -43,12 +52,12 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
 VALE, RESOLVIDO, INCERTO = "vale", "resolvido", "incerto"
 
 
-def _item_aberto(con, i: dict) -> bool:
+def _item_estado(con, i: dict):
     if i.get("id") is not None:
-        r = con.execute("select 1 from compromisso where id=? and estado in ('aberto','previsto')", (str(i["id"]),)).fetchone()
+        r = con.execute("select estado from compromisso where id=?", (str(i["id"]),)).fetchone()
     else:  # payload anterior à gravação do id: casa por nome+vencimento
-        r = con.execute("select 1 from compromisso where nome=? and vencimento=? and estado in ('aberto','previsto')", (i.get("nome"), i.get("vencimento"))).fetchone()
-    return r is not None
+        r = con.execute("select estado from compromisso where nome=? and vencimento=? order by estado in ('aberto','previsto') desc", (i.get("nome"), i.get("vencimento"))).fetchone()
+    return r[0] if r else None
 
 
 def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
@@ -63,8 +72,11 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
             return INCERTO, payload
         return (VALE if r[0] == "atrasado" else RESOLVIDO), payload
     if tipo == "vence_hoje":
-        itens = [i for i in payload.get("itens") or [] if _item_aberto(con, i)]
-        return (VALE, {**payload, "itens": itens}) if itens else (RESOLVIDO, payload)
+        estados = [(i, _item_estado(con, i)) for i in payload.get("itens") or []]
+        itens = [i for i, e in estados if e in ("aberto", "previsto")]
+        if itens:
+            return VALE, {**payload, "itens": itens}
+        return (INCERTO if any(e == "a_conferir" for _, e in estados) else RESOLVIDO), payload
     if tipo == "cobrada_apos_cancelar":
         ok = con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
         return (VALE if ok else RESOLVIDO), payload
@@ -88,11 +100,14 @@ TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar")
 
 
 def _fechar_obsoletos(con, agora: dt.datetime) -> None:
-    """Fecha (entregue_em) o aviso ainda aberto cuja condição JÁ RESOLVEU; o incerto fica aberto. O painel não o mostra como pendente para sempre."""
+    """Fecha (telegram_em+entregue_em = fechado, não enviado) o aviso aberto cuja condição JÁ RESOLVEU, e o INCERTO mais velho que a janela de entrega
+    (o Telegram não o enviará mais; fechá-lo deixa nascer um aviso novo quando a conta voltar a `atrasado`). Incerto dentro da janela fica aberto."""
     ts = agora.astimezone(dt.timezone.utc).isoformat()
-    for r in con.execute("select id, tipo, payload from aviso where entregue_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
-        if ainda_vale(con, r["tipo"], json.loads(r["payload"])) == RESOLVIDO:
-            con.execute("update aviso set entregue_em=? where id=?", (ts, r["id"]))
+    limite = (agora - JANELA_ENTREGA).astimezone(dt.timezone.utc).isoformat()
+    for r in con.execute("select id, tipo, payload, criado_em from aviso where entregue_em is null and telegram_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
+        estado = ainda_vale(con, r["tipo"], json.loads(r["payload"]))
+        if estado == RESOLVIDO or (estado == INCERTO and r["criado_em"] < limite):
+            con.execute("update aviso set telegram_em=?, entregue_em=? where id=?", (ts, ts, r["id"]))
 
 
 def _valor(c) -> str | None:

@@ -13,7 +13,7 @@ from pathlib import Path
 from gabi.db import conectar, migrar
 
 MAX_POR_RODADA = 10
-JANELA = dt.timedelta(days=2)
+from gabi.avisos import JANELA_ENTREGA as JANELA  # noqa: E402  (mesma janela que o produtor usa)
 
 
 def _http_real(url: str, corpo: dict) -> int:
