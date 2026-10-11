@@ -78,6 +78,8 @@ class ModeloComCusto:
 
     def fechar(self) -> None:
         self._gravar_pendentes()
+        if self.pendentes:  # só a contagem, nunca valores
+            print(f"AVISO: {len(self.pendentes)} linha(s) de custo_modelo não gravada(s)", file=sys.stderr)
         self._con.close()
 
 

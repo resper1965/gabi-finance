@@ -282,3 +282,33 @@ def test_insert_pendente_e_regravado_no_fechar(amb):
     bloqueada.execute("commit")
     w.fechar()
     assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 1
+
+
+def test_custo_pendente_e_gravado_no_fechar_quando_a_rodada_e_interrompida(amb):
+    banco, spool, con = amb
+    w = prog.ModeloComCusto(Modelo(custo=0.02), banco)
+    real = w._con
+    bloqueada = conectar(banco)
+    real.execute("pragma busy_timeout=1")
+    bloqueada.execute("begin immediate")
+    w.completar("p", forte=False)               # insert falha: fica pendente
+    assert len(w.pendentes) == 1
+    bloqueada.execute("commit")
+    with pytest.raises(KeyboardInterrupt):
+        try:
+            raise KeyboardInterrupt
+        finally:
+            w.fechar()
+    assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 1
+
+
+def test_fechar_que_nao_consegue_gravar_imprime_so_a_contagem(amb, capsys):
+    banco, spool, con = amb
+    w = prog.ModeloComCusto(Modelo(custo=0.02), banco)
+    bloqueada = conectar(banco)
+    w._con.execute("pragma busy_timeout=1")
+    bloqueada.execute("begin immediate")
+    w.completar("p", forte=False)
+    w.fechar()
+    err = capsys.readouterr().err
+    assert "1 linha" in err and "0.02" not in err

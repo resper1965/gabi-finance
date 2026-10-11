@@ -3,6 +3,7 @@ Ordem de decisão: grupo não aprovado, bloqueado/ignorado, palavra de risco (se
 fora da lista (retida, sem modelo), aprovado (modelo). Texto de mensagem nunca vai a log, exceção ou aviso."""
 import json
 import logging
+import sqlite3
 from pathlib import Path
 
 from gabi.cobrar.cadastro import dados
@@ -168,7 +169,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
               modo: str = "registro", spool: Path | None = None) -> dict:
     if modo not in ("registro", "ativo"):
         raise ValueError(f"modo inválido: {modo!r}")
-    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0}
+    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0, "ocupado": 0}
     erro_geral = False
     palavras = palavras_risco(con)
     ids = [(r["id"], r["estado"]) for r in con.execute(
@@ -186,7 +187,14 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             r = classificar(m["texto"], cliente, orcamento) if _precisa_modelo(con, m, palavras) else _SEM
             # Fase 2: escrita imediata; relê a linha e o remetente (pode ter mudado enquanto o modelo rodava).
             # O lock de escrita fica preso durante as chamadas dos destinos (upload no Paperless): aceitável neste volume.
-            with transacao(con, imediata=True):
+            try:
+                con.execute("begin immediate")
+            except sqlite3.OperationalError:
+                # lock de escrita ocupado além do busy_timeout: a linha fica como está (sem falha, sem aviso) e a rodada para;
+                # as demais esperariam 5 s cada. O próximo disparo do timer tenta de novo.
+                c["ocupado"] = 1
+                break
+            with transacao(con, aberta=True):
                 m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
                 if m is None:
                     continue

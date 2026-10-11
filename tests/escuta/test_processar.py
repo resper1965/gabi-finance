@@ -615,3 +615,35 @@ def test_outro_operationalerror_nao_e_refeito_e_vira_falhou(con):
     r = _rodar(con, D(), _ped())
     assert D.n == 1 and r["falhas"] == 1 and _msg_row(con)["estado"] == "falhou"
     assert _avisos(con, "servico_falhou") == [{"unidade": "gabi-brain-escuta"}]
+
+
+# ---------------- lock de escrita ocupado ----------------
+def test_lock_ocupado_nao_vira_falhou_e_encerra_a_rodada(con, tmp_path):
+    _aprovado(con)
+    _msg(con, ext="m1", rec="2026-10-11T09:00:00")
+    _msg(con, ext="m2", rec="2026-10-11T09:01:00", texto="paga a Ana 50")
+    segura = conectar(tmp_path / "t.db")
+    segura.execute("pragma busy_timeout=1")
+    con.execute("pragma busy_timeout=1")
+    segura.execute("begin immediate")
+    d, cli = DestinosContam(), _ped()
+    r = _rodar(con, d, cli)
+    assert r["ocupado"] == 1 and r["falhas"] == 0 and cli.chamadas == 1   # parou na primeira: a segunda nem tentou
+    assert [x["estado"] for x in con.execute("select estado from escuta_msg order by id")] == ["nova", "nova"]
+    assert con.execute("select count(*) from aviso").fetchone()[0] == 0 or _avisos(con, "servico_falhou") == []
+    segura.execute("rollback")
+    r2 = _rodar(con, d, _ped())
+    assert r2["ocupado"] == 0 and d.pedidos == ["m1", "m2"]
+    assert [x["estado"] for x in con.execute("select estado from escuta_msg order by id")] == ["processada", "processada"]
+
+
+def test_operationalerror_dentro_do_corpo_continua_virando_falhou(con):
+    _aprovado(con)
+    _msg(con)
+
+    class D(DestinosContam):
+        def pedido(self, *a, **k):
+            raise sqlite3.OperationalError("no such column: x")
+    r = _rodar(con, D(), _ped())
+    assert r["falhas"] == 1 and r["ocupado"] == 0 and _msg_row(con)["estado"] == "falhou"
+    assert _avisos(con, "servico_falhou") == [{"unidade": "gabi-brain-escuta"}]
