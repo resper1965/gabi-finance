@@ -450,7 +450,29 @@ def test_saude_com_anexo_fora_do_spool_falha(con, tmp_path):
     _msg(con, texto=SEGREDO, anexo=str(fora))
     d = FakeDestinos()
     _rodar(con, d, FakeModelo({"tipo": "saude", "confianca": 0.95, "campos": {}}), spool=spool)
-    assert d.saudes == [] and _msg_row(con)["estado"] == "falhou" and _msg_row(con)["texto"] == SEGREDO
+    assert d.saudes == [] and _msg_row(con)["estado"] == "falhou" and _msg_row(con)["texto"] is None
+
+
+def test_saude_que_falha_no_destino_apaga_o_texto(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto=SEGREDO, anexo=str(arq))
+
+    class Quebra(FakeDestinos):
+        def saude(self, con, msg, campos):
+            raise RuntimeError("paperless fora")
+
+    _rodar(con, Quebra(), FakeModelo({"tipo": "saude", "confianca": 0.95, "campos": {}}), spool=spool)
+    m = _msg_row(con)
+    assert m["estado"] == "falhou" and m["texto"] is None and arq.exists()
+
+
+def test_falha_de_outro_tipo_mantem_o_texto(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto=SEGREDO, anexo=str(arq))
+    _rodar(con, FakeDestinos(erro_doc=RuntimeError("x")), FakeModelo(), spool=spool)
+    assert _msg_row(con)["estado"] == "falhou" and _msg_row(con)["texto"] == SEGREDO
 
 
 def test_documentos_so_conta_apos_sucesso(con, tmp_path):

@@ -11,6 +11,7 @@ class PaperlessFalso:
         self.usuarios = {}
         self.chamadas = []  # (metodo, caminho, corpo, token)
         self._prox = 100
+        self.enviados = []  # (corpo multipart em bytes, cabecalhos)
 
     def __call__(self, metodo, url, corpo=None, cabecalhos=None):
         token = (cabecalhos or {}).get("Authorization", "")
@@ -35,6 +36,9 @@ class PaperlessFalso:
             if metodo == "PATCH":
                 d.update(corpo)
                 return 200, d
+        if rota == "/api/documents/post_document/" and metodo == "POST":
+            self.enviados.append((corpo, cabecalhos))
+            return 200, "tarefa-uuid-1"
         if rota == "/api/tags/":
             if metodo == "GET":
                 nome = unquote(re.search(r"name__iexact=([^&]+)", qs).group(1)) if "name__iexact" in qs else None

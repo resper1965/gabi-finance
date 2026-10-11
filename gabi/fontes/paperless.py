@@ -26,7 +26,7 @@ class ErroPaperless(Exception):
 
 
 def _http_real(metodo, url, corpo=None, cabecalhos=None):
-    dados = json.dumps(corpo).encode() if corpo is not None else None
+    dados = corpo if isinstance(corpo, bytes) else (json.dumps(corpo).encode() if corpo is not None else None)  # bytes = multipart já montado
     req = urllib.request.Request(url, data=dados, method=metodo, headers={"Content-Type": "application/json", **(cabecalhos or {})})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -42,8 +42,8 @@ class Paperless:
     def __init__(self, base: str, token: str, *, http: Http | None = None):
         self.base, self.token, self._http = base.rstrip("/"), token, http or _http_real
 
-    def _pedir(self, metodo, caminho, corpo=None, token=None):
-        status, resp = self._http(metodo, self.base + caminho, corpo, {"Authorization": f"Token {token or self.token}"})
+    def _pedir(self, metodo, caminho, corpo=None, token=None, cabecalhos=None):
+        status, resp = self._http(metodo, self.base + caminho, corpo, {"Authorization": f"Token {token or self.token}", **(cabecalhos or {})})
         if status >= 400:
             raise ErroPaperless(f"{metodo} {caminho.split('?')[0]} -> {status}")
         return resp
@@ -79,6 +79,20 @@ class Paperless:
         doc = self._pedir("GET", f"/api/documents/{int(id)}/")
         ids = set(doc.get("tags") or []) | {self._etiqueta(t) for t in tags}
         self._pedir("PATCH", f"/api/documents/{int(id)}/", {"tags": sorted(ids)})
+
+    def enviar(self, conteudo: bytes, nome: str, tags: list[str]) -> int | str:
+        """Envia um documento novo (POST multipart em /api/documents/post_document/) com etiquetas `gabi:*`; devolve o identificador
+        da tarefa de consumo que o Paperless responde (o id do documento só existe depois). Nunca altera nem apaga nada existente."""
+        if not tags or any(not isinstance(t, str) or not t.startswith("gabi:") for t in tags):
+            raise ValueError("o app só mexe em etiquetas gabi:*")
+        limpo = "".join(ch for ch in nome.replace("\\", "/").rsplit("/", 1)[-1] if ch.isprintable() and ch not in '"') or "documento"
+        ids = [self._etiqueta(t) for t in tags]
+        fronteira = "gabi" + secrets.token_hex(16)
+        partes = [f'--{fronteira}\r\nContent-Disposition: form-data; name="tags"\r\n\r\n{i}\r\n'.encode() for i in ids]
+        partes.append(f'--{fronteira}\r\nContent-Disposition: form-data; name="document"; filename="{limpo}"\r\n'
+                      f"Content-Type: application/octet-stream\r\n\r\n".encode() + bytes(conteudo) + b"\r\n")
+        corpo = b"".join(partes) + f"--{fronteira}--\r\n".encode()
+        return self._pedir("POST", "/api/documents/post_document/", corpo, cabecalhos={"Content-Type": f"multipart/form-data; boundary={fronteira}"})
 
     def campos(self, id: int) -> dict:
         """CPF, valor, vencimento e pessoa do documento (campos personalizados); ausente = None."""

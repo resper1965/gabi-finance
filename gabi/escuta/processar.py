@@ -47,14 +47,15 @@ def _fechar(con, id_: int, agora: str, tipo=None, confianca=None, campos=None, a
         (tipo, confianca, json.dumps(campos, ensure_ascii=False) if campos else None, agora, id_))
 
 
-def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None) -> None:
+def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None, apagar_texto: bool = False) -> None:
     with transacao(con):
-        con.execute("update escuta_msg set estado='falhou', processada_em=? where id=?", (agora, id_))
+        con.execute("update escuta_msg set estado='falhou', processada_em=?" + (", texto=null" if apagar_texto else "") + " where id=?",
+                    (agora, id_))
         if aviso:
             _aviso(con, aviso[0], aviso[1], agora)
 
 
-def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list, spool) -> None:
+def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list, spool, sinais: dict) -> None:
     """Roda dentro da transação da mensagem. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
     Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
     id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
@@ -110,6 +111,7 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
         c["classificadas"] += 0 if negado else 1
         return
     if tipo == "saude":  # o texto e os campos de saúde não ficam no banco da escuta
+        sinais["saude"] = True  # se falhar daqui em diante, o texto de saúde é apagado (ADR-014)
         if ativo:
             _exigir_dentro(m, spool)
             destinos.saude(con, dict(m), campos)
@@ -160,12 +162,13 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
         if estado_ini == "nova":
             c["novas"] += 1
         apagar: list = []
+        sinais: dict = {}
         try:
             with transacao(con):
                 m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
                 if m is None:
                     continue
-                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool)
+                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais)
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)
@@ -178,7 +181,7 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             log.warning("escuta: mensagem %s falhou (%s)", id_, type(e).__name__)
             c["falhas"] += 1
             erro_geral = True
-            _falhou(con, id_, agora)
+            _falhou(con, id_, agora, apagar_texto=bool(sinais.get("saude")))
             continue
         if spool is not None:
             for a in apagar:
