@@ -11,6 +11,8 @@ Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
 # PAPERLESS_URL, PAPERLESS_TOKEN e NIBO_TOKEN ficam aqui, colocados por você (R5); '-' = sobe sem o arquivo e a fonte responde "não configurada".
 EnvironmentFile=-/etc/gabi/cobrar.env
+# OPENROUTER_API_KEY (e, se quiser, OPENROUTER_MODEL_FAST/OPENROUTER_MODEL_STRONG): opcional; sem o arquivo, o modelo responde "chave ausente".
+EnvironmentFile=-/etc/gabi/openrouter.env
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock
 # Pasta e socket para o dono e o grupo gabibrain (a API e o MCP); mais ninguém na VPS alcança a ponte.
 RuntimeDirectory=gabi-brain-fontes

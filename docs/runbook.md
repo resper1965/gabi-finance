@@ -117,6 +117,9 @@ Rodar à mão: `sudo systemctl start gabi-brain-trabalho`; ler: `journalctl -u g
 ## Comprovantes Pix {#comprovantes-ingestao}
 `gabi-brain-comprovantes.timer` (07h BRT) lê o texto dos documentos do Paperless pela ponte do serviço de fontes, grava o comprovante, **propõe** vínculos aos lançamentos (nunca confirma, R1) e acrescenta a etiqueta `gabi:comprovante`. Idempotente por documento. Rodar à mão: `sudo systemctl start gabi-brain-comprovantes`.
 
+## Modelo (OpenRouter) {#openrouter}
+Opcional. Crie `/etc/gabi/openrouter.env` (`root:gabibrain-fontes` 0640) com `OPENROUTER_API_KEY=...` (e, se quiser trocar, `OPENROUTER_MODEL_FAST`/`OPENROUTER_MODEL_STRONG`; padrões em docs/fontes/openrouter.md) e `sudo systemctl restart gabi-brain-fontes`. Só o serviço de fontes lê a chave; sem o arquivo o modelo responde "chave ausente" e o resto funciona. O log do serviço mostra apenas se a chave existe (sim/não).
+
 ## Saúde, Família e Rumo {#saude-familia}
 - **Chave da saúde:** crie `/etc/gabi/saude.key` (32 bytes crus, 64 hex ou base64; `root:gabibrain` 0640) e reinicie a api. Sem ela, `/api/v1/familia/*` responde 503. O cofre é `/var/lib/gabi-brain/saude.enc` (AES-256-GCM, ADR-014). **Guarde a chave fora da VPS: sem ela os exames não abrem.**
 - **Quem vê:** pela linha `saúde` da matriz de acesso (`total` = todos, `parcial` = só a própria pessoa, `nenhum`/sem linha = ninguém além do boss). Cadastre o login de cada familiar: `python -m gabi.acesso adicionar login pessoa_id familia_vip`.

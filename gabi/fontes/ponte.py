@@ -11,15 +11,17 @@ import socketserver
 from pathlib import Path
 
 from gabi.fontes.nibo import ErroNibo
+from gabi.fontes.openrouter import ErroOpenRouter
 from gabi.fontes.paperless import ErroPaperless
 
 MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
-    "paperless": frozenset({"docs", "baixar", "etiquetar", "campos"}),
+    "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar"}),
+    "openrouter": frozenset({"completar"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
 }
-ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo}
+ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo, "openrouter": ErroOpenRouter}
 
 
 def _codificar(v):
@@ -72,7 +74,7 @@ def _atender(fontes: dict, bruto: bytes) -> dict:
         if hasattr(r, "__next__"):
             r = list(r)
         return {"ok": _codificar(r)}
-    except (ErroPaperless, ErroNibo) as e:
+    except (ErroPaperless, ErroNibo, ErroOpenRouter) as e:
         return {"erro": {"tipo": type(e).__name__, "msg": str(e)}}
     except Exception as e:  # nunca vaza traço (pode conter URL/cabeçalho)
         return {"erro": {"tipo": "interno", "msg": type(e).__name__}}
@@ -117,7 +119,7 @@ class Ponte:
             raise erro("serviço de fontes indisponível") from None
         if "erro" in resp:
             t, msg = resp["erro"]["tipo"], resp["erro"]["msg"]
-            raise erro(msg if t in ("ErroPaperless", "ErroNibo", "nao_configurada") else f"{t}: {msg}")
+            raise erro(msg if t in (erro.__name__, "nao_configurada") else f"{t}: {msg}")
         return _decodificar(resp["ok"])
 
     def configurada(self) -> bool:
@@ -130,3 +132,14 @@ class Ponte:
         if nome.startswith("_") or nome not in PERMITIDOS[self._fonte]:
             raise AttributeError(nome)
         return lambda *a, **k: self._chamar(nome, a, k)
+
+
+class PonteModelo:
+    """ModeloCliente (gabi.dinheiro.modelo) que chama o OpenRouter no serviço de fontes; sem chave, levanta ErroOpenRouter("chave ausente")."""
+
+    def __init__(self, caminho):
+        self._ponte = Ponte(caminho, "openrouter")
+
+    def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
+        texto, custo = self._ponte._chamar("completar", (prompt,), {"forte": forte})
+        return texto, float(custo)

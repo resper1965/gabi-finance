@@ -118,3 +118,68 @@ def test_ambiente_com_socket_usa_a_ponte_e_devolve_none_se_nao_configurada(tmp_p
 def test_socket_so_para_dono_e_grupo(ponte):
     import stat
     assert stat.S_IMODE(ponte[0].stat().st_mode) == 0o660
+
+
+# ---------------- Task 7a: enviar (Paperless) e openrouter ----------------
+from gabi.fontes.openrouter import ErroOpenRouter, OpenRouter  # noqa: E402
+from gabi.fontes.paperless import Paperless  # noqa: E402
+from gabi.fontes.ponte import PonteModelo  # noqa: E402
+from gabi.fontes.servico import openrouter_do_ambiente  # noqa: E402
+
+
+def _servir(tmp_path, fontes):
+    srv = Servidor(tmp_path / "g.sock", fontes)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, tmp_path / "g.sock"
+
+
+def test_ponte_permite_enviar_e_so_gabi_tags(tmp_path):
+    chamadas = []
+
+    def http(metodo, url, corpo=None, cab=None):
+        chamadas.append((metodo, url))
+        if "/api/tags/" in url and metodo == "GET":
+            return 200, {"results": [{"id": 3, "name": "gabi:escuta"}], "next": None}
+        return 200, "tarefa-1"
+    srv, sock = _servir(tmp_path, {"paperless": Paperless("http://p", "t", http=http)})
+    try:
+        p = Ponte(sock, "paperless")
+        with pytest.raises(ErroPaperless, match="ValueError"):
+            p.enviar(b"x", "a.pdf", ["outra"])
+        assert chamadas == []  # rejeitada antes de qualquer rede
+        assert p.enviar(b"%PDF\x00", "a.pdf", ["gabi:escuta"]) == "tarefa-1"
+        assert any(m == "POST" and u.endswith("/post_document/") for m, u in chamadas)
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ponte_openrouter_so_completar(tmp_path):
+    http = lambda *a: (200, {"choices": [{"message": {"content": "t"}}], "usage": {"cost": 0.5}})  # noqa: E731
+    srv, sock = _servir(tmp_path, {"openrouter": OpenRouter("k", "a", "b", http=http)})
+    try:
+        assert PonteModelo(sock).completar("p", forte=True) == ("t", 0.5)
+        o = Ponte(sock, "openrouter")
+        with pytest.raises(AttributeError):
+            o.modelo_rapido
+        with pytest.raises(ErroOpenRouter, match="metodo_proibido"):
+            o._chamar("__init__", ("x",))
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_ponte_modelo_sem_chave_vira_erro_tipado(tmp_path):
+    srv, sock = _servir(tmp_path, {"openrouter": openrouter_do_ambiente({})})
+    try:
+        with pytest.raises(ErroOpenRouter, match="^chave ausente$"):
+            PonteModelo(sock).completar("p", forte=False)
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_openrouter_do_ambiente_modelos_e_padroes():
+    o = openrouter_do_ambiente({"OPENROUTER_API_KEY": "k", "OPENROUTER_MODEL_FAST": "x/y"})
+    assert (o.modelo_rapido, o.modelo_forte) == ("x/y", "anthropic/claude-sonnet-5.5")
+    assert openrouter_do_ambiente({}).modelo_rapido == "deepseek/deepseek-v4-flash"

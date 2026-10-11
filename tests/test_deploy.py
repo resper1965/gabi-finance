@@ -322,3 +322,9 @@ def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert ligadas and "gabi-brain-telegram.timer" in ligadas[0]
     assert "TELEGRAM_BOT_TOKEN=" not in srv + t + INSTALAR
+
+
+def test_unit_fontes_tem_environmentfile_opcional_do_openrouter():
+    assert "EnvironmentFile=-/etc/gabi/openrouter.env" in FONTES
+    for u in (API, MCP):
+        assert "openrouter" not in u  # a chave só é lida pelo serviço de fontes

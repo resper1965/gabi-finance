@@ -4,7 +4,15 @@ import argparse
 import os
 
 from gabi.fontes.ambiente import fontes_do_ambiente
+from gabi.fontes.openrouter import MODELO_FORTE_PADRAO, MODELO_RAPIDO_PADRAO, OpenRouter
 from gabi.fontes.ponte import Servidor
+
+
+def openrouter_do_ambiente(env=None) -> OpenRouter:
+    """Sempre existe; sem OPENROUTER_API_KEY, `completar` levanta ErroOpenRouter("chave ausente")."""
+    env = os.environ if env is None else env
+    return OpenRouter(env.get("OPENROUTER_API_KEY", ""), env.get("OPENROUTER_MODEL_FAST") or MODELO_RAPIDO_PADRAO,
+                      env.get("OPENROUTER_MODEL_STRONG") or MODELO_FORTE_PADRAO)
 
 
 def main(argv=None):
@@ -13,7 +21,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     os.environ.pop("GABI_FONTES_SOCKET", None)  # aqui as fontes são as reais
     fontes = {n: f() for n, f in fontes_do_ambiente().items()}
-    print("fontes configuradas:", {n: o is not None for n, o in fontes.items()}, flush=True)  # nunca os valores
+    fontes["openrouter"] = openrouter_do_ambiente()
+    print("fontes configuradas:", {n: o is not None for n, o in fontes.items()}, "chave do modelo:", bool(os.environ.get("OPENROUTER_API_KEY")), flush=True)  # nunca os valores
     with Servidor(args.socket, fontes) as srv:
         srv.serve_forever()
 
