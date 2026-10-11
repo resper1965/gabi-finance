@@ -7,7 +7,6 @@ import crypto from 'node:crypto';
 
 const MODO_ARQ = 0o660;
 const MODO_DIR = 0o2770;
-const SUBPASTAS_CONSUMIDAS = ['lidos', 'invalidos'];
 
 function recusarSeInseguro(valor, rotulo) {
   if (typeof valor !== 'string' || valor === '' || valor === '.' || valor === '..' || valor.includes('..')
@@ -71,13 +70,15 @@ function gravarAtomico(destino, dados, { naoSobrescrever }) {
   return true;
 }
 
+// Só a raiz conta: o brain APAGA o json depois de gravar no banco (não há lidos/). Replay de um id já ingerido regrava o json
+// e o brain deduplica por id_externo; o anexo que ainda existe não é regravado (naoSobrescrever).
 function jaExiste(pasta, arquivo) {
-  return [pasta, ...SUBPASTAS_CONSUMIDAS.map((s) => path.join(pasta, s))].some((d) => fs.existsSync(path.join(d, arquivo)));
+  return fs.existsSync(path.join(pasta, arquivo));
 }
 
 /**
  * msg: {id_externo, de, grupo, id_grupo, recebida_em, texto, anexo}. opts.anexo: {nome, dados:Buffer} (nome === msg.anexo).
- * Devolve {gravado, arquivo}. Mesmo id_externo (inclusive já consumido pelo brain em lidos/) não regrava.
+ * Devolve {gravado, arquivo}. Mesmo id_externo ainda na raiz do spool não regrava (o brain deduplica o replay de id já ingerido).
  */
 export function gravarMensagem(msg, pasta, opts = {}) {
   const arquivo = `${nomeDoId(msg.id_externo)}.json`;

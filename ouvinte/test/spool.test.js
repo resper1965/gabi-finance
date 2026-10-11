@@ -37,13 +37,25 @@ test('mesmo id_externo duas vezes grava um', () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(p, r2.arquivo), 'utf8')).texto, 'oi');
 });
 
-test('id já consumido pelo brain (lidos/) não é regravado', () => {
+test('só a raiz do spool conta para "já existe": lidos/ e invalidos/ não existem mais no contrato (C1/M1)', () => {
   const p = nova();
   const r = gravarMensagem(base(), p);
-  fs.mkdirSync(path.join(p, 'lidos'));
-  fs.renameSync(path.join(p, r.arquivo), path.join(p, 'lidos', r.arquivo));
-  assert.equal(gravarMensagem(base(), p).gravado, false);
-  assert.deepEqual(fs.readdirSync(p).filter((n) => n.endsWith('.json')), []);
+  for (const sub of ['lidos', 'invalidos']) {
+    fs.mkdirSync(path.join(p, sub), { recursive: true });
+    fs.writeFileSync(path.join(p, sub, r.arquivo), '{}');
+  }
+  fs.unlinkSync(path.join(p, r.arquivo)); // o brain apagou o json depois do commit
+  assert.equal(gravarMensagem(base(), p).gravado, true); // replay regrava; o brain deduplica por id_externo
+});
+
+test('replay de id já ingerido com anexo ainda no spool não regrava o anexo', () => {
+  const p = nova();
+  const anexo = { nome: 'ABC123.pdf', dados: Buffer.from('original') };
+  gravarMensagem(base({ anexo: 'ABC123.pdf' }), p, { anexo });
+  fs.unlinkSync(path.join(p, 'ABC123.json'));
+  const r = gravarMensagem(base({ anexo: 'ABC123.pdf' }), p, { anexo: { nome: 'ABC123.pdf', dados: Buffer.from('outro') } });
+  assert.equal(r.gravado, true);
+  assert.equal(fs.readFileSync(path.join(p, 'anexos', 'ABC123.pdf'), 'utf8'), 'original');
 });
 
 test('o .json.tmp nunca é visível como .json: o json só aparece completo', () => {

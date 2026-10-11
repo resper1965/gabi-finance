@@ -42,9 +42,9 @@ def test_ingerir_grava_uma_vez(con, tmp_path):
     pasta = tmp_path / "spool"
     _msg(pasta, "a1")
     assert ingerir_spool(con, pasta, AGORA) == 1
-    assert not (pasta / "a1.json").exists() and (pasta / "lidos" / "a1.json").exists()
-    shutil.copy(pasta / "lidos" / "a1.json", pasta / "a1.json")
-    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert not (pasta / "a1.json").exists() and not (pasta / "lidos").exists()   # C1: o json some do spool, sem lidos/
+    _msg(pasta, "a1")                                                              # replay do mesmo id: deduplicado pelo id_externo
+    assert ingerir_spool(con, pasta, AGORA) == 0 and not (pasta / "a1.json").exists()
     assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 1
     assert con.execute("select estado from escuta_msg").fetchone()[0] == "nova"
     assert con.execute("select qtd from escuta_remetente").fetchone()[0] == 1
@@ -65,7 +65,7 @@ def test_bloqueado_nao_e_gravado(con, tmp_path):
     _msg(pasta, "b1")
     assert ingerir_spool(con, pasta, AGORA) == 0
     assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
-    assert (pasta / "lidos" / "b1.json").exists()
+    assert not (pasta / "b1.json").exists() and not (pasta / "lidos").exists()
 
 
 def test_desconhecido_gravado_e_vira_pendente(con, tmp_path):
@@ -336,9 +336,49 @@ def test_json_symlink_com_mesmo_nome_nunca_e_seguido_nem_movido_para_fora(con, t
     assert (vitima / "a1.json").exists() and con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
 
 
-def test_cria_lidos_e_invalidos_quando_faltam(con, tmp_path):
+def test_nao_cria_lidos_e_cria_invalidos_so_para_malformado(con, tmp_path):
     pasta = tmp_path / "spool"
     _msg(pasta, "ok")
     (pasta / "ruim.json").write_text("{")
     ingerir_spool(con, pasta, AGORA)
-    assert (pasta / "lidos" / "ok.json").is_file() and (pasta / "invalidos" / "ruim.json").is_file()
+    assert not (pasta / "lidos").exists() and not (pasta / "ok.json").exists() and (pasta / "invalidos" / "ruim.json").is_file()
+
+
+def test_nenhum_texto_de_mensagem_fica_no_spool_depois_da_ingestao(con, tmp_path):
+    pasta = tmp_path / "spool"
+    con.execute("insert into escuta_remetente(numero, estado, qtd) values ('+5511900000009','bloqueado',0)")
+    _msg(pasta, "a", texto="SEGREDO-A")
+    _msg(pasta, "b", texto="SEGREDO-B", de="5511900000009@s.whatsapp.net")
+    _msg(pasta, "c", texto="SEGREDO-C", grupo=True, id_grupo="1@g.us")
+    ingerir_spool(con, pasta, AGORA)
+    for f in pasta.rglob("*"):
+        if f.is_file():
+            assert b"SEGREDO" not in f.read_bytes(), f.name
+
+
+def test_limpar_orfaos_limpa_invalidos_antigos(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    pasta, con = _spool_orfaos(tmp_path)
+    inv = pasta / "invalidos"
+    inv.mkdir()
+    velho, novo = inv / "velho.json", inv / "novo.json"
+    velho.write_text("{"); novo.write_text("{")
+    _velho(velho)
+    fora = tmp_path / "fora.json"
+    fora.write_text("x"); _velho(fora)
+    ln = inv / "ln.json"
+    ln.symlink_to(fora); _velho(ln)
+    sub = inv / "sub"
+    sub.mkdir(); _velho(sub)
+    limpar_orfaos(con, pasta)
+    assert not velho.exists() and novo.exists() and not ln.is_symlink() and fora.exists() and sub.is_dir()
+
+
+def test_limpar_orfaos_invalidos_symlink_nao_e_seguido(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    pasta, con = _spool_orfaos(tmp_path)
+    alvo = _vitima_dir(tmp_path)
+    (alvo / "x.json").write_text("x"); _velho(alvo / "x.json")
+    (pasta / "invalidos").symlink_to(alvo, target_is_directory=True)
+    limpar_orfaos(con, pasta)
+    assert (alvo / "x.json").exists()

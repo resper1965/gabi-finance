@@ -56,9 +56,10 @@ _FLAGS_DIR = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
 def _mover(spool_fd: int, nome: str, sub: str) -> None:
-    """Move `nome` (entrada direta do spool) para `sub` (lidos/invalidos) ANCORADO no fd do spool: a subpasta é aberta com
-    O_NOFOLLOW relativo ao fd e o rename usa os dois fds, então trocar `lidos` por symlink (o ouvinte pode, o spool é 2770 sem
-    sticky) não leva o arquivo para fora. Se a subpasta não abrir (symlink, não é pasta), apaga o arquivo em vez de mover."""
+    """Move `nome` (entrada direta do spool) para `sub` (só `invalidos`: JSON malformado) ANCORADO no fd do spool: a subpasta é
+    aberta com O_NOFOLLOW relativo ao fd e o rename usa os dois fds, então trocar `invalidos` por symlink (o ouvinte pode, o spool
+    é 2770 sem sticky) não leva o arquivo para fora. Se a subpasta não abrir (symlink, não é pasta), apaga o arquivo em vez de mover.
+    `invalidos/` é limpo por `limpar_orfaos` (mais de 24 h)."""
     dest = -1
     try:
         try:
@@ -73,6 +74,11 @@ def _mover(spool_fd: int, nome: str, sub: str) -> None:
     finally:
         if dest >= 0:
             os.close(dest)
+    _apagar(spool_fd, nome)
+
+
+def _apagar(spool_fd: int, nome: str) -> None:
+    """Unlink ancorado no fd do spool (nunca segue symlink: unlink remove o próprio link)."""
     try:
         os.unlink(nome, dir_fd=spool_fd)
     except OSError:
@@ -141,29 +147,25 @@ def _ingerir(con, pasta: Path, sfd: int, agora: str) -> int:
                 if numero is not None and cur.rowcount:
                     registrar_remetente_visto(con, numero, agora)
             novas += cur.rowcount
-        _mover(sfd, nome, "lidos")
+        # C1: depois do commit o json SAI do spool (sem lidos/): o texto só fica no banco, onde as regras de apagamento valem.
+        # Replay do mesmo id é deduplicado por id_externo UNIQUE.
+        _apagar(sfd, nome)
     return novas
 
 
-def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
-    """Apaga anexo do spool que nenhuma linha de escuta_msg aponta e com mais de `idade_h` h (a API só anula o ponteiro; quem apaga é este timer).
-    Só arquivo regular direto em <spool>/anexos: nunca segue symlink (nem a própria pasta `anexos`, que o ouvinte pode trocar),
-    nunca entra em subpasta. Devolve só a contagem."""
-    import time
-    pasta = Path(spool) / "anexos"
+def _limpar_pasta(spool: Path, sub: str, manter: set[str], limite: float, so_regular: bool) -> int:
+    """Apaga, em <spool>/<sub>, entrada que não é pasta (com `so_regular`, só arquivo regular), não está em `manter` e tem mtime anterior a `limite`. A pasta é aberta com
+    O_NOFOLLOW (se o ouvinte a trocar por symlink, nada é tocado) e o unlink é ancorado no fd (symlink dentro dela é apagado, nunca seguido)."""
     try:
-        dfd = os.open(pasta, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        dfd = os.open(Path(spool) / sub, _FLAGS_DIR)
     except OSError:
         return 0
     try:
-        nomes = os.listdir(dfd)
-        referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
-        limite = time.time() - idade_h * 3600
         removidos = 0
-        for nome in nomes:
+        for nome in os.listdir(dfd):
             try:
                 st = os.stat(nome, dir_fd=dfd, follow_symlinks=False)
-                if not stat.S_ISREG(st.st_mode) or nome in referenciados or st.st_mtime >= limite:
+                if (not stat.S_ISREG(st.st_mode) if so_regular else stat.S_ISDIR(st.st_mode)) or nome in manter or st.st_mtime >= limite:
                     continue
                 os.unlink(nome, dir_fd=dfd)
                 removidos += 1
@@ -172,3 +174,13 @@ def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
         return removidos
     finally:
         os.close(dfd)
+
+
+def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
+    """Apaga anexo do spool que nenhuma linha de escuta_msg aponta e com mais de `idade_h` h (a API só anula o ponteiro; quem apaga é
+    este timer), e JSON malformado em <spool>/invalidos com mais de `idade_h` h (C1: nada do spool fica para sempre).
+    Nunca segue symlink (nem a própria pasta, que o ouvinte pode trocar) e nunca entra em subpasta. Devolve só a contagem."""
+    import time
+    limite = time.time() - idade_h * 3600
+    referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
+    return _limpar_pasta(spool, "anexos", referenciados, limite, True) + _limpar_pasta(spool, "invalidos", set(), limite, False)

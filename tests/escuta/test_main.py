@@ -345,3 +345,19 @@ def test_spool_sem_permissao_de_escrita_nao_aborta_a_rodada(amb, capsys, monkeyp
     assert prog.main(cliente=None, agora=AGORA) == 0
     out = capsys.readouterr().out
     assert "palavras_erro=1" in out and "ingeridas=1" in out
+
+
+def test_c1_depois_da_rodada_nenhum_texto_de_mensagem_fica_em_arquivo_do_spool(amb):
+    banco, spool, con = amb
+    _param(con, "escuta.palavras_risco", ["socorro"])
+    _spool(spool, "a", "SEGREDO-APROVADO paga a Maria 100")
+    _spool(spool, "b", "SEGREDO-CRISE socorro")
+    (spool / "c.json").write_text(json.dumps({"id_externo": "c", "de": "5511900000002@s.whatsapp.net", "recebida_em": "2026-10-11T09:00:00",
+                                              "texto": "SEGREDO-DESCONHECIDO"}))
+    (spool / "d.json").write_text(json.dumps({"id_externo": "d", "de": "1@g.us", "grupo": True, "id_grupo": "1@g.us",
+                                              "recebida_em": "2026-10-11T09:00:00", "texto": "SEGREDO-GRUPO"}))
+    assert prog.main(cliente=Modelo(), agora=AGORA) == 0
+    assert not (spool / "lidos").exists()
+    for f in spool.rglob("*"):
+        if f.is_file():
+            assert b"SEGREDO" not in f.read_bytes(), f.name
