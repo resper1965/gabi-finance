@@ -2,23 +2,27 @@
 orçamento de tempo por rodada (escuta.tempo_max_s).
 Ordem de decisão: grupo não aprovado, bloqueado/ignorado, palavra de risco (sem modelo, para todo não-bloqueado),
 fora da lista (retida, sem modelo), aprovado (modelo). Texto de mensagem nunca vai a log, exceção ou aviso."""
+import datetime as dt
 import json
 import logging
 import sqlite3
 import time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.dinheiro.modelo import ModeloCliente, Orcamento
 from gabi.cobrar.pedidos import SemEscopo
-from gabi.escuta.classificar import Classificacao, classificar
+from gabi.escuta.classificar import Classificacao, Falha, classificar
+from gabi.fontes.paperless import ErroPaperless
 from gabi.escuta.crise import palavras_risco, tem_risco
 from gabi.escuta.destinos import Destinos
 from gabi.escuta import spool_seguro
 from gabi.escuta.remetentes import avisar_novo, estado_remetente
 
 log = logging.getLogger(__name__)
+BRT = ZoneInfo("America/Sao_Paulo")
 
 
 class _PedidoIncompleto(Exception):
@@ -29,11 +33,50 @@ def _aviso(con, tipo: str, payload: dict, agora: str) -> None:
     con.execute("insert into aviso(tipo, payload, criado_em) values (?,?,?)", (tipo, json.dumps(payload, ensure_ascii=False), agora))
 
 
-def _aviso_sem_modelo(con, agora: str) -> None:
-    """Um por dia."""
+def _aviso_sem_modelo(con, agora: str, motivo: str) -> None:
+    """Um por dia. `motivo` é curto e fixo (vem de classificar.Falha), nunca texto de mensagem."""
     if con.execute("select 1 from aviso where tipo='escuta_sem_modelo' and substr(criado_em,1,10)=?", (agora[:10],)).fetchone():
         return
-    _aviso(con, "escuta_sem_modelo", {"motivo": "sem modelo ou teto de custo estourado"}, agora)
+    _aviso(con, "escuta_sem_modelo", {"motivo": motivo}, agora)
+
+
+MAX_TENTATIVAS = 8
+_ESPERA_BASE = dt.timedelta(minutes=5)
+_ESPERA_MAX = dt.timedelta(hours=6)
+# Falha temporária de destino: Paperless/ponte fora do ar, rede. Tenta de novo com espera; nunca apaga texto/anexo por isso.
+TEMPORARIAS = (ErroPaperless, ConnectionError, TimeoutError)
+
+
+def _quando(s: str) -> dt.datetime:
+    d = dt.datetime.fromisoformat(s)
+    return d if d.tzinfo else d.replace(tzinfo=BRT)
+
+
+def _esperando(proxima_em, agora: str) -> bool:
+    if not proxima_em:
+        return False
+    try:
+        return _quando(proxima_em) > _quando(agora)
+    except (TypeError, ValueError):
+        return False
+
+
+def _adiar(con, id_: int, agora: str, c: dict, apagar_texto_se_desistir: bool = False) -> None:
+    """Falha temporária: tentativas+1 e espera min(6 h, 5 min * 2^tentativas); a mensagem continua `nova`. Na 8ª, `falhou` + aviso
+    `escuta_falhou` (só número e nome). Roda dentro de uma transação do chamador."""
+    m = con.execute("select de, grupo, tentativas from escuta_msg where id=?", (id_,)).fetchone()
+    n = (m["tentativas"] or 0) + 1
+    if n >= MAX_TENTATIVAS:
+        con.execute("update escuta_msg set estado='falhou', tentativas=?, proxima_em=null, processada_em=?"
+                    + (", texto=null" if apagar_texto_se_desistir else "") + " where id=?", (n, agora, id_))
+        numero = m["de"]
+        _aviso(con, "escuta_falhou", {"numero": numero, "nome": None if m["grupo"] else _nome(con, numero, estado_remetente(con, numero)[1])}, agora)
+        c["falhas"] += 1
+        return
+    espera = min(_ESPERA_MAX, _ESPERA_BASE * (2 ** n))
+    d = dt.datetime.fromisoformat(agora)
+    con.execute("update escuta_msg set tentativas=?, proxima_em=? where id=?", (n, (d + espera).isoformat(), id_))
+    c["adiadas"] += 1
 
 
 def _nome(con, numero: str, pessoa_id: str | None) -> str | None:
@@ -117,8 +160,11 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
         return
     if r is _SEM:  # ficou aprovado durante a fase 1 sem modelo: espera a próxima rodada
         return
-    if r is None:  # fica nova e tenta de novo na próxima rodada
-        _aviso_sem_modelo(con, agora)
+    if isinstance(r, Falha):
+        if r.temporaria:  # exceção/timeout/resposta vazia: tenta de novo com espera (I6)
+            _adiar(con, id_, agora, c)
+        else:  # sem modelo, teto ou limite: fica nova, sem contar tentativa; o aviso diz o motivo
+            _aviso_sem_modelo(con, agora, r.motivo)
         return
     tipo, campos = r.tipo, r.campos
     if tipo == "pedido" and not (pid and dados(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()).get("pode_pedir") is True):
@@ -126,7 +172,10 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
         return
     if tipo == "nada":
         _nada(con, destinos, m, agora, ativo, c, apagar, r.confianca, spool)
-        c["classificadas"] += 1
+        if r.invalida:  # spec §3.3: resposta inválida vira 'nada' + contagem de falha (I13)
+            c["falhas"] += 1
+        else:
+            c["classificadas"] += 1
         return
     if tipo == "saude":  # o texto e os campos de saúde não ficam no banco da escuta
         sinais["saude"] = True  # se falhar daqui em diante, o texto de saúde é apagado (ADR-014)
@@ -201,12 +250,13 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
     As mensagens com palavra de risco são fechadas PRIMEIRO, sem modelo, antes de qualquer chamada ao modelo (backlog não atrasa crise)."""
     if modo not in ("registro", "ativo"):
         raise ValueError(f"modo inválido: {modo!r}")
-    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "documentos": 0, "ocupado": 0, "tempo": 0}
+    c = {"novas": 0, "classificadas": 0, "retidas": 0, "falhas": 0, "adiadas": 0, "documentos": 0, "ocupado": 0, "tempo": 0}
     erro_geral = False
     palavras = palavras_risco(con)
     inicio = monotonico()
     linhas = [(r["id"], r["estado"], tem_risco(r["texto"] or "", palavras)) for r in con.execute(
-        "select id, estado, texto from escuta_msg where estado in ('nova','retida') order by recebida_em, id")]
+        "select id, estado, texto, proxima_em from escuta_msg where estado in ('nova','retida') order by recebida_em, id")
+        if not _esperando(r["proxima_em"], agora)]  # em espera depois de falha temporária: só quando chegar proxima_em
     linhas.sort(key=lambda x: not x[2])  # estável: passada de risco (sem modelo) primeiro, depois a ordem de chegada
     for id_, estado_ini, risco in linhas:
         if not risco and tempo_max_s is not None and monotonico() - inicio > tempo_max_s:
@@ -246,6 +296,12 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             m = con.execute("select de from escuta_msg where id=?", (id_,)).fetchone()
             numero = m["de"]
             _falhou(con, id_, agora, ("escuta_pedido_incompleto", {"numero": numero, "nome": _nome(con, numero, estado_remetente(con, numero)[1])}))
+            continue
+        except TEMPORARIAS as e:
+            # Paperless/ponte/rede fora: a transação foi desfeita (nada apagado, nada enviado ao banco); tenta de novo com espera.
+            log.warning("escuta: mensagem %s adiada (%s)", id_, type(e).__name__)
+            with transacao(con):
+                _adiar(con, id_, agora, c, apagar_texto_se_desistir=bool(sinais.get("saude")))
             continue
         except Exception as e:
             log.warning("escuta: mensagem %s falhou (%s)", id_, type(e).__name__)

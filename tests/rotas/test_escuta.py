@@ -432,3 +432,11 @@ def test_i3_descrever_escuta_sem_permissao_so_numero_e_nome():
     from gabi.rotas.avisos import descrever
     t, x = descrever("escuta_sem_permissao", {"numero": N, "nome": "Joana"})
     assert "Pedido de Joana sem permissão" in t and "Cadastros" in (t + x)
+
+
+def test_i6_m5_descrever_escuta_falhou_e_sem_modelo_neutro():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("escuta_falhou", {"numero": N, "nome": "Joana"})
+    assert "Joana" in t and "abra a conversa" in (t + x)
+    t, x = descrever("escuta_sem_modelo", {"motivo": "teto de custo do modelo"})
+    assert x == "a escuta está sem modelo disponível agora: teto de custo do modelo" and "não está configurado" not in x

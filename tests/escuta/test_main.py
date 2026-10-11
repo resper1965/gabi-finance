@@ -388,3 +388,25 @@ def test_i1_teste_crise_grava_um_aviso_de_teste_sem_spool(amb, monkeypatch, caps
     from gabi.rotas.avisos import descrever
     assert "TESTE" in descrever("escuta_atencao", json.loads(r[0]["payload"]))[0]
     assert "teste" in capsys.readouterr().out
+
+
+
+def test_i9_chamada_que_falha_depois_do_envio_grava_custo_conservador_e_relanca(amb, monkeypatch):
+    banco, spool, con = amb
+    w = prog.ModeloComCusto(Modelo(erro=ErroOpenRouter("OpenRouter -> 502")), banco)
+    with pytest.raises(ErroOpenRouter):
+        w.completar("p", forte=False)
+    monkeypatch.setenv("OPENROUTER_CUSTO_PADRAO_USD", "0.1")
+    w2 = prog.ModeloComCusto(Modelo(erro=RuntimeError("timeout")), banco)
+    with pytest.raises(RuntimeError):
+        w2.completar("p", forte=True)
+    assert [tuple(r) for r in con.execute("select custo_usd, tarefa from custo_modelo order by id")] == [(0.05, "escuta-falha"), (0.1, "escuta-falha")]
+
+
+@pytest.mark.parametrize("msg", ["openrouter não está configurado no serviço de fontes", "chave ausente", "teto diário", "muitas chamadas", "prompt grande demais"])
+def test_i9_recusa_antes_do_envio_nao_grava_custo(amb, msg):
+    banco, spool, con = amb
+    w = prog.ModeloComCusto(Modelo(erro=ErroOpenRouter(msg)), banco)
+    with pytest.raises(ErroOpenRouter):
+        w.completar("p", forte=False)
+    assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 0

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { processarEvento } from '../src/ouvinte.js';
+import { processarEvento, criarGatilho } from '../src/ouvinte.js';
 
 const PRIV = '5511912345678@s.whatsapp.net';
 const GRUPO = '120363000000000000@g.us';
@@ -308,4 +308,29 @@ test('v7: primário @lid + telefone em remoteJidAlt/participantAlt usa o telefon
   const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
   assert.equal(por.V3.de, PRIV);
   assert.equal(por.V4.de, PART);
+});
+
+test('I6: gatilho limitado a 1 vez a cada 60 s', () => {
+  let t = 1_000_000;
+  const toques = [];
+  const g = criarGatilho('/x', { agora: () => t, tocar: (pasta) => toques.push(pasta) });
+  assert.equal(g(), true);
+  t += 30_000;
+  assert.equal(g(), false);
+  t += 30_000;
+  assert.equal(g(), true);
+  assert.deepEqual(toques, ['/x', '/x']);
+});
+
+test('I6: rajada de mensagens de risco toca o gatilho uma vez só', async () => {
+  const p = pasta();
+  const c = {};
+  let toques = 0;
+  const gatilho = criarGatilho(p, { agora: () => 5, tocar: () => { toques++; } });
+  await processarEvento(ev(msg({ conversation: 'matar' }), msg({ conversation: 'matar' }), msg({ conversation: 'matar' })),
+    deps(p, { palavras: () => ['matar'], gatilho, contadores: c }));
+  assert.equal(toques, 1);
+  assert.equal(c.gatilhos, 1);
+  assert.equal(c.gatilhos_limitados, 2);
+  assert.equal(lista(p).length, 3);
 });

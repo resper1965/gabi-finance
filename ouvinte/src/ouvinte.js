@@ -113,9 +113,30 @@ export async function lerComTeto(fonte, max, prazoMs) {
   return total > 0 ? { dados: Buffer.concat(partes) } : { motivo: 'teto' };
 }
 
+const GATILHO_INTERVALO_MS = 60_000;
+
+/** Gatilho do brain limitado a 1 toque a cada `intervaloMs` (o ouvinte não confiável não pode disparar a escuta à vontade).
+ * Devolve uma função que toca e diz true, ou diz false se ainda está no intervalo. */
+export function criarGatilho(pasta, { intervaloMs = GATILHO_INTERVALO_MS, agora = Date.now, tocar = tocarGatilho } = {}) {
+  let ultimo = -Infinity;
+  return () => {
+    const t = agora();
+    if (t - ultimo < intervaloMs) return false;
+    tocar(pasta);
+    ultimo = t;
+    return true;
+  };
+}
+
+const gatilhosPadrao = new Map();
+function gatilhoPadrao(pasta) {
+  if (!gatilhosPadrao.has(pasta)) gatilhosPadrao.set(pasta, criarGatilho(pasta));
+  return gatilhosPadrao.get(pasta);
+}
+
 /**
  * ev: evento `messages.upsert` do Baileys. deps: {pasta, baixar(msg)->Readable|Buffer, palavras()->string[], anexoMaxBytes?,
- * downloadTimeoutMs?, contadores?, gravar?}. Só `notify` (mensagem nova). Erro em uma mensagem não impede as demais.
+ * downloadTimeoutMs?, contadores?, gravar?, gatilho?}. Só `notify` (mensagem nova). Erro em uma mensagem não impede as demais.
  */
 export async function processarEvento(ev, deps) {
   const c = deps.contadores ?? {};
@@ -124,6 +145,7 @@ export async function processarEvento(ev, deps) {
   const max = deps.anexoMaxBytes ?? anexoMaxBytes();
   const prazo = deps.downloadTimeoutMs ?? downloadTimeoutMs();
   const gravar = deps.gravar ?? gravarMensagem;
+  const gatilho = deps.gatilho ?? gatilhoPadrao(deps.pasta);
   for (const m of ev.messages ?? []) {
     try {
       const x = extrair(m);
@@ -145,7 +167,7 @@ export async function processarEvento(ev, deps) {
       if (anexo) x.msg.anexo = anexo.nome;
       const r = gravar(x.msg, deps.pasta, { anexo });
       soma(r.gravado ? 'gravadas' : 'repetidas');
-      if (x.msg.texto && temRisco(x.msg.texto, deps.palavras())) { tocarGatilho(deps.pasta); soma('gatilhos'); }
+      if (x.msg.texto && temRisco(x.msg.texto, deps.palavras())) soma(gatilho() ? 'gatilhos' : 'gatilhos_limitados');
     } catch (e) { soma(e?.code === 'ENOSPC' || e?.code === 'EDQUOT' ? 'disco_cheio' : 'erros'); }
   }
 }

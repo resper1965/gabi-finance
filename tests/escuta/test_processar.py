@@ -705,3 +705,82 @@ def test_i1_sem_orcamento_de_tempo_processa_tudo(con):
         _msg(con, ext=f"b{i}", texto="oi")
     r = _rodar(con, FakeDestinos(), FakeModelo())
     assert r["tempo"] == 0 and r["classificadas"] == 3
+
+
+
+# ---- I6/I9: falha temporária com tentativas e espera; I13: resposta inválida conta falha ----
+class Quebra:
+    def __init__(self, erro=None, resposta=None):
+        self.chamadas, self.erro, self.resposta = 0, erro, resposta
+
+    def completar(self, prompt, *, forte):
+        self.chamadas += 1
+        if self.erro:
+            raise self.erro
+        return self.resposta, 0.001
+
+
+def test_i6_falha_temporaria_do_modelo_adia_com_espera_e_desiste_em_8(con):
+    import datetime as dt
+    _aprovado(con)
+    _msg(con)
+    cli, d = Quebra(RuntimeError("rede")), FakeDestinos()
+    t = dt.datetime.fromisoformat(AGORA)
+    r = processar(con, d, cli, _orc(), t.isoformat(), "ativo")
+    m = _msg_row(con)
+    assert (m["estado"], m["tentativas"], m["texto"]) == ("nova", 1, "paga a Maria 100") and r["adiadas"] == 1
+    assert dt.datetime.fromisoformat(m["proxima_em"]) == t + dt.timedelta(minutes=10)
+    processar(con, d, cli, _orc(), (t + dt.timedelta(minutes=5)).isoformat(), "ativo")
+    assert cli.chamadas == 1   # ainda esperando
+    for _ in range(7):
+        t = dt.datetime.fromisoformat(_msg_row(con)["proxima_em"])
+        assert t - dt.datetime.fromisoformat(AGORA) < dt.timedelta(days=2)
+        processar(con, d, cli, _orc(), t.isoformat(), "ativo")
+    m = _msg_row(con)
+    assert m["estado"] == "falhou" and m["tentativas"] == 8 and cli.chamadas == 8
+    assert _avisos(con, "escuta_falhou") == [{"numero": N, "nome": "Joana"}] and _avisos(con, "escuta_sem_modelo") == []
+
+
+def test_i6_espera_maxima_e_6_horas(con):
+    import datetime as dt
+    _aprovado(con)
+    _msg(con)
+    con.execute("update escuta_msg set tentativas=6")
+    processar(con, FakeDestinos(), Quebra(RuntimeError("x")), _orc(), AGORA, "ativo")
+    assert dt.datetime.fromisoformat(_msg_row(con)["proxima_em"]) == dt.datetime.fromisoformat(AGORA) + dt.timedelta(hours=6)
+
+
+def test_i6_resposta_vazia_nao_vira_nada_nem_apaga_o_pedido(con):
+    _aprovado(con)
+    _msg(con)
+    _rodar(con, FakeDestinos(), Quebra(resposta="  "))
+    m = _msg_row(con)
+    assert m["estado"] == "nova" and m["texto"] == "paga a Maria 100" and m["tentativas"] == 1 and m["tipo"] is None
+
+
+def test_i6_paperless_fora_e_temporario_e_nao_apaga_nada(con, tmp_path):
+    from gabi.fontes.paperless import ErroPaperless
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    r = _rodar(con, FakeDestinos(erro_doc=ErroPaperless("serviço de fontes indisponível")), None, spool=spool)
+    m = _msg_row(con)
+    assert m["estado"] == "nova" and m["tentativas"] == 1 and m["anexo_caminho"] == str(arq) and arq.exists()
+    assert r["falhas"] == 0 and _avisos(con, "servico_falhou") == []
+
+
+def test_i6_sem_modelo_ou_teto_nao_conta_tentativa_e_aviso_tem_motivo(con):
+    _aprovado(con)
+    _msg(con)
+    _rodar(con, FakeDestinos(), None)
+    processar(con, FakeDestinos(), _ped(), Orcamento(0.0, 0.0), "2026-10-12T10:00:00", "ativo")
+    assert _msg_row(con)["tentativas"] == 0 and _msg_row(con)["proxima_em"] is None
+    motivos = [a["motivo"] for a in _avisos(con, "escuta_sem_modelo")]
+    assert motivos == ["modelo não configurado", "teto de custo do modelo"]
+
+
+def test_i13_resposta_invalida_vira_nada_e_conta_falha(con):
+    _aprovado(con)
+    _msg(con)
+    r = _rodar(con, FakeDestinos(), Quebra(resposta="isto não é json"))
+    assert _msg_row(con)["tipo"] == "nada" and r["falhas"] == 1 and r["classificadas"] == 0

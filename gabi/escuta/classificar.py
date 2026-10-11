@@ -3,9 +3,9 @@ O texto do remetente é dado de terceiros (R14): vai mascarado e só entre as ma
 Sem texto de mensagem em log nem exceção. O cliente é injetado (sem rede aqui)."""
 import datetime as dt
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from gabi.dinheiro.modelo import LIMIAR, ModeloCliente, Orcamento, _chamar
+from gabi.dinheiro.modelo import LIMIAR, ModeloCliente, Orcamento
 from gabi.mascara import mascarar_texto
 
 TIPOS = ("pedido", "saude", "crise", "nada")
@@ -32,9 +32,47 @@ class Classificacao:
     tipo: str
     confianca: float
     campos: dict
+    invalida: bool = field(default=False, compare=False)  # resposta do modelo fora do formato: vira 'nada' e conta falha (spec §3.3)
+
+
+@dataclass(frozen=True)
+class Falha:
+    """Não classificou. `temporaria`: vale tentar de novo com espera (exceção/timeout/resposta vazia, possivelmente cobrada).
+    Não temporária: sem modelo, teto ou limite (o aviso `escuta_sem_modelo` cobre; não conta tentativa). `motivo` é curto e fixo,
+    nunca texto de mensagem nem do erro."""
+    motivo: str
+    temporaria: bool
 
 
 _NADA = Classificacao("nada", 0.0, {})
+_INVALIDA = Classificacao("nada", 0.0, {}, invalida=True)
+
+# Recusas que acontecem ANTES do envio ao modelo (nada foi cobrado; não são falha temporária). Trecho da mensagem -> motivo curto.
+RECUSAS_SEM_ENVIO = {"não está configurado": "modelo não configurado", "chave ausente": "modelo não configurado",
+                     "teto diário": "teto diário do serviço de modelo", "muitas chamadas": "limite de chamadas por minuto",
+                     "prompt grande demais": "mensagem grande demais para o modelo"}
+
+
+def recusa_sem_envio(e: BaseException) -> str | None:
+    from gabi.fontes.openrouter import ErroOpenRouter
+    if not isinstance(e, ErroOpenRouter):
+        return None
+    msg = str(e)
+    return next((motivo for trecho, motivo in RECUSAS_SEM_ENVIO.items() if trecho in msg), None)
+
+
+def _chamar(cliente, prompt: str, forte: bool, orcamento: Orcamento) -> "str | Falha":
+    if not orcamento.permite():
+        return Falha("teto de custo do modelo", False)
+    try:
+        texto, custo = cliente.completar(prompt, forte=forte)
+    except Exception as e:  # noqa: BLE001 - nunca derruba a rodada; a mensagem do erro não sai daqui
+        motivo = recusa_sem_envio(e)
+        return Falha(motivo, False) if motivo else Falha("falha temporária do modelo", True)
+    orcamento.registrar(custo)
+    if not isinstance(texto, str) or not texto.strip():
+        return Falha("resposta vazia do modelo", True)  # cobrada e sem conteúdo: tenta de novo, nunca 'nada'
+    return texto
 
 
 def _prompt(texto: str) -> str:
@@ -88,28 +126,28 @@ def _validar(resposta: str) -> Classificacao | None:
 
 
 def interpretar(resposta: str) -> Classificacao:
-    return _validar(resposta) or _NADA
+    return _validar(resposta) or _INVALIDA
 
 
-def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento) -> Classificacao | None:
-    """None = could not classify (no client, budget exhausted or model exception): the caller must leave the message
-    pending and retry later, NEVER treat it as 'nada'; crisis detection by palavras de risco runs separately and first.
-    Resposta inválida do modelo NÃO é None: vira 'nada' e não paga a repetição forte."""
+def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento) -> "Classificacao | Falha":
+    """Falha = não classificou: o chamador deixa a mensagem pendente (temporária: tenta de novo com espera), NUNCA trata como 'nada';
+    a crise por palavra de risco roda separada e antes. Resposta inválida do modelo NÃO é Falha: vira 'nada' marcada `invalida`
+    (conta falha) e não paga a repetição forte. Crise do modelo rápido não vai ao forte (spec §3.3)."""
     if cliente is None:
-        return None
+        return Falha("modelo não configurado", False)
     prompt = _prompt(texto)
     resposta = _chamar(cliente, prompt, False, orcamento)
-    if resposta is None:
-        return None
+    if isinstance(resposta, Falha):
+        return resposta
     c = _validar(resposta)
     if c is None:
-        return _NADA
+        return _INVALIDA
     if c.tipo == "crise":  # spec §3.3: crise não depende da confiança; nunca vai ao forte (que poderia rebaixá-la a 'nada')
         return c
     if c.confianca < LIMIAR:
         resposta = _chamar(cliente, prompt, True, orcamento)
-        if resposta is None:
-            return None
+        if isinstance(resposta, Falha):
+            return resposta
         forte = interpretar(resposta)
         c = c if (c.tipo == "crise" and forte.tipo == "nada") else forte  # defesa: crise do rápido nunca vira 'nada'
     return c

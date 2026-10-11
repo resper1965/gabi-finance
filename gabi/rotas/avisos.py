@@ -35,7 +35,9 @@ def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "escuta_parada":
         return "Escuta do WhatsApp parada", p.get("motivo", "")
     if tipo == "escuta_sem_modelo":
-        return "Escuta sem modelo de leitura", "o modelo que lê as mensagens não está configurado; as mensagens ficam retidas"
+        return "Escuta sem modelo de leitura", f"a escuta está sem modelo disponível agora: {p.get('motivo') or 'motivo desconhecido'}"
+    if tipo == "escuta_falhou":
+        return f"Mensagem de {_quem(p)} não foi processada", "falhou 8 vezes seguidas (Paperless, ponte ou modelo fora do ar); abra a conversa"
     return tipo, ""
 
 

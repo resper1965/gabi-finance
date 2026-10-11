@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
 from gabi.escuta.caixa import ingerir_spool, limpar_orfaos
+from gabi.escuta.classificar import recusa_sem_envio
 from gabi.escuta.crise import escrever_palavras_risco
 from gabi.escuta.destinos import DestinosReais
 from gabi.escuta.processar import processar
@@ -48,11 +49,21 @@ def _anexo_max_bytes(con) -> int:
 CUSTO_RESERVA_USD = 0.05  # custo inválido (NaN, infinito, negativo) nunca subnotifica o gasto: grava este valor fixo
 
 
+def custo_padrao_usd() -> float:
+    """Custo conservador de uma chamada que falhou depois do envio: OPENROUTER_CUSTO_PADRAO_USD (o mesmo do serviço de fontes), padrão 0,05."""
+    try:
+        v = float(os.environ.get("OPENROUTER_CUSTO_PADRAO_USD", CUSTO_RESERVA_USD))
+    except ValueError:
+        return CUSTO_RESERVA_USD
+    return v if math.isfinite(v) and v > 0 else CUSTO_RESERVA_USD
+
+
 class ModeloComCusto:
-    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa 'escuta', `em` = instante da chamada em BRT), numa
+    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa 'escuta'; chamada que falhou depois do envio: tarefa
+    'escuta-falha' com custo conservador, `em` = instante da chamada em BRT), numa
     SEGUNDA conexão em autocommit (WAL + busy_timeout). O serviço de fontes já cobrou a chamada: se o insert falhar (lock), a
     classificação paga NÃO se perde; a linha fica pendente e é regravada na próxima chamada completada e em `fechar()`.
-    Erro do cliente propaga e não grava."""
+    Erro do cliente propaga (recusa antes do envio não grava)."""
 
     def __init__(self, cliente, banco: Path, relogio=None):
         self._cliente, self._relogio = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc))
@@ -62,19 +73,27 @@ class ModeloComCusto:
     def _gravar_pendentes(self) -> None:
         while self.pendentes:
             try:
-                self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,'escuta')", self.pendentes[0])
+                self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,?)", self.pendentes[0])
             except sqlite3.Error:
                 return
             self.pendentes.pop(0)
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
-        texto, custo = self._cliente.completar(prompt, forte=forte)
+        try:
+            texto, custo = self._cliente.completar(prompt, forte=forte)
+        except Exception as e:
+            # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
+            # Recusa antes do envio (não configurado, teto, limite, prompt grande) não cobra nada.
+            if recusa_sem_envio(e) is None:
+                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo_padrao_usd(), "escuta-falha"))
+                self._gravar_pendentes()
+            raise
         try:
             ok = isinstance(custo, (int, float)) and not isinstance(custo, bool) and math.isfinite(custo) and custo >= 0
         except TypeError:
             ok = False
         custo = float(custo) if ok else CUSTO_RESERVA_USD
-        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo))
+        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, "escuta"))
         self._gravar_pendentes()
         return texto, custo
 

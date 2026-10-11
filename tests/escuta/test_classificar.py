@@ -1,8 +1,11 @@
 import json
 import logging
 
+import pytest
+
 from gabi.dinheiro.modelo import Orcamento
-from gabi.escuta.classificar import Classificacao, classificar, interpretar
+from gabi.escuta.classificar import Classificacao, Falha, classificar, interpretar
+from gabi.fontes.openrouter import ErroOpenRouter
 
 NADA = Classificacao("nada", 0.0, {})
 
@@ -107,18 +110,21 @@ def test_confianca_alta_chama_uma_vez():
 
 def test_teto_estourado_devolve_none():
     cli = Falso(_resp("nada"))
-    assert classificar("oi", cli, _orc(dia=0.0)) is None
+    r = classificar("oi", cli, _orc(dia=0.0))
+    assert isinstance(r, Falha) and not r.temporaria
     assert cli.chamadas == []
 
 
 def test_teto_estoura_antes_da_segunda_chamada_devolve_none():
     cli = Falso(_resp("pedido", 0.5), custo=0.6)
-    assert classificar("oi", cli, _orc(dia=0.5)) is None
+    r = classificar("oi", cli, _orc(dia=0.5))
+    assert isinstance(r, Falha) and not r.temporaria
     assert len(cli.chamadas) == 1
 
 
 def test_sem_cliente_devolve_none():
-    assert classificar("oi", None, _orc()) is None
+    r = classificar("oi", None, _orc())
+    assert r == Falha("modelo não configurado", False)
 
 
 def test_falha_do_modelo_devolve_none(caplog):
@@ -126,7 +132,8 @@ def test_falha_do_modelo_devolve_none(caplog):
         def completar(self, prompt, *, forte):
             raise RuntimeError("erro generico")
     with caplog.at_level(logging.DEBUG):
-        assert classificar("texto-secreto-xyz", Quebra(), _orc()) is None
+        r = classificar("texto-secreto-xyz", Quebra(), _orc())
+        assert isinstance(r, Falha) and r.temporaria and "texto-secreto" not in r.motivo
     assert "texto-secreto-xyz" not in caplog.text
 
 
@@ -136,7 +143,7 @@ def test_none_nunca_e_classificacao_nos_tres_casos():
             raise RuntimeError("x")
     for r in (classificar("oi", None, _orc()), classificar("oi", Falso(_resp()), _orc(dia=0.0)),
               classificar("oi", Quebra(), _orc())):
-        assert r is None and not isinstance(r, Classificacao)
+        assert isinstance(r, Falha) and not isinstance(r, Classificacao)
 
 
 def test_resposta_invalida_nao_repete_com_forte():
@@ -175,3 +182,26 @@ def test_i1_crise_do_rapido_com_confianca_baixa_nao_vai_ao_forte():
     cli = Falso(_resp("crise", 0.3), _resp("nada", 0.99))
     r = classificar("oi", cli, _orc())
     assert r.tipo == "crise" and len(cli.chamadas) == 1
+
+
+def test_i6_resposta_vazia_e_falha_temporaria_nao_nada():
+    for vazio in ("", "   \n"):
+        r = classificar("oi", Falso(vazio), _orc())
+        assert isinstance(r, Falha) and r.temporaria
+
+
+@pytest.mark.parametrize("msg,temporaria", [("openrouter não está configurado no serviço de fontes", False), ("chave ausente", False),
+                                            ("teto diário", False), ("muitas chamadas", False), ("prompt grande demais", False),
+                                            ("OpenRouter -> 502", True), ("serviço de fontes indisponível", True)])
+def test_i6_erro_do_modelo_temporario_ou_nao(msg, temporaria):
+    class Q:
+        def completar(self, prompt, *, forte):
+            raise ErroOpenRouter(msg)
+    r = classificar("oi", Q(), _orc())
+    assert isinstance(r, Falha) and r.temporaria is temporaria
+
+
+def test_i13_resposta_invalida_e_nada_marcada_como_invalida():
+    r = classificar("oi", Falso("lixo"), _orc())
+    assert r == NADA and r.invalida
+    assert not classificar("oi", Falso(_resp("nada", 0.9)), _orc()).invalida
