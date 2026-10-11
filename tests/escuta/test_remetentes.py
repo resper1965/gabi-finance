@@ -212,3 +212,11 @@ def test_descartar_com_anexos_trocado_por_symlink_nao_apaga_a_vitima(con, tmp_pa
     _msg(con, anexo=str(spool / "anexos" / "a.bin"))
     ignorar(con, N, "ricardo", spool=spool)
     assert (vitima / "a.bin").read_text() == "SEGREDO"
+
+
+def test_i4_id_cru_aprovado_casa_pelo_canal_exato(con):
+    lid = "123456789012345@lid"
+    pid = aprovar(con, lid, "familia", "Tia", "teste")
+    d = json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])
+    assert f"whatsapp:{lid}" in d["canais"]
+    assert estado_remetente(con, lid) == ("aprovado", pid)

@@ -14,12 +14,18 @@ BRT = ZoneInfo("America/Sao_Paulo")
 
 
 def normalizar_telefone(bruto: str) -> str | None:
-    """E.164 brasileiro (+55...). Sem DDI assume +55. None se inválido."""
+    """E.164 brasileiro (+55...). Sem DDI assume +55. None se inválido. JID só vale com sufixo de telefone (@s.whatsapp.net,
+    @c.us): `@lid`, `@g.us` e outros são ids opacos, nunca telefone. Celular antigo (+55 DD + 8 dígitos começando em 6–9) ganha
+    o 9 na frente; fixo (2–5) não muda."""
     if not isinstance(bruto, str):
+        return None
+    if "@" in bruto and bruto.split("@", 1)[1].strip().lower() not in ("s.whatsapp.net", "c.us"):
         return None
     digitos = re.sub(r"\D", "", bruto.split("@")[0])
     if len(digitos) in (10, 11):
         digitos = "55" + digitos
+    if digitos.startswith("55") and len(digitos) == 12 and digitos[4] in "6789":
+        digitos = digitos[:4] + "9" + digitos[4:]
     if digitos.startswith("55") and len(digitos) in (12, 13):
         return "+" + digitos
     return None
@@ -133,9 +139,10 @@ def _ingerir(con, pasta: Path, sfd: int, agora: str) -> int:
             _mover(sfd, nome, "invalidos")
             continue
         grupo = bool(d.get("grupo"))
-        numero = None if grupo else normalizar_telefone(d["de"])
+        # I4: remetente que não vira telefone (LID, número estrangeiro) é registrado pelo id CRU; o bloqueio vale pelos dois.
+        numero = None if grupo else (normalizar_telefone(d["de"]) or d["de"])
         bloqueado = numero is not None and con.execute(
-            "select 1 from escuta_remetente where numero=? and estado='bloqueado'", (numero,)).fetchone()
+            "select 1 from escuta_remetente where numero in (?,?) and estado='bloqueado'", (numero, d["de"])).fetchone()
         if not bloqueado:
             anexo = d.get("anexo")
             caminho = str(pasta / "anexos" / anexo) if anexo else None
@@ -146,6 +153,8 @@ def _ingerir(con, pasta: Path, sfd: int, agora: str) -> int:
                     (d["id_externo"], numero or d["de"], int(grupo), d.get("id_grupo"), d["recebida_em"], d.get("texto"), caminho))
                 if numero is not None and cur.rowcount:
                     registrar_remetente_visto(con, numero, agora)
+                if grupo and d.get("id_grupo"):  # I5: grupo visto aparece na tela para ser aprovado
+                    con.execute("insert or ignore into escuta_grupo(id_grupo, nome, aprovado) values (?, null, 0)", (d["id_grupo"],))
             novas += cur.rowcount
         # C1: depois do commit o json SAI do spool (sem lidos/): o texto só fica no banco, onde as regras de apagamento valem.
         # Replay do mesmo id é deduplicado por id_externo UNIQUE.

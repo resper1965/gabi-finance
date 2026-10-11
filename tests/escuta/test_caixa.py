@@ -382,3 +382,44 @@ def test_limpar_orfaos_invalidos_symlink_nao_e_seguido(tmp_path):
     (pasta / "invalidos").symlink_to(alvo, target_is_directory=True)
     limpar_orfaos(con, pasta)
     assert (alvo / "x.json").exists()
+
+
+# ---- I4: remetente que não vira telefone; celular antigo; I5: grupo visto ----
+LID = "123456789012345@lid"
+
+
+def test_i4_celular_antigo_ganha_o_nove_e_fixo_nao_muda():
+    assert normalizar_telefone("551181234567@s.whatsapp.net") == "+5511981234567"
+    assert normalizar_telefone("+55 11 8123-4567") == "+5511981234567"
+    assert normalizar_telefone("551161234567") == "+5511961234567"
+    for fixo in ("551131234567", "551121234567", "551151234567", "551141234567"):
+        assert normalizar_telefone(fixo) == "+" + fixo
+
+
+def test_i4_lid_nunca_vira_telefone():
+    assert normalizar_telefone("11912345678@lid") is None and normalizar_telefone(LID) is None
+
+
+def test_i4_remetente_cru_e_registrado(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "l1", de=LID, lid=True)
+    assert ingerir_spool(con, pasta, AGORA) == 1
+    r = con.execute("select numero, estado, qtd from escuta_remetente").fetchone()
+    assert (r["numero"], r["estado"], r["qtd"]) == (LID, "pendente", 1)
+    assert con.execute("select de from escuta_msg").fetchone()[0] == LID
+
+
+def test_i4_bloqueado_pelo_id_cru_nao_entra(con, tmp_path):
+    con.execute("insert into escuta_remetente(numero, estado, qtd) values (?,'bloqueado',0)", (LID,))
+    pasta = tmp_path / "spool"
+    _msg(pasta, "l1", de=LID, lid=True)
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
+
+
+def test_i5_grupo_visto_entra_em_escuta_grupo_nao_aprovado(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "g1", grupo=True, id_grupo="123@g.us", de="5511900000001@s.whatsapp.net")
+    _msg(pasta, "g2", grupo=True, id_grupo="123@g.us", de="5511900000002@s.whatsapp.net")
+    ingerir_spool(con, pasta, AGORA)
+    assert [tuple(r) for r in con.execute("select id_grupo, nome, aprovado from escuta_grupo")] == [("123@g.us", None, 0)]

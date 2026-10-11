@@ -130,6 +130,7 @@ def test_todas_as_contas_falhando_nao_mexe_na_tabela_mas_conta_removida_e_purgad
     ({"telefone": "+1 (415) 555-2671", "canonico": "+14155552671"}, "+14155552671"),
     ({"telefone": "(11) 91234-5678", "canonico": "+5511912345678"}, "+5511912345678"),
     ({"telefone": "(11) 91234-5678", "canonico": "lixo"}, "+5511912345678"),
+    ({"telefone": "(11) 8123-4567", "canonico": "+551181234567"}, "+5511981234567"),   # I4: celular antigo ganha o 9 também no canônico
 ])
 def test_telefones_internacionais_e_ramais(con, item, esperado):
     r = c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "X", **item}]}))

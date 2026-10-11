@@ -374,3 +374,55 @@ def test_trazer_usa_o_mesmo_id_do_aprovar_e_reativa_pessoa_excluida_sem_aprovar(
 def test_openapi_documenta_o_csv_como_text_csv():
     spec = json.loads((Path(__file__).parent.parent.parent / "docs" / "openapi.json").read_text())
     assert "text/csv" in spec["paths"]["/api/v1/escuta/contatos/so-na-ness.csv"]["get"]["responses"]["200"]["content"]
+
+
+LIDQ = "123456789012345%40lid"
+LID = "123456789012345@lid"
+
+
+def test_i4_id_cru_aparece_na_fila_e_aceita_ignorar_bloquear_aprovar(cli, banco):
+    _pendente(banco, numero=LID, nome=None)
+    d = cli.get("/api/v1/escuta/remetentes", headers=BOSS).json()["dados"]
+    assert [f["numero"] for f in d["fila"]] == [LID]
+    assert _post(cli, f"/api/v1/escuta/remetentes/{LIDQ}/aprovar", {"papel": "familia"}).status_code == 400   # id cru exige nome
+    r = _post(cli, f"/api/v1/escuta/remetentes/{LIDQ}/aprovar", {"papel": "familia", "nome": "Tia"})
+    assert r.status_code == 200 and r.json()["dados"]["numero"] == LID
+    d = cli.get("/api/v1/escuta/remetentes", headers=BOSS).json()["dados"]
+    assert d["fila"] == [] and [a["numero"] for a in d["aprovados"]] == [LID]
+    assert _post(cli, f"/api/v1/escuta/remetentes/{LIDQ}/bloquear").status_code == 200
+    c = conectar(banco)
+    assert c.execute("select estado from escuta_remetente where numero=?", (LID,)).fetchone()[0] == "bloqueado"
+    c.close()
+
+
+def test_i4_id_cru_desconhecido_continua_404(cli):
+    assert _post(cli, f"/api/v1/escuta/remetentes/{LIDQ}/ignorar").status_code == 404
+
+
+def test_i5_grupo_visto_no_spool_aparece_aprova_e_e_classificado(cli, banco, tmp_path):
+    from gabi.dinheiro.modelo import Orcamento
+    from gabi.escuta.caixa import ingerir_spool
+    from gabi.escuta.processar import processar
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    msg = {"id_externo": "g1", "de": "5511900000001@s.whatsapp.net", "grupo": True, "id_grupo": "999@g.us",
+           "recebida_em": "2026-10-16T09:00:00", "texto": "oi grupo"}
+    (spool / "g1.json").write_text(json.dumps(msg))
+    c = conectar(banco)
+    ingerir_spool(c, spool, "2026-10-16T12:00:00+00:00")
+    assert cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"] == [{"id_grupo": "999@g.us", "nome": None, "aprovado": False}]
+    assert _post(cli, "/api/v1/escuta/grupos/999@g.us/aprovar").status_code == 200
+
+    class M:
+        n = 0
+
+        def completar(self, prompt, *, forte):
+            M.n += 1
+            return json.dumps({"tipo": "nada", "confianca": 0.9, "campos": {}}), 0.001
+
+    class D:
+        def documento(self, *a): ...
+    r = processar(c, D(), M(), Orcamento(1.0, 10.0), "2026-10-16T12:00:00+00:00", "registro")
+    assert M.n == 1 and r["classificadas"] == 1
+    assert c.execute("select estado, tipo from escuta_msg").fetchone()[:] == ("processada", "nada")
+    c.close()

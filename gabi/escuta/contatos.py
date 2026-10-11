@@ -59,7 +59,8 @@ def _telefone(item) -> str | None:
         return None
     canon = item.get("canonico")
     if isinstance(canon, str) and _CANONICO.match(canon.strip()):
-        return canon.strip()
+        c = canon.strip()
+        return (normalizar_telefone(c) or c) if c.startswith("+55") else c  # +55: mesma regra do remetente (celular antigo ganha o 9)
     bruto = item.get("telefone")
     if not isinstance(bruto, str):
         return None

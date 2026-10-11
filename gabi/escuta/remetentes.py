@@ -26,7 +26,8 @@ def _casa(d: dict, numero: str) -> bool:
     canais = d.get("canais")
     if not isinstance(canais, list):
         return False
-    return any(isinstance(c, str) and c.startswith("whatsapp:") and normalizar_telefone(c[len("whatsapp:"):]) == numero for c in canais)
+    return any(isinstance(c, str) and c.startswith("whatsapp:") and (c == f"whatsapp:{numero}" or normalizar_telefone(c[len("whatsapp:"):]) == numero)
+               for c in canais)  # id cru (LID) casa pelo canal exato
 
 
 def _pessoas_do_numero(con, numero: str) -> list:
@@ -86,7 +87,7 @@ def garantir_pessoa(con, numero: str, nome: str | None) -> tuple[str, dict, str]
         d, estado = {}, "criada"
         con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')", (pid, nome or _nome_contato(con, numero) or numero, "{}"))
     canais = d.get("canais") if isinstance(d.get("canais"), list) else []
-    if not any(isinstance(c, str) and c.startswith("whatsapp:") and normalizar_telefone(c[9:]) == numero for c in canais):
+    if not _casa({"canais": canais}, numero):
         d["canais"] = canais + [f"whatsapp:{numero}"]
     return pid, d, estado
 

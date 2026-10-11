@@ -22,11 +22,19 @@ PADROES = {"modo": "registro", "palavras_risco": [], "horas_sem_receber": 12, "a
 CHAVES = {k: f"escuta.{k}" for k in PADROES}
 
 
-def _numero(bruto: str) -> str:
+def _numero(bruto: str, request: Request | None = None) -> str:
+    """Telefone normalizado; ou o id CRU (LID etc.) quando ele já existe em escuta_remetente (I4). Senão 404."""
     n = normalizar_telefone(bruto.strip())
-    if n is None:
-        raise erro(404, "nao_encontrado", "número inválido")
-    return n
+    if n is not None:
+        return n
+    if request is not None and bruto.strip():
+        con = _con(request)
+        try:
+            if con.execute("select 1 from escuta_remetente where numero=?", (bruto.strip(),)).fetchone():
+                return bruto.strip()
+        finally:
+            con.close()
+    raise erro(404, "nao_encontrado", "número inválido")
 
 
 def _inteiro(v, nome: str, minimo: int, maximo: int) -> int:
@@ -76,8 +84,8 @@ def _aprovados(con) -> list[dict]:
         d = dados(p)
         if d.get("escuta_aprovada") is not True:
             continue
-        numero = next((n for c in (d.get("canais") or []) if isinstance(c, str) and c.startswith("whatsapp:")
-                       and (n := normalizar_telefone(c[9:]))), None)
+        canais = [c for c in (d.get("canais") or []) if isinstance(c, str) and c.startswith("whatsapp:")]
+        numero = next((n for c in canais if (n := normalizar_telefone(c[9:]))), None) or next((c[9:] for c in canais if c[9:]), None)
         saida.append({"pessoa_id": p["id"], "nome": p["nome"], "numero": numero, "papel": d.get("papel_escuta")})
     return saida
 
@@ -101,7 +109,9 @@ async def aprovar(numero: str, request: Request, ident: Identidade = Depends(exi
         raise erro(400, "requisicao_invalida", f"papel deve ser um de {list(rem.PAPEIS)}")
     if nome is not None and (not isinstance(nome, str) or len(nome) > 120):
         raise erro(400, "requisicao_invalida", "nome deve ser texto de até 120 caracteres")
-    n = _numero(numero)
+    n = _numero(numero, request)
+    if normalizar_telefone(n) is None and not (nome or "").strip():
+        raise erro(400, "requisicao_invalida", "remetente sem telefone (id do WhatsApp): informe o nome para aprovar")
     con = _con(request)
     try:
         pid = rem.aprovar(con, n, papel, (nome or "").strip() or None, ident.login)
@@ -112,7 +122,7 @@ async def aprovar(numero: str, request: Request, ident: Identidade = Depends(exi
 
 async def _descartar(numero: str, request: Request, ident: Identidade, fn, estado: str):
     await _json(request)
-    n = _numero(numero)
+    n = _numero(numero, request)
     con = _con(request)
     try:
         fn(con, n, ident.login, None)  # spool=None: a API não apaga arquivo
