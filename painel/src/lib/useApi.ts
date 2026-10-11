@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ErroApi, type Envelope } from "./api";
 
 export interface Leitura<T> {
   estado: "carregando" | "ok" | "erro";
   env: Envelope<T> | null; // mantém os últimos dados bons mesmo em erro
   erro: ErroApi | null;
-  recarregar: () => void;
+  recarregar: () => Promise<void>; // resolve quando a releitura termina (ok ou erro)
 }
 
 export function useApi<T>(url: string | null): Leitura<T> {
@@ -13,17 +13,19 @@ export function useApi<T>(url: string | null): Leitura<T> {
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [estado, setEstado] = useState<Leitura<T>["estado"]>("carregando");
   const [rev, setRev] = useState(0);
+  const esperando = useRef<(() => void)[]>([]);
+  const liberar = () => { const f = esperando.current; esperando.current = []; f.forEach((r) => r()); };
   useEffect(() => {
     if (url === null) return;
     let vivo = true;
     setEstado((e) => (env ? e : "carregando"));
     api.get<T>(url).then(
-      (e) => { if (vivo) { setEnv(e); setErro(null); setEstado("ok"); } },
-      (x) => { if (vivo) { setErro(x as ErroApi); setEstado("erro"); } },
+      (e) => { if (vivo) { setEnv(e); setErro(null); setEstado("ok"); } liberar(); },
+      (x) => { if (vivo) { setErro(x as ErroApi); setEstado("erro"); } liberar(); },
     );
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, rev]);
-  const recarregar = useCallback(() => setRev((n) => n + 1), []);
+  const recarregar = useCallback(() => new Promise<void>((r) => { esperando.current.push(r); setRev((n) => n + 1); }), []);
   return { estado, env, erro, recarregar };
 }
