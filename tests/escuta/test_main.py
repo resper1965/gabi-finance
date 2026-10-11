@@ -312,3 +312,16 @@ def test_fechar_que_nao_consegue_gravar_imprime_so_a_contagem(amb, capsys):
     w.fechar()
     err = capsys.readouterr().err
     assert "1 linha" in err and "0.02" not in err
+
+
+def test_main_limpa_orfaos_e_imprime_so_contagem(amb, capsys):
+    import os, time
+    banco, spool, con = amb
+    (spool / "anexos").mkdir()
+    o = spool / "anexos" / "segredo-nome.pdf"
+    o.write_bytes(b"x")
+    t = time.time() - 48 * 3600
+    os.utime(o, (t, t))
+    assert prog.main(cliente=Modelo(), agora=AGORA) == 0
+    out = capsys.readouterr().out
+    assert not o.exists() and "orfaos=1" in out and "segredo" not in out

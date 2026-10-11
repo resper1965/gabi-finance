@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
-from gabi.escuta.caixa import ingerir_spool
+from gabi.escuta.caixa import ingerir_spool, limpar_orfaos
 from gabi.escuta.destinos import DestinosReais
 from gabi.escuta.processar import processar
 from gabi.fontes.ponte import Ponte, PonteModelo
@@ -118,7 +118,8 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
     finally:
         if isinstance(cliente, ModeloComCusto):
             cliente.fechar()
-    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()))
+    orfaos = limpar_orfaos(con, spool)  # último passo: anexo que nenhuma mensagem aponta mais (a API só anula o ponteiro)
+    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()) + f" orfaos={orfaos}")
     return 0
 
 

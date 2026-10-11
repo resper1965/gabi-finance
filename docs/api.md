@@ -62,6 +62,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
+| GET | `/api/v1/escuta/grupos` | Grupos de WhatsApp vistos pela escuta e se já foram aprovados. |
+| POST | `/api/v1/escuta/grupos/{id_grupo}/aprovar` | Aprova um grupo de WhatsApp para a escuta (404 se o grupo nunca foi visto). |
+| GET | `/api/v1/escuta/parametros` | Parâmetros da escuta: modo, palavras de risco, horas sem receber e tamanho máximo de anexo (padrões se não definidos). |
+| PUT | `/api/v1/escuta/parametros` | Grava parâmetros da escuta (só os enviados); valida modo, lista de palavras e faixas, e audita só os nomes. |
+| GET | `/api/v1/escuta/remetentes` | Fila de remetentes novos (pendentes) e a lista de aprovados da escuta. |
+| POST | `/api/v1/escuta/remetentes/{numero}/aprovar` | Aprova um remetente com um papel (familia, prestador ou cobranca); nome é opcional. |
+| POST | `/api/v1/escuta/remetentes/{numero}/bloquear` | Bloqueia um remetente: nada novo dele é guardado. |
+| POST | `/api/v1/escuta/remetentes/{numero}/ignorar` | Ignora um remetente: some da fila e as mensagens retidas dele perdem o texto. |
 | GET | `/api/v1/familia/edicoes` | Edições feitas fora (Obsidian) esperando decisão do boss, com o texto novo. |
 | POST | `/api/v1/familia/edicoes/{edicao_id}/decidir` | Aprova (você aplicou o que mudou) ou rejeita (o arquivo volta ao exportado) uma edição externa. |
 | GET | `/api/v1/familia/exames/{pessoa_id}` | Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde. |

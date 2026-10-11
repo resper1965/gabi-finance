@@ -86,3 +86,29 @@ def ingerir_spool(con, pasta: Path, agora: str) -> int:
             novas += cur.rowcount
         _mover(arq, pasta / "lidos")
     return novas
+
+
+def limpar_orfaos(con, spool: Path, *, idade_h: int = 24) -> int:
+    """Apaga anexo do spool que nenhuma linha de escuta_msg aponta e com mais de `idade_h` h (a API só anula o ponteiro; quem apaga é este timer).
+    Só arquivo regular direto em <spool>/anexos: nunca segue symlink, nunca entra em subpasta. Devolve só a contagem."""
+    import os
+    import time
+    pasta = Path(spool) / "anexos"
+    try:
+        entradas = list(os.scandir(pasta))
+    except OSError:
+        return 0
+    referenciados = {Path(r[0]).name for r in con.execute("select anexo_caminho from escuta_msg where anexo_caminho is not null")}
+    limite = time.time() - idade_h * 3600
+    removidos = 0
+    for e in entradas:
+        try:
+            if e.is_symlink() or not e.is_file(follow_symlinks=False) or e.name in referenciados:
+                continue
+            if e.stat(follow_symlinks=False).st_mtime >= limite:
+                continue
+            os.unlink(e.path)
+            removidos += 1
+        except OSError:
+            continue
+    return removidos

@@ -152,3 +152,53 @@ def test_recebida_em_invalida_vai_para_invalidos(con, tmp_path):
     pasta = tmp_path / "spool"
     _msg(pasta, "z", recebida_em="ontem")
     assert ingerir_spool(con, pasta, AGORA) == 0 and (pasta / "invalidos" / "z.json").exists()
+
+
+# ---- limpar_orfaos ----
+def _velho(p, horas=48):
+    import os, time
+    t = time.time() - horas * 3600
+    os.utime(p, (t, t), follow_symlinks=False)
+
+
+def _spool_orfaos(tmp_path):
+    pasta = tmp_path / "spool"
+    (pasta / "anexos").mkdir(parents=True)
+    con = conectar(tmp_path / "o.db")
+    migrar(con, Path(__file__).parent.parent.parent / "migrations")
+    return pasta, con
+
+
+def test_limpar_orfaos_remove_so_orfao_antigo(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    pasta, con = _spool_orfaos(tmp_path)
+    orf, ref, novo = (pasta / "anexos" / n for n in ("orfao.pdf", "ref.pdf", "novo.pdf"))
+    for a in (orf, ref, novo):
+        a.write_bytes(b"x")
+    _velho(orf); _velho(ref)
+    con.execute("insert into escuta_msg(id_externo, de, grupo, recebida_em, anexo_caminho) values ('1','+5511912345678',0,'2026-10-11T10:00:00+00:00',?)", (str(ref),))
+    assert limpar_orfaos(con, pasta) == 1
+    assert not orf.exists() and ref.exists() and novo.exists()
+
+
+def test_limpar_orfaos_nao_segue_symlink_nem_subpasta_nem_fora(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    pasta, con = _spool_orfaos(tmp_path)
+    fora = tmp_path / "fora.txt"
+    fora.write_bytes(b"x"); _velho(fora)
+    ln = pasta / "anexos" / "ln"
+    ln.symlink_to(fora); _velho(ln)
+    sub = pasta / "anexos" / "sub"
+    sub.mkdir(); (sub / "dentro.pdf").write_bytes(b"x"); _velho(sub / "dentro.pdf"); _velho(sub)
+    dirln = pasta / "anexos" / "dl"
+    alvo = tmp_path / "alvo"; alvo.mkdir(); (alvo / "a.pdf").write_bytes(b"x"); _velho(alvo / "a.pdf")
+    dirln.symlink_to(alvo, target_is_directory=True)
+    assert limpar_orfaos(con, pasta) == 0
+    assert fora.exists() and ln.is_symlink() and (sub / "dentro.pdf").exists() and (alvo / "a.pdf").exists() and dirln.is_symlink()
+
+
+def test_limpar_orfaos_sem_pasta_anexos(tmp_path):
+    from gabi.escuta.caixa import limpar_orfaos
+    con = conectar(tmp_path / "o.db")
+    migrar(con, Path(__file__).parent.parent.parent / "migrations")
+    assert limpar_orfaos(con, tmp_path / "nada") == 0
