@@ -440,3 +440,9 @@ def test_i6_m5_descrever_escuta_falhou_e_sem_modelo_neutro():
     assert "Joana" in t and "abra a conversa" in (t + x)
     t, x = descrever("escuta_sem_modelo", {"motivo": "teto de custo do modelo"})
     assert x == "a escuta está sem modelo disponível agora: teto de custo do modelo" and "não está configurado" not in x
+
+
+def test_i7_descrever_escuta_anexo_grande():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("escuta_anexo_grande", {"numero": N, "nome": "Joana"})
+    assert "Joana" in t and "25" not in t and "grande" in (t + x).lower() and x != "{}"

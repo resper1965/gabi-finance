@@ -58,7 +58,7 @@ docs@esper.ws (já existente) ────────────────�
 - **Fora do MCP:** o Hermes não lê valores de saúde (ADR-014). Pode saber só "há N exames novos a confirmar".
 
 ## 4. Dados
-No cofre (`saude.enc`): `exame` ganha `doc_id`, `versao`, `qualitativo`, `observacao`; `marcador_apelido(apelido, marcador)`. No `gabi.db`: só a referência (id do documento, estado: novo/extraído/confirmado/falhou, versão). Migração `0022` (a 0021 é da escuta). Nada de valor de saúde no `gabi.db`.
+No cofre (`saude.enc`): `exame` ganha `doc_id`, `versao`, `qualitativo`, `observacao`; `marcador_apelido(apelido, marcador)`. No `gabi.db`: só a referência (id do documento, estado: novo/extraído/confirmado/falhou, versão). Migração `0024` (0021 e 0023 são da escuta, 0022 da moeda). Nada de valor de saúde no `gabi.db`.
 
 ## 5. Erros e segurança
 - Sem chave do cofre ou do modelo: o timer não extrai e avisa; nada se perde (o PDF segue no Paperless).

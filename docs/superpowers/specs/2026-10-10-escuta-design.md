@@ -49,6 +49,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 ### 3.4 Destinos
 - **pedido** → `gabi/cobrar/pedidos.py` (já registra sem dizer que pagou; só o Ricardo aprova no painel). O remetente aprovado tem que ter `pode_pedir`.
 - **saúde** → o **anexo vai para o Paperless** (`consume`, com a etiqueta `gabi:saude-exame`; assume o papel do `gabi-wa-docs`) e **o Paperless é o arquivo do original**. A extração, a confirmação do dono, o histórico por familiar e o **reprocessamento** são do módulo de exames (spec 2026-10-11-exames-design). A pista de reembolso segue o fluxo do `reembolso_fila.py` (casa por checksum, classifica, avisa). Mensagem de saúde **só de texto** (sem anexo) é guardada no cofre cifrado (ADR-014), nunca em `escuta_msg` nem no `gabi.db`. Nada de saúde é apagado.
+  - **Nota de desvio (11/10/2026, ADR-016):** a implementação NÃO guarda a saúde só de texto no cofre (o cofre é do projeto dos exames): gera o aviso `escuta_saude` (só número e nome) e apaga o texto; o original continua no WhatsApp do Ricardo. Limitação conhecida, aceita como gate da troca para `ativo`.
 - **crise** → um `aviso` Telegram ao Ricardo: "Possível crise: <nome ou número>. Abra a conversa." Nada mais. Sem nível, sem trecho, sem conselho. Só ao Ricardo.
 - **nada** → texto e anexo apagados (vale só para tipo "nada"; saúde, pedido e crise nunca são apagados daqui); fica só `id_externo`, remetente, data e tipo.
 
@@ -62,8 +63,8 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 - Revogar o acesso apaga a tabela.
 
 ### 3.6 Aposentadoria do que sai
-- `reembolso_fila.py` e `reembolso_segunda` entram no brain sem mudar a lógica (portados com os testes).
-- `gabi-wa-docs`, o agente `escuta`, `escuta.py` e `gabi-reembolso.path` saem **depois** do paralelo (seção 6).
+- `reembolso_fila.py` e `reembolso_segunda` entram no brain sem mudar a lógica (portados com os testes). **Nota de desvio (11/10/2026, ADR-016):** o porte não foi feito; fica como item aberto em `docs/PLANO-DEFINITIVO.md`, e `gabi-reembolso*` sai da lista de aposentadoria da escuta até lá.
+- `gabi-wa-docs`, o agente `escuta` e `escuta.py` saem **depois** do paralelo (seção 6); `gabi-reembolso.path` só depois do porte do reembolso (ver nota acima).
 - Filas históricas (`feitas/`, `falhas/`) não se apagam; são arquivadas.
 
 ## 4. Dados (migração 0021)
