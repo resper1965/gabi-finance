@@ -59,14 +59,14 @@ def custo_padrao_usd() -> float:
 
 
 class ModeloComCusto:
-    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa 'escuta'; chamada que falhou depois do envio: tarefa
-    'escuta-falha' com custo conservador, `em` = instante da chamada em BRT), numa
+    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa `tarefa`, padrão 'escuta'; chamada que falhou depois do envio: tarefa
+    '<tarefa>-falha' com custo conservador, `em` = instante da chamada em BRT), numa
     SEGUNDA conexão em autocommit (WAL + busy_timeout). O serviço de fontes já cobrou a chamada: se o insert falhar (lock), a
     classificação paga NÃO se perde; a linha fica pendente e é regravada na próxima chamada completada e em `fechar()`.
     Erro do cliente propaga (recusa antes do envio não grava)."""
 
-    def __init__(self, cliente, banco: Path, relogio=None):
-        self._cliente, self._relogio = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc))
+    def __init__(self, cliente, banco: Path, relogio=None, tarefa: str = "escuta"):
+        self._cliente, self._relogio, self._tarefa = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc)), tarefa
         self._con = conectar(banco)
         self.pendentes: list[tuple[str, float]] = []
 
@@ -85,7 +85,7 @@ class ModeloComCusto:
             # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
             # Recusa antes do envio (não configurado, teto, limite, prompt grande) não cobra nada.
             if recusa_sem_envio(e) is None:
-                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo_padrao_usd(), "escuta-falha"))
+                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo_padrao_usd(), f"{self._tarefa}-falha"))
                 self._gravar_pendentes()
             raise
         try:
@@ -93,7 +93,7 @@ class ModeloComCusto:
         except TypeError:
             ok = False
         custo = float(custo) if ok else CUSTO_RESERVA_USD
-        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, "escuta"))
+        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, self._tarefa))
         self._gravar_pendentes()
         return texto, custo
 

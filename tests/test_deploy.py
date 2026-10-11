@@ -479,3 +479,26 @@ def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
     linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
     assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
+
+
+# ---------------- correio ----------------
+def test_unidades_do_correio_seguem_o_padrao_e_nao_sao_habilitadas():
+    srv, t = _ler("gabi-brain-correio.service"), _ler("gabi-brain-correio.timer")
+    assert "-m gabi.correio" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv  # segredo só no serviço de fontes
+    assert "OnCalendar=*-*-* 06..22:00,15,30,45:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-correio.service" in t
+    assert hasattr(importlib.import_module("gabi.correio.__main__"), "main")
+    for nome in ("gabi-brain-correio.service", "gabi-brain-correio.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert not any("correio" in l for l in ligadas)
+
+
+def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
+    unit = _ler("gabi-brain-fontes.service")
+    assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")

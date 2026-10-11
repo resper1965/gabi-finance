@@ -205,3 +205,24 @@ def test_agenda_liberada_sem_nenhuma_rodada_aparece_nao_conferida(con):
     con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
     e = envelope(con, None, AGORA)
     assert _estados(e)["agenda"] == "nao_conferida" and e["desatualizado"] is True
+
+
+# ---------------- correio: fonte própria de frescor ----------------
+def test_correio_so_conta_com_fonte_liberada_e_pela_propria_rodada(con):
+    _producao(con)
+    _r(con, "correio", 1, status="ok")
+    assert "correio" not in _estados(envelope(con, None, AGORA))  # nenhuma conta liberada: não conta
+    con.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["correio"] == "ok" and "trabalho" not in _estados(e) and "agenda" not in _estados(e)  # liberar e-mail não liga os outros
+    con.execute("delete from rodada where fonte='correio'")
+    _r(con, "correio", 13, status="ok")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["correio"] == "parada" and e["desatualizado"] is True
+
+
+def test_correio_liberado_sem_nenhuma_rodada_aparece_nao_conferida(con):
+    _producao(con)
+    con.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    e = envelope(con, None, AGORA)
+    assert _estados(e)["correio"] == "nao_conferida" and e["desatualizado"] is True

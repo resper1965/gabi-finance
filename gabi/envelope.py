@@ -16,6 +16,7 @@ FONTES = {
     "comprovantes-paperless": dt.timedelta(hours=30),   # diária 07:00
     "trabalho": dt.timedelta(hours=12),                 # a cada 15 min, 06-22h (a pausa noturna chega a 8 h); só conta se estiver em uso
     "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
+    "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
 }
 COM_CONFERENCIA = ("open-finance",)
@@ -65,6 +66,11 @@ def _agenda_em_uso(con) -> bool:
     return _em_uso(con, "agenda_fonte")
 
 
+def _correio_em_uso(con) -> bool:
+    """`correio` só vale como fonte com alguma conta de e-mail liberada (`email_fonte` em estado 'sim')."""
+    return _em_uso(con, "email_fonte")
+
+
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     agora = agora or dt.datetime.now(dt.timezone.utc)
     fontes, ultimas, falta, atrasada = [], [], False, False
@@ -72,6 +78,7 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     nomes |= set(ESPERADAS)
     nomes.add("trabalho") if _trabalho_em_uso(con) else nomes.discard("trabalho")
     nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
+    nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
     nomes = sorted(n for n in nomes if not (n in FONTES and FONTES[n] is None))
     for nome in nomes:
         conta = FONTES.get(nome) is not None
