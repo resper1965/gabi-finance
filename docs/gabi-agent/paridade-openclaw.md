@@ -33,7 +33,7 @@ Fonte: `openclaw cron list` (21 automações), `systemctl` (units `gabi-*`), `/v
 | `gabi-vigia` (`vigia_gateway.py`) | vigia o gateway do OpenClaw | trocar o alvo para `hermes-gateway` **antes** de desligar, senão alerta "gateway parado" para sempre (Task 10) |
 | `gabi-guarda-sessoes` (`sessoes.py`) | sessões do OpenClaw | descartar no corte (Hermes tem `sessions/` próprio) |
 | `gabi-wa-docs.path` | observa `.openclaw/media/inbound` e `workspace/media/inbound` (PDF/foto recebido no WhatsApp → Paperless) | apontar para o diretório de mídia do Hermes (`~/.hermes/image_cache` e documentos) ou DECIDIR descartar |
-| `gabi-reembolso.path` | observa `.openclaw/fila-reembolso` (escrita pelo agente `escuta`) | DECIDIR junto com o agente `escuta` |
+| `gabi-reembolso.path` | observa `.openclaw/fila-reembolso` (escrita pelo agente `escuta`) | aposentar com o agente `escuta`, só após `escuta.modo='ativo'` (`runbook.md#escuta-paralelo`) |
 | `gabi-financeiro`, `gabi-fluxos-*`, `gabi-contas-cartoes`, `gabi-reembolso-segunda` | só usam `HOME`/dados do usuário `gabi`; enviam ao Telegram pelo token do OpenClaw (`TELEGRAM_BOSS`, `financeiro.env`) | OK, mas o token usado para enviar muda se o bot do OpenClaw sair (Task 15 passo extra) |
 
 ## 3. Canais e agentes
@@ -41,7 +41,7 @@ Fonte: `openclaw cron list` (21 automações), `systemctl` (units `gabi-*`), `/v
 |---|---|---|---|
 | Telegram do Boss | OpenClaw (bot atual, token em store write-only) | bot novo (Task 12) | MIGRAR (por último) |
 | WhatsApp do Boss | OpenClaw (+5511983397196) | número dedicado (Task 13) | MIGRAR (por último) |
-| Agente `escuta` (WhatsApp pessoal: reembolso, pistas) | OpenClaw, 2 agentes | sem equivalente | DECIDIR (escopo de ADR-007: só o Ricardo conversa) |
+| Agente `escuta` (WhatsApp pessoal: reembolso, pistas) | OpenClaw, 2 agentes | gabi.brain: ouvinte só de leitura + timer `gabi-brain-escuta` (ADR-016) | MIGRADO (código pronto; gate: `tools.comparar_escuta` limpo por N dias e `escuta.modo='ativo'`, `runbook.md#escuta-paralelo`) |
 | Plugin `gabi-silencio` (barra narração) | OpenClaw | Hermes tem `SOUL.md`; sem plugin | DECIDIR (medir ruído no Hermes) |
 | `modelByChannel`, `modelPolicy` | OpenClaw | `config.yaml` do Hermes | MIGRAR (DeepSeek flash padrão; Sonnet 5.5 só no forecast) |
 

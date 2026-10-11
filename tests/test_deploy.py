@@ -424,3 +424,12 @@ def test_instalar_cria_usuario_do_ouvinte_e_instala_sem_ligar_nem_rodar_npm():
     ativas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith(("#", "echo"))]
     assert not any("escuta-ouvinte" in l and ("enable" in l or "start" in l) for l in ativas)
     assert not any(re.search(r"\bnpm\b", l) for l in ativas)
+
+
+def test_runbook_escuta_paralelo_tem_os_passos_e_o_aviso_de_crise():
+    from pathlib import Path
+    rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
+    trecho = rb.split("{#escuta-paralelo}")[1].split("\n## ")[0]
+    for esperado in ("tools.comparar_escuta", "google-contatos.env", "openrouter.env", "limite de crédito", "anexo_caminho",
+                     "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
+        assert esperado in trecho, esperado

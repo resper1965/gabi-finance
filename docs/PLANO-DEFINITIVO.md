@@ -22,7 +22,7 @@ Decisão do Ricardo, 10–11/10/2026. **Este arquivo manda.** Se algum plano, me
 
 ## Ordem
 1. Corte do `gabi-financeiro` (G21) — `comparar_agenda` já corrigido; falta contar os dias (rodadas 07h, 15h, 23h BRT) (Paineiras e Cristina Yabe já decididas: vale o brain).
-2. Escuta (plano) — em modo `registro`, paralelo com o agente antigo, depois `ativo`.
+2. Escuta — **código completo (11/10, ADR-016)**; aguardando passos do Ricardo: parear, G12, chave com limite, ligar em `registro`, comparar por N dias (`tools.comparar_escuta`), `ativo`. Runbook `#escuta-paralelo`.
 3. Exames (plano) — com a lista de PDFs do Ricardo como aceite.
 4. Agenda (spec e plano a escrever).
 5. Telegram e WhatsApp do Hermes (Tasks 12–13 do fechamento): token novo e número dedicado.
