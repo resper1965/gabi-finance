@@ -8,3 +8,4 @@ painel/dist/
 *.db-wal
 *.db-shm
 gabi/painel/
+ouvinte/node_modules/

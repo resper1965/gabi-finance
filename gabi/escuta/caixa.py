@@ -64,6 +64,8 @@ def ingerir_spool(con, pasta: Path, agora: str) -> int:
     pasta = Path(pasta)
     novas = 0
     for arq in sorted(pasta.glob("*.json")):
+        if arq.name == "palavras-risco.json":  # lista que o brain publica para o ouvinte, não é mensagem
+            continue
         try:
             d = _ler(arq)
         except (OSError, ValueError):  # JSONDecodeError e UnicodeDecodeError são ValueError

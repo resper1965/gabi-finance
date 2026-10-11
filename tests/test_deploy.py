@@ -393,3 +393,30 @@ def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
 
 def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
     assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in _ler("gabi-brain-fontes.service")
+
+
+# ---------------- ouvinte do WhatsApp (serviço separado, só leitura) ----------------
+def test_unidade_do_ouvinte_segue_o_padrao_e_isola_o_brain():
+    u = (DEPLOY / "escuta-ouvinte.service").read_text()
+    for linha in ("User=escuta-ouvinte", "Group=escuta-ouvinte", "SupplementaryGroups=gabibrain-escuta", "UMask=0007",
+                  "Restart=always", "RestartSec=10", "WorkingDirectory=/opt/escuta-ouvinte",
+                  "ExecStart=/usr/bin/node /opt/escuta-ouvinte/src/ouvinte.js",
+                  "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes",
+                  "ProtectKernelTunables=yes", "ProtectKernelModules=yes", "ProtectControlGroups=yes", "CapabilityBoundingSet=\n",
+                  "RestrictAddressFamilies=AF_INET AF_INET6\n", "ReadWritePaths=/var/lib/gabi-escuta-spool /var/lib/escuta-ouvinte\n",
+                  "InaccessiblePaths=/var/lib/gabi-brain /etc/gabi", "MemoryMax=512M",
+                  "OUVINTE_SPOOL=/var/lib/gabi-escuta-spool", "OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth"):
+        assert linha in u, linha
+    assert "AF_UNIX" not in re.sub(r"(?m)^#.*$", "", u)
+    assert "EnvironmentFile" not in u and "gabi-brain.env" not in u
+
+
+def test_instalar_cria_usuario_do_ouvinte_e_instala_sem_ligar_nem_rodar_npm():
+    assert "escuta-ouvinte.service" in INSTALAR
+    assert re.search(r"useradd --system .*--shell /usr/sbin/nologin .*escuta-ouvinte", INSTALAR)
+    assert "gabibrain-escuta" in re.search(r"useradd .*escuta-ouvinte", INSTALAR).group(0)
+    assert re.search(r"install -d -o escuta-ouvinte -g escuta-ouvinte -m 700 /var/lib/escuta-ouvinte", INSTALAR)
+    assert "/opt/escuta-ouvinte" in INSTALAR
+    ativas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith(("#", "echo"))]
+    assert not any("escuta-ouvinte" in l and ("enable" in l or "start" in l) for l in ativas)
+    assert not any(re.search(r"\bnpm\b", l) for l in ativas)

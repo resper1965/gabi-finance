@@ -325,3 +325,23 @@ def test_main_limpa_orfaos_e_imprime_so_contagem(amb, capsys):
     assert prog.main(cliente=Modelo(), agora=AGORA) == 0
     out = capsys.readouterr().out
     assert not o.exists() and "orfaos=1" in out and "segredo" not in out
+
+
+def test_main_escreve_palavras_risco_antes_da_ingestao(amb, capsys):
+    banco, spool, con = amb
+    _param(con, "escuta.palavras_risco", ["matar"])
+    assert prog.main(cliente=None, agora=AGORA) == 0
+    assert json.loads((spool / "palavras-risco.json").read_text(encoding="utf-8")) == ["matar"]
+    assert "palavras_erro=0" in capsys.readouterr().out
+
+
+def test_spool_sem_permissao_de_escrita_nao_aborta_a_rodada(amb, capsys, monkeypatch):
+    banco, spool, con = amb
+    _spool(spool)
+
+    def nega(*a, **kw):
+        raise PermissionError("sem escrita")
+    monkeypatch.setattr(prog, "escrever_palavras_risco", nega)
+    assert prog.main(cliente=None, agora=AGORA) == 0
+    out = capsys.readouterr().out
+    assert "palavras_erro=1" in out and "ingeridas=1" in out

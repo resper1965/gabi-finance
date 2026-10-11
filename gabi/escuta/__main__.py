@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
 from gabi.escuta.caixa import ingerir_spool, limpar_orfaos
+from gabi.escuta.crise import escrever_palavras_risco
 from gabi.escuta.destinos import DestinosReais
 from gabi.escuta.processar import processar
 from gabi.fontes.ponte import Ponte, PonteModelo
@@ -112,6 +113,11 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
         paperless = Ponte(sock, "paperless")
     destinos = DestinosReais(paperless, spool=spool, anexo_max_bytes=_anexo_max_bytes(con))
     agora_s = agora.astimezone(dt.timezone.utc).isoformat()
+    try:  # o ouvinte lê a lista de risco deste arquivo; spool sem escrita nunca aborta a rodada
+        palavras_erro = 0
+        escrever_palavras_risco(con, spool)
+    except Exception:  # noqa: BLE001
+        palavras_erro = 1
     novas = ingerir_spool(con, spool, agora_s)
     try:
         r = processar(con, destinos, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora_s, modo=_modo(con), spool=spool)
@@ -119,7 +125,7 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
         if isinstance(cliente, ModeloComCusto):
             cliente.fechar()
     orfaos = limpar_orfaos(con, spool)  # último passo: anexo que nenhuma mensagem aponta mais (a API só anula o ponteiro)
-    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()) + f" orfaos={orfaos}")
+    print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()) + f" orfaos={orfaos} palavras_erro={palavras_erro}")
     return 0
 
 

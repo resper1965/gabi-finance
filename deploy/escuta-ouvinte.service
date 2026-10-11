@@ -1,0 +1,38 @@
+[Unit]
+Description=Ouvinte do WhatsApp (aparelho vinculado, SOMENTE LEITURA): grava cada mensagem recebida no spool da escuta
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=escuta-ouvinte
+Group=escuta-ouvinte
+SupplementaryGroups=gabibrain-escuta
+UMask=0007
+WorkingDirectory=/opt/escuta-ouvinte
+Environment=OUVINTE_SPOOL=/var/lib/gabi-escuta-spool
+Environment=OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth
+Environment=OUVINTE_ANEXO_MAX_MB=50
+ExecStart=/usr/bin/node /opt/escuta-ouvinte/src/ouvinte.js
+Restart=always
+RestartSec=10
+# 78 = sessão encerrada pelo WhatsApp: religar não adianta, precisa parear de novo (runbook #escuta)
+RestartPreventExitStatus=78
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+# Precisa da internet para falar com o WhatsApp; não precisa de socket Unix.
+RestrictAddressFamilies=AF_INET AF_INET6
+ReadWritePaths=/var/lib/gabi-escuta-spool /var/lib/escuta-ouvinte
+InaccessiblePaths=/var/lib/gabi-brain /etc/gabi
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
