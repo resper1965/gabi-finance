@@ -8,6 +8,11 @@ import pytest
 from tools import obter_token_google as t
 
 SEGREDO = "CLIENT-SECRET-XYZ"
+
+
+@pytest.fixture(autouse=True)
+def _sem_env_real(tmp_path, monkeypatch):
+    monkeypatch.setattr(t, "ENV_PADRAO", str(tmp_path / "padrao-inexistente.env"))  # nunca lê o /etc/gabi/google.env de verdade
 TOKEN = "1//refresh-token-123"
 
 
@@ -95,3 +100,54 @@ def test_main_erro_na_troca_nao_imprime_segredo(monkeypatch, capsys):
     rc = t.main(["resper@gmail.com"], entrada=lambda p="": next(respostas), segredo=lambda p="": SEGREDO, http=lambda u, c: (400, {"error": "invalid_client"}))
     saida = capsys.readouterr()
     assert rc == 1 and "invalid_client" in saida.err and SEGREDO not in saida.out + saida.err
+
+
+# ---- cliente lido de /etc/gabi/google.env e token gravado lá (--gravar) ----
+def _env(tmp_path, texto="GOOGLE_CLIENT_ID=cid.apps\nGOOGLE_CLIENT_SECRET=" + SEGREDO + "\nOUTRA=1\n"):
+    p = tmp_path / "google.env"
+    p.write_text(texto)
+    p.chmod(0o600)
+    return p
+
+
+def test_le_o_cliente_do_arquivo_e_ignora_o_resto(tmp_path):
+    assert t.cliente_do_arquivo(_env(tmp_path)) == ("cid.apps", SEGREDO)
+    assert t.cliente_do_arquivo(tmp_path / "nao-existe.env") is None
+    assert t.cliente_do_arquivo(_env(tmp_path, "GOOGLE_CLIENT_ID=so-o-id\n")) is None  # incompleto: cai no pedido interativo
+
+
+def test_main_usa_o_cliente_do_arquivo_sem_perguntar_id_nem_segredo(tmp_path, monkeypatch, capsys):
+    env = _env(tmp_path)
+    respostas = iter(["http://localhost:8765/?state=ESTADO&code=abc"])
+    monkeypatch.setattr(t, "_estado", lambda: "ESTADO")
+    rc = t.main(["resper@gmail.com", "--env", str(env)], entrada=lambda p="": next(respostas), segredo=lambda p="": pytest.fail("não deveria pedir o segredo"),
+                http=lambda u, c: (200, {"refresh_token": TOKEN, "scope": " ".join(t.ESCOPOS)}) if c["client_secret"] == SEGREDO else (400, {"error": "invalid_client"}))
+    assert rc == 0 and f"GOOGLE_REFRESH_RESPER_GMAIL_COM={TOKEN}" in capsys.readouterr().out
+
+
+def test_gravar_acrescenta_a_linha_sem_imprimir_o_token_e_mantem_o_modo(tmp_path, monkeypatch, capsys):
+    env = _env(tmp_path)
+    respostas = iter(["http://localhost:8765/?state=ESTADO&code=abc"])
+    monkeypatch.setattr(t, "_estado", lambda: "ESTADO")
+    rc = t.main(["resper@gmail.com", "--env", str(env), "--gravar"], entrada=lambda p="": next(respostas), segredo=lambda p="": pytest.fail("x"),
+                http=lambda u, c: (200, {"refresh_token": TOKEN, "scope": " ".join(t.ESCOPOS)}))
+    saida = capsys.readouterr()
+    assert rc == 0 and TOKEN not in saida.out + saida.err and "GOOGLE_REFRESH_RESPER_GMAIL_COM" in saida.out
+    linhas = env.read_text().splitlines()
+    assert f"GOOGLE_REFRESH_RESPER_GMAIL_COM={TOKEN}" in linhas and "OUTRA=1" in linhas and oct(env.stat().st_mode & 0o777) == "0o600"
+
+
+def test_gravar_substitui_o_token_da_mesma_conta_sem_duplicar(tmp_path, monkeypatch):
+    env = _env(tmp_path, "GOOGLE_CLIENT_ID=cid.apps\nGOOGLE_CLIENT_SECRET=" + SEGREDO + "\nGOOGLE_REFRESH_RESPER_GMAIL_COM=velho\nGOOGLE_REFRESH_OUTRA_CONTA_COM=fica\n")
+    t.gravar_token(env, "resper@gmail.com", "novo")
+    linhas = env.read_text().splitlines()
+    assert linhas.count("GOOGLE_REFRESH_RESPER_GMAIL_COM=novo") == 1 and "GOOGLE_REFRESH_RESPER_GMAIL_COM=velho" not in linhas and "GOOGLE_REFRESH_OUTRA_CONTA_COM=fica" in linhas
+
+
+def test_gravar_sem_permissao_de_escrita_falha_sem_perder_o_token_na_tela(tmp_path, monkeypatch, capsys):
+    respostas = iter(["cid.apps", "http://localhost:8765/?state=ESTADO&code=abc"])
+    monkeypatch.setattr(t, "_estado", lambda: "ESTADO")
+    rc = t.main(["resper@gmail.com", "--env", str(tmp_path / "pasta-inexistente" / "google.env"), "--gravar"], entrada=lambda p="": next(respostas), segredo=lambda p="": SEGREDO,
+                http=lambda u, c: (200, {"refresh_token": TOKEN, "scope": " ".join(t.ESCOPOS)}))
+    saida = capsys.readouterr()
+    assert rc == 1 and "não consegui gravar" in saida.err.lower() and f"GOOGLE_REFRESH_RESPER_GMAIL_COM={TOKEN}" in saida.out  # o token não se perde

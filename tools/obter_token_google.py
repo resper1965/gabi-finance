@@ -2,16 +2,19 @@
 contacts.readonly, calendar.readonly e gmail.modify. Roda no terminal do dono, não no servidor da Gabi: nada é gravado em arquivo e o
 Client secret é pedido sem eco. Fluxo: mostra o link de consentimento; você abre no navegador, entra na conta, e o navegador termina numa página de erro
 em localhost (esperado); copie a URL dessa página e cole aqui. A linha final vai para /etc/gabi/google.env (root:root 0600).
-Uso: .venv/bin/python -m tools.obter_token_google resper@gmail.com"""
+Uso: sudo .venv/bin/python -m tools.obter_token_google resper@gmail.com --env /etc/gabi/google.env --gravar
+(sem --env ele pede o Client ID e o secret; com --gravar o token vai direto para o google.env sem aparecer na tela)"""
 import base64
 import getpass
 import hashlib
 import json
+import os
 import secrets
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida, nome_da_variavel
 
@@ -19,6 +22,7 @@ ESCOPOS = ("https://www.googleapis.com/auth/contacts.readonly", "https://www.goo
 REDIRECT = "http://localhost:8765"
 AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"
+ENV_PADRAO = "/etc/gabi/google.env"
 
 
 def pkce() -> tuple[str, str]:
@@ -83,17 +87,52 @@ def conferir(resp: dict) -> tuple[str, list[str]]:
     return token, sorted(set(ESCOPOS) - concedidos)
 
 
-def main(argv=None, *, entrada=input, segredo=getpass.getpass, http=_http_form) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+def cliente_do_arquivo(caminho) -> tuple[str, str] | None:
+    """(Client ID, Client secret) de um google.env, ou None se o arquivo não existe, não é legível ou está incompleto."""
     try:
-        conta = conta_valida(argv[0]) if len(argv) == 1 else None
+        linhas = Path(caminho).read_text().splitlines()
+    except OSError:
+        return None
+    v = {k.strip(): val.strip() for k, _, val in (l.partition("=") for l in linhas if "=" in l and not l.lstrip().startswith("#"))}
+    return (v["GOOGLE_CLIENT_ID"], v["GOOGLE_CLIENT_SECRET"]) if v.get("GOOGLE_CLIENT_ID") and v.get("GOOGLE_CLIENT_SECRET") else None
+
+
+def gravar_token(caminho, conta: str, token: str) -> None:
+    """Põe `GOOGLE_REFRESH_<CONTA>=<token>` no google.env (troca a linha da mesma conta, mantém o resto e o modo 0600), de forma atômica."""
+    caminho = Path(caminho)
+    nome = nome_da_variavel(conta)
+    linhas = caminho.read_text().splitlines() if caminho.exists() else []
+    novas = [l for l in linhas if not l.startswith(nome + "=")] + [f"{nome}={token}"]
+    tmp = caminho.with_name(caminho.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(novas) + "\n")
+    os.replace(tmp, caminho)
+
+
+def main(argv=None, *, entrada=input, segredo=getpass.getpass, http=_http_form) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    gravar = "--gravar" in argv
+    argv = [a for a in argv if a != "--gravar"]
+    env = ENV_PADRAO
+    if "--env" in argv:
+        i = argv.index("--env")
+        env = argv[i + 1] if i + 1 < len(argv) else None
+        argv = argv[:i] + argv[i + 2:]
+    try:
+        conta = conta_valida(argv[0]) if len(argv) == 1 and env else None
     except ErroGoogleOAuth:
         conta = None
     if conta is None:
-        print("Uso: python -m tools.obter_token_google <e-mail da conta>", file=sys.stderr)
+        print("Uso: python -m tools.obter_token_google <e-mail da conta> [--env /etc/gabi/google.env] [--gravar]", file=sys.stderr)
         return 2
-    client_id = entrada("Client ID: ").strip()
-    client_secret = segredo("Client secret (não aparece na tela): ").strip()
+    cliente = cliente_do_arquivo(env)
+    if cliente:
+        client_id, client_secret = cliente
+        print(f"Usando o cliente OAuth de {env}.")
+    else:
+        client_id = entrada("Client ID: ").strip()
+        client_secret = segredo("Client secret (não aparece na tela): ").strip()
     verificador, desafio = pkce()
     estado = _estado()
     print(f"\n1) Abra este link no navegador, entre com {conta} e aceite:\n\n{url_de_consentimento(client_id, desafio, estado)}\n")
@@ -107,6 +146,15 @@ def main(argv=None, *, entrada=input, segredo=getpass.getpass, http=_http_form) 
     if faltou:
         print("ERRO: faltou(aram) escopo(s) no consentimento: " + ", ".join(e.rsplit("/", 1)[1] for e in faltou) + ". Refaça marcando todas as permissões.", file=sys.stderr)
         return 1
+    if gravar:
+        try:
+            gravar_token(env, conta, token)
+        except OSError:
+            print(f"ERRO: não consegui gravar em {env} (rode com sudo?). Guarde esta linha:\n\n{nome_da_variavel(conta)}={token}\n", file=sys.stdout)
+            print(f"ERRO: não consegui gravar em {env}.", file=sys.stderr)
+            return 1
+        print(f"\nPronto. {nome_da_variavel(conta)} gravado em {env} (o token não é mostrado).")
+        return 0
     print(f"\nPronto. Acrescente esta linha em /etc/gabi/google.env:\n\n{nome_da_variavel(conta)}={token}\n")
     return 0
 
