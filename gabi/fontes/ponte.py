@@ -75,7 +75,8 @@ def _atender(fontes: dict, bruto: bytes) -> dict:
             r = list(r)
         return {"ok": _codificar(r)}
     except (ErroPaperless, ErroNibo, ErroOpenRouter) as e:
-        return {"erro": {"tipo": type(e).__name__, "msg": str(e)}}
+        tipo = next(c.__name__ for c in (ErroPaperless, ErroNibo, ErroOpenRouter) if isinstance(e, c))  # subclasses (TagInvalida) cruzam como a base
+        return {"erro": {"tipo": tipo, "msg": str(e)}}
     except Exception as e:  # nunca vaza traço (pode conter URL/cabeçalho)
         return {"erro": {"tipo": "interno", "msg": type(e).__name__}}
 
@@ -125,7 +126,7 @@ class Ponte:
     def configurada(self) -> bool:
         try:
             return bool(self._chamar("estado").get(self._fonte))
-        except (ErroPaperless, ErroNibo):
+        except (ErroPaperless, ErroNibo, ErroOpenRouter):
             return False
 
     def __getattr__(self, nome):
@@ -135,11 +136,14 @@ class Ponte:
 
 
 class PonteModelo:
-    """ModeloCliente (gabi.dinheiro.modelo) que chama o OpenRouter no serviço de fontes; sem chave, levanta ErroOpenRouter("chave ausente")."""
+    """ModeloCliente (gabi.dinheiro.modelo) que chama o OpenRouter no serviço de fontes; sem chave a fonte não está configurada e a ponte levanta ErroOpenRouter."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "openrouter")
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
-        texto, custo = self._ponte._chamar("completar", (prompt,), {"forte": forte})
-        return texto, float(custo)
+        r = self._ponte._chamar("completar", (prompt,), {"forte": forte})
+        if (not isinstance(r, (list, tuple)) or len(r) != 2 or not isinstance(r[0], str)
+                or isinstance(r[1], bool) or not isinstance(r[1], (int, float))):
+            raise ErroOpenRouter("resposta inválida do serviço de fontes")
+        return r[0], float(r[1])

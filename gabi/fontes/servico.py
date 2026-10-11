@@ -4,15 +4,17 @@ import argparse
 import os
 
 from gabi.fontes.ambiente import fontes_do_ambiente
-from gabi.fontes.openrouter import MODELO_FORTE_PADRAO, MODELO_RAPIDO_PADRAO, OpenRouter
+from gabi.fontes.openrouter import MODELO_FORTE_PADRAO, Limites, MODELO_RAPIDO_PADRAO, OpenRouter
 from gabi.fontes.ponte import Servidor
 
 
-def openrouter_do_ambiente(env=None) -> OpenRouter:
-    """Sempre existe; sem OPENROUTER_API_KEY, `completar` levanta ErroOpenRouter("chave ausente")."""
+def openrouter_do_ambiente(env=None) -> OpenRouter | None:
+    """None (fonte "não configurada", a ponte responde com ErroOpenRouter) sem OPENROUTER_API_KEY."""
     env = os.environ if env is None else env
+    if not env.get("OPENROUTER_API_KEY"):
+        return None
     return OpenRouter(env.get("OPENROUTER_API_KEY", ""), env.get("OPENROUTER_MODEL_FAST") or MODELO_RAPIDO_PADRAO,
-                      env.get("OPENROUTER_MODEL_STRONG") or MODELO_FORTE_PADRAO)
+                      env.get("OPENROUTER_MODEL_STRONG") or MODELO_FORTE_PADRAO, limites=Limites.do_ambiente(env))
 
 
 def main(argv=None):

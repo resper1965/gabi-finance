@@ -144,7 +144,7 @@ def test_ponte_permite_enviar_e_so_gabi_tags(tmp_path):
     srv, sock = _servir(tmp_path, {"paperless": Paperless("http://p", "t", http=http)})
     try:
         p = Ponte(sock, "paperless")
-        with pytest.raises(ErroPaperless, match="ValueError"):
+        with pytest.raises(ErroPaperless, match="etiquetas gabi"):
             p.enviar(b"x", "a.pdf", ["outra"])
         assert chamadas == []  # rejeitada antes de qualquer rede
         assert p.enviar(b"%PDF\x00", "a.pdf", ["gabi:escuta"]) == "tarefa-1"
@@ -170,16 +170,42 @@ def test_ponte_openrouter_so_completar(tmp_path):
 
 
 def test_ponte_modelo_sem_chave_vira_erro_tipado(tmp_path):
-    srv, sock = _servir(tmp_path, {"openrouter": openrouter_do_ambiente({})})
+    assert openrouter_do_ambiente({}) is None  # sem chave a fonte não está configurada
+    srv, sock = _servir(tmp_path, {"openrouter": None})
     try:
-        with pytest.raises(ErroOpenRouter, match="^chave ausente$"):
+        assert not Ponte(sock, "openrouter").configurada()
+        with pytest.raises(ErroOpenRouter, match="não está configurado"):
             PonteModelo(sock).completar("p", forte=False)
     finally:
         srv.shutdown()
         srv.server_close()
 
 
+def test_ponte_modelo_resposta_malformada_vira_erro_tipado(tmp_path, monkeypatch):
+    m = PonteModelo(tmp_path / "x.sock")
+    for ruim in ("lixo", ["t", "nao-numero"], ["t"], None):
+        monkeypatch.setattr(m._ponte, "_chamar", lambda *a, **k: ruim)
+        with pytest.raises(ErroOpenRouter, match="resposta inválida"):
+            m.completar("p", forte=False)
+
+
+def test_tag_invalida_atravessa_a_ponte_com_a_mensagem(tmp_path):
+    srv, sock = _servir(tmp_path, {"paperless": Paperless("http://p", "t", http=lambda *a: pytest.fail("rede"))})
+    try:
+        for chamada in (lambda p: p.enviar(b"x", "a", ["outra"]), lambda p: p.etiquetar(1, ["outra"])):
+            with pytest.raises(ErroPaperless, match=r"^o app só mexe em etiquetas gabi:\*$"):
+                chamada(Ponte(sock, "paperless"))
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_tag_invalida_e_erro_paperless_e_value_error():
+    from gabi.fontes.paperless import TagInvalida
+    assert issubclass(TagInvalida, ErroPaperless) and issubclass(TagInvalida, ValueError)
+
+
 def test_openrouter_do_ambiente_modelos_e_padroes():
     o = openrouter_do_ambiente({"OPENROUTER_API_KEY": "k", "OPENROUTER_MODEL_FAST": "x/y"})
     assert (o.modelo_rapido, o.modelo_forte) == ("x/y", "anthropic/claude-sonnet-5.5")
-    assert openrouter_do_ambiente({}).modelo_rapido == "deepseek/deepseek-v4-flash"
+    assert openrouter_do_ambiente({"OPENROUTER_API_KEY": "k"}).modelo_rapido == "deepseek/deepseek-v4-flash"

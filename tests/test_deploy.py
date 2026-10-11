@@ -328,3 +328,10 @@ def test_unit_fontes_tem_environmentfile_opcional_do_openrouter():
     assert "EnvironmentFile=-/etc/gabi/openrouter.env" in FONTES
     for u in (API, MCP):
         assert "openrouter" not in u  # a chave só é lida pelo serviço de fontes
+
+
+def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
+    from pathlib import Path
+    rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
+    trecho = rb.split("{#openrouter}")[1].split("\n## ")[0]
+    assert "root:root" in trecho and "0600" in trecho and "limite de crédito" in trecho

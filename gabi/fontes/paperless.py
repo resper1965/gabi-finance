@@ -38,6 +38,10 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
         raise ErroPaperless(f"Paperless indisponível: {type(e).__name__}") from None
 
 
+class TagInvalida(ErroPaperless, ValueError):
+    """Etiqueta fora de `gabi:*`; ValueError também, para quem já tratava assim."""
+
+
 class Paperless:
     def __init__(self, base: str, token: str, *, http: Http | None = None):
         self.base, self.token, self._http = base.rstrip("/"), token, http or _http_real
@@ -75,7 +79,7 @@ class Paperless:
     def etiquetar(self, id: int, tags: list[str]) -> None:
         """Acrescenta etiquetas `gabi:*` ao documento; nunca remove nem troca as que já existem."""
         if not tags or any(not t.startswith("gabi:") for t in tags):
-            raise ValueError("o app só mexe em etiquetas gabi:*")
+            raise TagInvalida("o app só mexe em etiquetas gabi:*")
         doc = self._pedir("GET", f"/api/documents/{int(id)}/")
         ids = set(doc.get("tags") or []) | {self._etiqueta(t) for t in tags}
         self._pedir("PATCH", f"/api/documents/{int(id)}/", {"tags": sorted(ids)})
@@ -84,7 +88,7 @@ class Paperless:
         """Envia um documento novo (POST multipart em /api/documents/post_document/) com etiquetas `gabi:*`; devolve o identificador
         da tarefa de consumo que o Paperless responde (o id do documento só existe depois). Nunca altera nem apaga nada existente."""
         if not tags or any(not isinstance(t, str) or not t.startswith("gabi:") for t in tags):
-            raise ValueError("o app só mexe em etiquetas gabi:*")
+            raise TagInvalida("o app só mexe em etiquetas gabi:*")
         limpo = "".join(ch for ch in nome.replace("\\", "/").rsplit("/", 1)[-1] if ch.isprintable() and ch not in '"') or "documento"
         ids = [self._etiqueta(t) for t in tags]
         fronteira = "gabi" + secrets.token_hex(16)

@@ -8,10 +8,21 @@ Só o serviço `gabi-brain-fontes` tem rede e a chave (R5). API, MCP e escuta ch
 ## Variáveis (arquivo `/etc/gabi/openrouter.env`, que o Ricardo coloca; `EnvironmentFile=-` opcional)
 | Variável | Para quê | Padrão |
 |---|---|---|
-| `OPENROUTER_API_KEY` | chave do OpenRouter | sem ela, `completar` levanta `ErroOpenRouter("chave ausente")` (o chamador trata como "sem modelo") |
+| `OPENROUTER_API_KEY` | chave do OpenRouter | sem ela a fonte `openrouter` fica "não configurada" (`configurada()` = falso) e `completar` levanta `ErroOpenRouter` tipado (o chamador trata como "sem modelo") |
 | `OPENROUTER_MODEL_FAST` | modelo rápido/barato | `deepseek/deepseek-v4-flash` |
 | `OPENROUTER_MODEL_STRONG` | modelo forte (repetição de baixa confiança) | `anthropic/claude-sonnet-5.5` |
 
+## Tetos (no serviço de fontes; falham seguro)
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `OPENROUTER_MAX_TOKENS_FAST` / `_STRONG` | 1024 / 2048 | `max_tokens` enviado em cada chamada |
+| `OPENROUTER_MAX_PROMPT_CHARS` | 50000 | maior prompt aceito; acima, `ErroOpenRouter("prompt grande demais")` antes de qualquer rede |
+| `OPENROUTER_TETO_DIA_USD` | 3.0 | gasto diário (dia em America/Sao_Paulo); ao somar o teto, `ErroOpenRouter("teto diário")` |
+| `OPENROUTER_MAX_CHAMADAS_MIN` | 30 | chamadas por minuto; acima, `ErroOpenRouter("muitas chamadas")` |
+
+O contador do teto diário fica na memória: **reiniciar o serviço o zera**. Por isso, defina também um **limite de crédito na própria chave** no painel do OpenRouter (o teto real).
+
 ## Custo e segredos
-- Chamada: `POST https://openrouter.ai/api/v1/chat/completions` com `usage: {include: true}`; o custo (USD) vem de `usage.cost`. Se ausente ou inválido, o custo é **0.0** (nunca é erro; o teto do orçamento então subconta, conferir no painel do OpenRouter).
-- A chave nunca entra em log nem em erro: falhas viram só `OpenRouter -> <status>` ou o nome do tipo da exceção; o corpo de erro HTTP não é lido. Prompts e respostas não são logados.
+- Chamada: `POST https://openrouter.ai/api/v1/chat/completions` com `usage: {include: true}`; o custo (USD) vem de `usage.cost`.
+- Se `usage.cost` faltar, for inválido, NaN, negativo ou zero, o custo é **estimado** por `prompt_tokens` e `completion_tokens` vezes o preço por milhão (`OPENROUTER_PRECO_ENTRADA_USD_M` padrão 3.0; `OPENROUTER_PRECO_SAIDA_USD_M` padrão 15.0, pessimistas de propósito). Sem tokens também, vale `OPENROUTER_CUSTO_PADRAO_USD` (padrão 0.05). O custo devolvido numa chamada bem-sucedida nunca é 0, e é o mesmo valor somado ao teto diário.
+- A chave nunca entra em log nem em erro: falhas viram só `OpenRouter -> <status>` ou o nome do tipo da exceção (sem exceção encadeada); o corpo de erro HTTP não é lido. Prompts e respostas não são logados.
