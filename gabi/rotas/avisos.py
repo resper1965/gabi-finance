@@ -65,6 +65,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return "Reconectar a Linear", "a chave foi recusada ou não está configurada; as entregas não estão sendo lidas"
     if tipo == "caixa_reconectar":
         return f"Reconectar a caixa {p.get('endereco', '?')}", "a credencial foi recusada ou não está configurada; a caixa não está sendo lida"
+    if tipo == "agenda_reconectar":
+        return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
     if tipo.startswith("escuta_"):
         return _descrever_escuta(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)

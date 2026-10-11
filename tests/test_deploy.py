@@ -454,3 +454,21 @@ def test_unit_fontes_le_google_env_e_o_antigo():
     assert "EnvironmentFile=-/etc/gabi/google.env" in unit
     assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in unit  # compatibilidade
     assert not [l for l in unit.splitlines() if l.startswith("Environment=") and ("REFRESH" in l or "SECRET" in l)]  # nenhum segredo na unit
+
+
+# ---------------- agenda ----------------
+def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
+    srv, t = _ler("gabi-brain-agenda.service"), _ler("gabi-brain-agenda.timer")
+    assert "-m gabi.agenda" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv
+    assert "OnCalendar=*-*-* 06..22:00,15,30,45:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-agenda.service" in t
+    assert hasattr(importlib.import_module("gabi.agenda.__main__"), "main")
+    for nome in ("gabi-brain-agenda.service", "gabi-brain-agenda.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert not any("agenda" in l for l in ligadas)

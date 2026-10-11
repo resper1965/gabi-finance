@@ -84,3 +84,9 @@ def test_descrever_aviso_de_caixa_para_reconectar():
     from gabi.rotas.avisos import descrever
     titulo, texto = descrever("caixa_reconectar", {"endereco": "a@ionic.health"})
     assert "a@ionic.health" in titulo and "credencial" in texto
+
+
+def test_descrever_aviso_de_agenda_para_reconectar():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("agenda_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
+    assert "a@x.com" in titulo and "agenda" in texto
