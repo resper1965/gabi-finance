@@ -142,3 +142,11 @@ Depois da migração 0022, lançamentos antigos em USD/EUR/PEN continuam com o v
 3. Conferir `sem_bruto`: ele conta TODA linha sem transação no bruto (BRL, lançamentos manuais ou importados também), não é o número de lançamentos estrangeiros que ficaram sem correção. Essas linhas não são tocadas: ficam com `moeda` vazia e `convertido=1`, então o aviso `lancamento_sem_conversao` NÃO as conta (ele só conta `convertido=0`).
 
 Ensaio feito em 11/10/2026 numa cópia do banco real: 104 lançamentos mudariam, diferença de -R$ 49.336,08, `sem_bruto=0`, e uma segunda execução não mudou nada (0). Portanto, no banco real, `sem_bruto` deve ser 0. Se não for, pare e investigue antes de rodar sem `--dry-run`.
+
+## Escuta do WhatsApp: timer, serviço e vigia {#escuta}
+`python -m gabi.escuta` (unit `gabi-brain-escuta.service`, oneshot, sem rede) ingere o spool do ouvinte, classifica pelo modelo (via ponte do serviço de fontes) e processa; imprime só contagens. Exige `GABI_ESCUTA_SPOOL` (a unit define `/var/lib/gabi-brain/escuta-spool`); sem ele sai com erro.
+- **Pasta do spool:** o `instalar.sh` cria `/var/lib/gabi-brain/escuta-spool` (`0770`, dono `gabibrain`, grupo `gabibrain-escuta`). O ouvinte (usuário `escuta-ouvinte`, criado em outra etapa) entra no grupo `gabibrain-escuta` e grava lá; tocar `escuta-spool/gatilho` dispara o processamento via `gabi-brain-escuta.path`.
+- **Ligar (só o Ricardo):** o instalador instala mas NÃO habilita. `sudo systemctl enable --now gabi-brain-escuta.timer gabi-brain-escuta.path` (timer: 2 min após o boot e a cada 5 min).
+- **Parâmetros** (tabela `parametro`, valor JSON): `escuta.modo` (`"registro"` padrão | `"ativo"`), `escuta.anexo_max_mb` (25), `escuta.horas_sem_receber` (12), `escuta.palavras_risco` (lista). Tetos do modelo: `teto_modelo_dia_usd` (0,7) e `teto_modelo_mes_usd` (17,5); o gasto vem de `custo_modelo` (tarefa `escuta`), igual à rota `/custo`.
+- **Sem modelo** (ponte sem chave, teto estourado, erro de rede): as mensagens ficam `nova`, sai o aviso `escuta_sem_modelo` (1 por dia) e a crise por palavra de risco continua funcionando.
+- **Vigia:** em modo `ativo`, se a mensagem mais recente em `escuta_msg` tiver mais de `escuta.horas_sem_receber` horas, o `gabi.avisos` grava `escuta_parada` (1 por dia). Sem nenhuma mensagem não avisa.

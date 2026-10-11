@@ -335,3 +335,27 @@ def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
     rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
     trecho = rb.split("{#openrouter}")[1].split("\n## ")[0]
     assert "root:root" in trecho and "0600" in trecho and "limite de crédito" in trecho
+
+
+# ---------------- escuta (WhatsApp): serviço, timer e gatilho por arquivo ----------------
+def test_unidades_escuta_seguem_o_padrao():
+    srv, t, p = _ler("gabi-brain-escuta.service"), _ler("gabi-brain-escuta.timer"), _ler("gabi-brain-escuta.path")
+    assert "-m gabi.escuta" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_ESCUTA_SPOOL=/var/lib/gabi-brain/escuta-spool" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv
+    assert "ReadWritePaths=/var/lib/gabi-brain /var/lib/gabi-brain/escuta-spool" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv
+    assert "OnUnitActiveSec=5min" in t and "OnBootSec=2min" in t and "Unit=gabi-brain-escuta.service" in t
+    assert "PathChanged=/var/lib/gabi-brain/escuta-spool/gatilho" in p and "Unit=gabi-brain-escuta.service" in p
+    assert hasattr(importlib.import_module("gabi.escuta.__main__"), "main")
+    for nome in ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path"):
+        assert nome in INSTALAR
+
+
+def test_instalar_nao_liga_timer_nem_path_da_escuta():
+    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert not any("escuta" in l for l in ligadas)
+    assert "escuta-spool" in INSTALAR      # a pasta do spool é criada (0770, dono gabibrain, grupo do ouvinte)

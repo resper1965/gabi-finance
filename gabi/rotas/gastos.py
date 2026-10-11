@@ -9,7 +9,7 @@ import re
 from fastapi import APIRouter, Depends, Request
 
 from gabi.dinheiro import analise, assinaturas as assinaturas_mod, consultas, contas_pagar as cp, repositorio
-from gabi.dinheiro.modelo import Orcamento
+from gabi.dinheiro.modelo import orcamento_do_banco
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
 from gabi.identidade import exigir
@@ -298,20 +298,14 @@ async def assinatura_patch(aid: int, request: Request):
 
 
 # ---------------- custo do modelo ----------------
-TETO_DIA_USD, TETO_MES_USD = 0.7, 17.5  # ≈ R$ 4/dia e R$ 100/mês (spec); ajustáveis em `parametro`
-
-
 @router.get("/custo")
 def custo(request: Request):
     """Custo do modelo (OpenRouter) no dia e no mês contra o teto."""
     con = _con(request)
     try:
         hoje = _agora(request).date()
-        dia = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,10)=?", (hoje.isoformat(),)).fetchone()[0]
-        mes = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,7)=?", (hoje.strftime("%Y-%m"),)).fetchone()[0]
-        teto = {r["chave"]: float(__import__("json").loads(r["valor"])) for r in con.execute("select chave, valor from parametro where chave in ('teto_modelo_dia_usd','teto_modelo_mes_usd')")}
-        td, tm = teto.get("teto_modelo_dia_usd", TETO_DIA_USD), teto.get("teto_modelo_mes_usd", TETO_MES_USD)
-        orc = Orcamento(td, tm, gasto_dia_usd=dia, gasto_mes_usd=mes)
+        orc = orcamento_do_banco(con, hoje)
+        dia, mes, td, tm = orc.gasto_dia_usd, orc.gasto_mes_usd, orc.teto_dia_usd, orc.teto_mes_usd
         cambio = con.execute("select valor from parametro where chave='cambio_usd_brl'").fetchone()  # editável; nunca fixo no código (R6)
         cambio = f"{float(__import__('json').loads(cambio['valor'])):.2f}" if cambio else None
         return envelope(con, {"dia_usd": round(dia, 4), "mes_usd": round(mes, 4), "teto_dia_usd": td, "teto_mes_usd": tm, "alerta": orc.alerta(),

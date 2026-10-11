@@ -147,3 +147,44 @@ def test_descrever_tipos_da_escuta():
                     ("escuta_sem_modelo", {}), ("escuta_pedido_incompleto", {"numero": "+55119", "nome": "Ana"})]:
         titulo, texto = descrever(tipo, p)
         assert titulo != tipo and titulo and not titulo.startswith("escuta_")
+
+
+# ---------------- escuta_parada ----------------
+def _param_escuta(con, chave, valor):
+    import json as _j
+    con.execute("insert or replace into parametro(chave, valor) values (?,?)", (chave, _j.dumps(valor)))
+
+
+def _msg_em(con, horas_atras):
+    quando = (AGORA - dt.timedelta(hours=horas_atras)).isoformat()
+    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values (?,?,?)", (f"x{horas_atras}", "+5511900000000", quando))
+
+
+def test_aviso_escuta_parada_so_em_modo_ativo(con):
+    _msg_em(con, 20)
+    assert "escuta_parada" not in _tipos_novos(con)          # sem parametro = registro
+    _param_escuta(con, "escuta.modo", "registro")
+    assert "escuta_parada" not in _tipos_novos(con)
+    _param_escuta(con, "escuta.modo", "ativo")
+    gerar_avisos(con, AGORA)
+    r = con.execute("select payload from aviso where tipo='escuta_parada'").fetchall()
+    assert len(r) == 1 and "20 horas" in r[0][0]
+    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1   # um por dia
+
+
+def test_escuta_parada_respeita_limite_e_sem_mensagens(con):
+    _param_escuta(con, "escuta.modo", "ativo")
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0   # sem linhas = sem aviso
+    _msg_em(con, 5)
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0   # dentro das 12h
+    _param_escuta(con, "escuta.horas_sem_receber", 4)
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1
+
+
+def _tipos_novos(con):
+    gerar_avisos(con, AGORA)
+    return [r[0] for r in con.execute("select tipo from aviso")]

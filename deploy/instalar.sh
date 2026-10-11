@@ -12,7 +12,10 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "$0")/.." && pwd)"
 id gabibrain >/dev/null 2>&1 || useradd --system --home-dir /var/lib/gabi-brain --shell /usr/sbin/nologin gabibrain
 id gabibrain-fontes >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin gabibrain-fontes
+getent group gabibrain-escuta >/dev/null 2>&1 || groupadd --system gabibrain-escuta
 install -d -o gabibrain -g gabibrain -m 700 /var/lib/gabi-brain /var/lib/gabi-brain/bruto /var/lib/gabi-brain/locks /var/backups/gabi-brain
+# Spool da escuta: o ouvinte (usuário escuta-ouvinte, a criar depois e pôr no grupo gabibrain-escuta) grava aqui; só o brain lê.
+install -d -o gabibrain -g gabibrain-escuta -m 770 /var/lib/gabi-brain/escuta-spool
 install -d -o root -g root -m 755 /opt/gabi-brain
 
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools
@@ -31,11 +34,13 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-notas.timer "$AQUI"/deploy/gabi-brain-avisos.service "$AQUI"/deploy/gabi-brain-avisos.timer "$AQUI"/deploy/gabi-brain-falha@.service "$AQUI"/deploy/gabi-brain-exportacao.service "$AQUI"/deploy/gabi-brain-exportacao.timer \
   "$AQUI"/deploy/gabi-brain-comprovantes.service "$AQUI"/deploy/gabi-brain-comprovantes.timer \
   "$AQUI"/deploy/gabi-brain-trabalho.service "$AQUI"/deploy/gabi-brain-trabalho.timer \
+  "$AQUI"/deploy/gabi-brain-escuta.service "$AQUI"/deploy/gabi-brain-escuta.timer "$AQUI"/deploy/gabi-brain-escuta.path \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer gabi-brain-trabalho.timer gabi-brain-telegram.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
+# O timer e o path da escuta (gabi-brain-escuta.timer, gabi-brain-escuta.path) ficam instalados mas DESLIGADOS até o Ricardo mandar ligar.
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).
 
 echo "OK. Verifique:"

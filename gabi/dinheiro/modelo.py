@@ -5,6 +5,7 @@
 - Texto de terceiros vai como dado delimitado (R14); CPF é mascarado; saúde/CPF só vão se a chave estiver ligada.
 Consome: dinheiro.caixa, dinheiro.mascara via gabi.dinheiro.. (sem rede: o cliente é injetado).
 """
+import datetime as dt
 import json
 import math
 import re
@@ -59,6 +60,18 @@ class Orcamento:
         if self.gasto_dia_usd >= 0.7 * self.teto_dia_usd:
             return "dia"
         return "mes" if self.gasto_mes_usd >= 0.7 * self.teto_mes_usd else None
+
+
+TETO_DIA_USD, TETO_MES_USD = 0.7, 17.5  # ≈ R$ 4/dia e R$ 100/mês (spec); ajustáveis em `parametro`
+
+
+def orcamento_do_banco(con, hoje: dt.date) -> Orcamento:
+    """Gasto do dia e do mês (data de Brasília, `em` gravado em BRT) a partir de `custo_modelo`; tetos de `parametro` com padrão."""
+    dia = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,10)=?", (hoje.isoformat(),)).fetchone()[0]
+    mes = con.execute("select coalesce(sum(custo_usd),0) from custo_modelo where substr(em,1,7)=?", (hoje.strftime("%Y-%m"),)).fetchone()[0]
+    teto = {r["chave"]: float(json.loads(r["valor"])) for r in con.execute(
+        "select chave, valor from parametro where chave in ('teto_modelo_dia_usd','teto_modelo_mes_usd')")}
+    return Orcamento(teto.get("teto_modelo_dia_usd", TETO_DIA_USD), teto.get("teto_modelo_mes_usd", TETO_MES_USD), gasto_dia_usd=dia, gasto_mes_usd=mes)
 
 
 @dataclass(frozen=True)

@@ -44,6 +44,35 @@ def _valor(c) -> str | None:
     return None if c is None else formatar(c)
 
 
+def _parametro(con, chave: str, padrao):
+    r = con.execute("select valor from parametro where chave=?", (chave,)).fetchone()
+    try:
+        return json.loads(r[0]) if r else padrao
+    except (ValueError, TypeError):
+        return padrao
+
+
+def _escuta_parada(con, agora: dt.datetime, novo) -> None:
+    """Vigia do ouvinte: só em modo 'ativo'; sem nenhuma mensagem registrada não avisa. Um aviso por dia, sem texto nem número."""
+    if _parametro(con, "escuta.modo", "registro") != "ativo":
+        return
+    horas = _parametro(con, "escuta.horas_sem_receber", 12)
+    if isinstance(horas, bool) or not isinstance(horas, (int, float)) or horas <= 0:
+        horas = 12
+    ultima = con.execute("select max(recebida_em) from escuta_msg").fetchone()[0]
+    if not ultima:
+        return
+    try:
+        quando = dt.datetime.fromisoformat(ultima)
+    except ValueError:
+        return
+    if quando.tzinfo is None:
+        quando = quando.replace(tzinfo=dt.timezone.utc)
+    if agora - quando > dt.timedelta(hours=horas):
+        n = int((agora - quando).total_seconds() // 3600)
+        novo("escuta_parada", "ouvinte", {"motivo": f"ouvinte sem receber mensagens há {n} horas"})
+
+
 def gerar_avisos(con, agora: dt.datetime) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
@@ -64,6 +93,8 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
     ref = con.execute("select coalesce((select max(fim) from rodada where fonte='exportacao' and status='ok'), min(inicio)) from rodada").fetchone()[0]
     if ref and agora - dt.datetime.fromisoformat(ref) > dt.timedelta(hours=HORAS_EXPORTACAO):
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
+
+    _escuta_parada(con, agora, novo)
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):
         novo("conta_atrasada", c["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"])})

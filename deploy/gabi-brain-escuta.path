@@ -1,0 +1,9 @@
+[Unit]
+Description=gabi.brain escuta: o ouvinte tocou o gatilho do spool, processa já (liga só quando o Ricardo mandar)
+
+[Path]
+PathChanged=/var/lib/gabi-brain/escuta-spool/gatilho
+Unit=gabi-brain-escuta.service
+
+[Install]
+WantedBy=multi-user.target
