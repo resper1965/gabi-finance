@@ -25,8 +25,8 @@ install -d -o root -g root -m 755 /opt/gabi-brain
 
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/
-# Utilitário de administração (seeds editáveis): só os carregadores de seeds, não o diretório tools inteiro.
-install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" /opt/gabi-brain/tools/
+# Utilitário de administração (seeds editáveis): carregadores de seeds e o comparador da escuta, não o diretório tools inteiro.
+install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/comparar_escuta.py" /opt/gabi-brain/tools/
 # App do ouvinte (código + package.json + lockfile). NÃO roda npm aqui: instalar dependência é passo do Ricardo (ver abaixo).
 install -d -o root -g root -m 755 /opt/escuta-ouvinte
 rm -rf /opt/escuta-ouvinte/src /opt/escuta-ouvinte/vendor

@@ -434,3 +434,9 @@ def test_runbook_escuta_paralelo_tem_os_passos_e_o_aviso_de_crise():
                      "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "PYTHONPATH=/opt/gabi-brain", "ilegiveis", "sem_numero", "ambiguos",
                      "meia-noite", "Aparelhos conectados", "órfãos", "NÃO somem na hora", "set anexo_caminho=null where anexo_caminho is not null", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
         assert esperado in trecho, esperado
+
+
+def test_instalar_instala_o_comparador_da_escuta():
+    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
+    assert '"$AQUI/tools/comparar_escuta.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
+    assert "PYTHONPATH=/opt/gabi-brain" in (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()

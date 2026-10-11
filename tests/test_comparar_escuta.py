@@ -113,11 +113,10 @@ def test_tipo_nada_e_ignorado(banco, fila):
 
 def test_formato_desconhecido_e_contado_sem_quebrar(banco, fila):
     (fila / "pista-x.json").write_text("{não é json")
-    (fila / "cmd-y.json").write_text(json.dumps({"qualquer": 1}))
     (fila / "feitas" / "aviso-w.json").write_text(json.dumps([1, 2]))
     (fila / "feitas" / "aviso-v.json").write_text(json.dumps({"texto": "x"}))  # sem criado_em: não se chuta pela data do arquivo
     r = _rodar(banco, fila)
-    assert r.ilegiveis == 4 and r.divergencias == []
+    assert r.ilegiveis == 3 and r.divergencias == []
 
 
 def test_aviso_de_outro_assunto_nao_e_ilegivel(banco, fila):
@@ -217,3 +216,26 @@ def test_banco_e_aberto_somente_leitura(banco, fila):
 
 def test_fila_inexistente_e_erro_claro(banco, tmp_path, capsys):
     assert main(["--banco", str(banco), "--fila-antiga", str(tmp_path / "nao")]) == 2
+
+
+def test_cmd_e_de_outro_produtor_e_nao_afeta_o_criterio(banco, fila, capsys):
+    (fila / "cmd-y.json").write_text("conteúdo qualquer, nem é lido")
+    (fila / "feitas" / "cmd-z.json").write_text(json.dumps({"x": 1}))
+    r = _rodar(banco, fila)
+    assert r.ilegiveis == 0 and r.comandos == 2
+    assert main(["--banco", str(banco), "--fila-antiga", str(fila)]) == 0
+    assert "comandos=2" in capsys.readouterr().out
+
+
+def test_desde_exclui_ilegiveis_e_informativos_antigos(banco, fila):
+    velho = fila / "pista-velha.json"
+    velho.write_text("{")
+    cmd = fila / "cmd-velho.json"
+    cmd.write_text("{}")
+    for p in (velho, cmd):
+        os.utime(p, (1_700_000_000, 1_700_000_000))  # 2023
+    novo = fila / "pista-nova.json"
+    novo.write_text("{")
+    r = _rodar(banco, fila, desde="2026-01-01")
+    assert r.ilegiveis == 1 and r.comandos == 0
+    assert _rodar(banco, fila).ilegiveis == 2

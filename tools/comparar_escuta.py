@@ -6,8 +6,10 @@ Formato do lado antigo, o que está EVIDENCIADO no código (escuta.py e /opt/gab
 - `aviso-*.json` = {texto, midia, seq, criado_em} (avisos.enfileirar), criado_em ISO com fuso. Na raiz da fila (pendente) ou em `feitas/`.
   Textos de escuta.py: "💸 Pedido de NOME — ..." (pedido) e "🚨 vida|saude|seguranca: NOME — “...”" (crise; NOME é o nome em contatos.md ou +número).
 - `pista-*.json` (saúde) com `quem` (NOME do contato) e `criado_em` ISO com fuso (escuta.py).
-- Aviso com outro texto (o reembolso.py e o próprio escuta.py, p.ex. "requisitos inválidos", também usam a fila) vira `outros_avisos`: informativo, fora do gate.
-NÃO verificado: `cmd-*.json` (nenhum código lido o escreve: conta como `ilegiveis`) e qualquer produtor da fila além de escuta.py/avisos.py.
+- Aviso com outro texto (o próprio escuta.py, p.ex. "requisitos inválidos", também usam a fila) vira `outros_avisos`: informativo, fora do gate.
+- `cmd-*.json` NÃO é da escuta: /opt/gabi-fin/reembolso_fila.py os documenta como "pedido da Gabi". São contados em `comandos` (informativo, fora do
+  gate) sem abrir o conteúdo. --desde também vale para ilegiveis/outros_avisos/comandos, pelo dia do arquivo (só nesse filtro).
+NÃO verificado: qualquer produtor da fila além dos citados (o reembolso.py citado como produtor não foi localizado em /opt/gabi-fin) e o conteúdo real de qualquer arquivo da fila.
 O agente antigo guarda o NOME do contato, não o número: resolve-se por escuta_remetente.nome. Nome sem número fica com chave própria
 ("nome:N…"), nunca colapsa com outro; nome com mais de um número é `ambiguos`. Mensagem do brain cujo `de` não vira telefone (LID, grupo,
 número curto) é `sem_numero`.
@@ -41,6 +43,7 @@ class Resultado:
     sem_numero: int = 0
     ambiguos: int = 0
     outros_avisos: int = 0
+    comandos: int = 0
     chaves: int = 0
 
 
@@ -102,28 +105,35 @@ def _lado_agente(fila: Path, nomes: dict, desde: str | None, res: Resultado) -> 
     arquivos = [p for sub in (fila, fila / "feitas") if sub.is_dir() for p in sorted(sub.iterdir())
                 if p.is_file() and p.suffix == ".json" and p.name.split("-")[0] in ("aviso", "pista", "cmd")]
     for p in arquivos:
+        try:  # --desde também vale para o que não dá para datar pelo conteúdo: usa o dia do arquivo, só para esse filtro
+            recente = not desde or dt.datetime.fromtimestamp(p.stat().st_mtime, BRT).date().isoformat() >= desde
+        except OSError:
+            recente = True
+        if p.name.startswith("cmd-"):  # pedido da Gabi (reembolso_fila.py): outro produtor, nem é lido
+            res.comandos += recente
+            continue
         try:
             dados = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            res.ilegiveis += 1
+            res.ilegiveis += recente
             continue
         if not isinstance(dados, dict) or not isinstance(dados.get("criado_em"), str):
-            res.ilegiveis += 1
+            res.ilegiveis += recente
             continue
         if p.name.startswith("pista-") and isinstance(dados.get("quem"), str):
             tipo, quem = "saude", dados["quem"].strip()
         elif p.name.startswith("aviso-") and isinstance(dados.get("texto"), str):
             c = _classificar_aviso(dados["texto"])
             if c is None:
-                res.outros_avisos += 1
+                res.outros_avisos += recente
                 continue
             tipo, quem = c
         else:
-            res.ilegiveis += 1
+            res.ilegiveis += recente
             continue
         dia = _dia_brt(dados["criado_em"])
         if not dia:
-            res.ilegiveis += 1
+            res.ilegiveis += recente
             continue
         if quem.startswith("+"):
             chave = normalizar_telefone(quem) or "nome:" + quem
@@ -188,7 +198,7 @@ def main(argv=None) -> int:
     cont = {k: sum(d["divergencia"] == k for d in res.divergencias) for k in ("so_no_brain", "so_no_agente", "tipo_diferente")}
     print(f"comparar_escuta: total={len(res.divergencias)} " + " ".join(f"{k}={v}" for k, v in cont.items())
           + f" ilegiveis={res.ilegiveis} sem_numero={res.sem_numero} ambiguos={res.ambiguos}"
-          + f" outros_avisos={res.outros_avisos} remetente_dia={res.chaves}")
+          + f" outros_avisos={res.outros_avisos} comandos={res.comandos} remetente_dia={res.chaves}")
     return 1 if (res.divergencias or res.ilegiveis or res.sem_numero or res.ambiguos) else 0
 
 
