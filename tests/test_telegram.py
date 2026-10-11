@@ -28,7 +28,10 @@ def con(tmp_path):
     return c
 
 
-def _aviso(con, tipo="conta_atrasada", payload=None, quando=AGORA, lido=False):
+def _aviso(con, tipo="conta_atrasada", payload=None, quando=AGORA, lido=False, existe=True):
+    if tipo == "conta_atrasada" and existe:  # a conta segue atrasada no banco (senão o aviso é obsoleto e não sai)
+        ch = (payload or {"chave": "k"})["chave"]
+        con.execute("insert or ignore into compromisso(id, nome, vencimento, valor_centavos, estado) values (?, 'x', '2026-10-01', 100, 'atrasado')", (ch,))
     return con.execute("insert into aviso(tipo, payload, criado_em, entregue_em) values (?,?,?,?)",
                        (tipo, json.dumps(payload or {"chave": "k", "nome": "IPTU", "vencimento": "2026-10-01", "valor": "R$ 500,00"}), quando.isoformat(),
                         AGORA.isoformat() if lido else None)).lastrowid
@@ -98,3 +101,96 @@ def test_i1_escuta_atencao_lida_nao_e_enviada(con):
     _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000001", "nome": "Ana"}, quando=AGORA - dt.timedelta(days=5), lido=True)
     h = Http()
     assert enviar_avisos(con, ENV, AGORA, h) == 0
+
+
+# ---- aviso obsoleto não é enviado (fonte única da verdade) ----
+from gabi.avisos import gerar_avisos, ainda_vale  # noqa: E402
+from gabi.telegram import enviar_avisos_contagem  # noqa: E402
+
+
+def _comp(con, id_, nome, venc, estado):
+    con.execute("insert into compromisso(id, nome, vencimento, valor_centavos, estado) values (?,?,?,?,?)", (id_, nome, venc, 528055, estado))
+
+
+def test_cenario_real_conta_paga_depois_do_aviso_nao_e_enviada_e_fecha(con):
+    _comp(con, "xp:2026-10", "Cartão XP Visa Infinite", "2026-10-05", "atrasado")
+    ontem = AGORA - dt.timedelta(hours=12)
+    gerar_avisos(con, ontem)
+    assert con.execute("select count(*) from aviso where tipo='conta_atrasada'").fetchone()[0] == 1
+    con.execute("update compromisso set estado='pago'")
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (0, 1)
+    assert h.chamadas == []
+    r = con.execute("select telegram_em, entregue_em from aviso").fetchone()
+    assert r["telegram_em"] and r["entregue_em"]  # nunca reenfileira e o painel não o mostra como pendente
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (0, 0)
+
+
+def test_conta_ainda_atrasada_e_enviada(con):
+    _comp(con, "xp:2026-10", "Cartão XP", "2026-10-05", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=12))
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (1, 0) and len(h.chamadas) == 1
+
+
+def test_conta_atrasada_cujo_compromisso_sumiu_e_obsoleta(con):
+    _aviso(con, payload={"chave": "nao-existe", "nome": "X", "vencimento": "2026-10-01", "valor": "R$ 1,00"}, existe=False)
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (0, 1) and h.chamadas == []
+
+
+def _vence(con, itens):
+    return _aviso(con, tipo="vence_hoje", payload={"chave": "2026-10-10", "itens": itens})
+
+
+def test_vence_hoje_todos_pagos_descartado_e_com_um_aberto_enviado(con):
+    _comp(con, "a:1", "Thiago", "2026-10-10", "pago")
+    _comp(con, "b:1", "Suzana", "2026-10-10", "pago")
+    itens = [{"nome": "Thiago", "valor": "1.00", "vencimento": "2026-10-10"}, {"nome": "Suzana", "valor": "2.00", "vencimento": "2026-10-10"}]
+    _vence(con, itens)
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (0, 1) and h.chamadas == []
+    con.execute("update aviso set telegram_em=null, entregue_em=null")
+    con.execute("update compromisso set estado='aberto' where id='b:1'")
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (1, 0)
+
+
+def test_vence_hoje_sem_itens_e_obsoleto(con):
+    assert ainda_vale(con, "vence_hoje", {"chave": "x", "itens": []}) is False
+
+
+def test_cobrada_apos_cancelar_deixa_de_valer_se_assinatura_nao_esta_mais_cancelada(con):
+    con.execute("insert into assinatura(estabelecimento, status, status_em) values ('X','cancelar','2026-09-20')")
+    aid = con.execute("select id from assinatura").fetchone()[0]
+    p = {"chave": str(aid), "nome": "X"}
+    assert ainda_vale(con, "cobrada_apos_cancelar", p) is True
+    con.execute("update assinatura set status='manter'")
+    assert ainda_vale(con, "cobrada_apos_cancelar", p) is False
+
+
+def test_outros_tipos_continuam_valendo(con):
+    for t in ("rodada_parada", "escuta_parada", "lancamento_sem_conversao", "servico_falhou", "escuta_atencao", "exportacao_parada"):
+        assert ainda_vale(con, t, {"chave": "k"}) is True
+
+
+def test_obsoletos_nao_contam_no_limite_de_10(con):
+    for i in range(5):
+        _aviso(con, payload={"chave": f"sumiu{i}", "nome": f"S{i}", "vencimento": "2026-10-01", "valor": "R$ 1,00"}, existe=False)
+    for i in range(12):
+        _aviso(con, payload={"chave": f"c{i}", "nome": f"C{i}", "vencimento": "2026-10-01", "valor": "R$ 1,00"})
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (10, 5) and len(h.chamadas) == 10
+
+
+def test_escuta_atencao_nunca_e_descartada_como_obsoleta_e_vai_primeiro(con):
+    _aviso(con, payload={"chave": "sumiu", "nome": "S", "vencimento": "2026-10-01", "valor": "R$ 1,00"}, existe=False)
+    _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000001", "nome": "Ana"}, quando=AGORA - dt.timedelta(days=5))
+    h = Http()
+    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (1, 1) and "crise" in h.chamadas[0][1]["text"]
+
+
+def test_log_so_conta_sem_nomes_nem_token(con, capsys, monkeypatch):
+    from gabi import telegram
+    _aviso(con, payload={"chave": "sumiu", "nome": "Fulano Secreto", "vencimento": "2026-10-01", "valor": "R$ 9,99"})
+    assert telegram.relatorio(0, 1) == "0 aviso(s) enviado(s), 1 obsoleto(s) descartado(s)"
+    assert "Fulano" not in telegram.relatorio(0, 1) and "segredo" not in telegram.relatorio(0, 1)

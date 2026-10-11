@@ -201,3 +201,20 @@ def test_escuta_parada_compara_instantes_com_entradas_mistas(con):
     con.execute("update escuta_msg set recebida_em=?", (_utc("2026-10-15T20:30:00-03:00"),))   # 23:30 UTC: 12,5h
     gerar_avisos(con, AGORA)
     assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1
+
+
+# ---- aviso obsoleto: produtor ----
+def test_nao_cria_conta_atrasada_nem_vence_hoje_para_compromisso_pago(con):
+    _comp(con, "a:2026-10", "Paga", "2026-10-14", "pago")
+    _comp(con, "b:2026-10", "Paga hoje", "2026-10-16", "pago")
+    assert gerar_avisos(con, AGORA) == []
+
+
+def test_produtor_fecha_aviso_aberto_cuja_condicao_resolveu(con):
+    _comp(con, "a:2026-10", "XP", "2026-10-05", "atrasado")
+    _comp(con, "b:2026-10", "Outra", "2026-10-06", "atrasado")
+    gerar_avisos(con, AGORA - dt.timedelta(hours=6))
+    con.execute("update compromisso set estado='pago' where id='a:2026-10'")
+    gerar_avisos(con, AGORA)
+    abertos = [json.loads(r[0])["nome"] for r in con.execute("select payload from aviso where entregue_em is null")]
+    assert abertos == ["Outra"]

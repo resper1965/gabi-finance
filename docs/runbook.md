@@ -132,6 +132,7 @@ Opcional. Crie `/etc/gabi/openrouter.env` (`root:root` 0600; o systemd lê como 
 
 ## Avisos no Telegram (G15) {#telegram}
 Desligado por padrão. Para ligar (é a sua exceção à R2): crie `/etc/gabi/telegram.env` (0640 `root:gabibrain`) com `TELEGRAM_BOT_TOKEN=...` e `TELEGRAM_CHAT_ID=...` (o bot vem do BotFather; o chat, do `getUpdates` depois de mandar uma mensagem ao bot). O `gabi-brain-telegram.timer` (5 min) envia os avisos ainda não lidos dos últimos 2 dias, no máximo 10 por rodada, em português, só com nome, valor e datas; marca `aviso.telegram_em` só depois do 200 e nunca reenvia. Para desligar: apague o arquivo. Teste à mão: `sudo systemctl start gabi-brain-telegram`.
+**Aviso obsoleto não é enviado.** O gabi.brain é a fonte única da verdade: antes de enviar, o timer relê a condição (`gabi.avisos.ainda_vale`): `conta_atrasada` só sai se o compromisso segue `atrasado`; `vence_hoje` só se algum item segue `aberto`/`previsto`; `cobrada_apos_cancelar` só se a assinatura segue em `cancelar`. Se já não vale (ex.: a fatura foi paga enquanto o Telegram estava desligado), o aviso é fechado (`telegram_em` e `entregue_em`) sem envio, não conta nos 10 por rodada e o log mostra só contagens (`N enviado(s), M obsoleto(s) descartado(s)`). O produtor (`gabi.avisos`, a cada 15 min) também fecha o aviso aberto cuja condição resolveu. `escuta_atencao` nunca é revalidada nem expira.
 
 ## Moeda estrangeira: corrigir o histórico {#moeda-historico}
 

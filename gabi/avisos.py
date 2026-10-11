@@ -40,6 +40,36 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
                        (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
 
 
+def ainda_vale(con, tipo: str, payload: dict) -> bool:
+    """Releitura (só leitura) da condição do aviso NO MOMENTO da entrega: o gabi.brain nunca anuncia o que deixou de ser verdade.
+    conta_atrasada: vale só se o compromisso (payload.chave) ainda existe e segue 'atrasado' (mesma condição do produtor; pago, a_conferir etc. = resolvido).
+    vence_hoje: vale se algum item (nome+vencimento) ainda está 'aberto'/'previsto'. cobrada_apos_cancelar: vale se a assinatura segue com status 'cancelar'.
+    Demais tipos: sempre valem."""
+    if tipo == "conta_atrasada":
+        r = con.execute("select estado from compromisso where id=?", (str(payload.get("chave")),)).fetchone()
+        return r is not None and r[0] == "atrasado"
+    if tipo == "vence_hoje":
+        for i in payload.get("itens") or []:
+            r = con.execute("select 1 from compromisso where nome=? and vencimento=? and estado in ('aberto','previsto')", (i.get("nome"), i.get("vencimento"))).fetchone()
+            if r:
+                return True
+        return False
+    if tipo == "cobrada_apos_cancelar":
+        return con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
+    return True
+
+
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar")
+
+
+def _fechar_obsoletos(con, agora: dt.datetime) -> None:
+    """Fecha (entregue_em) o aviso ainda aberto cuja condição já resolveu: o painel não o mostra como pendente para sempre."""
+    ts = agora.astimezone(dt.timezone.utc).isoformat()
+    for r in con.execute("select id, tipo, payload from aviso where entregue_em is null and tipo in (?,?,?)", TIPOS_REVALIDADOS).fetchall():
+        if not ainda_vale(con, r["tipo"], json.loads(r["payload"])):
+            con.execute("update aviso set entregue_em=? where id=?", (ts, r["id"]))
+
+
 def _valor(c) -> str | None:
     return None if c is None else formatar(c)
 
@@ -76,6 +106,7 @@ def _escuta_parada(con, agora: dt.datetime, novo) -> None:
 def gerar_avisos(con, agora: dt.datetime) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
+    _fechar_obsoletos(con, agora)
 
     def novo(*a):
         i = _novo(con, agora, *a)

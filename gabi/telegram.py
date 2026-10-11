@@ -1,6 +1,6 @@
 """Entrega dos avisos ao Telegram (G15): DESLIGADA por padrão. Só envia se TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID estiverem no ambiente
 (/etc/gabi/telegram.env, colocado pelo Ricardo: é a exceção à R2). Envia o texto em pt-BR do aviso (só nome, valor e datas: nunca CPF, conta ou chave PIX),
-no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos (exceto `escuta_atencao`, que vai primeiro e não expira); marca `telegram_em` somente depois do 200. O token nunca entra na mensagem nem no log.
+no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos (exceto `escuta_atencao`, que vai primeiro e não expira); marca `telegram_em` somente depois do 200. Aviso obsoleto (condição já resolvida) não é enviado: fecha sem mandar. O token nunca entra na mensagem nem no log.
 Uso: python -m gabi.telegram (timer). Consome: aviso, rotas.avisos.descrever."""
 import datetime as dt
 import json
@@ -28,25 +28,45 @@ def _http_real(url: str, corpo: dict) -> int:
 
 
 def enviar_avisos(con, env, agora: dt.datetime, http=_http_real) -> int:
+    return enviar_avisos_contagem(con, env, agora, http)[0]
+
+
+def relatorio(enviados: int, obsoletos: int) -> str:
+    return f"{enviados} aviso(s) enviado(s), {obsoletos} obsoleto(s) descartado(s)"
+
+
+def enviar_avisos_contagem(con, env, agora: dt.datetime, http=_http_real) -> tuple[int, int]:
+    """-> (enviados, obsoletos descartados). Aviso cuja condição já não é verdade (avisos.ainda_vale) não é enviado: fecha com telegram_em+entregue_em.
+    Descartados não contam no limite de 10 por rodada (só as tentativas de envio contam)."""
+    from gabi.avisos import ainda_vale
     from gabi.rotas.avisos import descrever
     token, chat = env.get("TELEGRAM_BOT_TOKEN"), env.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
-        return 0
+        return 0, 0
     desde = (agora - JANELA).astimezone(dt.timezone.utc).isoformat()
-    enviados = 0
+    agora_utc = agora.astimezone(dt.timezone.utc).isoformat()
+    enviados = obsoletos = tentativas = 0
     # escuta_atencao (possível crise) vai primeiro e nunca é descartada por idade enquanto não lida (I1c)
     for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null "
-                         "and (criado_em>=? or tipo='escuta_atencao') order by tipo!='escuta_atencao', id limit ?", (desde, MAX_POR_RODADA)).fetchall():
-        titulo, texto = descrever(r["tipo"], json.loads(r["payload"]))
+                         "and (criado_em>=? or tipo='escuta_atencao') order by tipo!='escuta_atencao', id", (desde,)).fetchall():
+        if tentativas >= MAX_POR_RODADA:
+            break
+        payload = json.loads(r["payload"])
+        if not ainda_vale(con, r["tipo"], payload):
+            con.execute("update aviso set telegram_em=?, entregue_em=? where id=?", (agora_utc, agora_utc, r["id"]))
+            obsoletos += 1
+            continue
+        tentativas += 1
+        titulo, texto = descrever(r["tipo"], payload)
         if http(f"https://api.telegram.org/bot{token}/sendMessage", {"chat_id": chat, "text": f"{titulo}\n{texto}"}) == 200:
-            con.execute("update aviso set telegram_em=? where id=?", (agora.astimezone(dt.timezone.utc).isoformat(), r["id"]))
+            con.execute("update aviso set telegram_em=? where id=?", (agora_utc, r["id"]))
             enviados += 1
-    return enviados
+    return enviados, obsoletos
 
 
 if __name__ == "__main__":
     con = conectar(Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db")))
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
-    n = enviar_avisos(con, os.environ, dt.datetime.now(dt.timezone.utc))
-    print("telegram: " + ("desligado (sem TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)" if not os.environ.get("TELEGRAM_BOT_TOKEN") or not os.environ.get("TELEGRAM_CHAT_ID") else f"{n} aviso(s) enviado(s)"))
+    n, obs = enviar_avisos_contagem(con, os.environ, dt.datetime.now(dt.timezone.utc))
+    print("telegram: " + ("desligado (sem TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)" if not os.environ.get("TELEGRAM_BOT_TOKEN") or not os.environ.get("TELEGRAM_CHAT_ID") else relatorio(n, obs)))
     sys.exit(0)
