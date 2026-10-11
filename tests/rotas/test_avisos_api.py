@@ -90,3 +90,15 @@ def test_descrever_aviso_de_agenda_para_reconectar():
     from gabi.rotas.avisos import descrever
     titulo, texto = descrever("agenda_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
     assert "a@x.com" in titulo and "agenda" in texto
+
+
+def test_descrever_avisos_do_correio():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("email_emergencial", {"chave": "T1", "remetente": "banco@x.com", "assunto": "Boleto vence hoje", "motivo": "prazo hoje"})
+    assert "banco@x.com" in titulo and "Boleto vence hoje" in titulo and "prazo hoje" in texto
+    titulo, texto = descrever("email_lixeira_resumo", {"chave": "2026-10-12", "total": 12, "itens": [{"remetente": "promo@loja.com", "assunto": "Oferta"}]})
+    assert "12" in titulo and "promo@loja.com" in texto and "Oferta" in texto and "restaur" in texto.lower()
+    assert "modelo" in descrever("email_sem_modelo", {"chave": "modelo", "motivo": "teto de custo do modelo"})[0].lower()
+    assert "teto de custo do modelo" in descrever("email_sem_modelo", {"chave": "modelo", "motivo": "teto de custo do modelo"})[1]
+    titulo, texto = descrever("email_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
+    assert "a@x.com" in titulo and "credencial" in texto

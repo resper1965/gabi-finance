@@ -48,9 +48,9 @@ def enviar_avisos_contagem(con, env, agora: dt.datetime, http=_http_real) -> tup
     agora_utc = agora.astimezone(dt.timezone.utc).isoformat()
     consolidar_duplicados(con, agora)  # uma conta repetida vira um aviso só: o mais recente
     enviados = obsoletos = incertos = tentativas = 0
-    # escuta_atencao (possível crise) vai primeiro e nunca é descartada por idade enquanto não lida (I1c)
+    # escuta_atencao (possível crise) vai primeiro e nunca é descartada por idade enquanto não lida (I1c); email_emergencial também vai na frente (mas respeita a janela)
     for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null "
-                         "and (criado_em>=? or tipo='escuta_atencao') order by tipo!='escuta_atencao', id", (desde,)).fetchall():
+                         "and (criado_em>=? or tipo='escuta_atencao') order by tipo not in ('escuta_atencao','email_emergencial'), tipo!='escuta_atencao', id", (desde,)).fetchall():
         if tentativas >= MAX_POR_RODADA:
             break
         estado, payload = triar(con, r["id"], r["tipo"], json.loads(r["payload"]), agora)

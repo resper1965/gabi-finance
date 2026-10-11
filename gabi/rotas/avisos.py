@@ -43,6 +43,23 @@ def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
     return tipo, ""
 
 
+def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
+    """Remetente e assunto são dado do dono (vão só para os canais dele); nunca para log."""
+    if tipo == "email_emergencial":
+        return f"E-mail emergencial de {p.get('remetente') or '?'}: {p.get('assunto') or '(sem assunto)'}", p.get("motivo", "")
+    if tipo == "email_lixeira_resumo":
+        itens = p.get("itens") or []
+        lista = "; ".join(f"{i.get('remetente') or '?'} — {i.get('assunto') or '(sem assunto)'}" for i in itens if isinstance(i, dict))
+        total = p.get("total", len(itens))
+        mais = f" (e mais {total - len(itens)})" if isinstance(total, int) and total > len(itens) else ""
+        return f"{total} e-mail(s) foram para a lixeira hoje", f"{lista}{mais}. Se faltou algo, restaure no painel (Mensagens › Prioridades): a lixeira esvazia sozinha em 30 dias."
+    if tipo == "email_sem_modelo":
+        return "Correio sem modelo de leitura", f"o e-mail está sem modelo disponível agora (nada vai para a lixeira): {p.get('motivo') or 'motivo desconhecido'}"
+    if tipo == "email_reconectar":
+        return f"Reconectar o e-mail {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; o e-mail não está sendo lido"
+    return tipo, json.dumps(p, ensure_ascii=False)
+
+
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
@@ -67,6 +84,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Reconectar a caixa {p.get('endereco', '?')}", "a credencial foi recusada ou não está configurada; a caixa não está sendo lida"
     if tipo == "agenda_reconectar":
         return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
+    if tipo.startswith("email_"):
+        return _descrever_email(tipo, p)
     if tipo.startswith("escuta_"):
         return _descrever_escuta(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)
