@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -24,10 +25,13 @@ class FakeDestinos:
 
     def pedido(self, con, pid, numero, msg, campos):
         self.pedidos.append(campos)
+        self.docs = getattr(self, "docs", []) + [msg["id_externo"]]
 
-    def saude(self, con, msg, campos): ...
+    def saude(self, con, msg, campos):
+        self.docs = getattr(self, "docs", []) + [msg["id_externo"]]
 
-    def documento(self, con, msg): ...
+    def documento(self, con, msg):
+        self.docs = getattr(self, "docs", []) + [msg["id_externo"]]
 
     def crise(self, con, numero, nome, agora=None):
         self.crises.append(numero)
@@ -169,15 +173,17 @@ def test_ponte_sem_modelo_configurado_vira_cliente_none(monkeypatch):
 class Interrompe(Modelo):
     def completar(self, prompt, *, forte):
         if self.n >= 1:
-            raise KeyboardInterrupt
+            raise self.saida
         return super().completar(prompt, forte=forte)
 
 
-def test_custo_gravado_na_hora_sobrevive_a_interrupcao(amb):
+@pytest.mark.parametrize("saida", [KeyboardInterrupt, SystemExit])
+def test_custo_gravado_na_hora_sobrevive_a_interrupcao(amb, saida, monkeypatch):
+    Interrompe.saida = saida
     banco, spool, con = amb
     _spool(spool, "a", "paga a Maria 100")
     _spool(spool, "b", "paga a Ana 200")
-    with pytest.raises(KeyboardInterrupt):
+    with pytest.raises(saida):
         prog.main(cliente=Interrompe(custo=0.03), agora=AGORA)
     assert [r[0] for r in con.execute("select custo_usd from custo_modelo")] == [0.03]
 
@@ -217,3 +223,62 @@ def test_sem_spool_o_erro_vai_para_stderr(amb, monkeypatch, capsys):
     prog.main(cliente=Modelo(), agora=AGORA)
     c = capsys.readouterr()
     assert "GABI_ESCUTA_SPOOL" in c.err and c.out == ""
+
+
+@pytest.mark.parametrize("tipo", ["nada", "saude", "pedido"])
+def test_ativo_com_anexo_executa_o_destino_uma_vez_e_um_custo(amb, tipo):
+    banco, spool, con = amb
+    con.execute("update pessoa set dados=json_set(dados,'$.pode_pedir',json('true'))")
+    _param(con, "escuta.modo", "ativo")
+    (spool / "anexos").mkdir()
+    (spool / "anexos" / "f.pdf").write_text("x")
+    (spool / "m1.json").write_text(json.dumps({"id_externo": "m1", "de": "5511912345678@s.whatsapp.net", "recebida_em": "2026-10-11T09:00:00",
+                                               "texto": "segue o documento", "anexo": "f.pdf"}))
+    resp = {"tipo": tipo, "confianca": 0.95, "campos": {"favorecido": "Maria", "valor": 100} if tipo == "pedido" else {}}
+
+    class M(Modelo):
+        def completar(self, prompt, *, forte):
+            self.n += 1
+            return json.dumps(resp), 0.01
+    assert prog.main(cliente=M(), agora=AGORA) == 0
+    assert FakeDestinos.criados[0].docs == ["m1"]
+    assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 1
+    assert con.execute("select estado from escuta_msg").fetchone()[0] == "processada"
+
+
+def test_insert_de_custo_que_falha_nao_perde_a_classificacao_e_regrava_depois(amb):
+    banco, spool, con = amb
+
+    class Proxy:
+        def __init__(self, real):
+            self.real, self.falhas = real, 1
+
+        def execute(self, sql, *a):
+            if sql.startswith("insert into custo_modelo") and self.falhas:
+                self.falhas -= 1
+                raise sqlite3.OperationalError("database is locked")
+            return self.real.execute(sql, *a)
+
+        def close(self):
+            self.real.close()
+    w = prog.ModeloComCusto(Modelo(custo=0.02), banco)
+    w._con = Proxy(w._con)
+    t1, c1 = w.completar("p1", forte=False)
+    assert t1 and c1 == 0.02 and len(w.pendentes) == 1
+    assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 0
+    w.completar("p2", forte=False)
+    assert w.pendentes == [] and con.execute("select count(*) from custo_modelo").fetchone()[0] == 2
+
+
+def test_insert_pendente_e_regravado_no_fechar(amb):
+    banco, spool, con = amb
+    w = prog.ModeloComCusto(Modelo(custo=0.02), banco)
+    real = w._con
+    bloqueada = conectar(banco)
+    bloqueada.execute("begin immediate")
+    real.execute("pragma busy_timeout=1")
+    w.completar("p", forte=False)
+    assert len(w.pendentes) == 1
+    bloqueada.execute("commit")
+    w.fechar()
+    assert con.execute("select count(*) from custo_modelo").fetchone()[0] == 1

@@ -3,7 +3,6 @@ Ordem de decisão: grupo não aprovado, bloqueado/ignorado, palavra de risco (se
 fora da lista (retida, sem modelo), aprovado (modelo). Texto de mensagem nunca vai a log, exceção ou aviso."""
 import json
 import logging
-import sqlite3
 from pathlib import Path
 
 from gabi.cobrar.cadastro import dados
@@ -56,8 +55,21 @@ def _falhou(con, id_: int, agora: str, aviso: tuple[str, dict] | None = None, ap
             _aviso(con, aviso[0], aviso[1], agora)
 
 
-def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar: list, spool, sinais: dict) -> None:
-    """Roda dentro da transação da mensagem. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
+_SEM = object()  # fase 1 não chamou o modelo
+
+
+def _precisa_modelo(con, m, palavras) -> bool:
+    """Fase 1 (sem transação): só aprovado (pessoa ou grupo aprovado), com texto e sem palavra de risco chega ao modelo."""
+    if not (m["texto"] or "").strip() or tem_risco(m["texto"] or "", palavras):
+        return False
+    if m["grupo"]:
+        g = con.execute("select aprovado from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
+        return bool(g and g["aprovado"] == 1)
+    return estado_remetente(con, m["de"])[0] == "aprovado"
+
+
+def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, spool, sinais: dict, r=_SEM) -> None:
+    """Fase 2: roda dentro da transação da mensagem (begin immediate, relendo linha e remetente). `r` = classificação feita na fase 1. Contadores em c; arquivos a apagar vão em `apagar` (só após o commit).
     Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
     id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
     if m["grupo"]:
@@ -98,7 +110,8 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
     if not (texto or "").strip():
         _nada(con, destinos, m, agora, ativo, c, apagar, None, spool)
         return
-    r = classificar(texto, cliente, orcamento)
+    if r is _SEM:  # ficou aprovado durante a fase 1 sem modelo: espera a próxima rodada
+        return
     if r is None:  # fica nova e tenta de novo na próxima rodada
         _aviso_sem_modelo(con, agora)
         return
@@ -166,26 +179,18 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
         apagar: list = []
         sinais: dict = {}
         try:
-            for tentativa in (1, 2):
-                antes = dict(c)
-                try:
-                    with transacao(con):
-                        m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
-                        if m is None:
-                            break
-                        _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais)
-                    break
-                except sqlite3.OperationalError:
-                    # outra conexão (custo do modelo, gravado na hora) commitou durante a transação: o snapshot de leitura ficou velho.
-                    # Refaz uma vez; o cliente de modelo guarda as respostas da rodada, então a repetição não paga de novo.
-                    if tentativa == 2:
-                        raise
-                    c.clear()
-                    c.update(antes)
-                    apagar.clear()
-                    sinais.clear()
+            m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
             if m is None:
                 continue
+            # Fase 1, SEM transação: o modelo (lento, pago, o custo é commitado em outra conexão) nunca roda com lock ou snapshot aberto.
+            r = classificar(m["texto"], cliente, orcamento) if _precisa_modelo(con, m, palavras) else _SEM
+            # Fase 2: escrita imediata; relê a linha e o remetente (pode ter mudado enquanto o modelo rodava).
+            # O lock de escrita fica preso durante as chamadas dos destinos (upload no Paperless): aceitável neste volume.
+            with transacao(con, imediata=True):
+                m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
+                if m is None:
+                    continue
+                _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais, r)
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)

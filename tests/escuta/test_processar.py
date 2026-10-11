@@ -521,3 +521,97 @@ def test_crise_recebe_o_mesmo_agora_da_rodada(con):
     d = FakeDestinos()
     _rodar(con, d, None)
     assert d.agoras == [AGORA]
+
+
+# ---------------- classificar FORA da transação ----------------
+import sqlite3
+
+from gabi.escuta.remetentes import bloquear
+
+
+class ModeloMexe(FakeModelo):
+    """Mexe no banco por OUTRA conexão enquanto o modelo 'roda'."""
+
+    def __init__(self, resposta, outro_con, acao):
+        super().__init__(resposta)
+        self.outro, self.acao = outro_con, acao
+
+    def completar(self, prompt, *, forte):
+        self.acao(self.outro)
+        return super().completar(prompt, forte=forte)
+
+
+@pytest.fixture
+def outro(tmp_path, con):
+    return conectar(tmp_path / "t.db")
+
+
+class DestinosContam(FakeDestinos):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.saudes_n = 0
+
+    def documento(self, con, msg):
+        self.docs.append(msg["id_externo"])
+
+    def pedido(self, con, pid, numero, msg, campos):
+        self.pedidos.append(msg["id_externo"])
+
+
+def test_modelo_roda_sem_transacao_aberta(con):
+    _aprovado(con)
+    _msg(con)
+    estado = []
+
+    class M(FakeModelo):
+        def completar(self, prompt, *, forte):
+            estado.append(con.in_transaction)
+            return super().completar(prompt, forte=forte)
+    _rodar(con, FakeDestinos(), M({"tipo": "nada", "confianca": 0.9, "campos": {}}))
+    assert estado == [False]
+
+
+def test_remetente_bloqueado_durante_o_modelo_nao_e_tratado_como_aprovado(con, outro):
+    _aprovado(con)
+    _msg(con)
+    cli = ModeloMexe({"tipo": "pedido", "confianca": 0.95, "campos": {"favorecido": "Maria", "valor": 100}}, outro, lambda c: bloquear(c, N, "teste"))
+    d = DestinosContam()
+    _rodar(con, d, cli)
+    assert d.pedidos == [] and d.docs == []
+    m = _msg_row(con)
+    assert m["estado"] == "processada" and m["tipo"] is None and m["texto"] is None   # caminho de bloqueado
+
+
+def test_remetente_desaprovado_durante_o_modelo_vira_retida(con, outro):
+    pid = _aprovado(con)
+    _msg(con)
+    cli = ModeloMexe({"tipo": "pedido", "confianca": 0.95, "campos": {"favorecido": "Maria", "valor": 100}}, outro,
+                     lambda c: c.execute("update pessoa set dados='{}' where id=?", (pid,)))
+    d = DestinosContam()
+    _rodar(con, d, cli)
+    assert d.pedidos == [] and _msg_row(con)["estado"] == "retida"
+
+
+def test_linha_finalizada_por_outra_conexao_durante_o_modelo_e_pulada(con, outro):
+    _aprovado(con)
+    _msg(con)
+    cli = ModeloMexe({"tipo": "pedido", "confianca": 0.95, "campos": {"favorecido": "Maria", "valor": 100}}, outro,
+                     lambda c: c.execute("update escuta_msg set estado='processada'"))
+    d = DestinosContam()
+    r = _rodar(con, d, cli)
+    assert d.pedidos == [] and r["falhas"] == 0 and _msg_row(con)["estado"] == "processada"
+
+
+def test_outro_operationalerror_nao_e_refeito_e_vira_falhou(con):
+    _aprovado(con)
+    _msg(con)
+
+    class D(DestinosContam):
+        n = 0
+
+        def pedido(self, *a, **k):
+            D.n += 1
+            raise sqlite3.OperationalError("no such column: x")
+    r = _rodar(con, D(), _ped())
+    assert D.n == 1 and r["falhas"] == 1 and _msg_row(con)["estado"] == "falhou"
+    assert _avisos(con, "servico_falhou") == [{"unidade": "gabi-brain-escuta"}]

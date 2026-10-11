@@ -222,3 +222,8 @@ def test_teto_de_tamanho_logo_abaixo_passa_e_acima_recusa(con, srv, tmp_path, mo
 
 def test_teto_padrao_e_25_mib(srv):
     assert DestinosReais(Paperless("http://p", "t", http=srv))._max == 25 * 1024 * 1024
+
+
+def test_quando_sem_offset_vale_brasilia():
+    from gabi.escuta.destinos import _quando
+    assert _quando("2026-10-11T09:00:00") == _quando("2026-10-11T12:00:00+00:00")

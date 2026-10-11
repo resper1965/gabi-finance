@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import math
 import os
+import sqlite3
 import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -47,29 +48,36 @@ CUSTO_RESERVA_USD = 0.05  # custo inválido (NaN, infinito, negativo) nunca subn
 
 class ModeloComCusto:
     """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa 'escuta', `em` = instante da chamada em BRT), numa
-    SEGUNDA conexão em autocommit (WAL + busy_timeout): não depende da transação da mensagem nem de o processo terminar bem.
-    O serviço de fontes já cobrou a chamada; erro do cliente propaga e não grava."""
+    SEGUNDA conexão em autocommit (WAL + busy_timeout). O serviço de fontes já cobrou a chamada: se o insert falhar (lock), a
+    classificação paga NÃO se perde; a linha fica pendente e é regravada na próxima chamada completada e em `fechar()`.
+    Erro do cliente propaga e não grava."""
 
     def __init__(self, cliente, banco: Path, relogio=None):
         self._cliente, self._relogio = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc))
         self._con = conectar(banco)
-        self._memo: dict = {}  # respostas da rodada: se processar refizer uma mensagem, não paga a chamada de novo
+        self.pendentes: list[tuple[str, float]] = []
+
+    def _gravar_pendentes(self) -> None:
+        while self.pendentes:
+            try:
+                self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,'escuta')", self.pendentes[0])
+            except sqlite3.Error:
+                return
+            self.pendentes.pop(0)
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
-        if (prompt, forte) in self._memo:
-            return self._memo[(prompt, forte)]
         texto, custo = self._cliente.completar(prompt, forte=forte)
         try:
             ok = isinstance(custo, (int, float)) and not isinstance(custo, bool) and math.isfinite(custo) and custo >= 0
         except TypeError:
             ok = False
         custo = float(custo) if ok else CUSTO_RESERVA_USD
-        self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,'escuta')",
-                          (self._relogio().astimezone(BRT).isoformat(), custo))
-        self._memo[(prompt, forte)] = (texto, custo)
+        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo))
+        self._gravar_pendentes()
         return texto, custo
 
     def fechar(self) -> None:
+        self._gravar_pendentes()
         self._con.close()
 
 

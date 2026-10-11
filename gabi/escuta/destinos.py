@@ -4,6 +4,7 @@ import datetime as dt
 import json
 from pathlib import Path
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from gabi.cobrar import pedidos
 from gabi.fontes.paperless import Paperless
@@ -27,6 +28,9 @@ TAG_SAUDE = "gabi:saude-exame"
 _JANELA_CRISE = dt.timedelta(minutes=60)
 
 
+BRT = ZoneInfo("America/Sao_Paulo")
+
+
 def _agora() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
@@ -36,7 +40,7 @@ def _quando(s: str) -> dt.datetime | None:
         d = dt.datetime.fromisoformat(s)
     except (TypeError, ValueError):
         return None
-    return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+    return d if d.tzinfo else d.replace(tzinfo=BRT)  # sem offset vale Brasília, como no spool e nos avisos
 
 
 def _chave_ou_linha(v) -> tuple[str | None, str | None]:

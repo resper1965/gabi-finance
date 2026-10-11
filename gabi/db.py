@@ -66,9 +66,9 @@ def _instrucoes(sql: str) -> list[str]:
 
 
 @contextmanager
-def transacao(con):
+def transacao(con, imediata: bool = False):
     """Tudo ou nada: begin/commit, rollback se algo falhar (a conexão é autocommit; sem isto cada execute grava na hora)."""
-    con.execute("begin")
+    con.execute("begin immediate" if imediata else "begin")
     try:
         yield
     except BaseException:
