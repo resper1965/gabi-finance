@@ -142,3 +142,50 @@ def test_agenda_evento_unico_por_fonte_e_externo_id(con):
 def test_agenda_evento_exige_fonte_existente(con):
     with pytest.raises(sqlite3.IntegrityError):
         _evento(con, 999)
+
+
+# ---------------- correio (0026) ----------------
+def _fonte_correio(con, conta="a@x.com"):
+    return con.execute("insert into email_fonte(conta, provedor) values (?, 'google')", (conta,)).lastrowid
+
+
+def _msg_correio(con, fonte, ext="m1", **extra):
+    colunas = {"fonte_id": fonte, "externo_id": ext, "thread_id": "t1", "remetente": "r@x.com", "assunto": "oi", "recebida_em": "2026-10-12T10:00:00+00:00", **extra}
+    return con.execute(f"insert into email_msg({','.join(colunas)}) values ({','.join('?' * len(colunas))})", list(colunas.values())).lastrowid
+
+
+def test_correio_tem_as_tres_tabelas_com_os_checks(con):
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert {"email_fonte", "email_msg", "email_respondido"} <= nomes
+    f = _fonte_correio(con)
+    linha = con.execute("select estado, lixeira from email_fonte where id=?", (f,)).fetchone()
+    assert tuple(linha) == ("a_decidir", 0)  # nada é lido nem movido até o dono liberar
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into email_fonte(conta, provedor) values ('b@x.com', 'imap')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into email_fonte(conta, provedor, estado) values ('c@x.com', 'google', 'talvez')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into email_fonte(conta, provedor, lixeira) values ('d@x.com', 'google', 2)")
+    with pytest.raises(sqlite3.IntegrityError):
+        _fonte_correio(con)  # conta única
+    m = _msg_correio(con, f)
+    assert tuple(con.execute("select estado, tentativas, lista, classe from email_msg where id=?", (m,)).fetchone()) == ("nova", 0, 0, None)
+    with pytest.raises(sqlite3.IntegrityError):
+        _msg_correio(con, f)  # (fonte_id, externo_id) único
+    for coluna, valor in (("classe", "spam"), ("estado", "apagada"), ("prioridade", 4), ("lista", 2)):
+        with pytest.raises(sqlite3.IntegrityError):
+            _msg_correio(con, f, ext=f"x{coluna}", **{coluna: valor})
+    for classe in ("normal", "importante", "emergencial", "lixo"):
+        _msg_correio(con, f, ext=f"c-{classe}", classe=classe, prioridade=3)
+    for estado in ("nova", "classificada", "alertada", "na_lixeira", "restaurada", "falhou"):
+        _msg_correio(con, f, ext=f"e-{estado}", estado=estado)
+
+
+def test_correio_respondido_tem_chave_composta_e_exige_a_fonte(con):
+    f = _fonte_correio(con)
+    con.execute("insert into email_respondido(fonte_id, endereco, em) values (?, 'r@x.com', '2026-10-12T10:00:00+00:00')", (f,))
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into email_respondido(fonte_id, endereco, em) values (?, 'r@x.com', '2026-10-13T10:00:00+00:00')", (f,))
+    con.execute("pragma foreign_keys=on")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into email_respondido(fonte_id, endereco, em) values (999, 'z@x.com', '2026-10-12T10:00:00+00:00')")
