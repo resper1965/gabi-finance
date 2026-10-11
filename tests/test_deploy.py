@@ -431,5 +431,6 @@ def test_runbook_escuta_paralelo_tem_os_passos_e_o_aviso_de_crise():
     rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
     trecho = rb.split("{#escuta-paralelo}")[1].split("\n## ")[0]
     for esperado in ("tools.comparar_escuta", "google-contatos.env", "openrouter.env", "limite de crédito", "anexo_caminho",
-                     "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
+                     "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "PYTHONPATH=/opt/gabi-brain", "ilegiveis", "sem_numero", "ambiguos",
+                     "meia-noite", "Aparelhos conectados", "órfãos", "NÃO somem na hora", "set anexo_caminho=null where anexo_caminho is not null", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
         assert esperado in trecho, esperado

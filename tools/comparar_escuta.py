@@ -2,13 +2,20 @@
 registrou (fila do reembolso). Somente leitura dos dois lados. Só conta: chave = (remetente, tipo, dia em Brasília).
 A saída não tem texto de mensagem nem número completo (+55119****5678).
 
-Formato do lado antigo (derivado de escuta.py, só o código): `pista-*.json` (saúde: campos quem, criado_em), `aviso-*.json`
-(texto do aviso: "💸 Pedido de QUEM — ..." = pedido; "🚨 NIVEL: QUEM — ..." = crise), na raiz e em `feitas/`. O agente antigo só
-guarda o NOME do contato (ou +número quando desconhecido): o nome é resolvido para número por escuta_remetente.nome; nome sem
-número conhecido aparece como remetente "?". Qualquer outro arquivo (cmd-*, JSON inválido, texto fora do padrão) é pulado e contado em `ilegiveis`.
+Formato do lado antigo, o que está EVIDENCIADO no código (escuta.py e /opt/gabi-fin/avisos.py, lidos em 11/10/2026; nenhum arquivo da fila foi lido):
+- `aviso-*.json` = {texto, midia, seq, criado_em} (avisos.enfileirar), criado_em ISO com fuso. Na raiz da fila (pendente) ou em `feitas/`.
+  Textos de escuta.py: "💸 Pedido de NOME — ..." (pedido) e "🚨 vida|saude|seguranca: NOME — “...”" (crise; NOME é o nome em contatos.md ou +número).
+- `pista-*.json` (saúde) com `quem` (NOME do contato) e `criado_em` ISO com fuso (escuta.py).
+- Aviso com outro texto (o reembolso.py e o próprio escuta.py, p.ex. "requisitos inválidos", também usam a fila) vira `outros_avisos`: informativo, fora do gate.
+NÃO verificado: `cmd-*.json` (nenhum código lido o escreve: conta como `ilegiveis`) e qualquer produtor da fila além de escuta.py/avisos.py.
+O agente antigo guarda o NOME do contato, não o número: resolve-se por escuta_remetente.nome. Nome sem número fica com chave própria
+("nome:N…"), nunca colapsa com outro; nome com mais de um número é `ambiguos`. Mensagem do brain cujo `de` não vira telefone (LID, grupo,
+número curto) é `sem_numero`.
+CUIDADO com o tempo: `criado_em` do lado antigo é quando o agente ENFILEIROU o arquivo, não quando a mensagem chegou; perto da meia-noite
+de Brasília isso gera falso so_no_*: só julgue uma divergência olhando também os dias vizinhos. Sem criado_em o arquivo é ilegível (data de arquivo seria pior).
 
 Uso: python -m tools.comparar_escuta [--banco ...] [--fila-antiga ...] [--escuta-py ...] [--desde AAAA-MM-DD]
-Saída 0 só quando não há divergência; 1 com divergência; 2 se não deu para ler."""
+Saída 0 SÓ com divergências = 0 E ilegiveis = 0 E sem_numero = 0 E ambiguos = 0; 1 caso contrário; 2 se não deu para ler."""
 import argparse
 import datetime as dt
 import json
@@ -25,20 +32,24 @@ BRT = ZoneInfo("America/Sao_Paulo")
 TIPOS = ("pedido", "saude", "crise")
 _PEDIDO = re.compile(r"^💸 Pedido de (?P<quem>.+?)(?: — |$)")
 _CRISE = re.compile(r"^🚨 (?:vida|saude|seguranca): (?P<quem>.+?) — ")
-_CHAVES_TEXTO = ("texto", "mensagem", "msg", "aviso", "text")
-_CHAVES_DATA = ("criado_em", "enfileirado_em", "em", "data", "ts")
 
 
 @dataclass
 class Resultado:
     divergencias: list = field(default_factory=list)
     ilegiveis: int = 0
+    sem_numero: int = 0
+    ambiguos: int = 0
+    outros_avisos: int = 0
     chaves: int = 0
 
 
-def mascarar(numero: str | None) -> str:
-    d = numero if isinstance(numero, str) else ""
-    return d[:6] + "****" + d[-4:] if len(d) >= 12 else "?"
+def mascarar(chave: str | None) -> str:
+    if not isinstance(chave, str) or not chave:
+        return "?"
+    if chave.startswith("nome:"):
+        return "nome:" + chave[5:6].upper() + "…"
+    return chave[:6] + "****" + chave[-4:] if len(chave) >= 12 else "+**"
 
 
 def abrir_somente_leitura(banco: Path) -> sqlite3.Connection:
@@ -54,28 +65,31 @@ def _dia_brt(valor: str) -> str | None:
     return t.date().isoformat()
 
 
-def _lado_brain(con, desde: str | None) -> dict:
+def _lado_brain(con, desde: str | None, res: Resultado) -> dict:
     out: dict = {}
     for de, quando, tipo in con.execute(
             "select de, recebida_em, tipo from escuta_msg where tipo in ('pedido','saude','crise')"):
         dia = _dia_brt(quando)
+        if not dia or (desde and dia < desde):
+            continue
         num = normalizar_telefone(de)
-        if dia and num and (not desde or dia >= desde):
+        if num is None:
+            res.sem_numero += 1
+        else:
             out.setdefault((num, dia), set()).add(tipo)
     return out
 
 
 def _nomes(con) -> dict:
-    return {(n or "").strip().casefold(): num for num, n in con.execute(
-        "select numero, nome from escuta_remetente where nome is not null and nome <> ''") if (n or "").strip()}
+    """nome (casefold) -> conjunto de números; mais de um número = ambíguo."""
+    out: dict = {}
+    for num, n in con.execute("select numero, nome from escuta_remetente where nome is not null and nome <> ''"):
+        if (n or "").strip():
+            out.setdefault(n.strip().casefold(), set()).add(num)
+    return out
 
 
-def _classificar_aviso(dados) -> tuple[str, str] | None:
-    if not isinstance(dados, dict):
-        return None
-    texto = next((dados[k] for k in _CHAVES_TEXTO if isinstance(dados.get(k), str)), None)
-    if not texto:
-        return None
+def _classificar_aviso(texto: str) -> tuple[str, str] | None:
     for rx, tipo in ((_PEDIDO, "pedido"), (_CRISE, "crise")):
         m = rx.match(texto.strip())
         if m:
@@ -93,35 +107,47 @@ def _lado_agente(fila: Path, nomes: dict, desde: str | None, res: Resultado) -> 
         except (OSError, ValueError):
             res.ilegiveis += 1
             continue
-        if p.name.startswith("pista-") and isinstance(dados, dict) and isinstance(dados.get("quem"), str):
+        if not isinstance(dados, dict) or not isinstance(dados.get("criado_em"), str):
+            res.ilegiveis += 1
+            continue
+        if p.name.startswith("pista-") and isinstance(dados.get("quem"), str):
             tipo, quem = "saude", dados["quem"].strip()
-        elif p.name.startswith("aviso-") and (c := _classificar_aviso(dados)):
+        elif p.name.startswith("aviso-") and isinstance(dados.get("texto"), str):
+            c = _classificar_aviso(dados["texto"])
+            if c is None:
+                res.outros_avisos += 1
+                continue
             tipo, quem = c
         else:
             res.ilegiveis += 1
             continue
-        quando = next((dados[k] for k in _CHAVES_DATA if isinstance(dados.get(k), str)), None)
-        dia = _dia_brt(quando) if quando else dt.datetime.fromtimestamp(p.stat().st_mtime, BRT).date().isoformat()
+        dia = _dia_brt(dados["criado_em"])
         if not dia:
             res.ilegiveis += 1
             continue
-        num = normalizar_telefone(quem) if quem.startswith("+") else nomes.get(quem.casefold())
+        if quem.startswith("+"):
+            chave = normalizar_telefone(quem) or "nome:" + quem
+        else:
+            numeros = nomes.get(quem.casefold(), set())
+            if len(numeros) > 1:
+                res.ambiguos += 1
+            chave = next(iter(numeros)) if len(numeros) == 1 else "nome:" + quem.casefold()
         if not desde or dia >= desde:
-            out.setdefault((num, dia), set()).add(tipo)
+            out.setdefault((chave, dia), set()).add(tipo)
     return out
 
 
 def comparar(con, fila: Path, desde: str | None = None) -> Resultado:
     res = Resultado()
-    brain = _lado_brain(con, desde)
+    brain = _lado_brain(con, desde, res)
     agente = _lado_agente(Path(fila), _nomes(con), desde, res)
-    for chave in sorted(set(brain) | set(agente), key=lambda k: (k[1], k[0] or "")):
+    for chave in sorted(set(brain) | set(agente), key=lambda k: (k[1], k[0])):
         b, a = brain.get(chave, set()), agente.get(chave, set())
         res.chaves += 1
         solo_b, solo_a = b - a, a - b
         base = {"remetente": mascarar(chave[0]), "dia": chave[1]}
         if solo_b and solo_a:
-            res.divergencias.append({**base, "divergencia": "tipo_diferente", "brain": sorted(b), "agente": sorted(a)})
+            res.divergencias.append({**base, "divergencia": "tipo_diferente", "tipo": sorted(b | a), "brain": sorted(b), "agente": sorted(a)})
         else:
             res.divergencias += [{**base, "divergencia": "so_no_brain", "tipo": t} for t in sorted(solo_b)]
             res.divergencias += [{**base, "divergencia": "so_no_agente", "tipo": t} for t in sorted(solo_a)]
@@ -161,8 +187,9 @@ def main(argv=None) -> int:
         print(json.dumps(d, ensure_ascii=False))
     cont = {k: sum(d["divergencia"] == k for d in res.divergencias) for k in ("so_no_brain", "so_no_agente", "tipo_diferente")}
     print(f"comparar_escuta: total={len(res.divergencias)} " + " ".join(f"{k}={v}" for k, v in cont.items())
-          + f" ilegiveis={res.ilegiveis} remetente_dia={res.chaves}")
-    return 1 if res.divergencias else 0
+          + f" ilegiveis={res.ilegiveis} sem_numero={res.sem_numero} ambiguos={res.ambiguos}"
+          + f" outros_avisos={res.outros_avisos} remetente_dia={res.chaves}")
+    return 1 if (res.divergencias or res.ilegiveis or res.sem_numero or res.ambiguos) else 0
 
 
 if __name__ == "__main__":

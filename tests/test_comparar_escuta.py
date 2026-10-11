@@ -49,7 +49,8 @@ def _pista(fila, quem="Fulano Teste", em="2026-10-05T12:00:00-03:00", nome="pist
 
 
 def _aviso(fila, texto, em="2026-10-05T12:00:00-03:00", nome="aviso-bb.json", sub="feitas"):
-    (fila / sub / nome).write_text(json.dumps({"texto": texto, "criado_em": em}))
+    # formato real de avisos.enfileirar: texto, midia, seq, criado_em (ISO com fuso local)
+    (fila / sub / nome).write_text(json.dumps({"texto": texto, "midia": [], "seq": 1, "criado_em": em}))
 
 
 def _rodar(banco, fila, **kw):
@@ -83,7 +84,7 @@ def test_tipo_diferente_mostra_os_dois(banco, fila):
     r = _rodar(banco, fila)
     assert len(r.divergencias) == 1
     d = r.divergencias[0]
-    assert d["divergencia"] == "tipo_diferente" and d["brain"] == ["pedido"] and d["agente"] == ["saude"]
+    assert d["divergencia"] == "tipo_diferente" and d["tipo"] == ["pedido", "saude"] and d["brain"] == ["pedido"] and d["agente"] == ["saude"]
 
 
 def test_aviso_de_pedido_e_de_crise_do_agente(banco, fila):
@@ -113,10 +114,53 @@ def test_tipo_nada_e_ignorado(banco, fila):
 def test_formato_desconhecido_e_contado_sem_quebrar(banco, fila):
     (fila / "pista-x.json").write_text("{não é json")
     (fila / "cmd-y.json").write_text(json.dumps({"qualquer": 1}))
-    _aviso(fila, "texto que não é de escuta", nome="aviso-z.json")
     (fila / "feitas" / "aviso-w.json").write_text(json.dumps([1, 2]))
+    (fila / "feitas" / "aviso-v.json").write_text(json.dumps({"texto": "x"}))  # sem criado_em: não se chuta pela data do arquivo
     r = _rodar(banco, fila)
     assert r.ilegiveis == 4 and r.divergencias == []
+
+
+def test_aviso_de_outro_assunto_nao_e_ilegivel(banco, fila):
+    _aviso(fila, "⚠️ requisitos-pedido.json inválido: x", nome="aviso-z.json")
+    r = _rodar(banco, fila)
+    assert r.ilegiveis == 0 and r.outros_avisos == 1 and r.divergencias == []
+
+
+def test_pista_sem_criado_em_e_ilegivel(banco, fila):
+    (fila / "pista-q.json").write_text(json.dumps({"quem": "Fulano Teste"}))
+    assert _rodar(banco, fila).ilegiveis == 1
+
+
+def test_brain_sem_numero_normalizavel_e_contado(banco, fila):
+    _msg(banco, "pedido", de="123456789012@lid")
+    _msg(banco, "nada", de="999")
+    r = _rodar(banco, fila)
+    assert r.sem_numero == 1 and r.divergencias == []
+
+
+def test_mesmo_nome_com_dois_numeros_e_ambiguo(banco, fila):
+    _nome(banco, numero=NUM)
+    _nome(banco, numero="+5511988887777")
+    _pista(fila)
+    r = _rodar(banco, fila)
+    assert r.ambiguos == 1
+
+
+def test_nomes_sem_numero_nao_se_mascaram_entre_si(banco, fila):
+    _pista(fila, quem="Alfa Um", nome="pista-1.json")
+    _pista(fila, quem="Beta Dois", nome="pista-2.json")
+    r = _rodar(banco, fila)
+    assert len(r.divergencias) == 2
+    assert {d["remetente"] for d in r.divergencias} == {"nome:A…", "nome:B…"}
+    assert all(d["tipo"] == "saude" for d in r.divergencias)
+
+
+def test_sem_modo_de_gate_so_zero_com_tudo_zerado(banco, fila, capsys):
+    _msg(banco, "pedido", de="123456789012@lid")
+    assert main(["--banco", str(banco), "--fila-antiga", str(fila)]) == 1
+    assert "sem_numero=1" in capsys.readouterr().out
+    (fila / "pista-x.json").write_text("{")
+    assert main(["--banco", str(banco), "--fila-antiga", str(fila)]) == 1
 
 
 def test_desde_filtra_os_dois_lados(banco, fila):
@@ -137,12 +181,12 @@ def test_dia_e_em_brasilia(banco, fila):
 def test_nome_sem_numero_conhecido_vira_so_no_agente(banco, fila):
     _pista(fila, quem="Ninguem Conhecido")
     r = _rodar(banco, fila)
-    assert [d["divergencia"] for d in r.divergencias] == ["so_no_agente"] and r.divergencias[0]["remetente"] == "?"
+    assert [d["divergencia"] for d in r.divergencias] == ["so_no_agente"] and r.divergencias[0]["remetente"] == "nome:N…"
 
 
 def test_mascara_do_numero():
     assert mascarar("+5511987655678") == "+55119****5678"
-    assert "?" == mascarar(None)
+    assert mascarar(None) == "?" and mascarar("+5511") == "+**"
 
 
 def test_saida_sem_texto_nem_numero_completo(banco, fila, capsys):
