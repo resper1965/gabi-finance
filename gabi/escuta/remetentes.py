@@ -7,6 +7,7 @@ from pathlib import Path
 
 from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
+from gabi.escuta import spool_seguro
 from gabi.escuta.caixa import normalizar_telefone
 from gabi.escuta.contatos import nome_do_numero
 
@@ -105,13 +106,6 @@ def aprovar(con, numero: str, papel: str, nome: str | None, por: str) -> str:
     return pid
 
 
-def _dentro(arq: str, spool: Path) -> bool:
-    try:
-        return Path(arq).resolve().is_relative_to(spool.resolve())
-    except (OSError, ValueError, RuntimeError):
-        return False
-
-
 def _descartar(con, numero: str, estado: str, por: str, spool: Path | None) -> None:
     anexos: list[str] = []
     with transacao(con):
@@ -132,11 +126,7 @@ def _descartar(con, numero: str, estado: str, por: str, spool: Path | None) -> N
         _auditar(con, por, f"escuta: {estado} {numero}")
     if spool is not None:  # só apaga arquivo dentro da pasta do spool; caminho vindo do banco não é confiável
         for a in anexos:
-            if _dentro(a, spool):
-                try:
-                    Path(a).unlink(missing_ok=True)
-                except OSError:
-                    pass
+            spool_seguro.apagar_anexo(spool, a)  # só <spool>/anexos/<nome>, via descritor de diretório
 
 
 def ignorar(con, numero: str, por: str, spool: Path | None = None) -> None:

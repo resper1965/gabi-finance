@@ -52,6 +52,17 @@ test('decidirReconexao: terminais, badSession e backoff', () => {
   assert.equal(decidirReconexao(515, e2, RAZAO).espera, 0);
 });
 
+test('decidirReconexao: código desconhecido (undefined/null) nunca é terminal', () => {
+  const bruta = { loggedOut: undefined, forbidden: undefined, connectionReplaced: undefined, badSession: undefined, restartRequired: undefined };
+  for (const razao of [RAZAO, bruta, {}]) {
+    for (const codigo of [undefined, null]) {
+      const est = { badSession: 0, tentativa: 0 };
+      assert.equal(decidirReconexao(codigo, est, razao).acao, 'retry');
+      assert.equal(est.badSession, 0);
+    }
+  }
+});
+
 test('403 e 440 encerram sem religar (exit 78 no main)', async () => {
   for (const codigo of [401, 403, 440]) {
     const { f, terminou } = await cenario();

@@ -1,4 +1,6 @@
 import json
+import os
+import pathlib
 import shutil
 from pathlib import Path
 
@@ -270,3 +272,73 @@ def test_limpar_orfaos_pasta_anexos_symlink_nao_apaga_fora(tmp_path):
     migrar(con, MIGR)
     assert limpar_orfaos(con, pasta) == 0
     assert (alvo / "backup.db").exists()
+
+
+def _vitima_dir(tmp_path):
+    v = tmp_path / "dados-do-brain"
+    v.mkdir()
+    return v
+
+
+@pytest.mark.parametrize("sub", ["lidos", "invalidos"])
+def test_mover_troca_da_subpasta_por_symlink_depois_da_checagem_nao_escapa(con, tmp_path, monkeypatch, sub):
+    """Corrida: o ouvinte troca lidos/invalidos por symlink DEPOIS de qualquer checagem por caminho, logo antes do rename."""
+    pasta = tmp_path / "spool"
+    vitima = _vitima_dir(tmp_path)
+    if sub == "lidos":
+        _msg(pasta, "a1")
+    else:
+        pasta.mkdir(exist_ok=True)
+        (pasta / "a1.json").write_text("{quebrado")
+    (pasta / sub).mkdir(exist_ok=True)
+
+    real_rename = os.rename
+
+    def troca():
+        if os.path.islink(pasta / sub):
+            return
+        real_rename(pasta / sub, pasta / (sub + "-orig"))
+        (pasta / sub).symlink_to(vitima, target_is_directory=True)
+
+    def rename(*a, **k):  # e também logo antes do rename (código novo ancorado em fd)
+        troca()
+        return real_rename(*a, **k)
+    monkeypatch.setattr(os, "rename", rename)
+    monkeypatch.setattr(os, "replace", rename)
+    ingerir_spool(con, pasta, AGORA)
+    assert list(vitima.iterdir()) == []
+    assert not (pasta / "a1.json").exists()
+
+
+@pytest.mark.parametrize("sub", ["lidos", "invalidos"])
+def test_subpasta_symlink_desde_o_inicio_apaga_o_json_e_nao_toca_a_vitima(con, tmp_path, sub):
+    pasta = tmp_path / "spool"
+    vitima = _vitima_dir(tmp_path)
+    (vitima / "a1.json").write_text("ORIGINAL")
+    pasta.mkdir()
+    (pasta / sub).symlink_to(vitima, target_is_directory=True)
+    if sub == "lidos":
+        _msg(pasta, "a1")
+    else:
+        (pasta / "a1.json").write_text("{quebrado")
+    ingerir_spool(con, pasta, AGORA)
+    assert (vitima / "a1.json").read_text() == "ORIGINAL"
+    assert not (pasta / "a1.json").exists()
+
+
+def test_json_symlink_com_mesmo_nome_nunca_e_seguido_nem_movido_para_fora(con, tmp_path):
+    pasta = tmp_path / "spool"
+    pasta.mkdir()
+    vitima = _vitima_dir(tmp_path)
+    (vitima / "a1.json").write_text(json.dumps({"id_externo": "VAZOU", "de": "5511912345678@s.whatsapp.net", "recebida_em": "2026-10-11T09:00:00+00:00"}))
+    (pasta / "a1.json").symlink_to(vitima / "a1.json")
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert (vitima / "a1.json").exists() and con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
+
+
+def test_cria_lidos_e_invalidos_quando_faltam(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "ok")
+    (pasta / "ruim.json").write_text("{")
+    ingerir_spool(con, pasta, AGORA)
+    assert (pasta / "lidos" / "ok.json").is_file() and (pasta / "invalidos" / "ruim.json").is_file()

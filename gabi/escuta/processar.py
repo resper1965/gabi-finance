@@ -12,7 +12,8 @@ from gabi.dinheiro.modelo import ModeloCliente, Orcamento
 from gabi.escuta.classificar import classificar
 from gabi.escuta.crise import palavras_risco, tem_risco
 from gabi.escuta.destinos import Destinos
-from gabi.escuta.remetentes import _dentro, avisar_novo, estado_remetente
+from gabi.escuta import spool_seguro
+from gabi.escuta.remetentes import avisar_novo, estado_remetente
 
 log = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
 
 def _exigir_dentro(m, spool) -> None:
     """Caminho de anexo vem do banco (não confiável): só vai a um destino se estiver dentro do spool. Senão a mensagem falha e nada é tocado."""
-    if m["anexo_caminho"] and (spool is None or not _dentro(m["anexo_caminho"], Path(spool))):
+    if m["anexo_caminho"] and not spool_seguro.caminho_valido(spool, m["anexo_caminho"]):
         raise RuntimeError("anexo fora do spool")
 
 
@@ -215,11 +216,8 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
             continue
         if spool is not None:
             for a in apagar:
-                if a and _dentro(a, Path(spool)):
-                    try:
-                        Path(a).unlink(missing_ok=True)
-                    except OSError:
-                        pass
+                if a:
+                    spool_seguro.apagar_anexo(spool, a)  # só <spool>/anexos/<nome>, via descritor de diretório
     if erro_geral and not con.execute("select 1 from aviso where tipo='servico_falhou' and payload like ? and substr(criado_em,1,10)=?",
                                       ('%gabi-brain-escuta%', agora[:10])).fetchone():
         _aviso(con, "servico_falhou", {"unidade": "gabi-brain-escuta"}, agora)

@@ -285,3 +285,27 @@ test('disco cheio vira contador e não derruba as outras mensagens', async () =>
   assert.equal(c.disco_cheio, 1);
   assert.equal(c.gravadas, 1);
 });
+
+// ---------- v7: remoteJidAlt/participantAlt só quando o primário é @lid ----------
+test('v7: primário telefone + LID em remoteJidAlt mantém o telefone', async () => {
+  const p = pasta();
+  await processarEvento(ev(
+    msg({ conversation: 'a' }, { remoteJid: PRIV, remoteJidAlt: '123456789@lid', id: 'V1' }),
+    msg({ conversation: 'b' }, { remoteJid: GRUPO, participant: PART, participantAlt: '999@lid', id: 'V2' }),
+  ), deps(p));
+  const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
+  assert.equal(por.V1.de, PRIV);
+  assert.equal(por.V2.de, PART);
+  assert.equal('lid' in por.V1 || 'lid' in por.V2, false);
+});
+
+test('v7: primário @lid + telefone em remoteJidAlt/participantAlt usa o telefone', async () => {
+  const p = pasta();
+  await processarEvento(ev(
+    msg({ conversation: 'a' }, { remoteJid: '123@lid', remoteJidAlt: PRIV, id: 'V3' }),
+    msg({ conversation: 'b' }, { remoteJid: GRUPO, participant: '999@lid', participantAlt: PART, id: 'V4' }),
+  ), deps(p));
+  const por = Object.fromEntries(lista(p).map((j) => [j.id_externo, j]));
+  assert.equal(por.V3.de, PRIV);
+  assert.equal(por.V4.de, PART);
+});

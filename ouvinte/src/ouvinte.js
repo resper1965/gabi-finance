@@ -57,10 +57,13 @@ export function extrair(m) {
   const conteudo = desembrulhar(m.message);
   if (!conteudo || IGNORADOS.some((k) => conteudo[k])) return null;
   const grupo = remoto.endsWith('@g.us');
-  // Baileys 6.7.x preenche senderPn/participantPn quando o JID é @lid; remoteJidAlt/participantAlt são nomes da v7.
-  const de = grupo
-    ? (key.participantPn || key.participantAlt || key.participant || m.participant)
-    : (key.senderPn || key.remoteJidAlt || remoto);
+  // Baileys 6.7.x preenche senderPn/participantPn quando o JID é @lid. Na v7, remoteJidAlt/participantAlt guardam o OUTRO
+  // endereço (para mensagem endereçada por telefone, é o LID): só valem quando o JID primário é @lid.
+  const ehLid = (j) => typeof j === 'string' && j.endsWith('@lid');
+  const primario = grupo ? (key.participant ?? m.participant) : remoto;
+  const alt = grupo ? key.participantAlt : key.remoteJidAlt;
+  const pn = grupo ? key.participantPn : key.senderPn;
+  const de = pn || (ehLid(primario) && alt ? alt : null) || primario;
   if (!de || typeof de !== 'string') return null;
   const lid = de.endsWith('@lid');
   const midiaChave = MIDIAS.find((k) => conteudo[k]);
@@ -176,12 +179,13 @@ const MAX_BAD_SESSION = 3;
  * `est` ({badSession, tentativa}) é alterado. Devolve {acao:'terminal'} ou {acao:'retry', espera}.
  */
 export function decidirReconexao(codigo, est, razao) {
-  if (codigo === razao.loggedOut || codigo === razao.forbidden || codigo === razao.connectionReplaced) return { acao: 'terminal' };
-  if (codigo === razao.badSession) {
+  const conhecido = codigo !== undefined && codigo !== null;
+  if (conhecido && (codigo === razao.loggedOut || codigo === razao.forbidden || codigo === razao.connectionReplaced)) return { acao: 'terminal' };
+  if (conhecido && codigo === razao.badSession) {
     est.badSession += 1;
     if (est.badSession >= MAX_BAD_SESSION) return { acao: 'terminal' };
   }
-  if (codigo === razao.restartRequired) return { acao: 'retry', espera: 0 };
+  if (conhecido && codigo === razao.restartRequired) return { acao: 'retry', espera: 0 };
   const espera = Math.min(60_000, 1000 * 2 ** est.tentativa);
   est.tentativa += 1;
   return { acao: 'retry', espera };

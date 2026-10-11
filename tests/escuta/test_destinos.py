@@ -63,7 +63,8 @@ def test_pedido_sem_valor_propaga_value_error_e_nao_grava(con, d):
 
 
 def test_pedido_com_anexo_vai_ao_paperless_com_etiqueta(con, d, srv, tmp_path):
-    arq = tmp_path / "boleto.pdf"
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "boleto.pdf"
     arq.write_bytes(b"%PDF-boleto")
     d.pedido(con, "p1", N, _msg(anexo=arq), {"valor": 50})
     corpo = srv.enviados[0][0]
@@ -73,7 +74,8 @@ def test_pedido_com_anexo_vai_ao_paperless_com_etiqueta(con, d, srv, tmp_path):
 
 
 def test_saude_envia_anexo_com_etiqueta_e_nao_apaga_nada(con, d, srv, tmp_path):
-    arq = tmp_path / "exame.pdf"
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "exame.pdf"
     arq.write_bytes(b"%PDF-exame")
     d.saude(con, _msg(SEGREDO, arq), {"x": SEGREDO})
     corpo, _ = srv.enviados[0]
@@ -89,7 +91,8 @@ def _tudo(con):
 
 
 def test_saude_nao_grava_texto_no_banco(con, d, tmp_path):
-    arq = tmp_path / "exame.pdf"
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "exame.pdf"
     arq.write_bytes(b"x")
     d.saude(con, {**_msg(SEGREDO, arq)}, {"resumo": SEGREDO})
     d.saude(con, _msg(SEGREDO), {"resumo": SEGREDO})
@@ -129,7 +132,8 @@ def test_crise_sem_agora_usa_relogio_utc(con, d):
 
 
 def test_documento_envia_com_etiqueta_e_propaga_erro(con, d, srv, tmp_path):
-    arq = tmp_path / "nf.pdf"
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "nf.pdf"
     arq.write_bytes(b"%PDF-nf")
     d.documento(con, _msg(anexo=arq))
     assert b"%PDF-nf" in srv.enviados[0][0] and "gabi:entrada-whatsapp" in srv.tags
@@ -206,11 +210,12 @@ def test_diretorio_e_spool_none_sao_recusados(con, srv, tmp_path):
 
 def test_teto_de_tamanho_logo_abaixo_passa_e_acima_recusa(con, srv, tmp_path, monkeypatch):
     d = DestinosReais(Paperless("http://p", "t", http=srv), spool=tmp_path, anexo_max_bytes=10)
-    ok = tmp_path / "ok.bin"
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    ok = tmp_path / "anexos" / "ok.bin"
     ok.write_bytes(b"x" * 10)
     d.documento(con, _msg(anexo=ok))
     assert len(srv.enviados) == 1
-    grande = tmp_path / "grande.bin"
+    grande = tmp_path / "anexos" / "grande.bin"
     grande.write_bytes(b"x" * 11)
     lidos = []
     real_open = open
@@ -243,3 +248,30 @@ def test_anexo_symlink_nao_e_seguido_nem_dentro_do_spool(con, d, tmp_path):
         with pytest.raises(RuntimeError):
             d.pedido(con, "p1", N, _msg(anexo=alvo), {"valor": 50})
     assert real.exists() and fora.exists()
+
+
+def test_anexo_trocado_por_symlink_entre_a_checagem_e_a_leitura_nao_envia_a_vitima(con, d, srv, tmp_path, monkeypatch):
+    import os
+    from gabi.escuta import spool_seguro
+    (tmp_path / "anexos").mkdir()
+    real = tmp_path / "anexos" / "a.pdf"
+    real.write_bytes(b"%PDF-real")
+    vitima = tmp_path.parent / f"vitima-{tmp_path.name}"
+    vitima.mkdir()
+    (vitima / "a.pdf").write_bytes(b"SEGREDO-DO-BRAIN")
+
+    def troca():
+        os.rename(tmp_path / "anexos", tmp_path / "anexos-orig")
+        (tmp_path / "anexos").symlink_to(vitima, target_is_directory=True)
+    monkeypatch.setattr(spool_seguro, "_gancho", troca)
+    d.pedido(con, "p1", N, _msg(anexo=real), {"valor": 50})
+    assert all(b"SEGREDO-DO-BRAIN" not in corpo for corpo, *_ in srv.enviados)
+    assert b"%PDF-real" in srv.enviados[0][0]
+
+
+def test_anexo_fora_de_spool_anexos_nome_e_recusado(con, d, tmp_path):
+    (tmp_path / "anexos" / "sub").mkdir(parents=True)
+    for arq in (tmp_path / "solto.pdf", tmp_path / "anexos" / "sub" / "a.pdf"):
+        arq.write_bytes(b"x")
+        with pytest.raises(RuntimeError):
+            d.pedido(con, "p1", N, _msg(anexo=arq), {"valor": 50})

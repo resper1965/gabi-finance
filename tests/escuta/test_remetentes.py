@@ -103,8 +103,8 @@ def _pessoa(con, pid, dados, excl=None):
 
 def test_ignorar_so_apaga_arquivo_dentro_do_spool(con, tmp_path):
     spool = tmp_path / "spool"
-    spool.mkdir()
-    dentro, fora = spool / "a.bin", tmp_path / "fora.bin"
+    (spool / "anexos").mkdir(parents=True)
+    dentro, fora = spool / "anexos" / "a.bin", tmp_path / "fora.bin"
     dentro.write_text("x")
     fora.write_text("x")
     registrar_remetente_visto(con, N, AGORA)
@@ -192,3 +192,23 @@ def test_ignorar_apaga_texto_de_crise_mas_nao_de_outras_processadas(con):
     ignorar(con, N, "ricardo")
     assert [r[0] for r in con.execute("select texto from escuta_msg where tipo='crise'")] == [None]
     assert [r[0] for r in con.execute("select texto from escuta_msg where tipo='pedido'")] == ["pedido-texto"]
+
+
+def test_descartar_com_anexos_trocado_por_symlink_nao_apaga_a_vitima(con, tmp_path, monkeypatch):
+    import os
+    from gabi.escuta import spool_seguro
+    spool = tmp_path / "spool"
+    (spool / "anexos").mkdir(parents=True)
+    vitima = tmp_path / "dados-do-brain"
+    vitima.mkdir()
+    (vitima / "a.bin").write_text("SEGREDO")
+    (spool / "anexos" / "a.bin").write_text("x")
+
+    def troca():
+        os.rename(spool / "anexos", spool / "anexos-orig")
+        (spool / "anexos").symlink_to(vitima, target_is_directory=True)
+    monkeypatch.setattr(spool_seguro, "_gancho", troca)
+    registrar_remetente_visto(con, N, AGORA)
+    _msg(con, anexo=str(spool / "anexos" / "a.bin"))
+    ignorar(con, N, "ricardo", spool=spool)
+    assert (vitima / "a.bin").read_text() == "SEGREDO"

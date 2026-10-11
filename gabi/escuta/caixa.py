@@ -1,5 +1,6 @@
 """Caixa de entrada da escuta: lê o spool (um JSON por mensagem) e grava em escuta_msg."""
 import datetime as dt
+import fnmatch
 import json
 import os
 import re
@@ -35,10 +36,10 @@ def registrar_remetente_visto(con, numero: str, agora: str) -> None:
 LIMITE_JSON = 5 * 1024 * 1024  # uma mensagem de texto não chega perto; acima disso é lixo ou ataque
 
 
-def ler_regular(caminho, limite: int) -> bytes:
+def ler_regular(caminho, limite: int, dir_fd: int | None = None) -> bytes:
     """O spool é gravável pelo ouvinte (não confiável): só lê arquivo REGULAR, sem seguir symlink (O_NOFOLLOW) e sem bloquear
     em FIFO (O_NONBLOCK; o tipo é checado no fd aberto). OSError/ValueError se for outra coisa ou passar de `limite`."""
-    fd = os.open(caminho, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    fd = os.open(caminho, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=dir_fd)
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode) or st.st_size > limite:
@@ -51,19 +52,29 @@ def ler_regular(caminho, limite: int) -> bytes:
             os.close(fd)
 
 
-def _mover(arq: Path, destino: Path) -> None:
-    """Move para lidos/ ou invalidos/. Se a subpasta não for uma pasta de verdade (o ouvinte pode ter plantado um symlink), o
-    arquivo é apagado em vez de movido: nunca grava fora do spool."""
+_FLAGS_DIR = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+
+def _mover(spool_fd: int, nome: str, sub: str) -> None:
+    """Move `nome` (entrada direta do spool) para `sub` (lidos/invalidos) ANCORADO no fd do spool: a subpasta é aberta com
+    O_NOFOLLOW relativo ao fd e o rename usa os dois fds, então trocar `lidos` por symlink (o ouvinte pode, o spool é 2770 sem
+    sticky) não leva o arquivo para fora. Se a subpasta não abrir (symlink, não é pasta), apaga o arquivo em vez de mover."""
+    dest = -1
     try:
-        if not destino.is_symlink():
-            destino.mkdir(exist_ok=True)
-            if destino.is_dir() and not destino.is_symlink():
-                arq.replace(destino / arq.name)
-                return
+        try:
+            os.mkdir(sub, 0o2770, dir_fd=spool_fd)
+        except FileExistsError:
+            pass
+        dest = os.open(sub, _FLAGS_DIR, dir_fd=spool_fd)
+        os.rename(nome, nome, src_dir_fd=spool_fd, dst_dir_fd=dest)
+        return
     except OSError:
         pass
+    finally:
+        if dest >= 0:
+            os.close(dest)
     try:
-        arq.unlink()
+        os.unlink(nome, dir_fd=spool_fd)
     except OSError:
         pass
 
@@ -76,8 +87,8 @@ def _utc(quando: str) -> str:
     return d.astimezone(dt.timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _ler(arq: Path) -> dict:
-    d = json.loads(ler_regular(arq, LIMITE_JSON).decode("utf-8"))
+def _ler(nome: str, sfd: int) -> dict:
+    d = json.loads(ler_regular(nome, LIMITE_JSON, dir_fd=sfd).decode("utf-8"))
     if not isinstance(d, dict):
         raise ValueError("spool não é objeto")
     for k in ("id_externo", "de", "recebida_em"):
@@ -95,14 +106,25 @@ def _ler(arq: Path) -> dict:
 
 def ingerir_spool(con, pasta: Path, agora: str) -> int:
     pasta = Path(pasta)
+    try:
+        sfd = os.open(pasta, _FLAGS_DIR)
+    except OSError:
+        return 0
+    try:
+        return _ingerir(con, pasta, sfd, agora)
+    finally:
+        os.close(sfd)
+
+
+def _ingerir(con, pasta: Path, sfd: int, agora: str) -> int:
     novas = 0
-    for arq in sorted(pasta.glob("*.json")):
-        if arq.name == "palavras-risco.json":  # lista que o brain publica para o ouvinte, não é mensagem
+    for nome in sorted(n for n in os.listdir(sfd) if fnmatch.fnmatchcase(n, "*.json")):
+        if nome == "palavras-risco.json":  # lista que o brain publica para o ouvinte, não é mensagem
             continue
         try:
-            d = _ler(arq)
+            d = _ler(nome, sfd)
         except (OSError, ValueError):  # JSONDecodeError e UnicodeDecodeError são ValueError
-            _mover(arq, pasta / "invalidos")
+            _mover(sfd, nome, "invalidos")
             continue
         grupo = bool(d.get("grupo"))
         numero = None if grupo else normalizar_telefone(d["de"])
@@ -119,7 +141,7 @@ def ingerir_spool(con, pasta: Path, agora: str) -> int:
                 if numero is not None and cur.rowcount:
                     registrar_remetente_visto(con, numero, agora)
             novas += cur.rowcount
-        _mover(arq, pasta / "lidos")
+        _mover(sfd, nome, "lidos")
     return novas
 
 

@@ -99,18 +99,30 @@ def test_ingestao_nao_trata_palavras_risco_como_mensagem(con, tmp_path):
 
 
 # ---------------- listener comprometido: symlink plantado no spool ----------------
-def test_symlink_plantado_no_tmp_nao_e_escrito_atraves(con, tmp_path):
+def test_symlink_plantado_no_tmp_previsivel_e_recusado_pelo_o_excl(con, tmp_path, monkeypatch):
     import os
-    from gabi.escuta.crise import escrever_palavras_risco
+    import secrets
+    from gabi.escuta import crise
     vitima = tmp_path / "gabi.db"
     vitima.write_bytes(b"BANCO-INTACTO")
     os.chmod(vitima, 0o600)
     spool = tmp_path / "spool"
     spool.mkdir()
-    (spool / "palavras-risco.json.tmp").symlink_to(vitima)
+    monkeypatch.setattr(secrets, "token_hex", lambda n=8: "previsivel")
+    (spool / f"palavras-risco.json.{os.getpid()}.previsivel.tmp").symlink_to(vitima)  # o ouvinte adivinhou o nome
+    _define(con, ["matar"])
+    with pytest.raises(OSError):  # O_EXCL|O_NOFOLLOW recusa; a rodada engole como palavras_erro
+        crise.escrever_palavras_risco(con, spool)
+    assert vitima.read_bytes() == b"BANCO-INTACTO" and (vitima.stat().st_mode & 0o777) == 0o600
+    assert not (spool / "palavras-risco.json").exists()
+
+
+def test_tmp_aleatorio_nao_colide_e_grava(con, tmp_path):
+    from gabi.escuta.crise import escrever_palavras_risco
+    spool = tmp_path / "spool"
+    spool.mkdir()
     _define(con, ["matar"])
     assert escrever_palavras_risco(con, spool) is True
-    assert vitima.read_bytes() == b"BANCO-INTACTO" and (vitima.stat().st_mode & 0o777) == 0o600
     assert json.loads((spool / "palavras-risco.json").read_text(encoding="utf-8")) == ["matar"]
 
 
