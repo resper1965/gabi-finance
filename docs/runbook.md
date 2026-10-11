@@ -139,4 +139,6 @@ Depois da migração 0022, lançamentos antigos em USD/EUR/PEN continuam com o v
 
 1. `python -m tools.corrigir_moeda --dry-run`: só lê e imprime contagens (`mudariam`, `diferenca_centavos`, `sem_bruto`). Não migra: se a 0022 ainda não foi aplicada, avisa e sai com erro.
 2. `python -m tools.corrigir_moeda`: aplica, em transação única, a partir do bruto imutável (sem rede). Só toca lançamentos em moeda estrangeira, usando o bruto mais novo de cada um; BRL nunca muda. Pode rodar de novo (idempotente).
-3. Conferir `sem_bruto`: lançamentos sem transação no bruto não são corrigidos (ficam como estão). Depois, o aviso `lancamento_sem_conversao` mostra quantos entraram sem valor em reais.
+3. Conferir `sem_bruto`: ele conta TODA linha sem transação no bruto (BRL, lançamentos manuais ou importados também), não é o número de lançamentos estrangeiros que ficaram sem correção. Essas linhas não são tocadas: ficam com `moeda` vazia e `convertido=1`, então o aviso `lancamento_sem_conversao` NÃO as conta (ele só conta `convertido=0`).
+
+Ensaio feito em 11/10/2026 numa cópia do banco real: 104 lançamentos mudariam, diferença de -R$ 49.336,08, `sem_bruto=0`, e uma segunda execução não mudou nada (0). Portanto, no banco real, `sem_bruto` deve ser 0. Se não for, pare e investigue antes de rodar sem `--dry-run`.
