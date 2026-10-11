@@ -73,6 +73,11 @@ def _evento(item: dict) -> dict:
             "privado": item.get("visibility") in ("private", "confidential")}
 
 
+def _recusado_por_mim(item: dict) -> bool:
+    """O próprio dono (`self`) recusou o convite. Só o campo de resposta é lido; e-mail de participante nunca é guardado."""
+    return any(isinstance(a, dict) and a.get("self") is True and a.get("responseStatus") == "declined" for a in item.get("attendees") or [])
+
+
 def _ler(conta, calendario_id, sync_token, janela, token, http):
     """Todas as páginas -> ResultadoEventos, ou None se o Google respondeu 410 (syncToken expirado) numa carga incremental."""
     base = f"{BASE}/calendars/{urllib.parse.quote(calendario_id, safe='')}/events"
@@ -95,8 +100,10 @@ def _ler(conta, calendario_id, sync_token, janela, token, http):
         for item in resp.get("items") or []:
             if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"]:
                 continue
-            if item.get("status") == "cancelled":
-                res.cancelados.append(item["id"])
+            if item.get("status") == "cancelled" or _recusado_por_mim(item):
+                res.cancelados.append(item["id"])  # recusado some do app do Google: some daqui (e apaga a linha já gravada)
+            elif item.get("eventType") == "workingLocation":
+                continue  # "Casa/Escritório" do dia não é compromisso
             else:
                 res.eventos.append(_evento(item))
         pagina = resp.get("nextPageToken")

@@ -175,3 +175,18 @@ def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
     assert ga.google_agenda_do_ambiente({}) is None
     assert ga.google_agenda_do_ambiente({"GOOGLE_CLIENT_ID": "i", "GOOGLE_CLIENT_SECRET": "s"}) is not None
     assert "SEGREDO" not in repr(g) and "TOK" not in repr(g)
+
+
+def test_recusado_pelo_proprio_dono_conta_como_cancelado_e_o_de_outro_participante_nao():
+    ch = []
+    eu = _ev("recusei", attendees=[{"email": "outro@x.com", "responseStatus": "accepted"}, {"email": "eu@x.com", "self": True, "responseStatus": "declined"}])
+    outro = _ev("outro_recusou", attendees=[{"email": "outro@x.com", "responseStatus": "declined"}, {"email": "eu@x.com", "self": True, "responseStatus": "accepted"}])
+    r = ga.listar_eventos("a@x.com", "primary", None, JANELA, Token(), http=_http([(200, {"items": [eu, outro], "nextSyncToken": "S"})], ch))
+    assert r.cancelados == ["recusei"] and [e["externo_id"] for e in r.eventos] == ["outro_recusou"]
+
+
+def test_local_de_trabalho_nao_e_compromisso_mas_fora_do_escritorio_e():
+    ch = []
+    itens = [_ev("casa", eventType="workingLocation"), _ev("ferias", eventType="outOfOffice"), _ev("normal", eventType="default")]
+    r = ga.listar_eventos("a@x.com", "primary", None, JANELA, Token(), http=_http([(200, {"items": itens, "nextSyncToken": "S"})], ch))
+    assert [e["externo_id"] for e in r.eventos] == ["ferias", "normal"] and r.cancelados == []

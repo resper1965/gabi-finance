@@ -453,6 +453,8 @@ def test_unit_fontes_le_google_env_e_o_antigo():
     unit = _ler("gabi-brain-fontes.service")
     assert "EnvironmentFile=-/etc/gabi/google.env" in unit
     assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in unit  # compatibilidade
+    # systemd: o ÚLTIMO arquivo vence — o canônico (dois escopos) tem de vir depois do legado (só contatos)
+    assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
     assert not [l for l in unit.splitlines() if l.startswith("Environment=") and ("REFRESH" in l or "SECRET" in l)]  # nenhum segredo na unit
 
 

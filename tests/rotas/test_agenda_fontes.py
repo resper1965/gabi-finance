@@ -150,3 +150,15 @@ def test_a_politica_gravada_vale_para_a_leitura(cli, banco):
     assert ver() == "Médico"
     _put(cli, {"privados": "ocultar"})
     assert ver() == "Compromisso privado"
+
+
+def test_mudar_parametro_forca_recarga_completa_na_proxima_rodada(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into agenda_fonte(id, conta, provedor, estado, sync_token, recarga_em) values (7,'a@x.com','google','sim','T','2026-10-16T10:00:00+00:00')")
+    c.close()
+    assert _put(cli, {"privados": "so_painel"}).status_code == 200
+    c = conectar(banco)
+    linha = c.execute("select sync_token, recarga_em from agenda_fonte where id=7").fetchone()
+    c.close()
+    assert linha["recarga_em"] is None  # dia_local, título mascarado e janela foram calculados com o valor antigo: refaz tudo
+    assert _put(cli, {"privados": "inexistente"}).status_code == 400  # pedido inválido não força nada

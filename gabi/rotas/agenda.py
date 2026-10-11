@@ -114,6 +114,7 @@ async def gravar_parametros(request: Request, ident: Identidade = Depends(exigir
             except fn.ErroFonte as e:
                 raise _traduzir(e) from None
             fn.gravar_parametros(con, novos)
+            con.execute("update agenda_fonte set recarga_em=null")  # dia local, título mascarado e janela estão gravados com o valor antigo: a próxima rodada recarrega tudo
             _audit(con, ident.login, "agenda: alterou parâmetros " + ", ".join(sorted(fn.CHAVES[k] for k in novos)))
         return envelope(con, fn.parametros(con), agora=_agora(request))
     finally:
