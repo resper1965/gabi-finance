@@ -5,7 +5,7 @@ import pytest
 
 from gabi.db import conectar, migrar
 from gabi.escuta.destinos import DestinosReais
-from gabi.fontes.paperless import Paperless
+from gabi.fontes.paperless import ErroPaperless, Paperless
 from tests.cobrar.paperless_falso import PaperlessFalso
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
@@ -28,8 +28,8 @@ def srv():
 
 
 @pytest.fixture
-def d(srv):
-    return DestinosReais(Paperless("http://p", "tok", http=srv))
+def d(srv, tmp_path):
+    return DestinosReais(Paperless("http://p", "tok", http=srv), spool=tmp_path)
 
 
 def _msg(texto="oi", anexo=None):
@@ -69,6 +69,7 @@ def test_pedido_com_anexo_vai_ao_paperless_com_etiqueta(con, d, srv, tmp_path):
     corpo = srv.enviados[0][0]
     assert b"%PDF-boleto" in corpo and "gabi:entrada-whatsapp" in srv.tags and arq.exists()
     assert con.execute("select count(*) from pedido").fetchone()[0] == 1
+    assert con.execute("select anexo_paperless_id from pedido").fetchone()[0] is None  # o Paperless devolve UUID de tarefa; vínculo adiado
 
 
 def test_saude_envia_anexo_com_etiqueta_e_nao_apaga_nada(con, d, srv, tmp_path):
@@ -112,13 +113,19 @@ def test_crise_aviso_so_com_numero_e_nome(con, d):
 
 
 def test_crise_deduplica_por_numero_por_hora(con, d):
-    d.crise(con, N, "Fulana")
-    d.crise(con, N, "Fulana")
-    d.crise(con, "+5599", None)
+    d.crise(con, N, "Fulana", "2026-10-11T10:00:00")
+    d.crise(con, N, "Fulana", "2026-10-11T10:59:00")  # 59 min: suprimido
+    d.crise(con, "+5599", None, "2026-10-11T10:59:00")  # outro número
     assert len(_avisos(con, "escuta_atencao")) == 2
-    con.execute("update aviso set criado_em='2020-01-01T00:00:00+00:00' where tipo='escuta_atencao'")  # há muito tempo
-    d.crise(con, N, "Fulana")
+    d.crise(con, N, "Fulana", "2026-10-11T11:01:00")  # 61 min depois do primeiro: novo aviso
     assert len(_avisos(con, "escuta_atencao")) == 3
+    assert con.execute("select criado_em from aviso where tipo='escuta_atencao' order by id desc limit 1").fetchone()[0] == "2026-10-11T11:01:00"
+
+
+def test_crise_sem_agora_usa_relogio_utc(con, d):
+    d.crise(con, N, "Fulana")
+    d.crise(con, N, "Fulana")
+    assert len(_avisos(con, "escuta_atencao")) == 1
 
 
 def test_documento_envia_com_etiqueta_e_propaga_erro(con, d, srv, tmp_path):
@@ -127,10 +134,91 @@ def test_documento_envia_com_etiqueta_e_propaga_erro(con, d, srv, tmp_path):
     d.documento(con, _msg(anexo=arq))
     assert b"%PDF-nf" in srv.enviados[0][0] and "gabi:entrada-whatsapp" in srv.tags
 
-    def quebrado(*a, **k):
-        return 500, {}
+    def quebrado(metodo, url, corpo=None, cab=None):
+        if "post_document" in url:
+            return 500, {"detail": "x"}
+        return srv(metodo, url, corpo, cab)
 
-    ruim = DestinosReais(Paperless("http://p", "tok", http=quebrado))
-    with pytest.raises(Exception):
+    ruim = DestinosReais(Paperless("http://p", "tok", http=quebrado), spool=tmp_path)
+    with pytest.raises(ErroPaperless, match="post_document"):
         ruim.documento(con, _msg(anexo=arq))
     assert arq.exists()
+
+
+def test_pedido_valor_passa_sem_converter_para_texto(con, srv, tmp_path):
+    vistos = {}
+
+    def registrar(con, **kw):
+        vistos.update(kw)
+
+    DestinosReais(Paperless("http://p", "t", http=srv), registrar, spool=tmp_path).pedido(con, "p1", N, _msg(), {"valor": 1.234})
+    assert vistos["valor"] == 1.234 and isinstance(vistos["valor"], float)
+
+
+def test_pedido_dentro_do_spool_e_fora(con, srv, tmp_path):
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    chamadas = []
+    d = DestinosReais(Paperless("http://p", "t", http=srv), lambda con, **kw: chamadas.append(kw), spool=spool)
+    fora = tmp_path / "fora.env"
+    fora.write_text("PAPERLESS_TOKEN=abc")
+    for caminho in (fora, spool / ".." / "fora.env"):
+        with pytest.raises(RuntimeError):
+            d.pedido(con, "p1", N, _msg(anexo=caminho), {"valor": 10})
+    assert chamadas == [] and srv.enviados == [] and srv.chamadas == []
+
+
+def test_destinos_diretos_recusam_caminho_fora_do_spool(con, srv, tmp_path):
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    fora = tmp_path / "fora.env"
+    fora.write_text("segredo")
+    d = DestinosReais(Paperless("http://p", "t", http=srv), spool=spool)
+    for chamada in (lambda: d.documento(con, _msg(anexo=fora)), lambda: d.saude(con, _msg(anexo=fora), {})):
+        with pytest.raises(RuntimeError):
+            chamada()
+    assert srv.enviados == []
+
+
+def test_symlink_dentro_do_spool_apontando_para_fora_e_recusado(con, srv, tmp_path):
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    fora = tmp_path / "fora.env"
+    fora.write_text("segredo")
+    elo = spool / "elo.pdf"
+    elo.symlink_to(fora)
+    d = DestinosReais(Paperless("http://p", "t", http=srv), spool=spool)
+    with pytest.raises(RuntimeError):
+        d.documento(con, _msg(anexo=elo))
+    assert srv.enviados == []
+
+
+def test_diretorio_e_spool_none_sao_recusados(con, srv, tmp_path):
+    spool = tmp_path / "spool"
+    (spool / "pasta").mkdir(parents=True)
+    with pytest.raises(RuntimeError):
+        DestinosReais(Paperless("http://p", "t", http=srv), spool=spool).documento(con, _msg(anexo=spool / "pasta"))
+    arq = spool / "a.pdf"
+    arq.write_bytes(b"x")
+    with pytest.raises(RuntimeError):
+        DestinosReais(Paperless("http://p", "t", http=srv)).documento(con, _msg(anexo=arq))
+
+
+def test_teto_de_tamanho_logo_abaixo_passa_e_acima_recusa(con, srv, tmp_path, monkeypatch):
+    d = DestinosReais(Paperless("http://p", "t", http=srv), spool=tmp_path, anexo_max_bytes=10)
+    ok = tmp_path / "ok.bin"
+    ok.write_bytes(b"x" * 10)
+    d.documento(con, _msg(anexo=ok))
+    assert len(srv.enviados) == 1
+    grande = tmp_path / "grande.bin"
+    grande.write_bytes(b"x" * 11)
+    lidos = []
+    real_open = open
+    monkeypatch.setattr("builtins.open", lambda f, *a, **k: (lidos.append(str(f)), real_open(f, *a, **k))[1])
+    with pytest.raises(RuntimeError):
+        d.documento(con, _msg(anexo=grande))
+    assert not [x for x in lidos if x.endswith("grande.bin")] and len(srv.enviados) == 1 and grande.exists()
+
+
+def test_teto_padrao_e_25_mib(srv):
+    assert DestinosReais(Paperless("http://p", "t", http=srv))._max == 25 * 1024 * 1024

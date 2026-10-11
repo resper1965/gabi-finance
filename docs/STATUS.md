@@ -125,3 +125,7 @@ Plano: `docs/superpowers/plans/2026-10-10-gabi-brain-finalizacao.md` (execução
 - **Avisos no Telegram (G15):** `gabi/telegram.py` + `gabi-brain-telegram.timer` (5 min), migração **0020** (`aviso.telegram_em`). DESLIGADO até existir `/etc/gabi/telegram.env` com `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` (a sua exceção à R2). Instalado; sem o arquivo roda e não envia nada.
 - **Canal (TC.2–TC.4, só o que é do repositório):** ferramenta MCP `resumo_manha` (≤5 linhas, 1ª linha "⚠ Dados desatualizados" quando for o caso), lista explícita `tools.include` do Hermes testada (`tests/mcp/test_hermes.py`, `python -m tools.gerar_hermes`), `docs/fontes/hermes.md`, ADR-007 (só o Ricardo com escopo completo no canal). Esquema novo = **0021+**.
 - **Continua fora do repositório, por ordem sua (08/10):** instalar o Hermes/OpenRouter (TC.1), WhatsApp (TC.5) e desligar o OpenClaw (TC.6, só após 7 dias de Hermes estável e backup exportado).
+
+## Escuta WhatsApp: pendência conhecida (Task 6)
+- pedido via WhatsApp: o anexo vai ao Paperless com a etiqueta gabi:entrada-whatsapp mas não fica ligado ao pedido (o Paperless devolve o UUID da tarefa); vínculo adiado — não afeta o modo registro, que não cria pedidos.
+- Anexos da escuta: só lidos de dentro do spool, arquivo regular, teto de 25 MiB (`DestinosReais(spool=..., anexo_max_bytes=...)`); fora disso a mensagem falha e o arquivo fica.

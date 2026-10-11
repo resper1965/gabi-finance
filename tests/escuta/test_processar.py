@@ -31,8 +31,9 @@ class FakeDestinos:
     def saude(self, con, msg, campos):
         self.saudes.append((msg["id_externo"], campos))
 
-    def crise(self, con, numero, nome):
+    def crise(self, con, numero, nome, agora=None):
         self.crises.append((numero, nome))
+        self.agoras = getattr(self, "agoras", []) + [agora]
 
 
 class FakeModelo:
@@ -481,3 +482,42 @@ def test_documentos_so_conta_apos_sucesso(con, tmp_path):
     _msg(con, texto="", anexo=str(arq))
     r = _rodar(con, FakeDestinos(erro_doc=RuntimeError("x")), None, spool=spool)
     assert r["documentos"] == 0
+
+
+def test_pedido_com_anexo_fora_do_spool_falha_sem_chamar_destino(con, tmp_path):
+    _aprovado(con)
+    spool, _ = _anexo(tmp_path)
+    fora = tmp_path / "fora.env"
+    fora.write_text("PAPERLESS_TOKEN=x")
+    _msg(con, texto="paga 100", anexo=str(fora))
+    d = FakeDestinos()
+    r = _rodar(con, d, _ped(), spool=spool)
+    assert d.pedidos == [] and _msg_row(con)["estado"] == "falhou" and fora.exists() and r["falhas"] == 1
+    assert len(_avisos(con, "servico_falhou")) == 1 and _avisos(con, "escuta_pedido_incompleto") == []
+
+
+def test_pedido_com_anexo_e_spool_none_falha(con, tmp_path):
+    _aprovado(con)
+    _, arq = _anexo(tmp_path)
+    _msg(con, texto="paga 100", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, _ped(), spool=None)
+    assert d.pedidos == [] and _msg_row(con)["estado"] == "falhou" and arq.exists()
+
+
+def test_pedido_com_anexo_dentro_do_spool_chega_ao_destino(con, tmp_path):
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="paga 100", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, _ped(), spool=spool)
+    assert len(d.pedidos) == 1 and _msg_row(con)["estado"] == "processada"
+
+
+def test_crise_recebe_o_mesmo_agora_da_rodada(con):
+    _risco(con, "socorro")
+    _aprovado(con)
+    _msg(con, texto="socorro")
+    d = FakeDestinos()
+    _rodar(con, d, None)
+    assert d.agoras == [AGORA]

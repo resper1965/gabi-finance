@@ -33,7 +33,7 @@ def _pessoa_autorizada(con, solicitante: str):
 
 def registrar(con, *, solicitante: str, canal: str, mensagem_original: str, descricao: str, valor: str | None, vencimento: str | None,
               anexo_base64: str | None, anexo_paperless_id: int | None, pix_chave: str | None, linha_digitavel: str | None,
-              para_quem: str | None, enviar_ao_paperless: Callable[[bytes, str], int] | None = None) -> RegistroPedido:
+              para_quem: str | None, enviar_ao_paperless: Callable[[bytes, str], int | str | None] | None = None) -> RegistroPedido:
     """Registra o pedido como `pendente`. O anexo vai ao Paperless (nunca ao banco). A resposta ao solicitante não diz que pagou."""
     pessoa = _pessoa_autorizada(con, solicitante)
     if pessoa is None:

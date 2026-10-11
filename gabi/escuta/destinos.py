@@ -15,7 +15,7 @@ class Destinos(Protocol):
 
     def saude(self, con, msg: dict, campos: dict) -> None: ...
 
-    def crise(self, con, numero: str, nome: str | None) -> None:
+    def crise(self, con, numero: str, nome: str | None, agora: str | None = None) -> None:
         """Nunca recebe o texto da mensagem."""
 
     def documento(self, con, msg: dict) -> None:
@@ -65,19 +65,28 @@ def _nome(con, numero: str) -> str | None:
     return None
 
 
-def _ler(msg: dict) -> tuple[bytes, str]:
-    """Lê o anexo (só leitura, no caminho dado; o processar já garantiu que está no spool)."""
-    caminho = Path(msg["anexo_caminho"])
-    with open(caminho, "rb") as f:
-        return f.read(), caminho.name
+def _ler(msg: dict, spool: Path | None, maximo: int) -> tuple[bytes, str]:
+    """Lê o anexo em modo leitura. Defesa em profundidade (o caminho vem do banco): só arquivo regular cujo caminho resolvido
+    está dentro do spool, e com tamanho até o teto (checado antes de ler). RuntimeError = a mensagem falha, o arquivo fica."""
+    try:
+        caminho = Path(msg["anexo_caminho"]).resolve(strict=True)
+        if spool is None or not caminho.is_relative_to(Path(spool).resolve()) or not caminho.is_file():
+            raise RuntimeError("anexo fora do spool")
+        if caminho.stat().st_size > maximo:
+            raise RuntimeError("anexo maior que o teto")
+        with open(caminho, "rb") as f:
+            return f.read(), caminho.name
+    except (OSError, ValueError) as e:
+        raise RuntimeError("anexo ilegível") from e
 
 
 class DestinosReais:
-    def __init__(self, paperless: Paperless, cobrar_registrar=pedidos.registrar):
-        self.paperless, self._registrar = paperless, cobrar_registrar
+    def __init__(self, paperless: Paperless, cobrar_registrar=pedidos.registrar, *, spool: Path | None = None,
+                 anexo_max_bytes: int = 25 * 1024 * 1024):
+        self.paperless, self._registrar, self._spool, self._max = paperless, cobrar_registrar, spool, anexo_max_bytes
 
     def _enviar_anexo(self, msg: dict, tag: str):
-        conteudo, nome = _ler(msg)
+        conteudo, nome = _ler(msg, self._spool, self._max)
         return self.paperless.enviar(conteudo, nome, [tag])
 
     def pedido(self, con, remetente_pessoa_id: str, numero: str, msg: dict, campos: dict) -> None:
@@ -87,7 +96,7 @@ class DestinosReais:
         enviar = None
         b64 = None
         if msg.get("anexo_caminho"):
-            conteudo, nome = _ler(msg)
+            conteudo, nome = _ler(msg, self._spool, self._max)
             b64 = base64.b64encode(conteudo).decode()
 
             def enviar(c: bytes, _nome_padrao: str):
@@ -95,7 +104,7 @@ class DestinosReais:
                 return r if isinstance(r, int) else None  # o Paperless devolve a tarefa de consumo; o id do documento só existe depois
         self._registrar(
             con, solicitante=f"whatsapp:{numero}", canal="whatsapp", mensagem_original=msg.get("texto") or "", descricao=descricao,
-            valor=None if valor is None else str(valor), vencimento=campos.get("vence") or None, anexo_base64=b64, anexo_paperless_id=None,
+            valor=valor, vencimento=campos.get("vence") or None, anexo_base64=b64, anexo_paperless_id=None,
             pix_chave=pix, linha_digitavel=linha, para_quem=None, enviar_ao_paperless=enviar)
 
     def saude(self, con, msg: dict, campos: dict) -> None:
@@ -107,19 +116,16 @@ class DestinosReais:
         con.execute("insert into aviso(tipo, payload, criado_em) values ('escuta_saude', ?, ?)",
                     (json.dumps({"numero": numero, "nome": _nome(con, numero)}, ensure_ascii=False), _agora().isoformat()))
 
-    def crise(self, con, numero: str, nome: str | None) -> None:
+    def crise(self, con, numero: str, nome: str | None, agora: str | None = None) -> None:
         """Um aviso por número por hora; payload só com número e nome."""
-        corte = _agora() - _JANELA_CRISE
-        for r in con.execute("select payload, criado_em from aviso where tipo='escuta_atencao'"):
-            q = _quando(r["criado_em"])
-            try:
-                n = json.loads(r["payload"]).get("numero")
-            except (TypeError, ValueError, AttributeError):
-                continue
-            if n == numero and q is not None and q > corte:
-                return
+        agora = agora or _agora().isoformat()
+        t = _quando(agora) or _agora()
+        corte = (t - _JANELA_CRISE).isoformat()  # mesmo formato de `agora`, então a comparação de texto no SQL vale
+        if con.execute("select 1 from aviso where tipo='escuta_atencao' and json_extract(payload,'$.numero')=? and criado_em>? limit 1",
+                       (numero, corte)).fetchone():
+            return
         con.execute("insert into aviso(tipo, payload, criado_em) values ('escuta_atencao', ?, ?)",
-                    (json.dumps({"numero": numero, "nome": nome}, ensure_ascii=False), _agora().isoformat()))
+                    (json.dumps({"numero": numero, "nome": nome}, ensure_ascii=False), agora))
 
     def documento(self, con, msg: dict) -> None:
         self._enviar_anexo(msg, TAG_ENTRADA)

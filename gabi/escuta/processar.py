@@ -72,7 +72,7 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
         if estado in ("ignorado", "bloqueado"):
             if estado == "ignorado" and tem_risco(texto or "", palavras):
                 if ativo:
-                    destinos.crise(con, numero, _nome(con, numero, None))
+                    destinos.crise(con, numero, _nome(con, numero, None), agora)
                 _fechar(con, id_, agora, tipo="crise", apagar_texto=True, apagar_anexo=True)
             else:
                 _fechar(con, id_, agora, apagar_texto=True, apagar_anexo=True)
@@ -82,7 +82,7 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
     aprovado = estado == "aprovado"
     if tem_risco(texto or "", palavras):  # independe do modelo e do remetente estar aprovado; crise nunca é apagada daqui
         if ativo:
-            destinos.crise(con, numero, nome)
+            destinos.crise(con, numero, nome, agora)
         if not aprovado:
             avisar_novo(con, numero, agora)
         _fechar(con, id_, agora, tipo="crise")
@@ -120,12 +120,13 @@ def _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar:
         return
     if ativo:
         if tipo == "pedido":
+            _exigir_dentro(m, spool)  # RuntimeError: vira falhou (não "pedido incompleto"), destino não é chamado
             try:
                 destinos.pedido(con, pid, numero, dict(m), campos)
             except ValueError as e:
                 raise _PedidoIncompleto() from e
         elif tipo == "crise":
-            destinos.crise(con, numero, nome)
+            destinos.crise(con, numero, nome, agora)
     _fechar(con, id_, agora, tipo=tipo, confianca=r.confianca, campos=campos)
     c["classificadas"] += 1
 
