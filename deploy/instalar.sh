@@ -14,8 +14,8 @@ id gabibrain >/dev/null 2>&1 || useradd --system --home-dir /var/lib/gabi-brain 
 id gabibrain-fontes >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin gabibrain-fontes
 getent group gabibrain-escuta >/dev/null 2>&1 || groupadd --system gabibrain-escuta
 install -d -o gabibrain -g gabibrain -m 700 /var/lib/gabi-brain /var/lib/gabi-brain/bruto /var/lib/gabi-brain/locks /var/backups/gabi-brain
-# Spool da escuta: o ouvinte (usuário escuta-ouvinte, a criar depois e pôr no grupo gabibrain-escuta) grava aqui; só o brain lê.
-install -d -o gabibrain -g gabibrain-escuta -m 770 /var/lib/gabi-brain/escuta-spool
+# Spool da escuta FORA da árvore 0700 do banco; setgid 2770: arquivos do ouvinte (grupo gabibrain-escuta, umask 0007) o brain lê. Transitório.
+install -d -o gabibrain -g gabibrain-escuta -m 2770 /var/lib/gabi-escuta-spool
 install -d -o root -g root -m 755 /opt/gabi-brain
 
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools

@@ -3,6 +3,7 @@ Ordem de decisão: grupo não aprovado, bloqueado/ignorado, palavra de risco (se
 fora da lista (retida, sem modelo), aprovado (modelo). Texto de mensagem nunca vai a log, exceção ou aviso."""
 import json
 import logging
+import sqlite3
 from pathlib import Path
 
 from gabi.cobrar.cadastro import dados
@@ -165,11 +166,26 @@ def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento:
         apagar: list = []
         sinais: dict = {}
         try:
-            with transacao(con):
-                m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
-                if m is None:
-                    continue
-                _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais)
+            for tentativa in (1, 2):
+                antes = dict(c)
+                try:
+                    with transacao(con):
+                        m = con.execute("select * from escuta_msg where id=? and estado in ('nova','retida')", (id_,)).fetchone()
+                        if m is None:
+                            break
+                        _uma(con, destinos, cliente, orcamento, agora, modo, m, palavras, c, apagar, spool, sinais)
+                    break
+                except sqlite3.OperationalError:
+                    # outra conexão (custo do modelo, gravado na hora) commitou durante a transação: o snapshot de leitura ficou velho.
+                    # Refaz uma vez; o cliente de modelo guarda as respostas da rodada, então a repetição não paga de novo.
+                    if tentativa == 2:
+                        raise
+                    c.clear()
+                    c.update(antes)
+                    apagar.clear()
+                    sinais.clear()
+            if m is None:
+                continue
         except _PedidoIncompleto as e:
             # pedido incompleto vem de Destinos.pedido; a mensagem fica falhou, sem texto no aviso
             log.warning("escuta: mensagem %s falhou (pedido incompleto)", id_)

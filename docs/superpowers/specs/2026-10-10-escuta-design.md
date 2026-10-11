@@ -26,7 +26,7 @@ WhatsApp pessoal ─► ouvinte (serviço leve, só lê) ─► escuta_msg (caix
 
 ### 3.1 Ouvinte (`escuta-ouvinte`, serviço próprio)
 - Aparelho vinculado ao número pessoal (Baileys), **somente leitura**: não tem código de envio. Pareamento por QR é passo do Ricardo.
-- Para cada mensagem recebida: grava `escuta_msg(id_externo, de, grupo, recebida_em, texto, anexo_caminho)`. Idempotente por `id_externo`.
+- Para cada mensagem recebida: grava `escuta_msg(id_externo, de, grupo, recebida_em, texto, anexo_caminho)`. Idempotente por `id_externo`. `recebida_em` do spool: com offset é convertido; sem offset vale Brasília; gravado em UTC.
 - Grupos: gravados com `grupo=1` e **ignorados** no processamento, a menos que o grupo esteja aprovado.
 - Falha do ouvinte não derruba o brain (o timer só processa o que existe). O vigia avisa se o ouvinte ficar sem receber nada por tempo anormal.
 - Gatilho de crise: uma lista curta de palavras de risco, **vinda de cadastro** (não do código), roda no ouvinte e dispara o timer na hora. É só um acelerador; a decisão continua sendo do brain.

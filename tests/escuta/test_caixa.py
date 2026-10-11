@@ -128,3 +128,27 @@ def test_bloqueado_vale_para_forma_whatsapp(con, tmp_path):
     _msg(pasta, "w1", de="5511912345678@s.whatsapp.net")
     assert ingerir_spool(con, pasta, AGORA) == 0
     assert con.execute("select count(*) from escuta_msg").fetchone()[0] == 0
+
+
+def test_json_tmp_do_ouvinte_e_ignorado(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "x")
+    (pasta / "x.json").rename(pasta / "x.json.tmp")
+    assert ingerir_spool(con, pasta, AGORA) == 0
+    assert (pasta / "x.json.tmp").exists() and not (pasta / "invalidos").exists()
+    (pasta / "x.json.tmp").rename(pasta / "x.json")
+    assert ingerir_spool(con, pasta, AGORA) == 1
+
+
+def test_recebida_em_normalizada_para_utc(con, tmp_path):
+    pasta = tmp_path / "spool"
+    for nome, quando in (("a", "2026-10-11T09:00:00"), ("b", "2026-10-11T12:00:00Z"), ("c", "2026-10-11T12:00:00+00:00"), ("d", "2026-10-11T09:00:00-03:00")):
+        _msg(pasta, nome, recebida_em=quando)
+    assert ingerir_spool(con, pasta, AGORA) == 4
+    assert {r[0] for r in con.execute("select recebida_em from escuta_msg")} == {"2026-10-11T12:00:00+00:00"}   # ingênuo = Brasília
+
+
+def test_recebida_em_invalida_vai_para_invalidos(con, tmp_path):
+    pasta = tmp_path / "spool"
+    _msg(pasta, "z", recebida_em="ontem")
+    assert ingerir_spool(con, pasta, AGORA) == 0 and (pasta / "invalidos" / "z.json").exists()

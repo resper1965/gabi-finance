@@ -1,9 +1,13 @@
 """Caixa de entrada da escuta: lê o spool (um JSON por mensagem) e grava em escuta_msg."""
+import datetime as dt
 import json
 import re
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from gabi.db import transacao
+
+BRT = ZoneInfo("America/Sao_Paulo")
 
 
 def normalizar_telefone(bruto: str) -> str | None:
@@ -31,6 +35,14 @@ def _mover(arq: Path, destino: Path) -> None:
     arq.replace(destino / arq.name)
 
 
+def _utc(quando: str) -> str:
+    """recebida_em em UTC ISO (`+00:00`). Offset explícito (`Z`, `-03:00`) é convertido; valor SEM offset é hora de Brasília. ValueError se inválido."""
+    d = dt.datetime.fromisoformat(quando)
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=BRT)
+    return d.astimezone(dt.timezone.utc).replace(microsecond=0).isoformat()
+
+
 def _ler(arq: Path) -> dict:
     d = json.loads(arq.read_text(encoding="utf-8"))
     if not isinstance(d, dict):
@@ -41,6 +53,7 @@ def _ler(arq: Path) -> dict:
     for k in ("texto", "id_grupo", "anexo"):
         if d.get(k) is not None and not isinstance(d[k], str):
             raise ValueError(f"tipo inválido: {k}")
+    d["recebida_em"] = _utc(d["recebida_em"])
     anexo = d.get("anexo")
     if anexo is not None and (anexo in ("", ".", "..") or anexo != Path(anexo).name or "\\" in anexo):
         raise ValueError("anexo inválido")

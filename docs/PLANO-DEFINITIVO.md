@@ -26,7 +26,7 @@ Decisão do Ricardo, 10–11/10/2026. **Este arquivo manda.** Se algum plano, me
 3. Exames (plano) — com a lista de PDFs do Ricardo como aceite.
 4. Agenda (spec e plano a escrever).
 5. Telegram e WhatsApp do Hermes (Tasks 12–13 do fechamento): token novo e número dedicado.
-6. 7 dias de Hermes estável + backup exportado → `--dry-run` → desligar o OpenClaw (Task 15) e arquivar o `gabi-fin`.
+6. 7 dias de Hermes estável + backup exportado → `--dry-run` → desligar o OpenClaw (Task 15) e arquivar o `gabi-fin`. Gate: em registro a crise é só registrada, sem aviso; NÃO desligue o OpenClaw antes de escuta.modo='ativo'.
 
 ## O que só o Ricardo faz
 G12 (Google, incluindo `contacts.readonly` nas duas contas) · parear o ouvinte (QR) · chaves do cofre e do modelo · subir a lista de PDFs · reconectar XP (G16) · `backup.pub` (G17) · comprovantes reais (G18) · bot novo do Telegram · número dedicado do WhatsApp.

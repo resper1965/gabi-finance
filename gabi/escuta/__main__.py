@@ -3,6 +3,7 @@ O modelo e o Paperless chegam pela ponte do serviço de fontes (GABI_FONTES_SOCK
 Todo parâmetro é DADO em `parametro` (JSON): escuta.modo, escuta.anexo_max_mb. Uso: python -m gabi.escuta"""
 import datetime as dt
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -41,23 +42,35 @@ def _anexo_max_bytes(con) -> int:
     return int(mb * 1024 * 1024)
 
 
-class ModeloComCusto:
-    """Cada chamada COMPLETADA vira uma linha em `custo_modelo` (custo devolvido pelo cliente); erro propaga e não registra.
-    As linhas são gravadas em `gravar()`, FORA da transação de cada mensagem: o rollback de uma mensagem não pode apagar gasto já feito."""
+CUSTO_RESERVA_USD = 0.05  # custo inválido (NaN, infinito, negativo) nunca subnotifica o gasto: grava este valor fixo
 
-    def __init__(self, cliente, con, agora: dt.datetime):
-        self._cliente, self._con, self._agora, self._pendentes = cliente, con, agora, []
+
+class ModeloComCusto:
+    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa 'escuta', `em` = instante da chamada em BRT), numa
+    SEGUNDA conexão em autocommit (WAL + busy_timeout): não depende da transação da mensagem nem de o processo terminar bem.
+    O serviço de fontes já cobrou a chamada; erro do cliente propaga e não grava."""
+
+    def __init__(self, cliente, banco: Path, relogio=None):
+        self._cliente, self._relogio = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc))
+        self._con = conectar(banco)
+        self._memo: dict = {}  # respostas da rodada: se processar refizer uma mensagem, não paga a chamada de novo
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
+        if (prompt, forte) in self._memo:
+            return self._memo[(prompt, forte)]
         texto, custo = self._cliente.completar(prompt, forte=forte)
-        self._pendentes.append(float(custo))
+        try:
+            ok = isinstance(custo, (int, float)) and not isinstance(custo, bool) and math.isfinite(custo) and custo >= 0
+        except TypeError:
+            ok = False
+        custo = float(custo) if ok else CUSTO_RESERVA_USD
+        self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,'escuta')",
+                          (self._relogio().astimezone(BRT).isoformat(), custo))
+        self._memo[(prompt, forte)] = (texto, custo)
         return texto, custo
 
-    def gravar(self) -> None:
-        em = self._agora.astimezone(BRT).isoformat()
-        pendentes, self._pendentes = self._pendentes, []
-        for custo in pendentes:
-            self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,'escuta')", (em, custo))
+    def fechar(self) -> None:
+        self._con.close()
 
 
 def cliente_da_ponte(socket_path: str | None):
@@ -70,10 +83,10 @@ def cliente_da_ponte(socket_path: str | None):
         return None
 
 
-def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.datetime | None = None) -> int:
+def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.datetime | None = None, relogio=None) -> int:
     spool = os.environ.get("GABI_ESCUTA_SPOOL")
     if not spool:
-        print("ERRO: GABI_ESCUTA_SPOOL não configurado (pasta do spool do ouvinte)")
+        print("ERRO: GABI_ESCUTA_SPOOL não configurado (pasta do spool do ouvinte)", file=sys.stderr)
         return 2
     spool = Path(spool)
     banco = Path(banco or os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
@@ -84,7 +97,7 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
     if cliente is _AUTO:
         cliente = cliente_da_ponte(sock)
     if cliente is not None:
-        cliente = ModeloComCusto(cliente, con, agora)
+        cliente = ModeloComCusto(cliente, banco, relogio)
     if paperless is None and sock:
         paperless = Ponte(sock, "paperless")
     destinos = DestinosReais(paperless, spool=spool, anexo_max_bytes=_anexo_max_bytes(con))
@@ -94,7 +107,7 @@ def main(banco: Path | None = None, *, cliente=_AUTO, paperless=None, agora: dt.
         r = processar(con, destinos, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora_s, modo=_modo(con), spool=spool)
     finally:
         if isinstance(cliente, ModeloComCusto):
-            cliente.gravar()
+            cliente.fechar()
     print(f"escuta: ingeridas={novas} " + " ".join(f"{k}={v}" for k, v in r.items()))
     return 0
 

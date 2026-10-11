@@ -188,3 +188,16 @@ def test_escuta_parada_respeita_limite_e_sem_mensagens(con):
 def _tipos_novos(con):
     gerar_avisos(con, AGORA)
     return [r[0] for r in con.execute("select tipo from aviso")]
+
+
+def test_escuta_parada_compara_instantes_com_entradas_mistas(con):
+    from gabi.escuta.caixa import _utc
+    _param_escuta(con, "escuta.modo", "ativo")
+    _param_escuta(con, "escuta.horas_sem_receber", 12)
+    # AGORA = 12:00 UTC; 12h atrás = 00:00 UTC do mesmo dia = 21:00 BRT do dia anterior
+    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values ('a','+5511900000000',?)", (_utc("2026-10-15T21:30:00"),))   # ingênuo BRT = 00:30 UTC: 11,5h
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0
+    con.execute("update escuta_msg set recebida_em=?", (_utc("2026-10-15T20:30:00-03:00"),))   # 23:30 UTC: 12,5h
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1

@@ -80,7 +80,7 @@ def test_main_ingere_e_processa_com_cliente_falso(amb, capsys):
 def test_custo_modelo_inserido_por_chamada_completada(amb):
     banco, spool, con = amb
     _spool(spool)
-    prog.main(cliente=Modelo(custo=0.02), agora=AGORA)
+    prog.main(cliente=Modelo(custo=0.02), agora=AGORA, relogio=lambda: AGORA)
     r = con.execute("select em, custo_usd, tarefa from custo_modelo").fetchall()
     assert len(r) == 1 and r[0]["custo_usd"] == 0.02 and r[0]["tarefa"] == "escuta"
     assert r[0]["em"].startswith("2026-10-11T10:00:00") and r[0]["em"].endswith("-03:00")
@@ -130,7 +130,7 @@ def test_main_sem_modelo_roda_so_crise(amb):
 def test_main_sem_spool_configurado_falha_claro(amb, monkeypatch, capsys):
     monkeypatch.delenv("GABI_ESCUTA_SPOOL")
     assert prog.main(cliente=Modelo(), agora=AGORA) != 0
-    assert "GABI_ESCUTA_SPOOL" in capsys.readouterr().out
+    assert "GABI_ESCUTA_SPOOL" in capsys.readouterr().err
 
 
 def test_main_passa_spool_e_teto_ao_destino(amb):
@@ -164,3 +164,56 @@ def test_ponte_sem_modelo_configurado_vira_cliente_none(monkeypatch):
             return False
     monkeypatch.setattr(prog, "Ponte", P)
     assert prog.cliente_da_ponte("/x.sock") is None
+
+
+class Interrompe(Modelo):
+    def completar(self, prompt, *, forte):
+        if self.n >= 1:
+            raise KeyboardInterrupt
+        return super().completar(prompt, forte=forte)
+
+
+def test_custo_gravado_na_hora_sobrevive_a_interrupcao(amb):
+    banco, spool, con = amb
+    _spool(spool, "a", "paga a Maria 100")
+    _spool(spool, "b", "paga a Ana 200")
+    with pytest.raises(KeyboardInterrupt):
+        prog.main(cliente=Interrompe(custo=0.03), agora=AGORA)
+    assert [r[0] for r in con.execute("select custo_usd from custo_modelo")] == [0.03]
+
+
+def test_custo_e_gravado_em_outra_conexao_e_ja_commitado_antes_da_proxima_chamada(amb):
+    banco, spool, con = amb
+    _spool(spool, "a")
+    visto = []
+
+    class Espia(Modelo):
+        def completar(self, prompt, *, forte):
+            visto.append(con.execute("select count(*) from custo_modelo").fetchone()[0])   # leitura de outra conexão
+            return super().completar(prompt, forte=forte)
+
+    class Duvida(Espia):
+        def completar(self, prompt, *, forte):
+            t, c = Espia.completar(self, prompt, forte=forte)
+            return t.replace("0.95", "0.1"), c
+    prog.main(cliente=Duvida(), agora=AGORA)   # confiança baixa: 2 chamadas (rápido, forte)
+    assert visto == [0, 1]
+
+
+def test_custo_invalido_vira_custo_fixo_de_reserva(amb):
+    banco, spool, con = amb
+    for i, c in enumerate((float("nan"), float("inf"), -1.0)):
+        _spool(spool, f"m{i}")
+        prog.main(cliente=Modelo(custo=c), agora=AGORA)
+    assert [r[0] for r in con.execute("select custo_usd from custo_modelo order by id")] == [0.05, 0.05, 0.05]
+
+
+def test_ponte_inexistente_vira_sem_modelo(tmp_path):
+    assert prog.cliente_da_ponte(str(tmp_path / "nao-existe.sock")) is None
+
+
+def test_sem_spool_o_erro_vai_para_stderr(amb, monkeypatch, capsys):
+    monkeypatch.delenv("GABI_ESCUTA_SPOOL")
+    prog.main(cliente=Modelo(), agora=AGORA)
+    c = capsys.readouterr()
+    assert "GABI_ESCUTA_SPOOL" in c.err and c.out == ""

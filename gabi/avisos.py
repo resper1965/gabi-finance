@@ -53,7 +53,7 @@ def _parametro(con, chave: str, padrao):
 
 
 def _escuta_parada(con, agora: dt.datetime, novo) -> None:
-    """Vigia do ouvinte: só em modo 'ativo'; sem nenhuma mensagem registrada não avisa. Um aviso por dia, sem texto nem número."""
+    """Vigia do ouvinte: só em modo 'ativo'; sem nenhuma mensagem registrada não avisa. Um aviso por dia, sem texto, nome nem número de telefone."""
     if _parametro(con, "escuta.modo", "registro") != "ativo":
         return
     horas = _parametro(con, "escuta.horas_sem_receber", 12)
@@ -67,7 +67,7 @@ def _escuta_parada(con, agora: dt.datetime, novo) -> None:
     except ValueError:
         return
     if quando.tzinfo is None:
-        quando = quando.replace(tzinfo=dt.timezone.utc)
+        quando = quando.replace(tzinfo=BRT)  # o spool grava em UTC; linha antiga sem offset vale como Brasília (convenção do spool)
     if agora - quando > dt.timedelta(hours=horas):
         n = int((agora - quando).total_seconds() // 3600)
         novo("escuta_parada", "ouvinte", {"motivo": f"ouvinte sem receber mensagens há {n} horas"})
