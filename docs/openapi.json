@@ -207,6 +207,146 @@
     "summary": "Agenda"
    }
   },
+  "/api/v1/agenda/fontes": {
+   "get": {
+    "description": "Contas e calendários de agenda cadastrados, com estado, última sincronização, último erro e quantos eventos.",
+    "operationId": "fontes_api_v1_agenda_fontes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Fontes"
+   },
+   "post": {
+    "description": "Cadastra uma conta de agenda (e-mail, provedor google|graph, auth oauth|delegacao). Nasce `a_decidir`: nada é lido até liberar.",
+    "operationId": "criar_fonte_api_v1_agenda_fontes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar Fonte"
+   }
+  },
+  "/api/v1/agenda/fontes/{fonte_id}": {
+   "patch": {
+    "description": "Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma fonte. Só liberada é lida pelo timer.",
+    "operationId": "alterar_fonte_api_v1_agenda_fontes__fonte_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fonte_id",
+      "required": true,
+      "schema": {
+       "title": "Fonte Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Alterar Fonte"
+   }
+  },
+  "/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir": {
+   "post": {
+    "description": "Pergunta ao Google (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora.",
+    "operationId": "descobrir_api_v1_agenda_fontes__fonte_id__calendarios_descobrir_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fonte_id",
+      "required": true,
+      "schema": {
+       "title": "Fonte Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Descobrir"
+   }
+  },
+  "/api/v1/agenda/parametros": {
+   "get": {
+    "description": "Parâmetros da agenda: privados (mostrar|so_painel|ocultar), fuso e janela de leitura em dias (padrões se não definidos).",
+    "operationId": "parametros_api_v1_agenda_parametros_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Parametros"
+   },
+   "put": {
+    "description": "Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves.",
+    "operationId": "gravar_parametros_api_v1_agenda_parametros_put",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Gravar Parametros"
+   }
+  },
   "/api/v1/assinaturas": {
    "get": {
     "description": "Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar.",

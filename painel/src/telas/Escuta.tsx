@@ -3,7 +3,7 @@ import { Bloco } from "../componentes/Bloco";
 import { Painel } from "../componentes/Painel";
 import { Vazio } from "../componentes/Estados";
 import { api } from "../lib/api";
-import { useToast } from "../lib/toast";
+import { Aviso, useAcao, type Acao } from "../lib/useAcao";
 import { useApi, type Leitura } from "../lib/useApi";
 
 interface Remetente { numero: string; nome: string | null; qtd: number }
@@ -18,26 +18,6 @@ const rotuloPapel = (p: string | null) => PAPEIS.find(([k]) => k === p)?.[1] ?? 
 const suave = { color: "var(--ink2)" } as const;
 const linha = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", padding: "8px 0" } as const;
 const lista = { listStyle: "none", margin: 0, padding: 0 } as const;
-
-type Acao = ReturnType<typeof useAcao>;
-
-/** Executa uma ação sob trava (uma por vez na tela), avisa o resultado e espera a releitura; em erro mantém a tela como está e guarda a mensagem na chave (linha) que falhou. */
-function useAcao() {
-  const avisar = useToast();
-  const trava = useRef(false);
-  const [ocupado, setOcupado] = useState(false);
-  const [erros, setErros] = useState<Record<string, string>>({});
-  const agir = async (chave: string, fn: () => Promise<unknown>, ok: string, recarregar?: () => Promise<void>) => {
-    if (trava.current) return false;
-    trava.current = true; setOcupado(true);
-    setErros((e) => { const { [chave]: _, ...resto } = e; return resto; });
-    try { await fn(); avisar(ok); await recarregar?.(); return true; }
-    catch (e) { const m = (e as Error).message; setErros((x) => ({ ...x, [chave]: m })); avisar(m); return false; }
-    finally { trava.current = false; setOcupado(false); }
-  };
-  return { ocupado, erros, agir };
-}
-const Aviso = ({ erro, id }: { erro?: string; id?: string }) => (erro ? <p role="alert" id={id} style={{ margin: 0, color: "var(--danger)", flexBasis: "100%" }}>Erro: {erro}</p> : null);
 
 function Fila({ leitura, acao }: { leitura: Leitura<{ fila: Remetente[]; aprovados: Aprovado[] }>; acao: Acao }) {
   const { ocupado, erros, agir } = acao;

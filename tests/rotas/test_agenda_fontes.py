@@ -1,0 +1,152 @@
+import json
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from gabi.api import criar_app
+from gabi.db import conectar
+from gabi.fontes.google_oauth import ErroGoogleOAuth
+
+from tests.rotas.test_escuta import AGORA, BOSS, JSON, VIP, banco  # noqa: F401  (fixture banco)
+
+U = "/api/v1/agenda"
+
+
+class _Agenda:
+    def __init__(self, cals=None, erro=None):
+        self.cals, self.erro, self.chamadas = cals or [], erro, []
+
+    def listar_calendarios(self, conta):
+        self.chamadas.append(conta)
+        if self.erro:
+            raise self.erro
+        return self.cals
+
+
+def _cli(banco, fonte=None):
+    fontes = {"google_agenda": (lambda: fonte)} if fonte is not None else {}
+    return TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes=fontes), client=("127.0.0.1", 50000))
+
+
+@pytest.fixture
+def cli(banco):
+    return _cli(banco, _Agenda([{"id": "resper@gmail.com", "nome": "Ricardo", "principal": True}, {"id": "fam@group.calendar.google.com", "nome": "Família", "principal": False}]))
+
+
+def _post(cli, url, corpo=None, h=BOSS):
+    return cli.post(url, headers={**h, **JSON}, content=json.dumps(corpo if corpo is not None else {}))
+
+
+def _patch(cli, url, corpo, h=BOSS):
+    return cli.patch(url, headers={**h, **JSON}, content=json.dumps(corpo))
+
+
+def _put(cli, corpo, h=BOSS):
+    return cli.put(f"{U}/parametros", headers={**h, **JSON}, content=json.dumps(corpo))
+
+
+def _criar(cli, conta="resper@gmail.com", **kw):
+    r = _post(cli, f"{U}/fontes", {"conta": conta, "provedor": "google", **kw})
+    assert r.status_code == 200, r.text
+    return r.json()["dados"]["id"]
+
+
+def _decisoes(banco):
+    c = conectar(banco)
+    r = [x["o_que"] for x in c.execute("select o_que from decisao order by id")]
+    c.close()
+    return r
+
+
+def test_so_boss_acessa(cli):
+    for m, url in (("get", f"{U}/fontes"), ("post", f"{U}/fontes"), ("post", f"{U}/fontes/1/calendarios/descobrir"), ("patch", f"{U}/fontes/1"),
+                   ("get", f"{U}/parametros"), ("put", f"{U}/parametros")):
+        assert getattr(cli, m)(url, headers=VIP).status_code == 403, (m, url)
+        assert getattr(cli, m)(url).status_code == 401, (m, url)
+
+
+def test_criar_fonte_valida_email_e_provedor(cli, banco):
+    assert _post(cli, f"{U}/fontes", {"conta": "isto-nao-e-email", "provedor": "google"}).status_code == 400
+    assert _post(cli, f"{U}/fontes", {"conta": "a@x.com", "provedor": "outlook"}).status_code == 400
+    assert _post(cli, f"{U}/fontes", {"conta": "a@x.com", "provedor": "google", "auth": "senha"}).status_code == 400
+    assert _post(cli, f"{U}/fontes", []).status_code == 400
+    fid = _criar(cli, "a@x.com")
+    f = cli.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"]
+    assert [(x["id"], x["conta"], x["estado"], x["provedor"], x["calendario_id"], x["eventos"]) for x in f] == [(fid, "a@x.com", "a_decidir", "google", "primary", 0)]
+    assert _post(cli, f"{U}/fontes", {"conta": "a@x.com", "provedor": "google"}).status_code == 409
+    assert _post(cli, f"{U}/fontes", {"conta": "g@x.com", "provedor": "graph", "auth": "delegacao"}).status_code == 200
+
+
+def test_descobrir_calendarios_cria_fontes_a_decidir(cli, banco):
+    fid = _criar(cli)
+    r = _post(cli, f"{U}/fontes/{fid}/calendarios/descobrir")
+    assert r.status_code == 200, r.text
+    cals = r.json()["dados"]["calendarios"]
+    assert [(c["calendario_id"], c["nome"], c["estado"], c["nova"]) for c in cals] == [("primary", "Ricardo", "a_decidir", False), ("fam@group.calendar.google.com", "Família", "a_decidir", True)]
+    fontes = cli.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"]
+    assert len(fontes) == 2
+    # de novo: não duplica e não mexe no estado já decidido
+    _patch(cli, f"{U}/fontes/{fid}", {"estado": "sim"})
+    cals = _post(cli, f"{U}/fontes/{fid}/calendarios/descobrir").json()["dados"]["calendarios"]
+    assert [c["nova"] for c in cals] == [False, False] and cals[0]["estado"] == "sim"
+    assert len(cli.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"]) == 2
+
+
+def test_descobrir_em_fonte_inexistente_ou_graph(cli):
+    assert _post(cli, f"{U}/fontes/999/calendarios/descobrir").status_code == 404
+    gid = _post(cli, f"{U}/fontes", {"conta": "g@x.com", "provedor": "graph"}).json()["dados"]["id"]
+    assert _post(cli, f"{U}/fontes/{gid}/calendarios/descobrir").status_code == 400
+
+
+def test_ponte_fora_vira_503(banco):
+    sem_fonte = _cli(banco)  # fonte não configurada
+    fid = _criar(sem_fonte)
+    r = _post(sem_fonte, f"{U}/fontes/{fid}/calendarios/descobrir")
+    assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
+    caida = _cli(banco, _Agenda(erro=ErroGoogleOAuth("serviço de fontes indisponível")))
+    r = _post(caida, f"{U}/fontes/{fid}/calendarios/descobrir")
+    assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
+    assert len(caida.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"]) == 1  # nada foi criado
+
+
+def test_liberar_fonte_muda_estado(cli, banco):
+    fid = _criar(cli)
+    for estado in ("sim", "nao", "a_decidir"):
+        assert _patch(cli, f"{U}/fontes/{fid}", {"estado": estado}).status_code == 200
+        assert cli.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"][0]["estado"] == estado
+    assert _patch(cli, f"{U}/fontes/{fid}", {"estado": "talvez"}).status_code == 400
+    assert _patch(cli, f"{U}/fontes/{fid}", {}).status_code == 400
+    assert _patch(cli, f"{U}/fontes/999", {"estado": "sim"}).status_code == 404
+    assert any(f"fonte {fid} → sim" in d for d in _decisoes(banco))
+
+
+def test_parametros_padrao_e_gravacao(cli):
+    assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"] == {"privados": "mostrar", "fuso": "America/Sao_Paulo", "janela_passado_dias": 7, "janela_futuro_dias": 90}
+    r = _put(cli, {"privados": "so_painel", "janela_futuro_dias": 120})
+    assert r.status_code == 200 and r.json()["dados"]["privados"] == "so_painel" and r.json()["dados"]["janela_futuro_dias"] == 120
+    assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]["privados"] == "so_painel"
+
+
+@pytest.mark.parametrize("corpo", [{}, {"privados": "tudo"}, {"fuso": "Marte/Olimpo"}, {"fuso": 3}, {"janela_passado_dias": 61}, {"janela_passado_dias": -1},
+                                   {"janela_futuro_dias": 6}, {"janela_futuro_dias": 366}, {"janela_futuro_dias": "90"}, {"janela_futuro_dias": True}, {"outra": 1}])
+def test_parametros_validam_faixas(cli, corpo):
+    assert _put(cli, corpo).status_code == 400
+    assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]["privados"] == "mostrar"
+
+
+def test_parametros_nao_logam_valores(cli, banco):
+    _put(cli, {"privados": "ocultar", "fuso": "America/Bahia"})
+    d = " | ".join(_decisoes(banco))
+    assert "agenda.fuso" in d and "agenda.privados" in d and "ocultar" not in d and "Bahia" not in d
+
+
+def test_a_politica_gravada_vale_para_a_leitura(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into agenda_fonte(id, conta, provedor, estado) values (7,'a@x.com','google','sim')")
+    c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo, privado) values (7,'p','2026-10-16T13:00:00+00:00','2026-10-16T14:00:00+00:00','2026-10-16','2026-10-16','Médico',1)")
+    c.close()
+    ver = lambda: cli.get(f"{U}?de=2026-10-16&ate=2026-10-16", headers=BOSS).json()["dados"]["eventos"][0]["titulo"]  # noqa: E731
+    assert ver() == "Médico"
+    _put(cli, {"privados": "ocultar"})
+    assert ver() == "Compromisso privado"

@@ -11,6 +11,12 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/saude` | Saúde do banco, versão do esquema, última rodada e contagem de cada tabela. |
 | GET | `/api/seguranca` | Acessos, tokens de agentes ativos, chamadas em 24 h e último backup. |
 | GET | `/api/v1/agenda` | Eventos do período e conflitos com sugestão de horário (proposta, não envia nada). |
+| GET | `/api/v1/agenda/fontes` | Contas e calendários de agenda cadastrados, com estado, última sincronização, último erro e quantos eventos. |
+| POST | `/api/v1/agenda/fontes` | Cadastra uma conta de agenda (e-mail, provedor google|graph, auth oauth|delegacao). Nasce `a_decidir`: nada é lido até liberar. |
+| PATCH | `/api/v1/agenda/fontes/{fonte_id}` | Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma fonte. Só liberada é lida pelo timer. |
+| POST | `/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir` | Pergunta ao Google (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora. |
+| GET | `/api/v1/agenda/parametros` | Parâmetros da agenda: privados (mostrar|so_painel|ocultar), fuso e janela de leitura em dias (padrões se não definidos). |
+| PUT | `/api/v1/agenda/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves. |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |
 | PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura e o lembrete até cancelar. |
 | GET | `/api/v1/avisos` | Avisos abertos (não lidos) do gabi.brain, os mais novos primeiro, com título e texto em pt-BR. |
