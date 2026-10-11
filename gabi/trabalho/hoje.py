@@ -3,6 +3,7 @@ Filtro: 'all', um id de empresa, ou 't-<id da frente>'. Com filtro, e-mails e ag
 import datetime as dt
 
 from gabi.agenda import consulta
+from gabi.correio import consulta as consulta_correio
 from gabi.dinheiro import contas_pagar as cp
 from gabi.dinheiro.valor import formatar
 
@@ -41,8 +42,11 @@ def hoje(con, agora: dt.datetime, filtro: str = "all", *, painel: bool = False) 
     mails = emails_importantes(con, filtro)
     # compromisso não tem empresa nem frente: a agenda (e os conflitos) só vão no 'all'
     agenda = consulta.agenda_do_dia(con, dia_agenda, fuso, painel=painel) if filtro == "all" else []
-    prioridades = [{"tipo": "email", "titulo": m["assunto"], "motivo": m["motivo"], "ref": m["id"]} for m in mails[:3]]
+    correio = consulta_correio.importantes(con) if filtro == "all" else []  # caixa de e-mail não tem empresa nem frente: só no 'all'
+    prioridades = [{"tipo": "email_emergencial", "titulo": f"{m['remetente'] or '?'} — {m['assunto'] or '(sem assunto)'}", "motivo": m["motivo"], "ref": m["id"]}
+                   for m in correio if m["classe"] == "emergencial"]
+    prioridades += [{"tipo": "email", "titulo": m["assunto"], "motivo": m["motivo"], "ref": m["id"]} for m in mails[:3]]
     prioridades += [{"tipo": "conflito", "titulo": "Conflito na agenda", "ref": c.evento_a, "sugestao": c.sugestao_inicio}
                     for c in consulta.conflitos(con, dia_agenda, dia_agenda, fuso)] if filtro == "all" else []
-    return {"filtro": filtro, "prioridades": prioridades, "agenda": agenda, "emails_importantes": mails,
+    return {"filtro": filtro, "prioridades": prioridades, "agenda": agenda, "emails_importantes": mails, "correio_importantes": correio,
             "dinheiro": _dinheiro(con, dia) if filtro == "all" else None}

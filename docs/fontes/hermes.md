@@ -19,6 +19,7 @@ mcp_servers:
       - classificar_lancamento
       - documentos_baixar
       - documentos_buscar
+      - email_listar
       - financeiro_contas_a_pagar
       - financeiro_lancamentos
       - financeiro_para_onde_vai
