@@ -16,6 +16,18 @@ def _brl(v) -> str:
     return f"R$ {v}" if v is not None else "valor a confirmar"
 
 
+def _reais(v) -> str:
+    """"3522.64" -> "R$ 3.522,64" (os avisos novos; os antigos seguem com o formato decimal)."""
+    try:
+        return "R$ " + f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return "sem valor"
+
+
+def _ddmm(iso) -> str:
+    return f"{str(iso)[8:10]}/{str(iso)[5:7]}" if isinstance(iso, str) and len(iso) >= 10 else "?"
+
+
 def _quem(p: dict) -> str:
     return p.get("nome") or p.get("numero") or "número desconhecido"
 
@@ -63,6 +75,17 @@ def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
 
 
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
+    if tipo == "vence_em_breve":
+        itens = p.get("itens") or []
+        linhas = []
+        for i in itens:
+            valor = _reais(i.get("valor")) if i.get("valor") is not None else "sem valor"
+            marca = f"≈{valor} (estimado)" if i.get("estimado") and i.get("valor") is not None else valor
+            linhas.append(f"{_ddmm(i.get('vencimento'))} {i.get('nome', '?')} {marca}" + (" · débito automático" if i.get("debito_automatico") else ""))
+        legenda = " ≈ = estimado pelo último valor; corrijo quando o real chegar." if any(i.get("estimado") for i in itens) else ""
+        return f"Vence em breve: {len(itens)} conta(s)", "; ".join(linhas) + "." + legenda
+    if tipo == "valor_diferente":
+        return f"Valor diferente: {p.get('nome', '?')}", f"estimado {_reais(p.get('estimado'))}, veio {_reais(p.get('real'))} (vence {_ddmm(p.get('vencimento'))})"
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
     if tipo == "conta_atrasada":

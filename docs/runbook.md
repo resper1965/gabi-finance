@@ -101,6 +101,9 @@ Despesa da **Bekaa** (`empresa.relacao='pj_titular'`) paga em conta PF vira um a
 - **Restaurar backup:** ver "Backup e restauração" e "Backup fora da VPS".
 - **Comparar com o gabi-financeiro (G21):** `python -m tools.comparar_agenda --mes AAAA-MM`; saída vazia por 7 dias é o critério de corte.
 
+## Avisos de vencimento antecipados {#avisos-vencimento}
+Além do aviso do dia (`vence_hoje`) e do de conta atrasada, o `gabi.avisos` (timer de 15 min) grava `vence_em_breve`: as contas `aberto`, `previsto` ou `debito_automatico` que vencem de amanhã até `avisos.antecedencia_dias` à frente (parâmetro JSON, padrão 3, de 1 a 14). Cada conta entra num aviso uma única vez (a que entra na janela depois, como boleto emitido tarde, sai no aviso do dia). O valor que ainda é estimativa (`valor_fonte` fora de `valores_do_mes`/`documento`/`fatura`: último pagamento ou padrão do mês) aparece como "≈ R$ X (estimado)"; a conta sem valor aparece como "sem valor"; débito automático vem marcado, para você garantir saldo. Na entrega o aviso é revalidado: conta já paga sai, e o valor real que chegou substitui o estimado (o aviso nunca anuncia o que deixou de ser verdade). Quando o valor real chega (cobrança confirmada ou pagamento conciliado) e difere em mais de 10% do estimado avisado, sai UM `valor_diferente` ("estimado R$ X, veio R$ Y"). Chegam pelo Telegram e pelo Hermes como os demais avisos.
+
 ## Trabalho: credenciais e rodada {#trabalho-credenciais}
 O job `gabi-brain-trabalho.timer` (a cada 15 min, 06h–22h BRT) lê e-mail, agenda e tarefas das caixas com estado `sim` (Cadastros › Caixas de e-mail) e conclui na origem as tarefas que você mandou concluir no painel. Só lê; nunca envia nem apaga (R2). As credenciais ficam **só** em `/etc/gabi/trabalho.env` (0600, legível pelo usuário `gabibrain`; colocadas por você, R5). Sem elas, cada caixa vira o aviso **"Reconectar a caixa …"** no sino, que fecha sozinho quando a leitura volta.
 
