@@ -209,3 +209,92 @@ def test_openrouter_do_ambiente_modelos_e_padroes():
     o = openrouter_do_ambiente({"OPENROUTER_API_KEY": "k", "OPENROUTER_MODEL_FAST": "x/y"})
     assert (o.modelo_rapido, o.modelo_forte) == ("x/y", "anthropic/claude-sonnet-5.5")
     assert openrouter_do_ambiente({"OPENROUTER_API_KEY": "k"}).modelo_rapido == "deepseek/deepseek-v4-flash"
+
+
+# ---- agenda do Google pela ponte ----
+from gabi.fontes.google_agenda import ResultadoEventos  # noqa: E402
+from gabi.fontes.google_oauth import ErroGoogleOAuth  # noqa: E402
+from gabi.fontes.ponte import ERROS, PERMITIDOS, PonteAgenda  # noqa: E402
+from gabi.fontes.servico import google_do_ambiente  # noqa: E402
+
+SEGREDO_AG = "refresh-SEGREDO-agenda"
+JANELA_AG = {"de": "2026-10-04T00:00:00+00:00", "ate": "2027-01-09T00:00:00+00:00"}
+
+
+class _FalsaAgenda:
+    def listar_calendarios(self, conta):
+        return [{"id": "primary", "nome": "Ricardo", "principal": True}]
+
+    def listar_eventos(self, conta, calendario_id, sync_token, janela):
+        if conta == "ruim@x.com":
+            raise ErroGoogleOAuth("conta não autorizada: ruim@x.com")
+        if conta == "boom@x.com":
+            raise RuntimeError(SEGREDO_AG)
+        if conta == "malformada@x.com":
+            return ["isto", "não", "é", "dict"]
+        if conta == "faltando@x.com":
+            return {"eventos": []}
+        return {"eventos": [{"externo_id": "a"}], "cancelados": ["b"], "novo_sync_token": "S", "recarga_completa": False}
+
+    def segredo(self):
+        return SEGREDO_AG
+
+
+@pytest.fixture
+def sock_agenda(tmp_path):
+    srv = Servidor(tmp_path / "ag.sock", {"google_agenda": _FalsaAgenda(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield tmp_path / "ag.sock"
+    srv.shutdown(); srv.server_close()
+
+
+def test_ponte_permite_so_listar_calendarios_e_listar_eventos(sock_agenda):
+    assert PERMITIDOS["google_agenda"] == frozenset({"listar_calendarios", "listar_eventos"})
+    assert ERROS["google_agenda"] is ErroGoogleOAuth
+    with pytest.raises(ErroGoogleOAuth) as e:
+        Ponte(sock_agenda, "google_agenda")._chamar("segredo")
+    assert SEGREDO_AG not in str(e.value) and "metodo_proibido" in str(e.value)
+
+
+def test_ponte_agenda_cruza_resultado_tipado(sock_agenda):
+    p = PonteAgenda(sock_agenda)
+    assert p.listar_calendarios("a@x.com") == [{"id": "primary", "nome": "Ricardo", "principal": True}]
+    r = p.listar_eventos("a@x.com", "primary", None, JANELA_AG)
+    assert isinstance(r, ResultadoEventos)
+    assert r.eventos == [{"externo_id": "a"}] and r.cancelados == ["b"] and r.novo_sync_token == "S" and r.recarga_completa is False
+
+
+def test_erro_tipado_atravessa_a_ponte_sem_segredo(sock_agenda):
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteAgenda(sock_agenda).listar_eventos("ruim@x.com", "primary", None, JANELA_AG)
+    assert str(e.value) == "conta não autorizada: ruim@x.com"
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteAgenda(sock_agenda).listar_eventos("boom@x.com", "primary", None, JANELA_AG)
+    assert SEGREDO_AG not in str(e.value)
+
+
+@pytest.mark.parametrize("conta", ["malformada@x.com", "faltando@x.com"])
+def test_ponte_agenda_valida_a_forma_da_resposta(sock_agenda, conta):
+    with pytest.raises(ErroGoogleOAuth) as e:
+        PonteAgenda(sock_agenda).listar_eventos(conta, "primary", None, JANELA_AG)
+    assert "resposta inválida" in str(e.value)
+
+
+def test_fonte_ausente_sem_credencial(tmp_path):
+    assert google_do_ambiente({}) == {"google_contatos": None, "google_agenda": None}
+    ok = google_do_ambiente({"GOOGLE_CLIENT_ID": "i", "GOOGLE_CLIENT_SECRET": "s"})
+    assert ok["google_agenda"] is not None and ok["google_contatos"] is not None
+    srv = Servidor(tmp_path / "n.sock", {"google_agenda": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        p = PonteAgenda(tmp_path / "n.sock")
+        assert p.configurada() is False
+        with pytest.raises(ErroGoogleOAuth):
+            p.listar_calendarios("a@x.com")
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ponte_agenda_indisponivel_e_erro_tipado(tmp_path):
+    with pytest.raises(ErroGoogleOAuth):
+        PonteAgenda(tmp_path / "nada.sock").listar_eventos("a@x.com", "primary", None, JANELA_AG)

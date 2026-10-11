@@ -14,6 +14,7 @@ EnvironmentFile=-/etc/gabi/cobrar.env
 # OPENROUTER_API_KEY (e, se quiser, OPENROUTER_MODEL_FAST/OPENROUTER_MODEL_STRONG): opcional; sem o arquivo, o modelo responde "chave ausente".
 EnvironmentFile=-/etc/gabi/openrouter.env
 # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_REFRESH_<CONTA> (ex.: GOOGLE_REFRESH_RESPER_GMAIL_COM): opcional; colocados por você; sem o arquivo, os contatos respondem "não configurada".
+EnvironmentFile=-/etc/gabi/google.env
 EnvironmentFile=-/etc/gabi/google-contatos.env
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock
 # Pasta e socket para o dono e o grupo gabibrain (a API e o MCP); mais ninguém na VPS alcança a ponte.

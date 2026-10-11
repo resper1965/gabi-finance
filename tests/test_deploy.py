@@ -447,3 +447,10 @@ def test_i7_i8_m4_ouvinte_teto_25_espaco_minimo_e_onfailure():
     assert "Environment=OUVINTE_ANEXO_MAX_MB=25\n" in u and "Environment=OUVINTE_ESPACO_MIN_MB=2048\n" in u
     assert "OnFailure=gabi-brain-falha@%n.service\n" in u
     assert "ReadWritePaths=/var/lib/gabi-brain\n" in (DEPLOY / "gabi-brain-falha@.service").read_text()   # o template grava no banco, como para os gabi-brain-*
+
+
+def test_unit_fontes_le_google_env_e_o_antigo():
+    unit = _ler("gabi-brain-fontes.service")
+    assert "EnvironmentFile=-/etc/gabi/google.env" in unit
+    assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in unit  # compatibilidade
+    assert not [l for l in unit.splitlines() if l.startswith("Environment=") and ("REFRESH" in l or "SECRET" in l)]  # nenhum segredo na unit
