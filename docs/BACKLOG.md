@@ -14,7 +14,7 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio 
 |---|---|---|---|---|
 | D1 | Conta 10 (XP Investimentos, cartão) para estado `nao` em Cadastros › Contas. A XP Investimentos saiu do mcp.ai em 11/10 (Bradesco entrou). Só ela; XP Banking (13–15) é outra conexão | R | ⛔ aguarda o Ricardo | conta 10 fora da conferência e dos avisos; histórico (181 lançamentos) preservado |
 | D2 | Descobrir por que a rodada de extratos segue `conferida=0` (último conferido 13/10). Ler `conferencia` da última rodada e separar conta morta, `saldo_final` e `dias_sem_buraco` | C | ❓ | causa registrada aqui; ajuste de código ou ação do Ricardo definidos |
-| D3 | ✅ código 16/10 (retry de 3 tentativas, aviso `incompleta`); falta instalar. **Saldos parciais:** `openfinance_list_accounts` devolve 4–17 das 17 contas, conforme a hora (15/10). Repetir a chamada quando vier menos do que o esperado e marcar a rodada incompleta | C | 🔧 aprovado em 16/10 | toda rodada horária lê as contas esperadas ou registra o que faltou; teste cobre os dois casos |
+| D3 | ✅ 16/10 instalado (retry de 3 tentativas, aviso `incompleta`). **Saldos parciais:** `openfinance_list_accounts` devolve 4–17 das 17 contas, conforme a hora (15/10). Repetir a chamada quando vier menos do que o esperado e marcar a rodada incompleta | C | 🔧 aprovado em 16/10 | toda rodada horária lê as contas esperadas ou registra o que faltou; teste cobre os dois casos |
 | D4 | Liberar C6 BANK (conta 12) no caixa único e decidir o Bradesco (contas 16–18, `a_decidir`) | R | ⏸ | contas decididas em Cadastros |
 | D5 | 145 lançamentos sem dono (Cadastros), depois `sudo ~/aplicar-donos.sh` | R | ⏸ | classificação ≥ 90 % |
 | D6 | Aceite T1.14: 7 rodadas seguidas `conferida=1` e `python -m tools.aceite` | R+C | ⛔ depende de D1–D2 | `docs/aceite-fase-1.md` escrito |
@@ -26,8 +26,8 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio 
 Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
-| AF1 | Agenda financeira **B**: diária (atrasadas, hoje, 3 dias, previsão com o saldo) dentro do bloco Financeiro do resumo; segunda: 30 dias por semana. Módulo `gabi/dinheiro/agenda_financeira.py` + ferramenta MCP `agenda_financeira` | C | 🔧 aprovada 16/10 | testes de falta de saldo, estimado `~`, débito automático, dia vazio, saldo velho |
-| AF2 | Pausar `resumo-semanal-pagamentos` (domingo) e apontar `forecast-semanal` (segunda) para a ferramenta nova | C | 🔧 aprovado 16/10 | job pausado e prompt trocado |
+| AF1 | ✅ 16/10 instalada (commit 5cef4b5; verificada com dado real em leitura). Agenda financeira **B**: diária (atrasadas, hoje, 3 dias, previsão com o saldo) dentro do bloco Financeiro do resumo; segunda: 30 dias por semana. Módulo `gabi/dinheiro/agenda_financeira.py` + ferramenta MCP `agenda_financeira` | C | 🔧 aprovada 16/10 | testes de falta de saldo, estimado `~`, débito automático, dia vazio, saldo velho |
+| AF2 | ✅ 16/10: `resumo-semanal-pagamentos` pausado (`hermes cron resume d70bee6dc6db` desfaz) e `forecast-semanal` (segunda 08:00) chama `agenda_financeira` (semanal) | C | ✅ | job pausado e prompt trocado |
 | AF3 | Cron `no_agent` do Hermes para a diária e a semanal (sem modelo); verificar se o script alcança o MCP com o token | C | ⏸ | mensagem idêntica sem chamada de LLM |
 | PF1 | **Perfil de 5 meses** (`gabi/dinheiro/perfil.py`): média, regularidade, dia típico, classe regular/semi/irregular por pagador e favorecido, separando camadas por faixa de valor e conta | C | ⏸ direção do Ricardo 16/10 | IONIC, FGV e Barra do Pará saem "regular"; NESS e Bekaa separadas em camadas |
 | AR1 | **A receber** aprendido do perfil + detecção de atraso (primeiro caso: contrato ORM família Reis, ~R$ 10.208 no C6; pagador a confirmar, candidato X2 Intermediações) | R+C | ⏸ | atraso vira linha na mensagem das 07:05 |
@@ -87,7 +87,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | H1 | Idioma pt no Hermes (`display.language`, `stt.language`) | C | ✅ 16/10 | confirmar nos logs que o WhatsApp reconectou |
-| H2 | Resumo da manhã em blocos Financeiro / Agenda / E-mail | C | ✅ instalado 16/10 | conferir a mensagem das 07:05 |
+| H2 | Resumo da manhã em blocos Financeiro (agenda financeira de 3 dias) / Agenda / E-mail | C | ✅ instalado 16/10 | conferir a mensagem das 07:05 |
 | H3 | Fechamento noturno (21:00 BRT) e outros jobs do Hermes no mesmo formato | C | ⏸ | prompts revisados |
 | H4 | `gabi-vigia` vigiar o `hermes-gateway` (plano definitivo) | C | ❓ | verificado |
 | H5 | WhatsApp do Hermes: **número dedicado** (hoje a conversa usa o seu) | R | ⏸ | número pareado |

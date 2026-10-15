@@ -17,7 +17,9 @@ A sessão começou com três queixas: **saldos/resumos faltando, WhatsApp em ing
 
 ## 3. Feito e instalado nesta sessão
 - Idioma pt no Hermes. Resumo da manhã em blocos (instalado em produção). `docs/BACKLOG.md` (fonte única). Pontos de `STATUS.md` e `PENDENCIAS-RICARDO.md` apontando para ele.
-- Retry dos saldos (código e testes; instalação registrada na seção 6).
+- Retry dos saldos **instalado**.
+- **Agenda financeira B instalada** (commit `5cef4b5`): módulo `gabi/dinheiro/agenda_financeira.py`, ferramenta MCP `agenda_financeira`, bloco Financeiro do resumo das 07:05 e visão semanal. Verificada com dado real em leitura (semana 19–25/10: sai R$ 4.581,56 = soma das contas da semana). Suíte completa: **2103 passaram, 0 falharam**; o vitest do painel falhou uma vez sob carga e passou 2/2 depois (instável conhecido, ledger do e-mail).
+- **Hermes:** `agenda_financeira` no `tools.include` (backup `config.yaml.bak-2026-10-16-agenda-financeira`); `forecast-semanal` (segunda 08:00) chama a ferramenta; `resumo-semanal-pagamentos` (domingo) **pausado**; gateway reiniciado.
 - Testes: suíte completa 2081 passando antes do retry; 2 testes antigos do resumo da agenda atualizados; `tests/dinheiro` 435 verdes depois do retry.
 - Perfil de 5 meses (script descartável de leitura) sobre créditos e débitos reais.
 
@@ -81,4 +83,5 @@ O Eve é um framework de agentes (diretório por agente, skills sob demanda, sub
 8. **Laço de correção:** taxa de aceite das sugestões (regras, classificações, compromissos) por origem; sobe ou desce o limiar do modelo conforme o aceite. Traces e custo por tarefa já existem (`chamada_mcp`, `custo_modelo`) e só faltam no painel.
 
 ## 10. Próximos passos, na ordem
+(Itens 1 e 2 já feitos em 16/10; os demais seguem.)
 1. Instalar o retry dos saldos. 2. Agenda financeira B (módulo + ferramenta MCP + testes) e pausar o resumo de domingo no Hermes. 3. Perfil de 5 meses como módulo. 4. Com as respostas do Ricardo: "a receber" (Matheus/ORM, camadas da NESS), comprovantes, H0, conta 10.
