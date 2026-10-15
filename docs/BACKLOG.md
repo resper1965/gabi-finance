@@ -34,6 +34,18 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | AR2 | **Cobrança com anuência**: só rascunho no chat (opção A); envio por e-mail com aprovação exige ADR novo (exceção à R2) | C | ⏸ | rascunho sai; Ricardo envia |
 | AR3 | Sugerir compromissos a partir de eventos da agenda ("Pagar…", "Adiantamento Sirlene" dia 20, "Contabilidade Holding" dia 15) | C | ⏸ | sugestão aprovada vira compromisso |
 | AR4 | Cadastrar já, com valores e formas: Adiantamento Sirlene e Contabilidade Holding | R | ⏸ | aparecem na agenda financeira |
+| AF4 | Entradas recorrentes na previsão: usar `analise.recorrentes` (entradas) como segundo cenário na agenda financeira ("só o contratado" × "com recorrentes esperadas") | C | ⏸ | dois cenários lado a lado na mensagem da segunda |
+| AR5 | **Alerta "esperado e não veio":** recorrente de entrada com dia típico passado e `ja_ocorreu_este_mes=False` vira aviso e linha na mensagem | C | ⏸ | IONIC/FGV/NESS/Bekaa monitorados; teste com banco fixo |
+| AR6 | Aceitar contrato novo com 2 meses consecutivos (confiança menor, rótulo "novo") | C | ⏸ | X2/ORM detectado |
+| AR7 | Separar camadas por faixa de valor e dia (NESS 16k × 26k no C6) | C | ⏸ | cada camada sai como série própria; teste golden |
+| AR8 | Desvio do normal: valor fora de ±2 desvios, atraso além do espalhamento; estender "cobrada depois de cancelar" a todo recorrente | C | ⏸ | aviso `fora_do_normal` |
+| MC1 | Ferramentas MCP somente leitura: `financeiro_recorrentes`, `financeiro_previsao`, `financeiro_vazamentos`, `financeiro_assinaturas`, `financeiro_rumo` (+ include do Hermes) | C | ⏸ | listadas, escopo `fin`, testes de "nenhuma destrutiva" |
+| EV1 | Snapshot pré-calculado do resumo e da agenda financeira (ferramenta responde sem consultar o banco) | C | ⏸ | latência medida |
+| EV2 | Checkpoint por conta e leitura concorrente nas rodadas de captura (retomável após queda) | C | ⏸ | rodada interrompida retoma sem refazer contas prontas |
+| EV3 | Evals de mensagens e perguntas antes de instalar (resumo, agenda financeira, cobrança, classificação) | C | ⏸ | suíte de evals no `pytest` |
+| EV4 | Subagentes por capacidade com ferramentas mínimas (financeiro leitura, cobrança, agenda/e-mail) | R+C | ⏸ junto do H0 | listas por canal testadas |
+| EV5 | Painel de qualidade: taxa de aceite das sugestões, custo por tarefa, latência | C | ⏸ | tela no painel |
+| FU1 | Auditar `agora.date()` e o relógio do servidor (CEST) nos timers; "hoje" sempre Brasília | C | ⏸ | testes com `agora` perto da meia-noite |
 | CP1 | Comprovantes/NF/pedido de pagamento pelo WhatsApp: escuta ganha os tipos `comprovante` e `nota_fiscal` (anexo → Paperless, etiquetas próprias); decidir A automático / B só encaminhado / C ambos, e se lê o que ele envia | R+C | ⏸ aguarda escolha | C1 do bloco 2 destravado |
 | H0 | Revisão de segurança do Hermes: `platform_toolsets` sem `terminal`/`write_file`/`execute_code` nos canais; `skills.write_approval` e `memory.write_approval`; terminal em Docker | R+C | ⏸ não aprovado | aprovação do Ricardo e teste |
 

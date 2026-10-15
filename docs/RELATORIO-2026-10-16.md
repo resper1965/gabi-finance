@@ -49,5 +49,36 @@ Regra usada (descartável): grupo regular = presente em ≥ 4 dos 5 meses, varia
 7. **Evals de mensagem** (resumo, fechamento, avisos) com exemplos fixos, em vez de só inspeção visual.
 8. **Checklist de "pronto" antes de instalar:** suíte inteira lida, `docs/api.md` regerado, painel `vitest` verde.
 
-## 8. Próximos passos, na ordem
+## 8. Ferramentas financeiras: inventário e onde evoluir
+**O que existe (verificado no código):**
+- **MCP (Hermes lê):** `financeiro_saldo`, `financeiro_lancamentos`, `financeiro_contas_a_pagar`, `financeiro_para_onde_vai` e, desde 16/10, `agenda_financeira` (diária e semanal).
+- **Análises no brain (só pelo painel/API, **não** expostas ao Hermes):** `analise.recorrentes` (6 meses, mediana, variação, dia típico, separa "camadas" de um mesmo favorecido), `analise.previsao`, `gastos`, `vazamentos`, `assinaturas`, `rumo` (entrou/saiu/sobrou/patrimônio mês a mês), previsão de NFS-e (`cobrar.previsao`), `projecao.projetar` (saldo dia a dia), classificação em cascata (regra → banco → cache → modelo), sugestão de regras por favorecido, conferência de saldo, avisos.
+- **O normal de 5 meses já é aprendido:** rodando `analise.recorrentes` nos dados reais (leitura): IONIC fixo R$ 22.261,22 dia 7; FGV fixo R$ 9.204,69 dia 26 (ainda não venceu); Barra do Pará R$ 3.660,15 dia 8; NESS e Bekaa em séries separadas; 10 entradas recorrentes ao todo.
+
+**Lacunas encontradas**
+1. **Sem alerta de "esperado e não veio".** O campo `ja_ocorreu_este_mes` existe, mas nada o usa: recorrente de entrada com o dia típico já passado e sem crédito vira aviso e linha na mensagem. É o caso do Matheus.
+2. **Critério de entrada exclui contratos novos:** exige presença em ≥ 3 dos últimos 4 meses. O contrato ORM (X2, 2 meses) não entra. Proposta: aceitar 2 meses consecutivos como "novo", com confiança menor e rótulo.
+3. **Camadas da NESS ainda se misturam:** a regra separa só quando o pagamento é < 60% do principal. R$ 16.000 e ~R$ 26.000 (ambos no C6) ficam na mesma série (mediana 16 mil). Proposta: separar por faixa de valor e dia (agrupamento por proximidade), com teste golden.
+4. **Duas previsões coexistem** (`analise.previsao` com recorrentes; `projecao.projetar` com compromissos + NFS-e). A agenda financeira usa a segunda, só com NFS-e como entrada. Proposta: unificar e mostrar dois cenários (só o contratado × com recorrentes esperadas).
+5. **Hermes enxerga pouco:** recorrentes, previsão, vazamentos, assinaturas e rumo existem mas não são ferramentas MCP. Propor `financeiro_recorrentes`, `financeiro_previsao`, `financeiro_vazamentos`, `financeiro_assinaturas` e `financeiro_rumo` (somente leitura).
+6. **Desvio do normal:** valor fora de ±2 desvios, atraso além do espalhamento típico, "cobrada depois de cancelar" (já existe para assinatura): ampliar para todo recorrente.
+7. **Qualidade medida:** classificação em 86,9% (meta 90%); sem painel de taxa de aceite das sugestões nem de custo por tarefa.
+8. **Data/fuso:** `agora.date()` aparece em vários pontos; no MCP o "agora" já é Brasília, mas o `rodar` do timer e `captura` usam o relógio do servidor (CEST). Auditar.
+
+## 9. Inspiração no Vercel Eve: o que copiar para o brain ficar mais rápido e mais inteligente
+O Eve é um framework de agentes (diretório por agente, skills sob demanda, subagentes, workflows duráveis com checkpoint, aprovação humana, evals e traces). A gabi.brain **não vira** agente; as ideias valem assim:
+
+**Mais rápida**
+1. **Resposta pré-calculada:** gravar o resultado do resumo e da agenda financeira num snapshot ao fim de cada rodada; a ferramenta MCP devolve em milissegundos, sem reconsultar o banco.
+2. **Entrega sem modelo:** cron `no_agent` do Hermes repassa o texto do brain (custo e latência zero de LLM). Probe de `no_agent` confirmado; falta provar o script alcançar o MCP.
+3. **Captura em paralelo e retomável:** hoje a rodada de extratos leva ~4–5 min e, se cair no meio, recomeça do zero. Checkpoint por conta (passo concluído não repete) e leitura concorrente com limite. É o "workflow durável" do Eve aplicado ao timer.
+
+**Mais inteligente**
+4. **Perfil de normalidade e desvios** (itens 1 a 3 e 6 da seção 8): é o que transforma dados em "isto está fora do normal".
+5. **Subagentes por capacidade, com ferramentas mínimas:** financeiro (leitura), cobrança (reembolsos e rascunho), agenda/e-mail; cada um com lista própria de ferramentas, sem `terminal`. Une o H0 ao padrão do Eve.
+6. **Skills sob demanda, versionadas:** manter `~/.hermes/skills/gabi-brain/` com referências por assunto, carregadas só quando necessárias, e `write_approval` para a Gabi propor skills sem alterar o comportamento sozinha.
+7. **Evals fixos:** conjunto de mensagens e perguntas com resposta esperada (resumo, agenda financeira, cobrança, classificação), rodado antes de instalar. Substitui a conferência "no olho".
+8. **Laço de correção:** taxa de aceite das sugestões (regras, classificações, compromissos) por origem; sobe ou desce o limiar do modelo conforme o aceite. Traces e custo por tarefa já existem (`chamada_mcp`, `custo_modelo`) e só faltam no painel.
+
+## 10. Próximos passos, na ordem
 1. Instalar o retry dos saldos. 2. Agenda financeira B (módulo + ferramenta MCP + testes) e pausar o resumo de domingo no Hermes. 3. Perfil de 5 meses como módulo. 4. Com as respostas do Ricardo: "a receber" (Matheus/ORM, camadas da NESS), comprovantes, H0, conta 10.
