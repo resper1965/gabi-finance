@@ -181,3 +181,68 @@ def test_extratos_propoe_recebimento_de_nota_para_credito_em_conta_do_caixa_unic
     historia["acc-bank-1111"].append(tx("cred1", (HOJE - dt.timedelta(days=1)).isoformat(), "Pix recebido CLIENTE X", 1000.0, tipo="CREDIT"))
     _rodar_ext(con, FakeFin([BANCO], historia), tmp_path)        # bancos_pj vazio: a conta é do caixa único e é suficiente
     assert con.execute("select nota_id, estado from recebimento_nota").fetchall()[0][:] == ("n1", "proposto")
+
+
+# ---------------- saldos: lista parcial do provedor (retry) ----------------
+class ListasEmSequencia:
+    """Devolve uma lista de contas diferente a cada chamada de openfinance_list_accounts (o provedor às vezes manda só parte)."""
+
+    def __init__(self, *listas):
+        self.listas, self.chamadas = list(listas), 0
+
+    def __call__(self, ferramenta, args, tent=5):
+        assert ferramenta == "openfinance_list_accounts"
+        lista = self.listas[min(self.chamadas, len(self.listas) - 1)]
+        self.chamadas += 1
+        return {"results": lista}
+
+
+def _conhecer_as_duas(con, tmp_path):
+    rodar_saldos(con, FakeFin([BANCO, CARTAO], {}), AGORA, tmp_path / "locks")
+
+
+def test_saldos_repete_quando_o_provedor_manda_so_parte_das_contas(con, tmp_path):
+    _conhecer_as_duas(con, tmp_path)
+    esperas = []
+    cliente = ListasEmSequencia([BANCO], [BANCO, CARTAO])
+    n = capturar_saldos(con, cliente, AGORA + dt.timedelta(hours=1), dorme=esperas.append)
+    assert n == 2 and cliente.chamadas == 2 and len(esperas) == 1
+    assert con.execute("select count(*) from saldo where em=?", ((AGORA + dt.timedelta(hours=1)).replace(tzinfo=None).isoformat(timespec="seconds"),)).fetchone()[0] == 2
+
+
+def test_saldos_junta_o_que_veio_em_cada_tentativa(con, tmp_path):
+    _conhecer_as_duas(con, tmp_path)
+    cliente = ListasEmSequencia([BANCO], [CARTAO])
+    assert capturar_saldos(con, cliente, AGORA + dt.timedelta(hours=1), dorme=lambda s: None) == 2
+
+
+def test_saldos_desiste_depois_de_tres_tentativas_e_deixa_aviso_na_rodada(con, tmp_path):
+    _conhecer_as_duas(con, tmp_path)
+    cliente = ListasEmSequencia([BANCO])
+    n = capturar_saldos(con, cliente, AGORA + dt.timedelta(hours=1), dorme=lambda s: None)
+    assert n == 1 and cliente.chamadas == 3
+    fonte, status, erro = con.execute("select fonte, status, erro from rodada order by id desc limit 1").fetchone()
+    assert (fonte, status) == ("open-finance-saldos", "ok") and "incompleta" in erro and "1 de 2" in erro
+    assert con.execute("select count(*) from saldo where conta_id=2").fetchone()[0] == 1  # a conta que faltou mantém a última leitura
+
+
+def test_saldos_completo_na_primeira_nao_repete_nem_espera(con, tmp_path):
+    _conhecer_as_duas(con, tmp_path)
+    esperas, cliente = [], ListasEmSequencia([BANCO, CARTAO])
+    capturar_saldos(con, cliente, AGORA + dt.timedelta(hours=1), dorme=esperas.append)
+    assert cliente.chamadas == 1 and esperas == []
+    assert con.execute("select erro from rodada order by id desc limit 1").fetchone()[0] is None
+
+
+def test_saldos_na_primeira_vez_sem_contas_conhecidas_nao_repete(con):
+    cliente = ListasEmSequencia([BANCO])
+    capturar_saldos(con, cliente, AGORA, dorme=lambda s: None)
+    assert cliente.chamadas == 1
+
+
+def test_saldos_conta_desligada_nao_e_esperada(con, tmp_path):
+    _conhecer_as_duas(con, tmp_path)
+    con.execute("update conta set estado='nao' where externo_id='acc-card-9999'")
+    cliente = ListasEmSequencia([BANCO])
+    capturar_saldos(con, cliente, AGORA + dt.timedelta(hours=1), dorme=lambda s: None)
+    assert cliente.chamadas == 1

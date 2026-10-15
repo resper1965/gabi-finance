@@ -296,11 +296,35 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
     return ResumoCaptura(len(contas), lidos, novos, sorted(falhas), problemas, rid)
 
 
-def capturar_saldos(con, cliente, agora: dt.datetime, bancos_pj=frozenset()) -> int:
-    """Só contas e saldos (de hora em hora); não lê extrato. Fonte própria ('open-finance-saldos'): não entra no dados_ate."""
+TENTATIVAS_SALDOS = 3   # o provedor às vezes devolve só parte das contas (4 a 17 de 17 em 15/10): repete e junta o que vier
+ESPERA_SALDOS = 20      # segundos entre as tentativas
+
+
+def _contas_esperadas(con) -> dict[str, str]:
+    """Contas que o brain já conhece e não foram desligadas (estado 'nao') nem excluídas: externo_id -> nome."""
+    return {r[0]: (r[1] or r[0]) for r in con.execute("select externo_id, apelido from conta where estado<>'nao' and excluido_em is null")}
+
+
+def capturar_saldos(con, cliente, agora: dt.datetime, bancos_pj=frozenset(), tentativas: int = TENTATIVAS_SALDOS,
+                    dorme=time.sleep, espera: float = ESPERA_SALDOS) -> int:
+    """Só contas e saldos (de hora em hora); não lê extrato. Fonte própria ('open-finance-saldos'): não entra no dados_ate.
+    Se vierem menos contas do que o brain conhece, repete até `tentativas` vezes e junta o que chegou; o que ainda faltar mantém
+    a última leitura (o caixa soma o saldo mais recente de cada conta) e a rodada guarda um aviso 'incompleta' em rodada.erro."""
     with registrar_rodada(con, "open-finance-saldos") as rodada:
-        contas = lista(cliente("openfinance_list_accounts", {}))
+        esperadas = _contas_esperadas(con)
+        por_id: dict[str, dict] = {}
+        for n in range(max(1, tentativas)):
+            if n:
+                dorme(espera)
+            for a in lista(cliente("openfinance_list_accounts", {})):
+                por_id[a["account_id"]] = a
+            if not set(esperadas) - set(por_id):
+                break
+        contas = list(por_id.values())
         ids = _gravar_contas(con, contas, agora.replace(tzinfo=None).isoformat(timespec="seconds"), bancos_pj)
         registrar_estado(con, contas, ids, None, bancos_pj, agora.date(), agora)
         rodada.lidos = len(contas)
+        faltam = sorted(nome for aid, nome in esperadas.items() if aid not in por_id)
+        if faltam:
+            rodada.aviso = f"incompleta: {len(esperadas) - len(faltam)} de {len(esperadas)} contas ({', '.join(faltam)[:200]} não vieram)"
     return len(contas)

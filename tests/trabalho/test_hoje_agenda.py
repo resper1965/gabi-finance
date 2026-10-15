@@ -73,7 +73,7 @@ def test_mesmo_evento_em_duas_contas_aparece_uma_vez_no_resumo_e_nos_conflitos(c
     _ev(con, f2, "9", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "  reunião   ionic ")  # mesma reunião, outra conta
     assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 1
     assert consulta.conflitos(con, "2026-10-12", "2026-10-12") == []
-    assert "1 compromisso" in next(l for l in resumo_da_manha(con, AGORA)["linhas"] if l.startswith("Agenda"))
+    assert "📅 *Agenda* (1)" in resumo_da_manha(con, AGORA)["linhas"]
 
 
 def test_fonte_desligada_nao_aparece(con):
@@ -86,10 +86,10 @@ def test_resumo_da_manha_mostra_horario_local_e_dia_inteiro(con):
     _ev(con, f, "d", "2026-10-12", "2026-10-13", "Viagem", inteiro=True)
     _ev(con, f, "a", "2026-10-12T14:00:00-03:00", "2026-10-12T15:00:00-03:00", "Reunião IONIC")
     _ev(con, f, "s", "2026-10-12T16:00:00-03:00", "2026-10-12T17:00:00-03:00", None)
-    txt = next(l for l in resumo_da_manha(con, AGORA)["linhas"] if l.startswith("Agenda"))
-    assert "3 compromisso" in txt and "dia inteiro: Viagem" in txt and "14:00, Reunião IONIC" in txt  # 17:00Z mostrado como 14:00 de Brasília
+    linhas = resumo_da_manha(con, AGORA)["linhas"]
+    assert "📅 *Agenda* (3)" in linhas and "• Dia inteiro: Viagem" in linhas and "• 14:00 Reunião IONIC" in linhas  # 17:00Z mostrado como 14:00 de Brasília
     con.execute("update agenda_evento set titulo='' where externo_id='a'")
-    assert "14:00, (sem título)" in resumo_da_manha(con, AGORA)["texto"]
+    assert "• 14:00 (sem título)" in resumo_da_manha(con, AGORA)["linhas"]
 
 
 def test_privados_mostrar_so_painel_ocultar(con):

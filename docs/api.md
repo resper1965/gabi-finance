@@ -147,7 +147,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `reembolsos_listar` | `fin` | — | Reembolsos em aberto por empresa contratante (ness, IONIC): valor a receber, número de itens e cobranças em andamento. |
 | `reembolsos_preparar_email` | `propostas` | empresa_id, itens | Prepara o RASCUNHO do e-mail de cobrança de reembolso de uma empresa contratante. Não envia nada: o rascunho fica no painel (ADR-006). |
 | `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |
-| `resumo_manha` | `trabalho` | — | Resumo da manhã em até 5 linhas (começa por 'dados desatualizados' se for o caso): agenda, e-mails que importam e o dinheiro de hoje. |
+| `resumo_manha` | `trabalho` | — | Resumo da manhã já formatado para o celular, em blocos Financeiro, Agenda e E-mail (começa por 'dados desatualizados' se for o caso). Entregar exatamente como vem. |
 | `tarefas_propor` | `propostas` | motivo, titulo, vencimento | PROPÕE uma tarefa para o Ricardo. Cria só sugestão pendente; nada vai para a origem (Microsoft 365, Linear) sem ele aprovar. |
 
 Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).

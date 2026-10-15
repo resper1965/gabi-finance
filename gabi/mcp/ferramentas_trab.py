@@ -13,19 +13,53 @@ ESCOPOS = {"agenda_listar": "trabalho", "email_listar": "trabalho", "hoje_resumo
 LIMITE_DIAS_AGENDA = 31
 
 
-def _linha_agenda(ag: list[dict]) -> str:
-    """Horário local; dia inteiro por extenso; título vazio vira "(sem título)"."""
-    texto = f"Agenda: {len(ag)} compromisso(s) hoje"
+def _corta(texto: str, n: int = 70) -> str:
+    texto = " ".join((texto or "").split())
+    return texto if len(texto) <= n else texto[: n - 1].rstrip() + "…"
+
+
+def _reais(v: str) -> str:
+    """'29571.85' -> 'R$ 29.571,85' (os valores do painel vêm como texto com ponto decimal)."""
+    sinal, v = ("-", v[1:]) if v.startswith("-") else ("", v)
+    inteiro, _, cent = v.partition(".")
+    return f"{sinal}R$ {int(inteiro):,}".replace(",", ".") + f",{(cent or '0').ljust(2, '0')[:2]}"
+
+
+def _bloco_agenda(ag: list[dict]) -> list[str]:
+    """Um item por linha: dia inteiro primeiro, depois por horário (HH:MM local); título vazio vira "(sem título)"."""
+    cab = "📅 *Agenda*" + (f" ({len(ag)})" if ag else "")
     if not ag:
-        return texto + "."
-    nome = lambda e: e["titulo"] or "(sem título)"  # noqa: E731
-    inteiros = [e for e in ag if e["dia_inteiro"]]
-    horarios = [e for e in ag if not e["dia_inteiro"]]
-    if inteiros:
-        texto += "; dia inteiro: " + ", ".join(nome(e) for e in inteiros[:2])
-    if horarios:
-        texto += f"; o primeiro às {horarios[0]['inicio_local'][11:16]}, {nome(horarios[0])}"
-    return texto + "."
+        return [cab, "• Nada hoje"]
+    nome = lambda e: _corta(e["titulo"] or "(sem título)")  # noqa: E731
+    itens = [f"• Dia inteiro: {nome(e)}" for e in ag if e["dia_inteiro"]]
+    itens += [f"• {e['inicio_local'][11:16]} {nome(e)}" for e in ag if not e["dia_inteiro"]]
+    return [cab, *itens[:6], *([f"• +{len(itens) - 6} outros"] if len(itens) > 6 else [])]
+
+
+def _bloco_correio(importantes: list[dict], n_painel: int) -> list[str]:
+    """Até 3 e-mails (remetente: assunto), o mais urgente primeiro; o total vai no cabeçalho."""
+    total = len(importantes) or n_painel
+    if not total:
+        return ["📧 *E-mail*", "• Nenhum importante"]
+    itens = [f"• {m['remetente'] or '?'}: {_corta(m['assunto'] or '(sem assunto)')}" for m in importantes[:3]]
+    return [f"📧 *E-mail* ({total} importante{'s' if total != 1 else ''})", *itens, *([f"• +{total - 3} outros"] if total > 3 else [])]
+
+
+def _bloco_dinheiro(din: dict) -> list[str]:
+    atr = din["atrasadas"]
+    return ["💰 *Financeiro*",
+            f"• {'⚠️ ' if atr['n'] else ''}Atrasadas: {atr['n']}" + (f" ({_reais(atr['valor'])})" if atr["n"] else ""),
+            f"• Sai hoje: {_reais(din['sai_hoje'])}",
+            f"• Saldo: {_reais(din['saldo'])}"]
+
+
+def _quando(iso: str | None) -> str:
+    """ISO UTC -> 'dd/mm HH:MM' em Brasília; sem data: 'nunca'."""
+    try:
+        t = dt.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return "nunca"
+    return (t.astimezone(dt.timezone(dt.timedelta(hours=-3)))).strftime("%d/%m %H:%M")
 
 
 def agenda_listar(con, agora: dt.datetime, de: str, ate: str) -> dict:
@@ -63,40 +97,26 @@ def email_listar(con, agora: dt.datetime, prioridade_min: int, dias: int) -> dic
 _email_listar = email_listar  # o nome `email_listar` é reusado pela ferramenta MCP dentro de registrar()
 
 
-def _linha_correio(importantes: list[dict]) -> str:
-    """Até 3 e-mails citados (remetente: assunto), o mais urgente primeiro; o total entra na frente."""
-    citados = "; ".join(f"{m['remetente'] or '?'}: {m['assunto'] or '(sem assunto)'}" for m in importantes[:3])
-    return f"E-mail: {len(importantes)} importante(s) — {citados}" + ("; …" if len(importantes) > 3 else ".")
-
-
 def resumo_da_manha(con, agora: dt.datetime) -> dict:
-    """Até 5 linhas para o canal das 07:05; se os dados estiverem desatualizados, a primeira linha avisa."""
+    """Mensagem das 07:05 em blocos separados por linha em branco: Financeiro, Agenda, E-mail (e Prioridade).
+    Se os dados estiverem desatualizados, a primeira linha avisa. `linhas` guarda cada linha; `texto` junta com \n."""
     env = envelope(con, {}, agora=agora)
     d = modulo_hoje.hoje(con, agora)
     linhas = []
     if env["desatualizado"]:
-        causa = [f"{f['nome']} {f['estado'].replace('_', ' ')}" for f in env["fontes"] if f["estado"] != "ok"]
-        causa = f" ({', '.join(causa)})" if causa else ""
-        linhas.append(f"⚠ Dados desatualizados{causa} (último conferido: {env['dados_ate'] or 'nunca'}). Confira antes de agir.")
-    linhas.append(_linha_agenda(d["agenda"]))
-    correio = consulta_correio.importantes(con, limite=50, agora=agora)
-    n = len(d["emails_importantes"])
-    if correio:
-        linhas.append(_linha_correio(correio))
-    else:
-        linhas.append(f"{n} e-mail(s) importante(s) esperando." if n else "Nenhum e-mail importante esperando.")
-    din = d["dinheiro"]
-    linhas.append(f"Atrasadas: {din['atrasadas']['n']} ({din['atrasadas']['valor']}); sai hoje {din['sai_hoje']}; saldo {din['saldo']}.")
+        linhas += [f"⚠️ *Dados desatualizados* (conferidos até {_quando(env['dados_ate'])}). Confira antes de agir.", ""]
+    linhas += _bloco_dinheiro(d["dinheiro"]) + [""]
+    linhas += _bloco_agenda(d["agenda"]) + [""]
+    linhas += _bloco_correio(consulta_correio.importantes(con, limite=50, agora=agora), len(d["emails_importantes"]))
     if d["prioridades"]:
-        linhas.append(f"Prioridade: {d['prioridades'][0]['titulo']}.")
-    linhas = linhas[:5]
+        linhas += ["", f"⭐ *Prioridade:* {_corta(d['prioridades'][0]['titulo'], 90)}"]
     return {"linhas": linhas, "texto": "\n".join(linhas)}
 
 
 def registrar(srv, executar) -> None:
     @srv.tool()
     def resumo_manha() -> dict:
-        """Resumo da manhã em até 5 linhas (começa por 'dados desatualizados' se for o caso): agenda, e-mails que importam e o dinheiro de hoje."""
+        """Resumo da manhã já formatado para o celular, em blocos Financeiro, Agenda e E-mail (começa por 'dados desatualizados' se for o caso). Entregar exatamente como vem."""
         return executar("resumo_manha", resumo_da_manha)
 
     @srv.tool()

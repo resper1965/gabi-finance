@@ -73,7 +73,7 @@ def test_listar_filtra_prioridade_e_dias_e_exclui_lixo(con):
 
 
 def _linha(texto):
-    return next(l for l in texto["linhas"] if l.startswith("E-mail"))
+    return next(l for l in texto["linhas"] if l.startswith("📧"))
 
 
 def test_resumo_da_manha_cita_os_tres_primeiros_em_ordem(con):
@@ -82,16 +82,17 @@ def test_resumo_da_manha_cita_os_tres_primeiros_em_ordem(con):
     _msg(con, f, "b", "importante", 3, de="ana@x.com", assunto="Proposta"); _msg(con, f, "c", "importante", 2, de="bia@x.com", assunto="Contrato")
     _msg(con, f, "d", "importante", 2, de="cid@x.com", assunto="Quarto item", recebida="2026-10-12T01:00:00+00:00")
     linha = _linha(resumo_da_manha(con, AGORA))
-    assert "4 importante(s)" in linha and linha.index("banco@x.com") < linha.index("ana@x.com") < linha.index("bia@x.com") and "cid@x.com" not in linha
+    t = "\n".join(resumo_da_manha(con, AGORA)["linhas"])
+    assert "(4 importantes)" in linha and t.index("banco@x.com") < t.index("ana@x.com") < t.index("bia@x.com") and "cid@x.com" not in t and "+1 outros" in t
 
 
-def test_resumo_sem_correio_mantem_a_linha_antiga_e_cabe_em_cinco_linhas(con):
-    r = resumo_da_manha(con, AGORA)
-    assert any(l.startswith("Nenhum e-mail importante") for l in r["linhas"]) and len(r["linhas"]) <= 5
+def test_resumo_sem_correio_diz_nenhum_e_com_muitos_cita_so_tres(con):
+    assert "• Nenhum importante" in resumo_da_manha(con, AGORA)["linhas"]
     f = _fonte(con)
     for i in range(6):
         _msg(con, f, f"m{i}")
-    assert len(resumo_da_manha(con, AGORA)["linhas"]) <= 5
+    r = resumo_da_manha(con, AGORA)["linhas"]
+    assert sum(1 for l in r if l.startswith("• ") and "@" in l) == 3
 
 
 def test_email_listar_respeita_limite_escopo_e_valores(con):

@@ -1,6 +1,7 @@
 # gabi.brain · STATUS (retomada rápida)
 
 > **Direção definitiva (10–11/10/2026): só Hermes + gabi.brain. Ver `docs/PLANO-DEFINITIVO.md`.** Nada novo no OpenClaw nem no gabi-fin.
+**O que falta para completar: ver `docs/BACKLOG.md` (fonte única, 16/10/2026).** Este arquivo é só o histórico.
 Atualizado: 11/10/2026. Se a máquina caiu, leia só este arquivo e `.superpowers/sdd/progress.md`.
 
 ## Onde estamos

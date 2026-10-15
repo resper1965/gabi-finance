@@ -31,10 +31,13 @@ def _banco(tmp_path):
     return c
 
 
-def test_resumo_tem_no_maximo_5_linhas(tmp_path):
+def test_resumo_tem_um_bloco_por_assunto_separado_por_linha_em_branco(tmp_path):
     c = _banco(tmp_path)
     r = resumo_da_manha(c, AGORA)
-    assert 1 <= len(r["linhas"]) <= 5 and r["texto"] == "\n".join(r["linhas"])
+    assert r["texto"] == "\n".join(r["linhas"])
+    cabecalhos = [l for l in r["linhas"] if l.startswith(("💰", "📅", "📧"))]
+    assert cabecalhos == ["💰 *Financeiro*", "📅 *Agenda*", "📧 *E-mail*"]
+    assert all(l.startswith("•") or l == "" or l[0] in "💰📅📧⚠⭐" for l in r["linhas"])
 
 
 def test_resumo_comeca_por_desatualizado(tmp_path):
@@ -52,7 +55,7 @@ def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
     c.execute("insert into item_email(caixa_id, message_id, remetente, assunto, recebido_em, relevante, motivo) values (1,'<a>','c@x.com','Proposta','2026-10-10T05:00:00Z',1,'cliente')")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     txt = resumo_da_manha(c, AGORA)["texto"]
-    assert "Reunião IONIC" in txt and "14:00" in txt and "1 e-mail" in txt
+    assert "• 14:00 Reunião IONIC" in txt and "📅 *Agenda* (1)" in txt and "📧 *E-mail* (1 importante)" in txt and "• Saldo: R$ 0,00" in txt
 
 
 def test_aviso_so_e_marcado_entregue_apos_confirmacao_do_canal(tmp_path):
@@ -76,4 +79,5 @@ def test_resumo_desatualizado_nomeia_a_fonte_que_causa(tmp_path):
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     c.execute("insert into rodada(fonte, inicio, fim, status) values ('notas-nibo','2026-10-01T05:00:00+00:00','2026-10-01T05:00:30+00:00','ok')")
     c.execute("insert into rodada(fonte, inicio, fim, status) values ('comprovantes-paperless','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
-    assert "(notas-nibo parada)" in resumo_da_manha(c, AGORA)["linhas"][0]
+    primeira = resumo_da_manha(c, AGORA)["linhas"][0]
+    assert primeira.startswith("⚠️") and "desatualizados" in primeira and "notas-nibo" not in primeira
