@@ -23,6 +23,8 @@ A sessão começou com três queixas: **saldos/resumos faltando, WhatsApp em ing
 - Testes: suíte completa 2081 passando antes do retry; 2 testes antigos do resumo da agenda atualizados; `tests/dinheiro` 435 verdes depois do retry.
 - Perfil de 5 meses (script descartável de leitura) sobre créditos e débitos reais.
 
+- **"Esperado e não veio" (código pronto, instala após a suíte verde):** `gabi/dinheiro/esperados.py` aprende o normal de cada pagador pelos 5 últimos meses (valor médio, dia mais tardio, camadas por faixa de valor, "nova" com 2 meses seguidos) e a agenda financeira passa a mostrar `⚠️ A receber atrasado: <pagador> ~R$ X (costuma cair até o dia N)`. Em dado real (leitura): a partir de 16/10 só a X2 Intermediações (R$ 10.208) aparece atrasada, o caso do Matheus; as outras 9 séries ficam em ordem. Um teste achou e corrigiu um defeito (o dígito de "X2" sumia do nome).
+
 ## 4. Decisões (e o que ficou aberto)
 - **Aprovado:** agenda financeira **B** (diária curta: atrasadas, hoje, 3 dias com previsão do saldo; segunda: 30 dias); pausar o resumo semanal de domingo; previsão diária conservadora (só saídas, aviso de "entradas esperadas não contadas"); opção C do backlog (núcleo + "Depois").
 - **Direção nova do Ricardo:** o brain deve **aprender o normal** de pagadores e favorecidos por **média e regularidade de 5 meses** (em vez de cadastro manual de cada linha). Isto vira o "a receber" automático (§5).
