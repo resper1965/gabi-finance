@@ -23,7 +23,7 @@ A sessão começou com três queixas: **saldos/resumos faltando, WhatsApp em ing
 - Testes: suíte completa 2081 passando antes do retry; 2 testes antigos do resumo da agenda atualizados; `tests/dinheiro` 435 verdes depois do retry.
 - Perfil de 5 meses (script descartável de leitura) sobre créditos e débitos reais.
 
-- **"Esperado e não veio" (código pronto, instala após a suíte verde):** `gabi/dinheiro/esperados.py` aprende o normal de cada pagador pelos 5 últimos meses (valor médio, dia mais tardio, camadas por faixa de valor, "nova" com 2 meses seguidos) e a agenda financeira passa a mostrar `⚠️ A receber atrasado: <pagador> ~R$ X (costuma cair até o dia N)`. Em dado real (leitura): a partir de 16/10 só a X2 Intermediações (R$ 10.208) aparece atrasada, o caso do Matheus; as outras 9 séries ficam em ordem. Um teste achou e corrigiu um defeito (o dígito de "X2" sumia do nome).
+- **"Esperado e não veio" (**instalado**, commit `fcd03ca`, suíte completa 2116 verdes):** `gabi/dinheiro/esperados.py` aprende o normal de cada pagador pelos 5 últimos meses (valor médio, dia mais tardio, camadas por faixa de valor, "nova" com 2 meses seguidos) e a agenda financeira passa a mostrar `⚠️ A receber atrasado: <pagador> ~R$ X (costuma cair até o dia N)`. Em dado real (leitura): a partir de 16/10 só a X2 Intermediações (R$ 10.208) aparece atrasada, o caso do Matheus; as outras 9 séries ficam em ordem. Um teste achou e corrigiu um defeito (o dígito de "X2" sumia do nome).
 
 ## 4. Decisões (e o que ficou aberto)
 - **Aprovado:** agenda financeira **B** (diária curta: atrasadas, hoje, 3 dias com previsão do saldo; segunda: 30 dias); pausar o resumo semanal de domingo; previsão diária conservadora (só saídas, aviso de "entradas esperadas não contadas"); opção C do backlog (núcleo + "Depois").
@@ -83,6 +83,9 @@ O Eve é um framework de agentes (diretório por agente, skills sob demanda, sub
 6. **Skills sob demanda, versionadas:** manter `~/.hermes/skills/gabi-brain/` com referências por assunto, carregadas só quando necessárias, e `write_approval` para a Gabi propor skills sem alterar o comportamento sozinha.
 7. **Evals fixos:** conjunto de mensagens e perguntas com resposta esperada (resumo, agenda financeira, cobrança, classificação), rodado antes de instalar. Substitui a conferência "no olho".
 8. **Laço de correção:** taxa de aceite das sugestões (regras, classificações, compromissos) por origem; sobe ou desce o limiar do modelo conforme o aceite. Traces e custo por tarefa já existem (`chamada_mcp`, `custo_modelo`) e só faltam no painel.
+
+## Estado final de 16/10 (o que está em produção)
+Resumo da manhã em blocos · agenda financeira diária (atrasadas, hoje, 3 dias, previsão, "a receber atrasado") · agenda financeira semanal de 30 dias (segunda 08:00 via `forecast-semanal`) · retry dos saldos · Hermes em português com `agenda_financeira` liberada · resumo de domingo pausado. Último commit: `fcd03ca`. Próxima manhã (07:05 BRT) deve trazer o primeiro "A receber atrasado" (X2 Intermediações, R$ 10.208).
 
 ## 10. Próximos passos, na ordem
 (Itens 1 e 2 já feitos em 16/10; os demais seguem.)
