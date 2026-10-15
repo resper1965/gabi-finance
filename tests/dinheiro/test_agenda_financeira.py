@@ -1,0 +1,115 @@
+import datetime as dt
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from gabi.db import conectar, migrar
+from gabi.dinheiro.agenda_financeira import montar
+
+BRT = ZoneInfo("America/Sao_Paulo")
+AGORA = dt.datetime(2026, 10, 16, 7, 5, tzinfo=BRT)  # sexta-feira
+MIGR = Path(__file__).parent.parent.parent / "migrations"
+
+
+@pytest.fixture
+def con(tmp_path):
+    c = conectar(tmp_path / "t.db")
+    migrar(c, MIGR)
+    c.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values ('b1','Itau','BANK','Itaú','sim')")
+    c.execute("insert into saldo(conta_id, em, saldo_centavos) values (1, '2026-10-16T06:05:00', 1000000)")  # R$ 10.000,00
+    return c
+
+
+def comp(con, id_, venc, estado, valor, fonte="valores_do_mes", nome=None, forma=""):
+    con.execute("insert into compromisso(id, origem, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, estado, forma) values (?,?,?,?,?,?,?,?,?)",
+                (id_, "linha", nome or id_, venc, venc, valor, fonte, estado, forma))
+
+
+def texto(con, **k):
+    return "\n".join(montar(con, AGORA, **k))
+
+
+def test_diaria_mostra_saldo_com_hora_e_proximos_dias_em_ordem(con):
+    comp(con, "b", "2026-10-19", "aberto", 186362, nome="Fatura Personnalite")
+    comp(con, "a", "2026-10-18", "aberto", 50000, nome="Escola")
+    t = texto(con)
+    assert t.startswith("💰 *Financeiro*") and "Saldo: R$ 10.000,00" in t
+    assert t.index("• 18/10 Escola R$ 500,00") < t.index("• 19/10 Fatura Personnalite R$ 1.863,62")
+
+
+def test_valor_estimado_vai_com_til_e_debito_automatico_marcado(con):
+    comp(con, "e", "2026-10-17", "previsto", 30000, fonte="ultimo", nome="Sem Parar")
+    comp(con, "d", "2026-10-18", "debito_automatico", 6400, fonte="padrao", nome="Vivo")
+    t = texto(con)
+    assert "• 17/10 Sem Parar ~R$ 300,00" in t and "• 18/10 Vivo ~R$ 64,00 (déb. auto)" in t
+
+
+def test_dia_vazio_diz_que_nao_ha_nada(con):
+    t = texto(con)
+    assert "• Hoje: nada" in t and "• Atrasadas: 0" in t and "Nada nos próximos 3 dias" in t
+
+
+def test_atrasadas_contam_e_somam(con):
+    comp(con, "x", "2026-10-10", "atrasado", 120000)
+    comp(con, "y", "2026-10-12", "atrasado", 80000)
+    assert "• ⚠️ Atrasadas: 2 (R$ 2.000,00)" in texto(con)
+
+
+def test_o_que_vence_hoje_aparece_em_hoje(con):
+    comp(con, "h", "2026-10-16", "aberto", 25000, nome="Condomínio")
+    t = texto(con)
+    assert "• Hoje: Condomínio R$ 250,00" in t and "Hoje: nada" not in t
+
+
+def test_falta_de_saldo_avisa_o_dia_e_o_valor(con):
+    comp(con, "g", "2026-10-18", "aberto", 1300000, nome="Aluguel")
+    t = texto(con)
+    assert "⚠️ Falta R$ 3.000,00 em 18/10" in t
+
+
+def test_sem_falta_mostra_o_saldo_previsto(con):
+    comp(con, "g", "2026-10-18", "aberto", 100000)
+    t = texto(con)
+    assert "Previsão: R$ 9.000,00 em 19/10" in t and "Falta" not in t
+
+
+def test_valor_a_confirmar_nao_entra_na_soma_e_e_dito(con):
+    comp(con, "v", "2026-10-17", "previsto", None, nome="Carla (reembolso)")
+    t = texto(con)
+    assert "• 17/10 Carla (reembolso) valor a confirmar" in t and "Previsão: R$ 10.000,00" in t
+
+
+def test_saldo_com_leitura_antiga_avisa(con):
+    con.execute("update saldo set em='2026-10-15T20:00:00'")  # 11 h antes
+    t = texto(con)
+    assert "⚠️ leitura de 15/10 20:00" in t
+
+
+def test_saldo_recente_nao_avisa_de_leitura(con):
+    assert "leitura de" not in texto(con)
+
+
+def test_lista_longa_corta_em_doze_e_diz_quantos_faltam(con):
+    for i in range(15):
+        comp(con, f"c{i}", "2026-10-18", "aberto", 1000, nome=f"Conta {i:02d}")
+    t = texto(con)
+    assert t.count("• 18/10 Conta") == 12 and "+3 outros" in t
+
+
+def test_avisa_que_entradas_alem_das_notas_nao_contam(con):
+    assert "entradas" in texto(con).lower().splitlines()[-1]
+
+
+def test_semanal_agrupa_por_semana_e_aponta_o_primeiro_aperto(con):
+    comp(con, "s1", "2026-10-20", "aberto", 400000, nome="A")
+    comp(con, "s2", "2026-10-27", "aberto", 900000, nome="B")
+    t = texto(con, dias=30, semanal=True)
+    assert t.startswith("💰 *Financeiro: próximos 30 dias*")
+    assert "• 19/10–25/10: sai R$ 4.000,00" in t and "• 26/10–01/11: sai R$ 9.000,00" in t
+    assert "⚠️ Primeiro aperto: 27/10 (falta R$ 3.000,00)" in t
+
+
+def test_semanal_sem_aperto(con):
+    comp(con, "s1", "2026-10-20", "aberto", 100000)
+    assert "Sem falta de caixa no período" in texto(con, dias=30, semanal=True)

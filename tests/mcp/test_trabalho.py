@@ -37,7 +37,7 @@ def test_resumo_tem_um_bloco_por_assunto_separado_por_linha_em_branco(tmp_path):
     assert r["texto"] == "\n".join(r["linhas"])
     cabecalhos = [l for l in r["linhas"] if l.startswith(("💰", "📅", "📧"))]
     assert cabecalhos == ["💰 *Financeiro*", "📅 *Agenda*", "📧 *E-mail*"]
-    assert all(l.startswith("•") or l == "" or l[0] in "💰📅📧⚠⭐" for l in r["linhas"])
+    assert "Saldo: sem leitura" in r["linhas"] and any(l.startswith("Previsão:") for l in r["linhas"])
 
 
 def test_resumo_comeca_por_desatualizado(tmp_path):
@@ -55,7 +55,7 @@ def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
     c.execute("insert into item_email(caixa_id, message_id, remetente, assunto, recebido_em, relevante, motivo) values (1,'<a>','c@x.com','Proposta','2026-10-10T05:00:00Z',1,'cliente')")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     txt = resumo_da_manha(c, AGORA)["texto"]
-    assert "• 14:00 Reunião IONIC" in txt and "📅 *Agenda* (1)" in txt and "📧 *E-mail* (1 importante)" in txt and "• Saldo: R$ 0,00" in txt
+    assert "• 14:00 Reunião IONIC" in txt and "📅 *Agenda* (1)" in txt and "📧 *E-mail* (1 importante)" in txt and "Saldo: sem leitura" in txt
 
 
 def test_aviso_so_e_marcado_entregue_apos_confirmacao_do_canal(tmp_path):

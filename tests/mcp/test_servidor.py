@@ -14,7 +14,7 @@ from gabi.mcp.tokens import emitir, revogar
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
-LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai"}
+LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira"}
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "pedidos_estado", "avisos_pendentes", "avisos_confirmar_entrega",
                "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar", "pessoas_dado"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}  # só leitura do Trabalho

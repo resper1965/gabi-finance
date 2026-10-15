@@ -4,6 +4,7 @@ import datetime as dt
 
 from gabi.agenda import consulta
 from gabi.correio import consulta as consulta_correio
+from gabi.dinheiro import agenda_financeira
 from gabi.envelope import envelope
 from gabi.trabalho import frentes as modulo_frentes, hoje as modulo_hoje
 
@@ -16,13 +17,6 @@ LIMITE_DIAS_AGENDA = 31
 def _corta(texto: str, n: int = 70) -> str:
     texto = " ".join((texto or "").split())
     return texto if len(texto) <= n else texto[: n - 1].rstrip() + "…"
-
-
-def _reais(v: str) -> str:
-    """'29571.85' -> 'R$ 29.571,85' (os valores do painel vêm como texto com ponto decimal)."""
-    sinal, v = ("-", v[1:]) if v.startswith("-") else ("", v)
-    inteiro, _, cent = v.partition(".")
-    return f"{sinal}R$ {int(inteiro):,}".replace(",", ".") + f",{(cent or '0').ljust(2, '0')[:2]}"
 
 
 def _bloco_agenda(ag: list[dict]) -> list[str]:
@@ -43,14 +37,6 @@ def _bloco_correio(importantes: list[dict], n_painel: int) -> list[str]:
         return ["📧 *E-mail*", "• Nenhum importante"]
     itens = [f"• {m['remetente'] or '?'}: {_corta(m['assunto'] or '(sem assunto)')}" for m in importantes[:3]]
     return [f"📧 *E-mail* ({total} importante{'s' if total != 1 else ''})", *itens, *([f"• +{total - 3} outros"] if total > 3 else [])]
-
-
-def _bloco_dinheiro(din: dict) -> list[str]:
-    atr = din["atrasadas"]
-    return ["💰 *Financeiro*",
-            f"• {'⚠️ ' if atr['n'] else ''}Atrasadas: {atr['n']}" + (f" ({_reais(atr['valor'])})" if atr["n"] else ""),
-            f"• Sai hoje: {_reais(din['sai_hoje'])}",
-            f"• Saldo: {_reais(din['saldo'])}"]
 
 
 def _quando(iso: str | None) -> str:
@@ -98,14 +84,14 @@ _email_listar = email_listar  # o nome `email_listar` é reusado pela ferramenta
 
 
 def resumo_da_manha(con, agora: dt.datetime) -> dict:
-    """Mensagem das 07:05 em blocos separados por linha em branco: Financeiro, Agenda, E-mail (e Prioridade).
+    """Mensagem das 07:05 em blocos separados por linha em branco: Financeiro (agenda financeira de 3 dias), Agenda, E-mail (e Prioridade).
     Se os dados estiverem desatualizados, a primeira linha avisa. `linhas` guarda cada linha; `texto` junta com \n."""
     env = envelope(con, {}, agora=agora)
     d = modulo_hoje.hoje(con, agora)
     linhas = []
     if env["desatualizado"]:
         linhas += [f"⚠️ *Dados desatualizados* (conferidos até {_quando(env['dados_ate'])}). Confira antes de agir.", ""]
-    linhas += _bloco_dinheiro(d["dinheiro"]) + [""]
+    linhas += agenda_financeira.montar(con, agora, dias=3) + [""]
     linhas += _bloco_agenda(d["agenda"]) + [""]
     linhas += _bloco_correio(consulta_correio.importantes(con, limite=50, agora=agora), len(d["emails_importantes"]))
     if d["prioridades"]:

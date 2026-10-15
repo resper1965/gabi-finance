@@ -16,7 +16,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro import consultas, contas_pagar as cp
+from gabi.dinheiro import agenda_financeira as agenda_fin, consultas, contas_pagar as cp
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
 from gabi.mcp import ferramentas_prop, ferramentas_trab
@@ -27,7 +27,7 @@ log = logging.getLogger("gabi.mcp")
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
-ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin",
+ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS}
 
 
@@ -122,6 +122,15 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
             return {"caixa_unico": formatar(sum(c["saldo_centavos"] for c in cx.contas if not conta or c["apelido"] == conta)),
                     "contas": contas, "faturas_abertas": formatar(cx.faturas_abertas_centavos)}
         return executar("financeiro_saldo", f)
+
+    @srv.tool()
+    def agenda_financeira(dias: int = 3, semanal: bool = False) -> dict:
+        """Agenda financeira pronta para o celular, entregar exatamente como vem: atrasadas, o que vence hoje, os próximos `dias` (1 a 45) e a previsão do saldo; com semanal=true, 30 dias agrupados por semana e o primeiro aperto de caixa. Só leitura."""
+        def f(con, agora):
+            d = ferramentas_trab._inteiro(dias, 1, 45, "dias")
+            linhas = agenda_fin.montar(con, agora, dias=30 if semanal else d, semanal=semanal)
+            return {"linhas": linhas, "texto": "\n".join(linhas)}
+        return executar("agenda_financeira", f)
 
     @srv.tool()
     def financeiro_lancamentos(de: str | None = None, ate: str | None = None, conta: str | None = None, categoria: int | None = None,
