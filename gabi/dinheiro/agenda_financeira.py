@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.conciliacao import CONFIRMADO
+from gabi.dinheiro.esperados import entradas_esperadas
 from gabi.dinheiro.projecao import projetar
 
 BRT = ZoneInfo("America/Sao_Paulo")
@@ -65,6 +66,15 @@ def _previsao_diaria(proj: list[dict]) -> str:
     return f"Previsão: {_brl(ultimo['saldo_centavos'])} em {_dm(dt.date.fromisoformat(ultimo['dia']))}"
 
 
+def _a_receber_atrasado(con, hoje: dt.date) -> list[str]:
+    """Entradas que o extrato mostra como normais (últimos 5 meses) e já deveriam ter caído este mês."""
+    atrasadas = [e for e in entradas_esperadas(con, hoje) if e["atrasada"]]
+    linhas = [f"• ⚠️ A receber atrasado: {e['pagador']} ~{_brl(e['valor_centavos'])} (costuma cair até o dia {e['dia_limite']})" for e in atrasadas[:5]]
+    if len(atrasadas) > 5:
+        linhas.append(f"• +{len(atrasadas) - 5} a receber atrasados")
+    return linhas
+
+
 def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     caixa = contas_pagar.caixa_unico(con, hoje)
     atrasadas, do_dia, adiante = _itens(con, hoje, hoje + dt.timedelta(days=dias))
@@ -72,6 +82,7 @@ def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     linhas = ["💰 *Financeiro*", _linha_saldo(caixa, agora),
               f"• ⚠️ Atrasadas: {len(atrasadas)} ({_brl(soma_atraso)})" if atrasadas else "• Atrasadas: 0",
               "• Hoje: " + "; ".join(f"{i['nome']} {_valor(i)}{_marca(i)}" for i in do_dia) if do_dia else "• Hoje: nada"]
+    linhas += _a_receber_atrasado(con, hoje)
     if adiante:
         linhas.append(f"Próximos {dias} dias")
         linhas += [f"• {_dm(dt.date.fromisoformat(i['vencimento_util']))} {i['nome']} {_valor(i)}{_marca(i)}" for i in adiante[:LIMITE_ITENS]]
