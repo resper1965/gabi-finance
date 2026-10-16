@@ -95,6 +95,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "vence_hoje":
         itens = p.get("itens") or []
         return "Vence hoje", "; ".join(f"{i['nome']} {_brl(i.get('valor'))}" for i in itens) or "nada"
+    if tipo == "hermes_parado":
+        return "O Hermes (Telegram e WhatsApp) está parado", f"a unidade {p.get('unidade') or 'hermes-gateway'} está {p.get('estado') or 'fora do ar'}; reinicie com: sudo systemctl restart hermes-gateway"
     if tipo == "servico_falhou":
         return "Serviço falhou", f"{p.get('unidade', '?')} terminou com erro"
     if tipo == "lancamento_sem_conversao":

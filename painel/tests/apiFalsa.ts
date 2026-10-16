@@ -11,7 +11,7 @@ const ROTAS: [RegExp, string][] = [
   [/\/lancamentos.*pendente=para_quem/, "lancamentos-pendentes"], [/\/lancamentos/, "lancamentos"],
   [/\/destino\/agrupado.*por=pessoa/, "destino-pessoa"], [/\/destino\/agrupado/, "destino-fornecedor"], [/\/destino/, "destino"],
   [/\/cartoes/, "cartoes"], [/\/parcelas/, "parcelas"], [/\/assinaturas/, "assinaturas"], [/\/sugestoes/, "sugestoes"], [/\/regras/, "regras"],
-  [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/rodadas/, "rodadas"], [/\/cobrar\/reembolsos/, "cobrar-reembolsos"], [/\/cobrar\/comprovantes/, "cobrar-comprovantes"],
+  [/\/gabi\/qualidade/, "qualidade"], [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/rodadas/, "rodadas"], [/\/cobrar\/reembolsos/, "cobrar-reembolsos"], [/\/cobrar\/comprovantes/, "cobrar-comprovantes"],
   [/\/cobrar\/pedidos/, "cobrar-pedidos"], [/\/cobrar\/cobrancas/, "cobrar-cobrancas"], [/\/cadastros\/nibo/, "cadastros-nibo"], [/\/cadastros\/liberacoes/, "cadastros-liberacoes"], [/\/cadastros\/contas/, "cadastros-contas"], [/\/cadastros\/pessoas/, "cadastros-pessoas"],
   [/\/familia\/pessoas/, "familia-pessoas"], [/\/familia\/exames\/[^/]+\/serie/, "familia-serie"], [/\/familia\/exames\/[^/]+\/resumo/, "familia-resumo"], [/\/familia\/exames\//, "familia-exames"], [/\/familia\/laudos/, "familia-laudos"],
   [/\/hoje/, "hoje"], [/\/frentes\/1/, "frente-1"], [/\/frentes/, "frentes"], [/\/agenda/, "agenda"], [/\/mensagens/, "mensagens"], [/\/tarefas/, "tarefas"], [/\/entregas/, "entregas"], [/\/setup/, "setup"], [/\/caixas-email/, "caixas-email"],

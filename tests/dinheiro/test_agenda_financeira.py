@@ -206,3 +206,15 @@ def test_falha_no_desvio_nao_derruba_a_diaria(con, monkeypatch):
     monkeypatch.setattr("gabi.dinheiro.agenda_financeira.fora_do_normal", estoura)
     t = texto(con)
     assert t.startswith("💰 *Financeiro*") and "Fora do normal" not in t
+
+
+def test_semanal_traz_cenario_com_recorrentes_esperadas(con):
+    for i, m in enumerate(["2026-06", "2026-07", "2026-08", "2026-09"]):
+        con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                    "values (1,?,?,2000000,'PIX RECEBIDO CLIENTE FIXO','caixa+custo','posted')", (f"r{i}", f"{m}-20"))
+    t = texto(con, dias=30, semanal=True)
+    assert "Com recorrentes esperadas (médias, +R$ 20.000,00 em entradas)" in t
+
+
+def test_semanal_sem_recorrentes_nao_ganha_o_segundo_cenario(con):
+    assert "Com recorrentes esperadas" not in texto(con, dias=30, semanal=True)

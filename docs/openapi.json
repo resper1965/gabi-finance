@@ -2058,7 +2058,7 @@
     "summary": "Perguntas"
    },
    "post": {
-    "description": "Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim).",
+    "description": "Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem).",
     "operationId": "criar_api_v1_decisoes_perguntas_post",
     "responses": {
      "200": {
@@ -2996,6 +2996,23 @@
      }
     },
     "summary": "Confirmar Item"
+   }
+  },
+  "/api/v1/gabi/qualidade": {
+   "get": {
+    "description": "A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias).",
+    "operationId": "ler_api_v1_gabi_qualidade_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Ler"
    }
   },
   "/api/v1/hoje": {

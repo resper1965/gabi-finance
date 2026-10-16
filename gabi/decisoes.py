@@ -26,11 +26,55 @@ def _conta_existe(con, p: dict) -> None:
         raise ErroDecisao("opcoes_invalidas", "conta_id não existe")
 
 
+CAMPOS_NOVO_COMPROMISSO = {"nome", "extrato", "vencimento", "ajuste_dia_util", "valor_tipo", "valor_padrao", "forma", "obs", "ativo"}
+
+
+def _compromisso_novo(con, p: dict):
+    """Valida pela MESMA regra do cadastro (planilha) e devolve a linha pronta; não grava."""
+    from gabi.rotas import cadastros as cad
+    if not isinstance(p, dict) or not p.get("nome") or set(p) - CAMPOS_NOVO_COMPROMISSO:
+        raise ErroDecisao("opcoes_invalidas", f"criar_compromisso aceita só os campos {sorted(CAMPOS_NOVO_COMPROMISSO)} e exige nome")
+    if not isinstance(p.get("ativo", True), bool):
+        raise ErroDecisao("opcoes_invalidas", "ativo deve ser true ou false")
+    dado = {k: v for k, v in p.items() if k not in ("obs", "ativo")}
+    dado["id"] = cad._id_unico(con, "compromisso_linha", cad._slug(str(p["nome"])))
+    try:
+        return cad.COMPROMISSOS._validar(con, dado, None)
+    except Exception as e:  # HTTPException do cadastro: devolve o motivo como erro de decisão
+        raise ErroDecisao("opcoes_invalidas", f"compromisso inválido: {getattr(e, 'detail', e)}")
+
+
+def _criar_compromisso_validar(con, p: dict) -> None:
+    _compromisso_novo(con, p)
+
+
+def _criar_compromisso_aplicar(con, p: dict) -> None:
+    from gabi.rotas import cadastros as cad
+    linha = _compromisso_novo(con, p)  # dentro da transação da resposta: o id é recalculado agora, sem corrida
+    cad.COMPROMISSOS._gravar(con, linha, p.get("ativo", True), p.get("obs"), True)
+
+
+def _para_quem_validar(con, p: dict) -> None:
+    if not isinstance(p, dict) or set(p) != {"estabelecimento", "pessoa_id"} or not str(p.get("estabelecimento") or "").strip():
+        raise ErroDecisao("opcoes_invalidas", "atribuir_para_quem exige estabelecimento e pessoa_id, só esses dois")
+    if con.execute("select 1 from pessoa where id=?", (p["pessoa_id"],)).fetchone() is None:
+        raise ErroDecisao("opcoes_invalidas", "pessoa_id não existe")
+
+
+def _para_quem_aplicar(con, p: dict) -> None:
+    """Só preenche o que está sem dono (nunca troca um dono já escolhido); a origem é 'voce': foi o Ricardo quem decidiu."""
+    _para_quem_validar(con, p)
+    con.execute("update lancamento set para_quem_id=?, para_quem_origem='voce' where para_quem_id is null and coalesce(estabelecimento, descricao_original)=?",
+                (p["pessoa_id"], p["estabelecimento"]))
+
+
 # efeito -> (validação na criação, aplicação na resposta). Acrescentar um efeito é mudança de código revisada, nunca dado.
 EFEITOS = {
     "registrar_nota": (lambda con, p: None, lambda con, p: None),
     "marcar_conta_nao": (_conta_existe, _conta_estado("nao")),
     "marcar_conta_sim": (_conta_existe, _conta_estado("sim")),
+    "criar_compromisso": (_criar_compromisso_validar, _criar_compromisso_aplicar),
+    "atribuir_para_quem": (_para_quem_validar, _para_quem_aplicar),
 }
 
 

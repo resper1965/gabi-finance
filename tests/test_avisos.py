@@ -338,3 +338,44 @@ def test_sem_produtor_o_telegram_tambem_consolida_duplicados(con):
     chamadas = []
     assert enviar_avisos_contagem(con, {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}, AGORA, lambda u, c: chamadas.append(c) or 200) == (3, 0, 0)
     assert con.execute("select count(*) from aviso where telegram_em is not null").fetchone()[0] == 9  # 3 enviados + 6 superados
+
+
+# ---------------- hermes_parado (H4) ----------------
+def test_hermes_parado_avisa_uma_vez_por_dia(con):
+    gerar_avisos(con, AGORA, estado_servico=lambda u: "failed")
+    gerar_avisos(con, AGORA + dt.timedelta(hours=1), estado_servico=lambda u: "failed")
+    r = con.execute("select payload from aviso where tipo='hermes_parado'").fetchall()
+    assert len(r) == 1 and json.loads(r[0][0]) == {"chave": "hermes-gateway", "unidade": "hermes-gateway", "estado": "failed"}
+
+
+def test_hermes_ativo_subindo_ou_desconhecido_nao_avisa(con):
+    for st in ("active", "activating", "reloading", None):
+        gerar_avisos(con, AGORA, estado_servico=lambda u, st=st: st)
+    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
+
+
+def test_sem_leitor_de_servico_ninguem_consulta_o_systemd(con):
+    gerar_avisos(con, AGORA)  # padrão dos testes e de quem não passa o leitor
+    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
+
+
+def test_hermes_parado_pode_ser_desligado_e_a_unidade_trocada(con):
+    _param_escuta(con, "avisos.vigiar_hermes", False)
+    gerar_avisos(con, AGORA, estado_servico=lambda u: "failed")
+    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
+    _param_escuta(con, "avisos.vigiar_hermes", True)
+    _param_escuta(con, "avisos.hermes_unidade", "outro-gateway")
+    chamadas = []
+    gerar_avisos(con, AGORA, estado_servico=lambda u: chamadas.append(u) or "inactive")
+    assert chamadas == ["outro-gateway"]
+
+
+def test_descrever_hermes_parado():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("hermes_parado", {"unidade": "hermes-gateway", "estado": "failed"})
+    assert "Hermes" in t and "restart hermes-gateway" in x and "failed" in x
+
+
+def test_estado_do_servico_devolve_none_quando_nao_ha_systemd_ou_unidade():
+    from gabi.avisos import estado_do_servico
+    assert estado_do_servico("unidade-que-nao-existe-xyz") is None

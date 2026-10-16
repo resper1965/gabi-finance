@@ -189,6 +189,34 @@ def _escuta_parada(con, agora: dt.datetime, novo) -> None:
         novo("escuta_parada", "ouvinte", {"motivo": f"ouvinte sem receber mensagens há {n} horas"})
 
 
+UNIDADE_HERMES = "hermes-gateway"
+
+
+def estado_do_servico(unidade: str) -> str | None:
+    """'active', 'failed', 'inactive'... ou None se não deu para saber (sem systemctl, sem permissão, unidade inexistente)."""
+    import subprocess
+    try:
+        r = subprocess.run(["systemctl", "show", unidade, "-p", "LoadState", "-p", "ActiveState"], capture_output=True, text=True, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    campos = dict(l.split("=", 1) for l in r.stdout.splitlines() if "=" in l)
+    if r.returncode != 0 or campos.get("LoadState") != "loaded":
+        return None
+    return campos.get("ActiveState")
+
+
+def _hermes_parado(con, agora: dt.datetime, novo, estado) -> None:
+    """H4: o canal (Hermes) caiu? Só 'failed' ou 'inactive' avisam; 'activating', 'reloading' e 'não sei' não. Um aviso por dia, sem texto de conversa.
+    O aviso sai pelo Telegram do próprio brain, que não depende do Hermes."""
+    if _parametro(con, "avisos.vigiar_hermes", True) is False:
+        return
+    unidade = _parametro(con, "avisos.hermes_unidade", UNIDADE_HERMES)
+    unidade = unidade if isinstance(unidade, str) and unidade.strip() else UNIDADE_HERMES
+    st = estado(unidade)
+    if st in ("failed", "inactive"):
+        novo("hermes_parado", unidade, {"unidade": unidade, "estado": st})
+
+
 def _vence_em_breve(con, agora: dt.datetime, hoje: dt.date, novo) -> None:
     """Contas que vencem de amanhã até `avisos.antecedencia_dias` (padrão 3) à frente e ainda não foram avisadas, com o valor estimado marcado como tal.
     Cada conta entra num aviso uma única vez (as que entram na janela depois, como boleto emitido tarde, saem no aviso do dia); o do dia do vencimento é o `vence_hoje`."""
@@ -229,7 +257,7 @@ def _valor_diferente(con, agora: dt.datetime, novo) -> None:
                 novo("valor_diferente", i["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "estimado": formatar(est), "real": formatar(real)})
 
 
-def gerar_avisos(con, agora: dt.datetime) -> list[int]:
+def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
     _fechar_obsoletos(con, agora)
@@ -252,6 +280,8 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
     _escuta_parada(con, agora, novo)
+    if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
+        _hermes_parado(con, agora, novo, estado_servico)
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):
         novo("conta_atrasada", c["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"])})
@@ -289,7 +319,7 @@ def main(argv=None) -> int:
     if a.falha:
         print("servico_falhou:", a.falha, "->", registrar_servico_falhou(con, a.falha, agora))
     else:
-        print("avisos criados:", gerar_avisos(con, agora))
+        print("avisos criados:", gerar_avisos(con, agora, estado_servico=estado_do_servico))
     return 0
 
 

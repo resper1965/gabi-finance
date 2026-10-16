@@ -6,6 +6,7 @@ Consome: dinheiro.{captura,conferencia,classificar,contas_pagar,repositorio}, fo
 """
 import datetime as dt
 import fcntl
+import logging
 import os
 import sys
 import time
@@ -16,11 +17,13 @@ from zoneinfo import ZoneInfo
 
 from gabi.cobrar.recebimentos import propor_recebimentos
 from gabi.db import conectar, migrar
-from gabi.dinheiro import repositorio
+from gabi.dinheiro import repositorio, sugestoes_agenda, sugestoes_dono
 from gabi.dinheiro.captura import ResumoCaptura, capturar, capturar_saldos
 from gabi.dinheiro.classificar import ResumoClassificacao, classificar_pendentes
 from gabi.dinheiro.conferencia import conferir, marcar_conferida
 from gabi.dinheiro.contas_pagar import ResumoCompromissos, atualizar_compromissos
+
+log = logging.getLogger(__name__)
 
 
 class RodadaEmAndamento(RuntimeError):
@@ -61,6 +64,14 @@ def rodar_extratos(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: 
         conferida = marcar_conferida(con, captura.rodada_id)
         resultado = ResultadoExtratos(captura, conferida, classificar_pendentes(con), atualizar_compromissos(con, hoje, agora))
         propor_recebimentos(con)  # crédito em conta PJ x NFS-e autorizada: só PROPÕE (R1)
+        try:
+            sugestoes_agenda.propor(con, hoje, agora.astimezone(dt.timezone.utc).isoformat())  # evento mensal "Pagar…" vira pergunta (R1)
+        except Exception:  # acessório: a rodada de extratos nunca falha por isso
+            log.exception("sugestões de compromisso da agenda falharam")
+        try:
+            sugestoes_dono.propor(con, agora.astimezone(dt.timezone.utc).isoformat())  # fornecedor sem dono vira pergunta (R1), até 5 abertas
+        except Exception:
+            log.exception("perguntas de dono falharam")
         return resultado
 
 

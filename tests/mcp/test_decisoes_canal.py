@@ -88,3 +88,12 @@ def test_api_so_para_boss_e_valida_efeito(api):
     assert api.get("/api/v1/decisoes/perguntas", headers=BOSS).json()["dados"]["perguntas"] == []
     api.post("/api/v1/decisoes/perguntas", headers=BOSS, json=PERGUNTA)
     assert len(api.get("/api/v1/decisoes/perguntas?estado=aberta", headers=BOSS).json()["dados"]["perguntas"]) == 1
+
+
+def test_qualidade_e_duracao_das_chamadas_mcp(api, mcp, toks, banco):
+    chamar(mcp, toks["fin"], "financeiro_saldo")
+    ms = conectar(banco).execute("select duracao_ms from chamada_mcp where ferramenta='financeiro_saldo'").fetchone()[0]
+    assert isinstance(ms, int) and ms >= 0
+    q = api.get("/api/v1/gabi/qualidade", headers=BOSS).json()["dados"]
+    assert set(q) == {"aceite", "custo", "latencia"} and any(f["ferramenta"] == "financeiro_saldo" for f in q["latencia"]["ferramentas"])
+    assert api.get("/api/v1/gabi/qualidade", headers={"Tailscale-User-Login": "vip@x.com"}).status_code == 403

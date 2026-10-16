@@ -5,7 +5,7 @@ import datetime as dt
 import logging
 from zoneinfo import ZoneInfo
 
-from gabi.dinheiro import contas_pagar
+from gabi.dinheiro import analise, contas_pagar
 from gabi.dinheiro.conciliacao import CONFIRMADO
 from gabi.dinheiro.desvio import fora_do_normal
 from gabi.dinheiro.esperados import entradas_esperadas
@@ -125,6 +125,40 @@ def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     return linhas
 
 
+def _cenario_recorrentes(con, hoje: dt.date, dias: int, proj: list[dict]) -> list[str]:
+    """Segundo cenário (AF4): o contratado + as entradas recorrentes que o extrato mostra como normais e ainda não vieram este mês.
+    Só para comparar com o primeiro; as médias podem repetir uma NFS-e já prevista, por isso é o cenário otimista."""
+    try:
+        fim = hoje + dt.timedelta(days=dias - 1)
+        extras: dict[dt.date, int] = {}
+        for r in analise.recorrentes(FonteAnalise(con, so_liberadas=True), "caixa", hoje):
+            if r["sentido"] != "entrada":
+                continue
+            y, m = hoje.year, hoje.month
+            for _ in range(2):
+                try:
+                    dia = dt.date(y, m, min(r["dia"], 28))
+                except ValueError:
+                    dia = None
+                if dia and hoje <= dia <= fim and not (dia.month == hoje.month and r["ja_ocorreu_este_mes"]):
+                    extras[dia] = extras.get(dia, 0) + round(r["valor_medio"] * 100)
+                m += 1
+                if m > 12:
+                    y, m = y + 1, 1
+        if not extras:
+            return []
+        acum, menor, saldo_fim = 0, None, 0
+        for d in proj:
+            acum += extras.get(dt.date.fromisoformat(d["dia"]), 0)
+            saldo = d["saldo_centavos"] + acum
+            menor = saldo if menor is None else min(menor, saldo)
+            saldo_fim = saldo
+        return [f"Com recorrentes esperadas (médias, +{_brl(sum(extras.values()))} em entradas): menor saldo {_brl(menor)}, em {_dm(fim)} {_brl(saldo_fim)}"]
+    except Exception:  # cenário acessório: nunca derruba a semanal
+        log.exception("cenário com recorrentes falhou")
+        return []
+
+
 def _semanal(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     caixa = contas_pagar.caixa_unico(con, hoje)
     proj = projetar(con, hoje, dias)
@@ -142,6 +176,7 @@ def _semanal(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     linhas.append(f"⚠️ Primeiro aperto: {_dm(dt.date.fromisoformat(aperto['dia']))} (falta {_brl(-aperto['saldo_centavos'])})" if aperto
                   else "Sem falta de caixa no período")
     linhas.append(AVISO_ENTRADAS)
+    linhas += _cenario_recorrentes(con, hoje, dias, proj)
     return linhas
 
 

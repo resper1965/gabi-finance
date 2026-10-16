@@ -24,7 +24,7 @@ def perguntas(request: Request, estado: str | None = None):
 
 @router.post("/perguntas")
 async def criar(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim)."""
+    """Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem)."""
     corpo = _corpo(await _json(request))
     con = _con(request)
     try:

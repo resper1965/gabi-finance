@@ -8,6 +8,7 @@ import contextvars
 import datetime as dt
 import logging
 import os
+import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -16,7 +17,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro import agenda_financeira as agenda_fin, analise, consultas, contas_pagar as cp, rumo
+from gabi.dinheiro import agenda_financeira as agenda_fin, analise, cobranca_atraso, fechamento, consultas, contas_pagar as cp, rumo
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -28,7 +29,7 @@ log = logging.getLogger("gabi.mcp")
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
-ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin",
+ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "cobranca_rascunho": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS, **ferramentas_dec.ESCOPOS}
 
@@ -52,12 +53,12 @@ def ferramentas_do_token(escopos) -> list[str]:
     return sorted(n for n, e in ESCOPOS_FERRAMENTAS.items() if e in set(escopos))
 
 
-def _registrar(banco: Path, token: Token | None, ferramenta: str | None, escopo: str | None, status: str) -> None:
+def _registrar(banco: Path, token: Token | None, ferramenta: str | None, escopo: str | None, status: str, duracao_ms: int | None = None) -> None:
     try:
         con = conectar(banco)
         try:
-            con.execute("insert into chamada_mcp(quando, token_id, ferramenta, escopo, status) values (?,?,?,?,?)",
-                        (dt.datetime.now(dt.timezone.utc).isoformat(), token.id if token else None, ferramenta, escopo, status))
+            con.execute("insert into chamada_mcp(quando, token_id, ferramenta, escopo, status, duracao_ms) values (?,?,?,?,?,?)",
+                        (dt.datetime.now(dt.timezone.utc).isoformat(), token.id if token else None, ferramenta, escopo, status, duracao_ms))
         finally:
             con.close()
     except Exception:
@@ -108,20 +109,22 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
             _registrar(banco, t, ferramenta, escopo, "sem_escopo")
             return {"erro": "sem_escopo", "mensagem": f"este token não tem o escopo {escopo!r}"}
         con = conectar(banco)
+        inicio = time.perf_counter()
+        ms = lambda: round((time.perf_counter() - inicio) * 1000)  # noqa: E731
         try:
             try:
                 dados = fn(con, agora_fn())
             except ferramentas_prop.ErroFerramenta as e:
-                _registrar(banco, t, ferramenta, escopo, "erro")
+                _registrar(banco, t, ferramenta, escopo, "erro", ms())
                 return {"erro": e.codigo, "mensagem": e.mensagem}
             except ValueError as e:
-                _registrar(banco, t, ferramenta, escopo, "erro")
+                _registrar(banco, t, ferramenta, escopo, "erro", ms())
                 return {"erro": "requisicao_invalida", "mensagem": str(e)}
             except Exception:
                 log.exception("erro na ferramenta %s", ferramenta)
-                _registrar(banco, t, ferramenta, escopo, "erro")
+                _registrar(banco, t, ferramenta, escopo, "erro", ms())
                 return {"erro": "erro_interno", "mensagem": "falha ao consultar; tente de novo"}
-            _registrar(banco, t, ferramenta, escopo, "ok")
+            _registrar(banco, t, ferramenta, escopo, "ok", ms())
             return envelope(con, dados, agora=agora_fn())
         finally:
             con.close()
@@ -146,6 +149,22 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
         return executar("agenda_financeira", f)
 
     @srv.tool()
+    def fechamento_dia() -> dict:
+        """Fechamento do dia pronto para o celular, entregar exatamente como vem: gastos de hoje (total e os 3 maiores), contas pagas hoje e atrasadas. Só leitura."""
+        def f(con, agora):
+            linhas = fechamento.montar(con, agora.date())
+            return {"linhas": linhas, "texto": "\n".join(linhas)}
+        return executar("fechamento_dia", f)
+
+    @srv.tool()
+    def cobranca_rascunho(pagador: str | None = None) -> dict:
+        """Rascunho de mensagem para cobrar uma entrada atrasada (o que costuma cair no mês e não caiu). `pagador` filtra pelo nome. Só devolve texto: nada é enviado; quem envia é o Ricardo."""
+        def f(con, agora):
+            itens = cobranca_atraso.rascunhos(con, agora.date(), pagador)
+            return {"itens": itens, "nenhum_atrasado": not itens}
+        return executar("cobranca_rascunho", f)
+
+    @srv.tool()
     def financeiro_recorrentes(sentido: str | None = None) -> dict:
         """Entradas e saídas recorrentes aprendidas dos últimos 6 meses (valor médio, dia típico, fixo ou variável). `sentido`: entrada ou saida. Só leitura."""
         def f(con, agora):
@@ -159,7 +178,10 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     def financeiro_previsao(dias: int = 30) -> dict:
         """Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura."""
         def f(con, agora):
-            return _reais(analise.previsao(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date()))
+            r = analise.previsao(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date())
+            if not r.get("dados_de"):  # sem saldo lido, saldo_inicial 0 não é "zero reais": é "não sei"
+                r = {**r, "saldo_indisponivel": True, "aviso": "sem saldo lido das contas liberadas; os saldos abaixo partem de zero e não valem"}
+            return _reais(r)
         return executar("financeiro_previsao", f)
 
     @srv.tool()
