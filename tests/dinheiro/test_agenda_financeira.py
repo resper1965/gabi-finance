@@ -113,3 +113,43 @@ def test_semanal_agrupa_por_semana_e_aponta_o_primeiro_aperto(con):
 def test_semanal_sem_aperto(con):
     comp(con, "s1", "2026-10-20", "aberto", 100000)
     assert "Sem falta de caixa no período" in texto(con, dias=30, semanal=True)
+
+
+def conta_bank(con, apelido, saldo, estado="sim"):
+    n = con.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values (?,?,?,?,?)",
+                    (apelido, apelido, "BANK", apelido, estado)).lastrowid
+    con.execute("insert into saldo(conta_id, em, saldo_centavos) values (?, '2026-10-16T06:05:00', ?)", (n, saldo))
+
+
+def test_conta_negativa_vira_aviso_mesmo_com_caixa_total_positivo(con):
+    conta_bank(con, "Santander", -73707)
+    t = texto(con)
+    assert "⚠️ Saldo negativo: Santander -R$ 737,07" in t
+    assert "Saldo: R$ 9.262,93" in t  # o total continua o do caixa único
+
+
+def test_conta_negativa_diz_onde_ha_saldo_para_cobrir(con):
+    conta_bank(con, "Santander", -73707)
+    assert "Cobre com saldo em: Itaú R$ 10.000,00" in texto(con)
+
+
+def test_varias_contas_negativas_somam_e_listam_a_mais_funda_primeiro(con):
+    conta_bank(con, "Santander", -73707)
+    conta_bank(con, "XP", -200000)
+    t = texto(con)
+    assert t.index("XP -R$ 2.000,00") < t.index("Santander -R$ 737,07")
+
+
+def test_sem_conta_negativa_nao_avisa(con):
+    conta_bank(con, "C6", 5000)
+    assert "Saldo negativo" not in texto(con)
+
+
+def test_conta_nao_liberada_nao_entra_no_aviso(con):
+    conta_bank(con, "Velha", -999900, estado="nao")
+    assert "Saldo negativo" not in texto(con)
+
+
+def test_semanal_tambem_avisa_conta_negativa(con):
+    conta_bank(con, "Santander", -73707)
+    assert "⚠️ Saldo negativo: Santander -R$ 737,07" in texto(con, dias=30, semanal=True)

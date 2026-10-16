@@ -13,9 +13,9 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio 
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | D1 | Conta 10 (XP Investimentos, cartão) para estado `nao` em Cadastros › Contas. A XP Investimentos saiu do mcp.ai em 11/10 (Bradesco entrou). Só ela; XP Banking (13–15) é outra conexão | R | ⛔ aguarda o Ricardo | conta 10 fora da conferência e dos avisos; histórico (181 lançamentos) preservado |
-| D2 | Descobrir por que a rodada de extratos segue `conferida=0` (último conferido 13/10). Ler `conferencia` da última rodada e separar conta morta, `saldo_final` e `dias_sem_buraco` | C | ❓ | causa registrada aqui; ajuste de código ou ação do Ricardo definidos |
+| D2 | Descobrir por que a rodada de extratos segue `conferida=0` (último conferido 13/10). **Causa achada 16/10:** não é conta morta nem captura (falhas=[]). Reprovam só `saldo_final` e `volume_proximo` de duas contas: **C6 BANK (12)** (saldo 14/10→16/10 sobe R$ 8.314 com 0 lançamentos na janela; ontem 0 lançamentos; 12 já está `sim`) e **Itaú (6)** (volume; saldo_final −R$ 800 em 16/10); em 14/10 também a conta 2. Heurística `saldo_final` é risco conhecido (sem saldo inicial). Decidir: liberar/excluir a 12 (D4) e/ou tolerar `saldo_final` em conta que ainda não entrou no caixa único | C+R | 🔧 causa achada | causa registrada aqui; ajuste de código ou ação do Ricardo definidos |
 | D3 | ✅ 16/10 instalado (retry de 3 tentativas, aviso `incompleta`). **Saldos parciais:** `openfinance_list_accounts` devolve 4–17 das 17 contas, conforme a hora (15/10). Repetir a chamada quando vier menos do que o esperado e marcar a rodada incompleta | C | 🔧 aprovado em 16/10 | toda rodada horária lê as contas esperadas ou registra o que faltou; teste cobre os dois casos |
-| D4 | Liberar C6 BANK (conta 12) no caixa único e decidir o Bradesco (contas 16–18, `a_decidir`) | R | ⏸ | contas decididas em Cadastros |
+| D4 | ✅ 16/10 (decisão do Ricardo: todos os bancos entram no caixa único). C6 BANK (12) já estava `sim`; Bradesco 16–18 passaram de `a_decidir` para `sim` (backup `/var/backups/gabi-brain/antes-do-bradesco-*.sqlite`). Saldo do caixa único R$ 37.275,08 inclui Bradesco | R | ✅ | contas decididas em Cadastros |
 | D5 | 145 lançamentos sem dono (Cadastros), depois `sudo ~/aplicar-donos.sh` | R | ⏸ | classificação ≥ 90 % |
 | D6 | Aceite T1.14: 7 rodadas seguidas `conferida=1` e `python -m tools.aceite` | R+C | ⛔ depende de D1–D2 | `docs/aceite-fase-1.md` escrito |
 | D7 | Corte G21: 7 dias de `tools.comparar_agenda` vazio (rodadas 07h, 15h, 23h BRT), depois `python -m tools.congelar --confirm`. Paineiras e Cristina Yabe: vale o brain | R+C | ⛔ depende de D6 | gabi-financeiro congelado |
@@ -66,7 +66,7 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | A4 | Minors diferidos de maior risco: exceção que não é `ErroGoogleOAuth` derruba a rodada de todas as fontes (agenda M3); recarga com lista vazia apaga a fonte (agenda M4); mensagem "veneno" bloqueia a conta (e-mail M7); 403 que não é credencial gera "reconectar" falso (agenda M1); `restaurar`/`descobrir` bloqueiam o laço da API (e-mail M2, agenda M9) | C | ⏸ | cada um com teste |
 | A5 | Demais minors dos dois ledgers (`docs/superpowers/ledgers/2026-10-11-{agenda,email}.md`) | C | ⏸ | triados: fazer, descartar ou virar Depois |
 | A6 | `email_sem_modelo` ("teto de custo do modelo") aparece todo dia às 09:45: o teto de custo é global e escuta e correio dividem. Decidir o teto | R+C | ❓ | aviso some ou o teto é separado |
-| A7 | `gabi-brain-notas.service` falhou em 15/10 09:40 (aviso `servico_falhou`) e o resumo cita "notas-nibo erro": investigar | C | ❓ | causa e correção |
+| A7 | `gabi-brain-notas.service` falhou em 16/10 (aviso `servico_falhou`, "notas-nibo erro"). **Causa: `GET /schedules/credit -> 401: Api token expirado`** (Nibo). Última rodada boa: 5 notas novas. Código está certo; falta renovar o `NIBO_TOKEN` (segredo: só o Ricardo coloca) | R | ⛔ aguarda token novo | `systemctl start gabi-brain-notas` sem erro |
 
 ### 4. Escuta do WhatsApp pessoal
 Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#escuta-paralelo`.
@@ -102,7 +102,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 | F2 | Encerramento e memória (Task 16 do fechamento) | C | ⛔ |
 
 ## Depois (não bloqueia a v1.0)
-- Microsoft Graph (G11: app no Entra ID da IONIC): agenda e e-mail do ionic e da ness.
+- Microsoft Graph (G11): DECISÃO 16/10 do Ricardo: NÃO mexer na conta ionic (Microsoft). Só quando a ness migrar para o MS: ler agenda/e-mail da ness e mandar e-mail para a lixeira (Itens Excluídos, recuperável; nunca apagar de vez, mesmas travas do Gmail).
 - Marcação de agenda com anuência (exceção controlada à R2) e Teams.
 - Tela Entregas (Linear, `LINEAR_API_KEY`) e Tailscale da família (G13, ACL, convites).
 - Obsidian por pessoa (T4.6 está codificado; uso real fica para depois).

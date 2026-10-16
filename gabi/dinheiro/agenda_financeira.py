@@ -44,6 +44,18 @@ def _linha_saldo(caixa, agora: dt.datetime) -> str:
     return f"Saldo: {_brl(caixa.saldo_centavos)}{aviso}"
 
 
+def _contas_negativas(caixa) -> list[str]:
+    """Conta liberada com saldo abaixo de zero, mesmo que o caixa total esteja positivo; a mais funda primeiro, com onde há saldo para cobrir."""
+    negativas = sorted((c for c in caixa.contas if c["saldo_centavos"] < 0), key=lambda c: c["saldo_centavos"])
+    if not negativas:
+        return []
+    linhas = ["⚠️ Saldo negativo: " + "; ".join(f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in negativas)]
+    com_saldo = sorted((c for c in caixa.contas if c["saldo_centavos"] > 0), key=lambda c: -c["saldo_centavos"])
+    if com_saldo:
+        linhas.append("Cobre com saldo em: " + "; ".join(f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in com_saldo))
+    return linhas
+
+
 def _itens(con, hoje: dt.date, fim: dt.date) -> tuple[list[dict], list[dict], list[dict]]:
     """(atrasadas, de hoje, dos próximos dias até `fim`), cada item com a data real do vencimento útil."""
     g = contas_pagar.contas_a_pagar(con, hoje)
@@ -79,7 +91,7 @@ def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     caixa = contas_pagar.caixa_unico(con, hoje)
     atrasadas, do_dia, adiante = _itens(con, hoje, hoje + dt.timedelta(days=dias))
     soma_atraso = sum(i["valor_centavos"] or 0 for i in atrasadas)
-    linhas = ["💰 *Financeiro*", _linha_saldo(caixa, agora),
+    linhas = ["💰 *Financeiro*", _linha_saldo(caixa, agora), *_contas_negativas(caixa),
               f"• ⚠️ Atrasadas: {len(atrasadas)} ({_brl(soma_atraso)})" if atrasadas else "• Atrasadas: 0",
               "• Hoje: " + "; ".join(f"{i['nome']} {_valor(i)}{_marca(i)}" for i in do_dia) if do_dia else "• Hoje: nada"]
     linhas += _a_receber_atrasado(con, hoje)
@@ -101,7 +113,7 @@ def _semanal(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     for d in proj:
         dia = dt.date.fromisoformat(d["dia"])
         semanas.setdefault(dia - dt.timedelta(days=dia.weekday()), []).append(d)
-    linhas = [f"💰 *Financeiro: próximos {dias} dias*", _linha_saldo(caixa, agora)]
+    linhas = [f"💰 *Financeiro: próximos {dias} dias*", _linha_saldo(caixa, agora), *_contas_negativas(caixa)]
     for dias_da_semana in semanas.values():
         a, b = dt.date.fromisoformat(dias_da_semana[0]["dia"]), dt.date.fromisoformat(dias_da_semana[-1]["dia"])
         sai, entra = sum(d["saidas_centavos"] for d in dias_da_semana), sum(d["entradas_centavos"] for d in dias_da_semana)
