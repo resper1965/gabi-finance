@@ -7,7 +7,9 @@ import threading
 from fastapi import APIRouter, Depends, Request
 
 from gabi.envelope import envelope
+from gabi.dinheiro.modelo import Orcamento
 from gabi.familia import exames
+from gabi.familia.extrair import extrair
 from gabi.familia.saude import abrir_saude, marcadores, pode_ver, resumo_para_consulta, serie
 from gabi.identidade import Identidade, exigir_informacao, grau
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
@@ -112,7 +114,8 @@ async def ler_laudo(request: Request, ident: Identidade = SO_BOSS):
     if not docs:
         raise erro(404, "nao_encontrado", f"documento {pid} não existe no Paperless")
     with _TRAVA, _cofre(request) as s:
-        n = exames.propor_exames(s, pid, docs[0].get("content") or "", corpo.get("pessoa_sugerida"))
+        laudo = extrair(docs[0].get("content") or "", None, Orcamento(0, 0))  # só regras: o modelo roda no timer, com orçamento e ponte
+        n = exames.propor_exames(s, pid, laudo, corpo.get("pessoa_sugerida")) if laudo else 0
     return _resp(request, {"paperless_id": pid, "propostas": n})
 
 

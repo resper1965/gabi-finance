@@ -113,7 +113,7 @@ def test_cofre_antigo_abre_e_ganha_colunas(arq, monkeypatch):
         m.setattr(saude, "ESQUEMA", antigo)
         m.setattr(saude, "_migrar", lambda con: None)
         with abrir_saude(arq, CHAVE) as s:
-            registrar_exame(s, "p1", "Glicose", "90", "mg/dL", D(2026, 1, 1), None, 1, "boss@x.com")
+            s.con.execute("insert into exame(pessoa_id, marcador, valor, unidade, em, paperless_id, confirmado_por, criado_em) values ('p1','Glicose','90','mg/dL','2026-01-01',1,'boss@x.com','x')")
             assert "versao" not in {r[1] for r in s.con.execute("pragma table_info(exame)")}
     with abrir_saude(arq, CHAVE) as s:
         r = s.con.execute("select * from exame").fetchone()

@@ -35,13 +35,24 @@ COLUNAS_V2 = {
 }
 
 
+# Histórico: de cada documento só a versão mais recente da extração; em (pessoa, marcador, data) repetida entre documentos, a linha mais nova.
+VISAO_ATUAL = """
+create view if not exists exame_atual as
+select * from exame e
+where (e.paperless_id is null or e.versao = (select max(x.versao) from exame x where x.paperless_id = e.paperless_id))
+  and e.id = (select max(y.id) from exame y where y.pessoa_id = e.pessoa_id and y.marcador = e.marcador and y.em = e.em
+              and (y.paperless_id is null or y.versao = (select max(z.versao) from exame z where z.paperless_id = y.paperless_id)));
+"""
+
+
 def _migrar(con: sqlite3.Connection) -> None:
-    """Idempotente: acrescenta as colunas da v2 que o cofre antigo não tem."""
+    """Idempotente: acrescenta as colunas da v2 que o cofre antigo não tem e cria a visão do histórico atual."""
     for tabela, colunas in COLUNAS_V2.items():
         tem = {r[1] for r in con.execute(f"pragma table_info({tabela})")}
         for nome, tipo in colunas:
             if nome not in tem:
                 con.execute(f"alter table {tabela} add column {nome} {tipo}")
+    con.executescript(VISAO_ATUAL)
 
 
 class ChaveInvalida(Exception):
@@ -122,14 +133,17 @@ def _log(s: Cofre, quem: str, pessoa_id: str | None, o_que: str) -> None:
 
 
 def registrar_exame(s: Cofre, pessoa_id: str, marcador: str, valor: str, unidade: str | None, em: dt.date,
-                    referencia: tuple[str, str] | None, paperless_id: int | None, confirmado_por: str) -> int:
+                    referencia: tuple[str, str] | None, paperless_id: int | None, confirmado_por: str, *,
+                    versao: int = 1, qualitativo: bool = False, observacao: str | None = None, laboratorio: str | None = None) -> int:
     """Só entra com a pessoa CONFIRMADA por alguém (`confirmado_por`): laudo de quem? é decisão do Ricardo, nunca do extrator."""
     if not confirmado_por or not confirmado_por.strip():
         raise ValueError("o exame só entra depois que alguém confirma de quem é o laudo")
     ref_min, ref_max = referencia if referencia else (None, None)
     return s.con.execute(
-        "insert into exame(pessoa_id, marcador, valor, valor_num, unidade, em, ref_min, ref_max, paperless_id, confirmado_por, criado_em) values (?,?,?,?,?,?,?,?,?,?,?)",
-        (pessoa_id, marcador, valor, _num(valor), unidade, em.isoformat(), ref_min, ref_max, paperless_id, confirmado_por, _agora())).lastrowid
+        "insert into exame(pessoa_id, marcador, valor, valor_num, unidade, em, ref_min, ref_max, paperless_id, confirmado_por, criado_em, versao, qualitativo, observacao, laboratorio) "
+        "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (pessoa_id, marcador, valor, _num(valor), unidade, em.isoformat(), ref_min, ref_max, paperless_id, confirmado_por, _agora(),
+         versao, int(qualitativo), observacao, laboratorio)).lastrowid
 
 
 def _fora(valor: str, ref_min: str | None, ref_max: str | None) -> bool:
@@ -143,14 +157,14 @@ def _fora(valor: str, ref_min: str | None, ref_max: str | None) -> bool:
 def serie(s: Cofre, pessoa_id: str, marcador: str, quem: str) -> list[Ponto]:
     _log(s, quem, pessoa_id, f"serie:{marcador}")
     return [Ponto(dt.date.fromisoformat(r["em"]), r["valor"], r["unidade"], _fora(r["valor"], r["ref_min"], r["ref_max"]))
-            for r in s.con.execute("select * from exame where pessoa_id=? and marcador=? order by em, id", (pessoa_id, marcador))]
+            for r in s.con.execute("select * from exame_atual where pessoa_id=? and marcador=? and qualitativo=0 order by em, id", (pessoa_id, marcador))]
 
 
 def resumo_para_consulta(s: Cofre, pessoa_id: str, quem: str) -> str:
     """Texto curto com o último valor de cada marcador da pessoa escolhida (e só dela)."""
     _log(s, quem, pessoa_id, "resumo")
     linhas = []
-    for r in s.con.execute("select * from exame e where pessoa_id=? and em=(select max(em) from exame where pessoa_id=e.pessoa_id and marcador=e.marcador) "
+    for r in s.con.execute("select * from exame_atual e where pessoa_id=? and em=(select max(em) from exame_atual where pessoa_id=e.pessoa_id and marcador=e.marcador) "
                            "group by marcador order by marcador", (pessoa_id,)):
         faixa = f" (ref. {r['ref_min']} a {r['ref_max']})" if r["ref_min"] and r["ref_max"] else ""
         marca = " ← fora da faixa" if _fora(r["valor"], r["ref_min"], r["ref_max"]) else ""
@@ -168,6 +182,7 @@ def pode_ver(ident: Identidade, grau: str, pessoa_id: str) -> bool:
 def marcadores(s: Cofre, pessoa_id: str, quem: str) -> list[dict]:
     """Último valor de cada marcador da pessoa (para a tela Família)."""
     _log(s, quem, pessoa_id, "lista")
-    return [{"marcador": r["marcador"], "valor": r["valor"], "unidade": r["unidade"], "em": r["em"], "fora_da_faixa": _fora(r["valor"], r["ref_min"], r["ref_max"])}
-            for r in s.con.execute("select * from exame e where pessoa_id=? and em=(select max(em) from exame where pessoa_id=e.pessoa_id and marcador=e.marcador) "
+    return [{"marcador": r["marcador"], "valor": r["valor"], "unidade": r["unidade"], "em": r["em"], "fora_da_faixa": _fora(r["valor"], r["ref_min"], r["ref_max"]),
+             "qualitativo": bool(r["qualitativo"]), "ref_min": r["ref_min"], "ref_max": r["ref_max"]}
+            for r in s.con.execute("select * from exame_atual e where pessoa_id=? and em=(select max(em) from exame_atual where pessoa_id=e.pessoa_id and marcador=e.marcador) "
                                    "group by marcador order by marcador", (pessoa_id,))]
