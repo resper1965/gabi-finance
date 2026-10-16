@@ -25,13 +25,15 @@ test("gera o resumo para a consulta", async () => {
   expect((await screen.findByLabelText("Resumo para a consulta")).textContent).toContain("Colesterol total");
 });
 
-test("laudo so e confirmado com a pessoa escolhida (a sugestao vem pre-selecionada)", async () => {
+test("laudo so e confirmado em lote com a pessoa escolhida (a sugestao vem pre-selecionada)", async () => {
   const chamadas = apiFalsa();
   montar(<Familia />);
-  const confirmar = await screen.findByRole("button", { name: "Confirmar e registrar" });
+  const confirmar = await screen.findByRole("button", { name: "Confirmar selecionados" });
+  expect((confirmar as HTMLButtonElement).disabled).toBe(true);  // nada selecionado
+  fireEvent.click(await screen.findByLabelText("Selecionar documento 55"));
   fireEvent.click(confirmar);
-  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /laudos\/55\/confirmar$/.test(c.url))).toBe(true));
-  expect(chamadas.find((c) => /confirmar$/.test(c.url))!.corpo).toEqual({ pessoa_id: "p-lia" });
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /laudos\/lote$/.test(c.url))).toBe(true));
+  expect(chamadas.find((c) => /laudos\/lote$/.test(c.url))!.corpo).toEqual({ itens: [{ paperless_id: 55, pessoa_id: "p-lia" }] });
 });
 
 test("sem ser boss (403 nos laudos) a tela nao mostra a area de laudos", async () => {

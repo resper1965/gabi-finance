@@ -186,3 +186,10 @@ def marcadores(s: Cofre, pessoa_id: str, quem: str) -> list[dict]:
              "qualitativo": bool(r["qualitativo"]), "ref_min": r["ref_min"], "ref_max": r["ref_max"]}
             for r in s.con.execute("select * from exame_atual e where pessoa_id=? and em=(select max(em) from exame_atual where pessoa_id=e.pessoa_id and marcador=e.marcador) "
                                    "group by marcador order by marcador", (pessoa_id,))]
+
+
+def historico(s: Cofre, pessoa_id: str) -> list[dict]:
+    """Todas as medições atuais da pessoa (versão mais recente de cada documento), para a tabela marcador x data. A leitura já foi registrada por `marcadores`."""
+    return [{"marcador": r["marcador"], "em": r["em"], "valor": r["valor"], "unidade": r["unidade"], "ref_min": r["ref_min"], "ref_max": r["ref_max"],
+             "fora_da_faixa": _fora(r["valor"], r["ref_min"], r["ref_max"]), "qualitativo": bool(r["qualitativo"]), "paperless_id": r["paperless_id"], "versao": r["versao"]}
+            for r in s.con.execute("select * from exame_atual where pessoa_id=? order by marcador, em", (pessoa_id,))]

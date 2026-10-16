@@ -12,7 +12,7 @@ from gabi.envelope import envelope
 from gabi.familia import exames, marcadores as apelidos
 from gabi.familia.extrair import extrair
 from gabi.familia.rodada_exames import reprocessar_documentos
-from gabi.familia.saude import abrir_saude, marcadores, pode_ver, resumo_para_consulta, serie
+from gabi.familia.saude import abrir_saude, historico, marcadores, pode_ver, resumo_para_consulta, serie
 from gabi.identidade import Identidade, exigir, exigir_informacao, grau
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
@@ -69,7 +69,8 @@ def lista(pessoa_id: str, request: Request, ident: Identidade = Depends(exigir_i
     _ver(request, ident, pessoa_id)
     with _TRAVA, _cofre(request) as s:
         itens = marcadores(s, pessoa_id, ident.login)
-    return _resp(request, {"pessoa_id": pessoa_id, "marcadores": itens})
+        todos = historico(s, pessoa_id)
+    return _resp(request, {"pessoa_id": pessoa_id, "marcadores": itens, "historico": todos})
 
 
 @router.get("/exames/{pessoa_id}/serie")

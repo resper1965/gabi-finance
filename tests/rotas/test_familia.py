@@ -236,3 +236,13 @@ def test_rejeitar_marca_o_documento_descartado_e_documento_falho_aparece_com_mot
     c.execute("insert into exame_doc(paperless_id, estado, motivo, atualizado_em) values (77, 'falhou', 'sem texto legível', 'x')")
     c.close()
     assert get(cli, "/api/v1/familia/laudos").json()["dados"]["falhos"] == [{"paperless_id": 77, "motivo": "sem texto legível"}]
+
+
+def test_exames_da_pessoa_trazem_o_historico_inteiro_e_so_a_versao_atual(app, cli):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    CONTEUDOS[55] = LAUDO.replace("215", "180")
+    post(cli, "/api/v1/familia/exames/reprocessar", {"paperless_id": 55})
+    h = get(cli, "/api/v1/familia/exames/p2").json()["dados"]["historico"]
+    col = [x for x in h if x["marcador"] == "Colesterol total"]
+    assert [(x["valor"], x["versao"], x["qualitativo"]) for x in col] == [("180", 2, False)] and col[0]["ref_max"] == "200"
