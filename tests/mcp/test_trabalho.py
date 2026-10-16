@@ -99,3 +99,14 @@ def test_agenda_listar_recusa_data_compacta_em_vez_de_devolver_vazio(tmp_path):
         else:
             raise AssertionError(f"aceitou {de!r}..{ate!r}")
     assert agenda_listar(con, agora, "2026-10-11", "2026-10-12")["eventos"] == []
+
+
+def test_resumo_avisa_so_a_contagem_de_decisoes_esperando(tmp_path):
+    from gabi.decisoes import criar_pergunta
+    c = _banco(tmp_path)
+    assert not any("decisão" in l or "decisões" in l for l in resumo_da_manha(c, AGORA)["linhas"])
+    criar_pergunta(c, "t", "Pergunta secreta A?", None, [{"n": 1, "rotulo": "Sim", "efeito": "registrar_nota"}], "claude", "2026-10-10T10:00:00+00:00")
+    t1 = resumo_da_manha(c, AGORA)["texto"]
+    assert t1.rstrip().endswith("🗳 1 decisão esperando você. Quer ver?") and "secreta" not in t1
+    criar_pergunta(c, "t", "Pergunta B?", None, [{"n": 1, "rotulo": "Sim", "efeito": "registrar_nota"}], "claude", "2026-10-10T10:00:00+00:00")
+    assert resumo_da_manha(c, AGORA)["texto"].rstrip().endswith("🗳 2 decisão(ões) esperando você. Quer ver?")

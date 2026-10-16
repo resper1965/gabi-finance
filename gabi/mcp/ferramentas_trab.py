@@ -2,6 +2,7 @@
 Consome: trabalho.hoje, trabalho.frentes; recebe `executar` do servidor."""
 import datetime as dt
 
+from gabi import decisoes
 from gabi.agenda import consulta
 from gabi.correio import consulta as consulta_correio
 from gabi.dinheiro import agenda_financeira
@@ -98,6 +99,9 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
     linhas += _bloco_correio(consulta_correio.importantes(con, limite=50, agora=agora), len(d["emails_importantes"]))
     if d["prioridades"]:
         linhas += ["", f"⭐ *Prioridade:* {_corta(d['prioridades'][0]['titulo'], 90)}"]
+    n = len(decisoes.abertas(con))
+    if n:  # só a contagem: as perguntas saem quando ele pedir ("o que preciso decidir?")
+        linhas += ["", f"🗳 {n} decisão(ões) esperando você. Quer ver?" if n > 1 else "🗳 1 decisão esperando você. Quer ver?"]
     return {"linhas": linhas, "texto": "\n".join(linhas)}
 
 
