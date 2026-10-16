@@ -52,7 +52,8 @@ def test_segunda_de_manha_gera_a_lista(con, arq, tmp_path):
     assert "reembolso_saude_semana" in tipos and "reembolso_saude_abre" in tipos
 
 
-def test_outra_rodada_com_o_cofre_trancado_nao_roda(con, arq, tmp_path, capsys):
+def test_outra_rodada_com_o_cofre_trancado_nao_roda(con, arq, tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("gabi.familia.saude.ESPERA_TRAVA_S", 0.3)
     p, _ = sistema([doc(10, "nf1")])
     trava = open(str(arq) + ".lock", "w")
     fcntl.flock(trava, fcntl.LOCK_EX)

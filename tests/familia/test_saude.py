@@ -94,8 +94,10 @@ def test_saude_nunca_aparece_no_banco_principal(tmp_path):
     migrar(con, Path(__file__).parent.parent.parent / "migrations")
     nomes = [r[0].lower() for r in con.execute("select name from sqlite_master")] + \
             [r[1].lower() for t in [r[0] for r in con.execute("select name from sqlite_master where type='table'")] for r in con.execute(f"pragma table_info({t})")]
-    # única exceção: `exame_doc` e o índice automático dela (referência do documento e estado; sem valor, marcador nem paciente)
-    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo")) and n != "exame_doc" and not n.startswith("sqlite_autoindex_exame_doc")]
+    # exceções, só de referência e estado (sem valor, marcador nem paciente): `exame_doc` e as quatro tabelas `reembolso_saude_*` (migração 0040), com os índices delas
+    permitidos = {"exame_doc", "reembolso_saude_doc", "reembolso_saude_dossie", "reembolso_saude_acao", "reembolso_saude_acao_aberta"}
+    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo")) and n not in permitidos
+                and not n.startswith(("sqlite_autoindex_exame_doc", "sqlite_autoindex_reembolso_saude_", "reembolso_saude_"))]
 
 
 def test_cofre_antigo_abre_e_ganha_colunas(arq, monkeypatch):
@@ -121,4 +123,53 @@ def test_cofre_antigo_abre_e_ganha_colunas(arq, monkeypatch):
         assert {"origem", "versao"} <= {c[1] for c in s.con.execute("pragma table_info(proposta_exame)")}
         assert s.con.execute("select count(*) from marcador_apelido").fetchone()[0] == 0
     with abrir_saude(arq, CHAVE):  # abrir de novo é idempotente
+        pass
+
+
+# ---------------- trava do cofre (exames, reembolso e API não se sobrescrevem) ----------------
+def test_abertura_aninhada_no_mesmo_fio_nao_trava(tmp_path):
+    from gabi.familia.saude import abrir_saude
+    with abrir_saude(tmp_path / "s.enc", b"k" * 32):
+        with abrir_saude(tmp_path / "s.enc", b"k" * 32):
+            pass
+
+
+def test_segundo_fio_espera_o_primeiro_soltar_e_nao_perde_a_gravacao(tmp_path):
+    import threading
+    import time
+    from gabi.familia.saude import abrir_saude
+    ordem = []
+
+    def a():
+        with abrir_saude(tmp_path / "s.enc", b"k" * 32) as s:
+            ordem.append("a-abriu")
+            time.sleep(0.5)
+            s.con.execute("insert into leitura(quando, quem, pessoa_id, o_que) values ('t','a',null,'x')")
+            ordem.append("a-gravou")
+
+    def b():
+        time.sleep(0.1)
+        with abrir_saude(tmp_path / "s.enc", b"k" * 32) as s:
+            ordem.append("b-abriu")
+            assert s.con.execute("select count(*) from leitura where quem='a'").fetchone()[0] == 1  # b já enxerga o que a gravou
+    ta, tb = threading.Thread(target=a), threading.Thread(target=b)
+    ta.start(); tb.start(); ta.join(); tb.join()
+    assert ordem == ["a-abriu", "a-gravou", "b-abriu"]
+
+
+def test_cofre_trancado_por_outro_processo_estoura_o_tempo_e_solta_a_trava_local(tmp_path, monkeypatch):
+    import fcntl
+    import os
+    from gabi.familia import saude
+    monkeypatch.setattr(saude, "ESPERA_TRAVA_S", 0.3)
+    fd = os.open(str(tmp_path / "s.enc") + ".lock", os.O_RDWR | os.O_CREAT)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    try:
+        import pytest
+        with pytest.raises(TimeoutError):
+            with saude.abrir_saude(tmp_path / "s.enc", b"k" * 32):
+                pass
+    finally:
+        os.close(fd)
+    with saude.abrir_saude(tmp_path / "s.enc", b"k" * 32):  # liberado: abre normalmente
         pass

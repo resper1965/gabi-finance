@@ -2,9 +2,12 @@
 O arquivo inteiro é AES-256-GCM; o SQLite só existe em memória, enquanto o `with` está aberto. Sair do `with` sem erro grava (arquivo novo + rename, modo 0600);
 com erro, descarta. Toda leitura entra no log `leitura`. Consome: identidade (Identidade) e o grau da matriz (quem chama passa)."""
 import datetime as dt
+import fcntl
 import os
 import sqlite3
 import tempfile
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,6 +74,47 @@ def _agora() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+ESPERA_TRAVA_S = 120   # quanto esperar outra rodada ou a API soltarem o cofre antes de desistir
+_TRAVAS: dict[str, tuple[threading.RLock, dict]] = {}
+_TRAVAS_GUARDA = threading.Lock()
+
+
+def _travar(caminho: Path) -> None:
+    """Uma escrita por vez no cofre: RLock por arquivo (threads da API e abertura aninhada no mesmo fio) + flock em `<cofre>.lock` (outros
+    processos: timers de exames e de reembolso). Sem isto, duas rodadas leem o mesmo estado e a última a gravar apaga o trabalho da outra."""
+    with _TRAVAS_GUARDA:
+        rl, estado = _TRAVAS.setdefault(str(caminho), (threading.RLock(), {"n": 0, "fd": None}))
+    rl.acquire()
+    try:
+        if estado["n"] == 0:
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(caminho) + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+            limite = time.monotonic() + ESPERA_TRAVA_S
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= limite:
+                        os.close(fd)
+                        raise TimeoutError("o cofre de saúde está em uso por outra rodada") from None
+                    time.sleep(0.2)
+            estado["fd"] = fd
+        estado["n"] += 1
+    except BaseException:
+        rl.release()
+        raise
+
+
+def _destravar(caminho: Path) -> None:
+    rl, estado = _TRAVAS[str(caminho)]
+    estado["n"] -= 1
+    if estado["n"] == 0:
+        os.close(estado["fd"])  # fechar solta o flock
+        estado["fd"] = None
+    rl.release()
+
+
 class Cofre:
     def __init__(self, caminho: Path, chave: bytes):
         if len(chave) != 32:
@@ -80,6 +124,15 @@ class Cofre:
         self.con.row_factory = sqlite3.Row
 
     def __enter__(self) -> "Cofre":
+        _travar(self.caminho)
+        try:
+            return self._abrir()
+        except BaseException:
+            self.con.close()
+            _destravar(self.caminho)
+            raise
+
+    def _abrir(self) -> "Cofre":
         if self.caminho.exists():
             bruto = self.caminho.read_bytes()
             if not bruto.startswith(MAGICO):
@@ -100,6 +153,7 @@ class Cofre:
                 self._gravar()
         finally:
             self.con.close()
+            _destravar(self.caminho)
         return False
 
     def _gravar(self) -> None:

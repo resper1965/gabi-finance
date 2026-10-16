@@ -2,7 +2,6 @@
 Imprime SÓ contagens, nunca nome, valor ou texto (ADR-014). O Paperless e o modelo chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); a chave do cofre
 vem de GABI_SAUDE_CHAVE_ARQUIVO (R5). Um escritor do cofre por vez: trava de arquivo ao lado do cofre. Uso: python -m gabi.reembolso_saude"""
 import datetime as dt
-import fcntl
 import os
 import sys
 from pathlib import Path
@@ -46,13 +45,7 @@ def main(banco: Path | None = None, *, paperless=None, cliente=_AUTO, cofre=_AUT
         cliente = cliente_da_ponte(sock)
         if cliente is not None:
             cliente = ModeloComCusto(cliente, banco, tarefa="reembolso-saude")
-    trava = open(str(cofre[0]) + ".lock", "w")
     try:
-        try:
-            fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print("reembolso-saude: cofre em uso por outra rodada; nada feito")
-            return 0
         try:
             with registrar_rodada(con, "reembolso-saude") as rod:
                 r = rodar(con, lambda: abrir_saude(*cofre), paperless, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), agora)
@@ -62,6 +55,9 @@ def main(banco: Path | None = None, *, paperless=None, cliente=_AUTO, cofre=_AUT
             if r["motivo_espera"]:
                 _novo(con, agora, "reembolso_saude_sem_modelo", "modelo", {"motivo": r["motivo_espera"]})
             texto.avisar_semana(con, agora)
+        except TimeoutError:  # a trava do cofre (gabi.familia.saude) esperou e a outra rodada não soltou
+            print("reembolso-saude: cofre em uso por outra rodada; nada feito")
+            return 0
         except RequisitosInvalidos:
             _novo(con, agora, "reembolso_saude_requisitos", "requisitos", {})
             print("reembolso-saude: requisitos inválidos; parado até corrigir")
@@ -70,7 +66,6 @@ def main(banco: Path | None = None, *, paperless=None, cliente=_AUTO, cofre=_AUT
             if isinstance(cliente, ModeloComCusto):
                 cliente.fechar()
     finally:
-        trava.close()
         con.close()
     print("reembolso-saude: " + " ".join(f"{k}={v}" for k, v in r.items() if k != "motivo_espera"))
     return 0
