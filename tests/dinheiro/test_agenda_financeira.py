@@ -153,3 +153,28 @@ def test_conta_nao_liberada_nao_entra_no_aviso(con):
 def test_semanal_tambem_avisa_conta_negativa(con):
     conta_bank(con, "Santander", -73707)
     assert "⚠️ Saldo negativo: Santander -R$ 737,07" in texto(con, dias=30, semanal=True)
+
+
+def serie(con, desc, valores, prefixo="s"):
+    """Um lançamento por mês de 2026-05 a 2026-10 (o último valor é o do mês corrente)."""
+    meses = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"][-len(valores):]
+    for m, v in zip(meses, valores):
+        con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                    "values (1,?,?,?,?,'caixa+custo','posted')", (f"{prefixo}{m}", f"{m}-05", v, desc))
+
+
+def test_diaria_traz_fora_do_normal(con):
+    serie(con, "ENERGIA ELETRICA", [-30000, -31000, -29000, -30500, -29500, -90000])
+    t = texto(con)
+    assert "Fora do normal: ENERGIA ELETRICA R$ 900,00 (normal ~R$ 300,00)" in t
+
+
+def test_diaria_sem_historico_nao_ganha_linha(con):
+    assert "Fora do normal" not in texto(con)
+
+
+def test_diaria_limita_a_tres_avisos(con):
+    for n in "ABCD":
+        serie(con, f"CONTA {n}", [-30000, -31000, -29000, -30500, -29500, -90000], prefixo=n)
+    t = texto(con)
+    assert t.count("Fora do normal:") == 3 and "+1 fora do normal" in t

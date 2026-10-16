@@ -6,12 +6,15 @@ from zoneinfo import ZoneInfo
 
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.conciliacao import CONFIRMADO
+from gabi.dinheiro.desvio import fora_do_normal
 from gabi.dinheiro.esperados import entradas_esperadas
 from gabi.dinheiro.projecao import projetar
+from gabi.dinheiro.repositorio import FonteAnalise
 
 BRT = ZoneInfo("America/Sao_Paulo")
 LIMITE_ITENS = 12
 LEITURA_VELHA_HORAS = 6
+LIMITE_DESVIOS = 3
 AVISO_ENTRADAS = "Entradas: só as notas (NFS-e) previstas contam; o resto não entra na previsão."
 
 
@@ -87,6 +90,15 @@ def _a_receber_atrasado(con, hoje: dt.date) -> list[str]:
     return linhas
 
 
+def _fora_do_normal(con, hoje: dt.date) -> list[str]:
+    """Recorrentes cujo valor deste mês foge do normal dos meses fechados (AR8)."""
+    avisos = fora_do_normal(FonteAnalise(con), hoje)
+    linhas = [f"• ⚠️ Fora do normal: {a['descricao']} {_brl(round(a['valor'] * 100))} (normal ~{_brl(round(a['normal'] * 100))})" for a in avisos[:LIMITE_DESVIOS]]
+    if len(avisos) > LIMITE_DESVIOS:
+        linhas.append(f"• +{len(avisos) - LIMITE_DESVIOS} fora do normal")
+    return linhas
+
+
 def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
     caixa = contas_pagar.caixa_unico(con, hoje)
     atrasadas, do_dia, adiante = _itens(con, hoje, hoje + dt.timedelta(days=dias))
@@ -95,6 +107,7 @@ def _diaria(con, hoje: dt.date, agora: dt.datetime, dias: int) -> list[str]:
               f"• ⚠️ Atrasadas: {len(atrasadas)} ({_brl(soma_atraso)})" if atrasadas else "• Atrasadas: 0",
               "• Hoje: " + "; ".join(f"{i['nome']} {_valor(i)}{_marca(i)}" for i in do_dia) if do_dia else "• Hoje: nada"]
     linhas += _a_receber_atrasado(con, hoje)
+    linhas += _fora_do_normal(con, hoje)
     if adiante:
         linhas.append(f"Próximos {dias} dias")
         linhas += [f"• {_dm(dt.date.fromisoformat(i['vencimento_util']))} {i['nome']} {_valor(i)}{_marca(i)}" for i in adiante[:LIMITE_ITENS]]
