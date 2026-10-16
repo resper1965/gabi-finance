@@ -7,7 +7,7 @@ import { Prioridades } from "../src/telas/Trabalho/Prioridades";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
 interface Chamada { metodo: string; url: string; corpo: unknown }
-interface Opcoes { fontes?: unknown[]; parametros?: Record<string, unknown>; prioridades?: unknown[]; lixeira?: unknown[]; falha?: RegExp; negar?: boolean }
+interface Opcoes { fontes?: unknown[]; parametros?: Record<string, unknown>; prioridades?: unknown[]; lixeira?: unknown[]; sugerido?: unknown[]; dispensadas?: unknown[]; falha?: RegExp; negar?: boolean }
 
 const FONTE = { id: 1, conta: "a@x.com", provedor: "google", estado: "a_decidir", lixeira: 0, sincronizada_em: null, ultimo_erro: null, mensagens: 0, na_lixeira: 0 };
 const MSG = { id: 7, conta: "a@x.com", remetente: "banco@x.com", assunto: "Boleto vence hoje", recebida_em: "2026-10-12T13:00:00+00:00", classe: "emergencial", prioridade: 3, motivo: "prazo hoje" };
@@ -15,6 +15,9 @@ const MSG = { id: 7, conta: "a@x.com", remetente: "banco@x.com", assunto: "Bolet
 function fake(o: Opcoes = {}) {
   const chamadas: Chamada[] = [];
   let lixeira = o.lixeira ?? [];
+  let sugerido = o.sugerido ?? [];
+  let dispensadas = o.dispensadas ?? [];
+  let prioridades = o.prioridades ?? [];
   const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], ...o.parametros };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
@@ -24,11 +27,16 @@ function fake(o: Opcoes = {}) {
     if (metodo !== "GET") {
       if (o.falha?.test(url)) return { ok: false, status: 503, json: async () => ({ erro: "fonte_indisponivel", mensagem: "o Gmail não confirmou a restauração" }) } as Response;
       if (/restaurar/.test(url)) lixeira = [];
+      if (/\/lixeira$|nao-e-lixo/.test(url)) sugerido = [];
+      if (/\/dispensar$/.test(url)) { dispensadas = prioridades; prioridades = []; }
+      if (/desfazer-dispensa/.test(url)) { prioridades = dispensadas; dispensadas = []; }
       return ok(env({}));
     }
     if (/correio\/fontes/.test(url)) return ok(env({ fontes: o.fontes ?? [] }));
     if (/correio\/parametros/.test(url)) return ok(env(parametros));
-    if (/correio\/prioridades/.test(url)) return ok(env({ mensagens: o.prioridades ?? [] }));
+    if (/correio\/prioridades/.test(url)) return ok(env({ mensagens: prioridades }));
+    if (/correio\/lixo-sugerido/.test(url)) return ok(env({ mensagens: sugerido }));
+    if (/correio\/dispensadas/.test(url)) return ok(env({ mensagens: dispensadas }));
     if (/correio\/lixeira/.test(url)) return ok(env({ mensagens: lixeira }));
     return { ok: false, status: 404, json: async () => ({ erro: "nao_encontrado", mensagem: url }) } as Response;
   }));
@@ -195,4 +203,47 @@ test("dias em aberto e alertas por dia fora da faixa são recusados antes de env
   fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("de 1 a 50"));
   expect(mudancas(c)).toEqual([]);
+});
+
+
+const LIXO = { ...MSG, id: 11, classe: "lixo", assunto: "Oferta imperdível", remetente: "promo@loja.com", motivo: "promoção", conta_lixeira: 1 };
+
+test("lixo sugerido mostra remetente, assunto e motivo e move para a lixeira pelo POST seguro", async () => {
+  const c = fake({ sugerido: [LIXO] });
+  montar(<Prioridades />);
+  const li = (await screen.findByText(/Oferta imperdível/)).closest("li")!;
+  expect(li.textContent).toContain("promo@loja.com");
+  expect(li.textContent).toContain("promoção");
+  expect(screen.getByText(/Lixo sugerido \(não movido\)/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Mover para a lixeira Oferta imperdível" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "POST", url: "/api/v1/correio/mensagens/11/lixeira", corpo: {} }]));
+  await waitFor(() => expect(screen.queryByRole("button", { name: /Mover para a lixeira/ })).toBeNull());
+});
+
+test("lixo sugerido: Não é lixo envia o POST e a conta sem lixeira não oferece mover", async () => {
+  const c = fake({ sugerido: [LIXO, { ...LIXO, id: 12, assunto: "Outra oferta", conta_lixeira: 0 }] });
+  montar(<Prioridades />);
+  const mover = (await screen.findByRole("button", { name: "Mover para a lixeira Outra oferta" })) as HTMLButtonElement;
+  expect(mover.disabled).toBe(true);
+  expect(screen.getByText(/lixeira desligada nesta conta/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Não é lixo Oferta imperdível" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "POST", url: "/api/v1/correio/mensagens/11/nao-e-lixo", corpo: {} }]));
+});
+
+test("dispensar tira da fila e aparece em Dispensadas, onde dá para desfazer", async () => {
+  const c = fake({ prioridades: [MSG] });
+  montar(<Prioridades />);
+  fireEvent.click(await screen.findByRole("button", { name: "Dispensar Boleto vence hoje" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "POST", url: "/api/v1/correio/mensagens/7/dispensar", corpo: {} }]));
+  fireEvent.click(await screen.findByRole("button", { name: "Desfazer dispensa de Boleto vence hoje" }));
+  await waitFor(() => expect(mudancas(c)[1]).toEqual({ metodo: "POST", url: "/api/v1/correio/mensagens/7/desfazer-dispensa", corpo: {} }));
+  expect(await screen.findByRole("button", { name: "Dispensar Boleto vence hoje" })).toBeTruthy();
+});
+
+test("a aba Na lixeira continua visível com a conta desligada e avisa", async () => {
+  fake({ lixeira: [{ ...MSG, id: 9, classe: "lixo", assunto: "Oferta", remetente: "promo@loja.com", motivo: "promoção", conta_desligada: true }] });
+  montar(<Prioridades />);
+  const li = (await screen.findByText(/Oferta/, { selector: "span" })).closest("li")!;
+  expect(li.textContent).toContain("conta desligada");
+  expect(within(li).getByRole("button", { name: "Restaurar Oferta" })).toBeTruthy();
 });

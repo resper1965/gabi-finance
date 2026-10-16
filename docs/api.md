@@ -65,10 +65,16 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/contas-pagar` | Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas. |
 | POST | `/api/v1/contas-pagar/{id_compromisso}/paga` | Baixa manual de um compromisso (vale só se não houver lançamento no extrato). |
 | GET | `/api/v1/contatos` | Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura. |
+| GET | `/api/v1/correio/dispensadas` | O que o dono dispensou nos últimos 30 dias, para desfazer. |
 | GET | `/api/v1/correio/fontes` | Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens. |
 | POST | `/api/v1/correio/fontes` | Cadastra uma conta (e-mail e provedor google|graph). Nasce `a_decidir` e sem lixeira: nada é lido nem movido até liberar. |
 | PATCH | `/api/v1/correio/fontes/{fonte_id}` | Libera ou desliga a leitura (`estado`) e liga ou desliga a lixeira (`lixeira`); a lixeira exige a leitura liberada. |
 | GET | `/api/v1/correio/lixeira` | O que a Gabi mandou para a lixeira nos últimos 30 dias, para restaurar. |
+| GET | `/api/v1/correio/lixo-sugerido` | Lixo que o modelo apontou e NÃO foi movido (lixeira desligada na conta, confiança baixa, remetente protegido). Só sugestão: o dono decide. |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/desfazer-dispensa` | Volta a mensagem dispensada para as listas (o alerta já fechado não reabre). Idempotente. |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/dispensar` | Marca um e-mail emergencial, importante ou normal como tratado: sai das listas e do resumo da manhã e fecha o alerta da conversa. Não vai para a lixeira nem |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/lixeira` | Decisão do dono sobre um "lixo sugerido": manda para a lixeira do Gmail (só trash, recuperável) e marca `na_lixeira`. Exige a conta liberada e a lixeira |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/nao-e-lixo` | O dono diz que o "lixo sugerido" não é lixo: marca `restaurada` (a Gabi nunca a move). Não toca no Gmail. Idempotente. |
 | POST | `/api/v1/correio/mensagens/{mensagem_id}/restaurar` | Tira da lixeira (pela ponte) e marca `restaurada`: a Gabi nunca a move de novo. Idempotente. 503 `fonte_indisponivel` se a ponte ou o Gmail não confirmar. |
 | GET | `/api/v1/correio/parametros` | Critérios de emergência, VIPs, limiar da lixeira, janela de leitura e retenção do trecho (padrões se não definidos). |
 | PUT | `/api/v1/correio/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves (nunca critérios nem VIPs). |

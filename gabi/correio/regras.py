@@ -34,11 +34,14 @@ def _vips(con) -> set[str]:
 
 
 def _pessoa_conhecida(con, a: str) -> bool:
-    """Pessoa ativa com o canal `email:<endereço>` (o dono cadastrou esse e-mail deliberadamente)."""
+    """Pessoa ativa com o canal `email:<endereço>` ou o endereço em `emails` (o dono cadastrou esse e-mail deliberadamente)."""
     for p in con.execute("select dados from pessoa where excluido_em is null"):
-        for c in dados(p).get("canais") or []:
+        d = dados(p)
+        for c in d.get("canais") or []:
             if isinstance(c, str) and c.lower() == f"email:{a}":
                 return True
+        if any(isinstance(e, str) and endereco(e) == a for e in d.get("emails") or []):
+            return True
     return False
 
 

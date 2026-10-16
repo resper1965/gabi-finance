@@ -294,6 +294,40 @@ def test_purgar_trechos_apaga_so_o_texto_e_mantem_o_estado(con):
     assert con.execute("select trecho from email_msg where externo_id='recente'").fetchone()[0] == "texto"
 
 
+def _n(con, tabela="email_msg"):
+    return {r[0] for r in con.execute(f"select externo_id from {tabela}")} if tabela == "email_msg" else {r[0] for r in con.execute(f"select endereco from {tabela}")}
+
+
+def test_purgar_mensagens_poda_por_idade_e_preserva_lixeira_recuperavel_e_pendentes(con):
+    f = _fonte(con)
+    velha = "2026-01-01T10:00:00+00:00"
+    for ext, estado in (("class", "classificada"), ("alert", "alertada"), ("rest", "restaurada"), ("falhou", "falhou"), ("lix_rec", "na_lixeira"), ("lix_velha", "na_lixeira"), ("nova", "nova")):
+        _msg(con, f, ext, estado=estado, recebida=velha)
+    _msg(con, f, "recente", estado="classificada")
+    con.execute("update email_msg set atualizado_em='2026-10-05T10:00:00+00:00' where externo_id='lix_rec'")   # movida há 7 dias: o Gmail ainda guarda
+    con.execute("update email_msg set atualizado_em='2026-08-01T10:00:00+00:00' where externo_id='lix_velha'")  # movida há mais de 30 dias
+    n = pr.purgar_mensagens(con, AGORA, 180)
+    assert n == 5
+    assert _n(con) == {"lix_rec", "nova", "recente"}
+
+
+def test_purgar_mensagens_poda_respondidos_so_depois_da_janela_dos_enviados_e_guarda_a_sentinela(con):
+    f = _fonte(con)
+    con.execute("insert into email_respondido(fonte_id, endereco, em) values (?,?,?)", (f, "antigo@x.com", "2025-01-01T00:00:00+00:00"))
+    con.execute("insert into email_respondido(fonte_id, endereco, em) values (?,?,?)", (f, "meio@x.com", "2026-02-01T00:00:00+00:00"))   # 8 meses: dentro dos 365 d da conferência
+    con.execute("insert into email_respondido(fonte_id, endereco, em) values (?,?,?)", (f, "novo@x.com", "2026-10-01T00:00:00+00:00"))
+    pr.purgar_mensagens(con, AGORA, 180)
+    assert _n(con, "email_respondido") == {"", "meio@x.com", "novo@x.com"}
+    assert sz.respondidos_prontos(con, f)
+
+
+def test_retencao_msg_dias_do_banco_tem_padrao_180_e_piso_90(con):
+    assert pr.retencao_msg_dias(con) == 180
+    for bruto, esperado in (("365", 365), ("30", 180), ("\"x\"", 180), ("true", 180), ("5000", 180)):
+        con.execute("insert into parametro(chave, valor) values ('email.retencao_msg_dias', ?) on conflict(chave) do update set valor=excluded.valor", (bruto,))
+        assert pr.retencao_msg_dias(con) == esperado
+
+
 def test_limites_do_banco_usa_parametros_com_padrao_e_ignora_lixo(con):
     assert pr.limites_do_banco(con) == pr.Limites(60, 210)
     con.execute("insert into parametro(chave, valor) values ('email.max_por_rodada', '10'), ('email.tempo_max_s', '\"muito\"')")

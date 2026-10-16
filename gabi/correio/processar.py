@@ -235,3 +235,29 @@ def purgar_trechos(con, agora: str, dias: int) -> int:
     """Apaga só o `trecho` das mensagens recebidas há mais de `dias`; o estado e o cabeçalho ficam."""
     corte = (_utc(agora) - dt.timedelta(days=dias)).isoformat()
     return con.execute("update email_msg set trecho=null where trecho is not null and recebida_em<?", (corte,)).rowcount
+
+
+RETENCAO_MSG_PADRAO = 180
+RETENCAO_MSG_MIN = 90      # acima da maior janela de leitura (60 d): a mensagem podada nunca volta numa recarga
+RETENCAO_MSG_MAX = 3650
+GMAIL_LIXEIRA_DIAS = 30    # o Gmail esvazia a lixeira em 30 dias: antes disso a mensagem movida ainda é recuperável
+RESPONDIDOS_DIAS = 365     # janela dos enviados que alimenta `email_respondido`
+
+
+def retencao_msg_dias(con) -> int:
+    """`email.retencao_msg_dias` (90 a 3650; padrão 180); valor ausente, corrompido ou fora da faixa cai no padrão."""
+    v = _parametro(con, "email.retencao_msg_dias", RETENCAO_MSG_PADRAO)
+    return v if isinstance(v, int) and not isinstance(v, bool) and RETENCAO_MSG_MIN <= v <= RETENCAO_MSG_MAX else RETENCAO_MSG_PADRAO
+
+
+def purgar_mensagens(con, agora: str, dias: int) -> int:
+    """Apaga do banco as mensagens recebidas há mais de `dias` (cabeçalho incluso; o Gmail não é tocado) e os `email_respondido` velhos. Nunca poda `nova`
+    (ainda a processar) nem `na_lixeira` movida há menos de 30 dias (ainda recuperável pelo painel). `email_respondido` só sai depois de passada a janela dos
+    enviados (365 d) E `dias`, e a linha-sentinela da conferência fica. Devolve quantas mensagens saíram."""
+    agora_utc = _utc(agora)
+    corte = (agora_utc - dt.timedelta(days=dias)).isoformat()
+    recuperavel = (agora_utc - dt.timedelta(days=GMAIL_LIXEIRA_DIAS)).isoformat()
+    n = con.execute("delete from email_msg where recebida_em<? and estado<>'nova' and (estado<>'na_lixeira' or coalesce(atualizado_em,'')<?)", (corte, recuperavel)).rowcount
+    corte_resp = (agora_utc - dt.timedelta(days=max(dias, RESPONDIDOS_DIAS + 35))).isoformat()
+    con.execute("delete from email_respondido where endereco<>'' and em<?", (corte_resp,))
+    return n

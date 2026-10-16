@@ -9,7 +9,7 @@ from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida
 
 PROVEDORES = ("google", "graph")
 ESTADOS = ("sim", "nao", "a_decidir")
-PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
+PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30, "retencao_msg_dias": 180,
            "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO)}
 CHAVES = {k: f"email.{k}" for k in PADROES}
 CRITERIOS_MAX = 2000
@@ -108,6 +108,8 @@ def validar_parametros(corpo) -> dict:
             _inteiro(v, k, 1, 60)
         elif k == "retencao_dias":
             _inteiro(v, k, 1, 365)
+        elif k == "retencao_msg_dias":
+            _inteiro(v, k, 90, 3650)
         elif k == "dias_em_aberto":
             _inteiro(v, k, 1, 30)
         elif k == "max_alertas_dia":

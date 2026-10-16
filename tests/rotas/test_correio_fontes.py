@@ -16,6 +16,12 @@ class _Email:
     def __init__(self, erro=None, resultado="ok"):
         self.erro, self.resultado, self.chamadas = erro, resultado, []
 
+    def lixeira(self, conta, ids):
+        self.movidas = getattr(self, "movidas", []) + [(conta, list(ids))]
+        if self.erro:
+            raise self.erro
+        return {i: self.resultado for i in ids}
+
     def restaurar(self, conta, ids):
         self.chamadas.append((conta, list(ids)))
         if self.erro:
@@ -68,7 +74,9 @@ def _msg(banco, fonte_id, ext, estado="classificada", classe="importante", prior
 
 def test_so_boss_acessa(cli):
     for m, url in (("get", f"{U}/fontes"), ("post", f"{U}/fontes"), ("patch", f"{U}/fontes/1"), ("get", f"{U}/parametros"), ("put", f"{U}/parametros"),
-                   ("get", f"{U}/prioridades"), ("get", f"{U}/lixeira"), ("post", f"{U}/mensagens/1/restaurar")):
+                   ("get", f"{U}/prioridades"), ("get", f"{U}/lixeira"), ("post", f"{U}/mensagens/1/restaurar"),
+                   ("get", f"{U}/lixo-sugerido"), ("get", f"{U}/dispensadas"), ("post", f"{U}/mensagens/1/lixeira"), ("post", f"{U}/mensagens/1/nao-e-lixo"),
+                   ("post", f"{U}/mensagens/1/dispensar"), ("post", f"{U}/mensagens/1/desfazer-dispensa")):
         assert getattr(cli, m)(url, headers=VIP).status_code == 403, (m, url)
         assert getattr(cli, m)(url).status_code == 401, (m, url)
 
@@ -105,7 +113,7 @@ def test_liberar_leitura_e_lixeira_sao_chaves_separadas_e_a_lixeira_exige_leitur
 def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
     padrao = cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]
     assert {k: v for k, v in padrao.items() if k != "palavras_protegidas"} == {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
-                                                                                "dias_em_aberto": 7, "max_alertas_dia": 5}
+                                                                                "retencao_msg_dias": 180, "dias_em_aberto": 7, "max_alertas_dia": 5}
     assert "fatura" in padrao["palavras_protegidas"] and "boleto" in padrao["palavras_protegidas"]  # a lista padrão aparece para o dono editar
     r = _put(cli, {"vips": ["Chefe@Ionic.com", "chefe@ionic.com", " bia@x.com "], "criterios_emergencia": "banco ou cobrança com prazo", "lixeira_confianca": 0.95})
     assert r.status_code == 200
@@ -116,7 +124,7 @@ def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
 @pytest.mark.parametrize("corpo", [{}, {"outra": 1}, {"vips": "chefe@x.com"}, {"vips": ["nao-e-email"]}, {"vips": [3]}, {"vips": ["a@x.com"] * 0 + [f"u{i}@x.com" for i in range(201)]},
                                    {"criterios_emergencia": 5}, {"criterios_emergencia": "x" * 2001}, {"lixeira_confianca": 0.49}, {"lixeira_confianca": 0.69}, {"lixeira_confianca": 1.01},
                                    {"lixeira_confianca": "0.9"}, {"lixeira_confianca": True}, {"janela_dias": 0}, {"janela_dias": 61}, {"janela_dias": 1.5},
-                                   {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_dias": True},
+                                   {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_msg_dias": 89}, {"retencao_msg_dias": 3651}, {"retencao_msg_dias": True}, {"retencao_dias": True},
                                    {"dias_em_aberto": 0}, {"dias_em_aberto": 31}, {"dias_em_aberto": True}, {"max_alertas_dia": 0}, {"max_alertas_dia": 51}, {"max_alertas_dia": 2.5},
                                    {"palavras_protegidas": "fatura"}, {"palavras_protegidas": [3]}, {"palavras_protegidas": ["x" * 61]}, {"palavras_protegidas": ["a"] * 0 + [f"p{i}" for i in range(201)]}])
 def test_parametros_validam_faixas(cli, corpo):
@@ -236,3 +244,129 @@ def test_restaurar_nao_trava_o_laco_da_api(banco):
     mid = _msg(banco, f, "ab12cd", "na_lixeira", "lixo", 0, "Promo")
     assert _post(cli, f"{U}/mensagens/{mid}/restaurar").status_code == 200
     assert fonte.no_laco is False
+
+
+# ---------------- lixo sugerido, dispensar, lixeira com conta desligada ----------------
+def _liberada(cli, lixeira=False):
+    f = _criar(cli); _patch(cli, f"{U}/fontes/{f}", {"estado": "sim"})
+    if lixeira:
+        _patch(cli, f"{U}/fontes/{f}", {"lixeira": 1})
+    return f
+
+
+def _estado(banco, mid, coluna="estado"):
+    c = conectar(banco)
+    v = c.execute(f"select {coluna} from email_msg where id=?", (mid,)).fetchone()[0]
+    c.close()
+    return v
+
+
+def test_lixo_sugerido_lista_so_lixo_nao_movido(cli, banco):
+    f = _liberada(cli)
+    _msg(banco, f, "a", "classificada", "lixo", 0, "Oferta"); _msg(banco, f, "b", "na_lixeira", "lixo", 0, "Ja foi"); _msg(banco, f, "c", "classificada", "importante", 2, "Contrato")
+    r = cli.get(f"{U}/lixo-sugerido", headers=BOSS).json()["dados"]["mensagens"]
+    assert [(m["assunto"], m["motivo"], m["conta_lixeira"]) for m in r] == [("Oferta", "cliente", 0)]
+
+
+def test_mover_lixo_sugerido_usa_a_ponte_so_trash_e_marca_na_lixeira(banco):
+    fonte = _Email()
+    cli = _cli(banco, fonte)
+    f = _liberada(cli, lixeira=True)
+    mid = _msg(banco, f, "ab12cd", "classificada", "lixo", 0, "Oferta")
+    r = _post(cli, f"{U}/mensagens/{mid}/lixeira")
+    assert r.status_code == 200 and r.json()["dados"] == {"id": mid, "estado": "na_lixeira"}
+    assert fonte.movidas == [("resper@gmail.com", ["ab12cd"])] and _estado(banco, mid) == "na_lixeira"
+    assert _post(cli, f"{U}/mensagens/{mid}/lixeira").status_code == 200 and len(fonte.movidas) == 1  # idempotente
+    d = " ".join(_decisoes(banco))
+    assert f"moveu mensagem {mid} para a lixeira" in d and "Oferta" not in d
+    assert [m["assunto"] for m in cli.get(f"{U}/lixeira", headers=BOSS).json()["dados"]["mensagens"]] == ["Oferta"]
+
+
+def test_mover_exige_404_antes_de_409_e_503_e_so_lixo_classificado(banco):
+    sem_ponte = _cli(banco)
+    f = _liberada(sem_ponte, lixeira=True)
+    assert _post(sem_ponte, f"{U}/mensagens/999/lixeira").status_code == 404  # 404 antes do 503
+    importante = _msg(banco, f, "i1", "classificada", "importante", 2)
+    assert _post(sem_ponte, f"{U}/mensagens/{importante}/lixeira").status_code == 409  # só o que o modelo chamou de lixo
+    lixo = _msg(banco, f, "l1", "classificada", "lixo", 0)
+    assert _post(sem_ponte, f"{U}/mensagens/{lixo}/lixeira").status_code == 503  # ponte não configurada
+    assert _estado(banco, lixo) == "classificada"
+    assert _post(_cli(banco, _Email(resultado="erro")), f"{U}/mensagens/{lixo}/lixeira").status_code == 503
+    assert _post(_cli(banco, _Email(erro=ErroGoogleOAuth("fora"))), f"{U}/mensagens/{lixo}/lixeira").status_code == 503
+    assert _estado(banco, lixo) == "classificada"
+
+
+def test_mover_respeita_a_chave_da_lixeira_e_a_conta_desligada(banco):
+    fonte = _Email()
+    cli = _cli(banco, fonte)
+    f = _liberada(cli, lixeira=False)
+    mid = _msg(banco, f, "l1", "classificada", "lixo", 0)
+    r = _post(cli, f"{U}/mensagens/{mid}/lixeira")
+    assert r.status_code == 409 and "lixeira" in r.json()["mensagem"] and not hasattr(fonte, "movidas")
+    _patch(cli, f"{U}/fontes/{f}", {"lixeira": 1}); _patch(cli, f"{U}/fontes/{f}", {"estado": "nao"})
+    assert _post(cli, f"{U}/mensagens/{mid}/lixeira").status_code == 409 and not hasattr(fonte, "movidas")
+
+
+def test_nao_e_lixo_tira_da_lista_e_a_gabi_nunca_mais_move(banco):
+    from gabi.correio import processar as pr
+    from gabi.dinheiro.modelo import Orcamento
+    cli = _cli(banco, _Email())
+    f = _liberada(cli, lixeira=True)
+    mid = _msg(banco, f, "l1", "classificada", "lixo", 0, "Newsletter boa")
+    r = _post(cli, f"{U}/mensagens/{mid}/nao-e-lixo")
+    assert r.status_code == 200 and r.json()["dados"] == {"id": mid, "estado": "restaurada"}
+    assert cli.get(f"{U}/lixo-sugerido", headers=BOSS).json()["dados"]["mensagens"] == []
+    assert _post(cli, f"{U}/mensagens/{mid}/nao-e-lixo").status_code == 200  # idempotente
+    assert _post(cli, f"{U}/mensagens/999/nao-e-lixo").status_code == 404
+    novo = _msg(banco, f, "i1", "classificada", "importante", 2)
+    assert _post(cli, f"{U}/mensagens/{novo}/nao-e-lixo").status_code == 409
+    c = conectar(banco)
+    class Ponte:
+        chamadas = []
+        def lixeira(self, conta, ids):
+            self.chamadas.append(ids); return {i: "ok" for i in ids}
+    p = Ponte(); pr.processar(c, None, Orcamento(1.0, 10.0), p, "2026-10-16T12:00:00+00:00"); c.close()
+    assert p.chamadas == []
+
+
+def test_dispensar_sai_das_listas_fecha_o_alerta_e_desfazer_volta(cli, banco):
+    f = _liberada(cli)
+    a = _msg(banco, f, "a", "classificada", "importante", 2, "Proposta")
+    b = _msg(banco, f, "b", "alertada", "emergencial", 3, "Boleto", thread="T9")
+    c = conectar(banco)
+    c.execute("insert into aviso(tipo, payload, criado_em) values ('email_emergencial', ?, '2026-10-16T10:00:00+00:00')", (json.dumps({"chave": "T9", "remetente": "a@x.com", "assunto": "s", "motivo": "m"}),))
+    c.close()
+    assert len(cli.get(f"{U}/prioridades", headers=BOSS).json()["dados"]["mensagens"]) == 2
+    for mid in (a, b):
+        r = _post(cli, f"{U}/mensagens/{mid}/dispensar")
+        assert r.status_code == 200 and r.json()["dados"] == {"id": mid, "dispensada": True}
+    assert _post(cli, f"{U}/mensagens/{a}/dispensar").status_code == 200  # idempotente
+    assert cli.get(f"{U}/prioridades", headers=BOSS).json()["dados"]["mensagens"] == []
+    assert {m["assunto"] for m in cli.get(f"{U}/dispensadas", headers=BOSS).json()["dados"]["mensagens"]} == {"Proposta", "Boleto"}
+    c = conectar(banco)
+    assert c.execute("select count(*) from aviso where tipo='email_emergencial' and entregue_em is null").fetchone()[0] == 0
+    c.close()
+    assert _estado(banco, a) == "classificada"  # nada vai para a lixeira nem muda de estado
+    r = _post(cli, f"{U}/mensagens/{a}/desfazer-dispensa")
+    assert r.status_code == 200 and r.json()["dados"] == {"id": a, "dispensada": False}
+    assert [m["assunto"] for m in cli.get(f"{U}/prioridades", headers=BOSS).json()["dados"]["mensagens"]] == ["Proposta"]
+    assert _post(cli, f"{U}/mensagens/{a}/desfazer-dispensa").status_code == 200  # idempotente
+    d = " ".join(_decisoes(banco))
+    assert f"dispensou mensagem {a}" in d and f"desfez a dispensa da mensagem {a}" in d and "Proposta" not in d
+
+
+def test_dispensar_404_e_409_para_lixo_na_lixeira_ou_nova(cli, banco):
+    f = _liberada(cli)
+    assert _post(cli, f"{U}/mensagens/999/dispensar").status_code == 404
+    assert _post(cli, f"{U}/mensagens/999/desfazer-dispensa").status_code == 404
+    for estado, classe in (("na_lixeira", "lixo"), ("classificada", "lixo"), ("nova", None), ("restaurada", "importante")):
+        mid = _msg(banco, f, f"x{estado}{classe}", estado, classe, 1)
+        assert _post(cli, f"{U}/mensagens/{mid}/dispensar").status_code == 409, (estado, classe)
+
+
+def test_lixeira_segue_listada_com_a_conta_desligada_e_avisa(cli, banco):
+    f = _liberada(cli)
+    _msg(banco, f, "c", "na_lixeira", "lixo", 0, "Promo")
+    _patch(cli, f"{U}/fontes/{f}", {"estado": "nao"})
+    m = cli.get(f"{U}/lixeira", headers=BOSS).json()["dados"]["mensagens"]
+    assert [(x["assunto"], x["conta_desligada"]) for x in m] == [("Promo", True)]

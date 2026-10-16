@@ -54,13 +54,13 @@ def test_importantes_respeita_o_limite(con):
     assert len(consulta.importantes(con, agora=AGORA)) == 10 and len(consulta.importantes(con, limite=3, agora=AGORA)) == 3
 
 
-def test_na_lixeira_lista_so_os_ultimos_30_dias_da_fonte_liberada(con):
+def test_na_lixeira_lista_so_os_ultimos_30_dias(con):
     f, g = _fonte(con), _fonte(con, "b@x.com", estado="nao")
     _msg(con, f, "recente", "lixo", 0, estado="na_lixeira", atualizado="2026-10-10T10:00:00+00:00")
     _msg(con, f, "velha", "lixo", 0, estado="na_lixeira", atualizado="2026-08-01T10:00:00+00:00")
     _msg(con, g, "outra", "lixo", 0, estado="na_lixeira", atualizado="2026-10-10T10:00:00+00:00")
     _msg(con, f, "classificada", "lixo", 0)
-    assert [m["id"] for m in consulta.na_lixeira(con, agora=AGORA)] == [1]
+    assert [m["id"] for m in consulta.na_lixeira(con, agora=AGORA)] == [3, 1]  # a conta desligada segue visível (aviso no painel)
 
 
 def test_listar_filtra_prioridade_e_dias_e_exclui_lixo(con):
@@ -84,6 +84,14 @@ def test_resumo_da_manha_cita_os_tres_primeiros_em_ordem(con):
     linha = _linha(resumo_da_manha(con, AGORA))
     t = "\n".join(resumo_da_manha(con, AGORA)["linhas"])
     assert "(4 importantes)" in linha and t.index("banco@x.com") < t.index("ana@x.com") < t.index("bia@x.com") and "cid@x.com" not in t and "+1 outros" in t
+
+
+def test_resumo_da_manha_ignora_a_dispensada(con):
+    f = _fonte(con)
+    a = _msg(con, f, "a", "importante", 3, de="ana@x.com", assunto="Proposta"); _msg(con, f, "b", "importante", 2, de="bia@x.com", assunto="Contrato")
+    con.execute("update email_msg set dispensada_em='2026-10-12T09:00:00+00:00' where id=?", (a,))
+    t = "\n".join(resumo_da_manha(con, AGORA)["linhas"])
+    assert "bia@x.com" in t and "ana@x.com" not in t
 
 
 def test_resumo_sem_correio_diz_nenhum_e_com_muitos_cita_so_tres(con):
@@ -133,3 +141,35 @@ def test_resumo_e_hoje_nao_trazem_emergencial_antigo(con):
     f = _fonte(con)
     _msg(con, f, "velho", "emergencial", 3, estado="alertada", recebida="2026-09-01T08:00:00+00:00")
     assert modulo_hoje.hoje(con, AGORA)["prioridades"] == [] and all(not l.startswith("E-mail:") for l in resumo_da_manha(con, AGORA)["linhas"])
+
+
+def test_lixo_sugerido_lista_o_lixo_nao_movido_so_de_conta_liberada(con):
+    f, g = _fonte(con), _fonte(con, "b@x.com", estado="nao")
+    con.execute("update email_fonte set lixeira=1 where id=?", (f,))
+    _msg(con, f, "sug", "lixo", 0, motivo="promoção", de="promo@loja.com", assunto="Oferta")
+    _msg(con, f, "movida", "lixo", 0, estado="na_lixeira"); _msg(con, f, "voltou", "lixo", 0, estado="restaurada")
+    _msg(con, f, "imp", "importante", 2); _msg(con, g, "desl", "lixo", 0)
+    _msg(con, f, "velha", "lixo", 0, recebida="2026-08-01T08:00:00+00:00")
+    r = consulta.lixo_sugerido(con, agora=AGORA)
+    assert [(m["assunto"], m["motivo"], m["conta_lixeira"]) for m in r] == [("Oferta", "promoção", 1)]
+    assert {"id", "conta", "remetente", "assunto", "motivo", "recebida_em"} <= set(r[0])
+
+
+def test_dispensada_sai_das_listas_e_do_resumo_da_manha_e_desfazer_volta(con):
+    f = _fonte(con)
+    a = _msg(con, f, "a", "importante", 3); b = _msg(con, f, "b", "emergencial", 3, estado="alertada"); _msg(con, f, "c", "normal", 1)
+    assert len(consulta.importantes(con, agora=AGORA)) == 2 and len(consulta.listar(con, AGORA)) == 3
+    con.execute("update email_msg set dispensada_em='2026-10-12T09:00:00+00:00' where id in (?,?)", (a, b))
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == []
+    assert len(consulta.listar(con, AGORA)) == 1
+    assert {m["id"] for m in consulta.dispensadas(con, agora=AGORA)} == {a, b}
+    con.execute("update email_msg set dispensada_em=null where id=?", (a,))
+    assert [m["id"] for m in consulta.importantes(con, agora=AGORA)] == [a]
+
+
+def test_na_lixeira_continua_visivel_com_a_conta_desligada_e_avisa(con):
+    f, g = _fonte(con), _fonte(con, "b@x.com", estado="nao")
+    _msg(con, f, "ok", "lixo", 0, estado="na_lixeira", atualizado="2026-10-10T10:00:00+00:00")
+    _msg(con, g, "desl", "lixo", 0, estado="na_lixeira", atualizado="2026-10-11T10:00:00+00:00")
+    r = {m["conta"]: m["conta_desligada"] for m in consulta.na_lixeira(con, agora=AGORA)}
+    assert r == {"a@x.com": False, "b@x.com": True}

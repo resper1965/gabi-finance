@@ -1,5 +1,5 @@
 """Programa do correio (timer de 15 min): sincroniza as fontes liberadas, confere quem o dono já respondeu, classifica, move o obviamente inútil para a
-lixeira (só em conta com a lixeira ligada), alerta emergências, resume o dia e apaga trechos antigos. Imprime SÓ contagens, nunca remetente, assunto ou trecho.
+lixeira (só em conta com a lixeira ligada), alerta emergências, resume o dia e apaga trechos antigos e poda mensagens velhas (`email.retencao_msg_dias`). Imprime SÓ contagens, nunca remetente, assunto ou trecho.
 O Gmail e o modelo chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem segredo.
 Sai 0 se ao menos uma fonte sincronizou ou não há fonte liberada; 1 só se todas falham e alguma por motivo diferente de "conta não autorizada".
 Uso: python -m gabi.correio"""
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from gabi.correio.processar import processar, purgar_trechos, resumo_do_dia
+from gabi.correio.processar import processar, purgar_mensagens, purgar_trechos, resumo_do_dia, retencao_msg_dias
 from gabi.correio.sincronizar import atualizar_respondidos, respondidos_prontos, sincronizar
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
@@ -73,6 +73,7 @@ def main(banco: Path | None = None, *, listar=None, ponte=None, cliente=_AUTO, a
             c = processar(con, cliente, orcamento_do_banco(con, agora.astimezone(BRT).date()), ponte, agora_s)
             resumo_do_dia(con, agora)
             purgados = purgar_trechos(con, agora_s, _retencao_dias(con))
+            podadas = purgar_mensagens(con, agora_s, retencao_msg_dias(con))
             rod.lidos = sum(v.get("lidos", 0) for v in r.values())
             rod.novos = sum(v.get("novos", 0) for v in r.values())
             falhas = sum(1 for v in r.values() if "erro" in v)
@@ -90,7 +91,7 @@ def main(banco: Path | None = None, *, listar=None, ponte=None, cliente=_AUTO, a
     for fid, v in ok.items():
         print(f"correio: fonte={fid} lidos={v['lidos']} novos={v['novos']} pulados={v['pulados']} recarga={'sim' if v['recarga'] else 'nao'}")
     print(f"correio: fontes={len(r)} ok={len(ok)}")
-    print("correio: " + " ".join(f"{k}={int(v) if isinstance(v, bool) else v}" for k, v in c.items()) + f" purgados={purgados}")
+    print("correio: " + " ".join(f"{k}={int(v) if isinstance(v, bool) else v}" for k, v in c.items()) + f" purgados={purgados} purgadas={podadas}")
     for fid, msg in erros.items():
         print(f"AVISO: fonte {contas.get(fid, fid)} falhou: {msg}", file=sys.stderr)
     todas = bool(r) and not ok

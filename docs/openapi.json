@@ -1839,6 +1839,23 @@
     "summary": "Contatos"
    }
   },
+  "/api/v1/correio/dispensadas": {
+   "get": {
+    "description": "O que o dono dispensou nos últimos 30 dias, para desfazer.",
+    "operationId": "dispensadas_api_v1_correio_dispensadas_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Dispensadas"
+   }
+  },
   "/api/v1/correio/fontes": {
    "get": {
     "description": "Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens.",
@@ -1924,6 +1941,175 @@
      }
     },
     "summary": "Lixeira"
+   }
+  },
+  "/api/v1/correio/lixo-sugerido": {
+   "get": {
+    "description": "Lixo que o modelo apontou e NÃO foi movido (lixeira desligada na conta, confiança baixa, remetente protegido). Só sugestão: o dono decide.",
+    "operationId": "lixo_sugerido_api_v1_correio_lixo_sugerido_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Lixo Sugerido"
+   }
+  },
+  "/api/v1/correio/mensagens/{mensagem_id}/desfazer-dispensa": {
+   "post": {
+    "description": "Volta a mensagem dispensada para as listas (o alerta já fechado não reabre). Idempotente.",
+    "operationId": "desfazer_dispensa_api_v1_correio_mensagens__mensagem_id__desfazer_dispensa_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Desfazer Dispensa"
+   }
+  },
+  "/api/v1/correio/mensagens/{mensagem_id}/dispensar": {
+   "post": {
+    "description": "Marca um e-mail emergencial, importante ou normal como tratado: sai das listas e do resumo da manhã e fecha o alerta da conversa. Não vai para a lixeira nem\nmexe no Gmail. Idempotente.",
+    "operationId": "dispensar_api_v1_correio_mensagens__mensagem_id__dispensar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Dispensar"
+   }
+  },
+  "/api/v1/correio/mensagens/{mensagem_id}/lixeira": {
+   "post": {
+    "description": "Decisão do dono sobre um \"lixo sugerido\": manda para a lixeira do Gmail (só trash, recuperável) e marca `na_lixeira`. Exige a conta liberada e a lixeira\ndela ligada. Idempotente. 404 antes de 409 antes de 503 `fonte_indisponivel` (ponte ou Gmail não confirmou).",
+    "operationId": "mover_para_lixeira_api_v1_correio_mensagens__mensagem_id__lixeira_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Mover Para Lixeira"
+   }
+  },
+  "/api/v1/correio/mensagens/{mensagem_id}/nao-e-lixo": {
+   "post": {
+    "description": "O dono diz que o \"lixo sugerido\" não é lixo: marca `restaurada` (a Gabi nunca a move). Não toca no Gmail. Idempotente.",
+    "operationId": "nao_e_lixo_api_v1_correio_mensagens__mensagem_id__nao_e_lixo_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Nao E Lixo"
    }
   },
   "/api/v1/correio/mensagens/{mensagem_id}/restaurar": {

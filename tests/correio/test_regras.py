@@ -39,6 +39,13 @@ def test_protegido_por_pessoa_com_canal_de_email(con):
     assert regras.protegido(con, f, "outra@x.com") is None
 
 
+def test_protegido_por_pessoa_com_emails_no_cadastro(con):
+    f = _fonte(con)
+    con.execute("insert into pessoa(id, nome, dados) values ('p9','p9',?)", (json.dumps({"emails": ["Bia@X.com"]}),))
+    assert regras.protegido(con, f, "Bia <bia@x.com>") == "aprovado"
+    assert regras.protegido(con, f, "outra@x.com") is None
+
+
 def test_pessoa_excluida_nao_protege(con):
     f = _fonte(con)
     _pessoa(con, "p1", ["email:ana@x.com"], excluido="2026-10-01T00:00:00+00:00")

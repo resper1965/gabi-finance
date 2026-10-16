@@ -181,6 +181,16 @@ def test_main_purga_trechos_antigos_e_nunca_imprime_texto(banco, capsys):
     assert "SEGREDO" not in capsys.readouterr().out
 
 
+def test_main_poda_mensagens_antigas_pela_retencao_e_mantem_as_recentes(banco, capsys):
+    f = _fonte(banco, "a@x.com", lixeira=0)
+    c = conectar(banco)
+    c.execute("insert into email_msg(fonte_id, externo_id, recebida_em, estado) values (?, 'antiga', '2026-01-01T10:00:00+00:00', 'classificada')", (f,))
+    c.close()
+    main(banco, listar=_listar(_m("nova1")), ponte=Ponte(), cliente=Modelo(), agora=AGORA)
+    assert set(_estados(banco)) == {"nova1"}
+    assert "purgadas=1" in capsys.readouterr().out
+
+
 def _linhas_custo(banco):
     c = conectar(banco)
     r = [(x["tarefa"], round(x["custo_usd"], 4)) for x in c.execute("select tarefa, custo_usd from custo_modelo order by id")]
