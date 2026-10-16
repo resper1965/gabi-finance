@@ -209,3 +209,16 @@ def laudos_pendentes(s: Cofre) -> list[dict]:
         l["marcadores"].append({"marcador": p["marcador"], "valor": p["valor"], "unidade": p["unidade"], "em": p["em"], "ref_min": p["ref_min"], "ref_max": p["ref_max"],
                                 "qualitativo": bool(p["qualitativo"]), "observacao": p["observacao"]})
     return list(saida.values())
+
+
+def guardar_mensagem(s: Cofre, de_pessoa: str | None, recebida_em: str, texto: str) -> int:
+    """Texto de saúde SEM anexo (ex.: a escuta) fica só no cofre cifrado; nunca no `gabi.db`. Devolve o id da mensagem."""
+    if not texto or not texto.strip() or not recebida_em:
+        raise ValueError("informe o texto e quando foi recebido")
+    return s.con.execute("insert into mensagem_saude(de_pessoa, recebida_em, texto) values (?,?,?)", (de_pessoa, recebida_em, texto)).lastrowid
+
+
+def mensagens(s: Cofre, quem: str) -> list[dict]:
+    """Mensagens de saúde guardadas, da mais antiga para a mais nova; a leitura entra no log `leitura`."""
+    _log(s, quem, None, "mensagens")
+    return [dict(r) for r in s.con.execute("select id, de_pessoa, recebida_em, texto from mensagem_saude order by recebida_em, id")]

@@ -4,7 +4,7 @@ import pytest
 
 from gabi.dinheiro.modelo import Orcamento
 from gabi.familia import marcadores as apelidos
-from gabi.familia.exames import (confirmar_laudo, confirmar_lote, diferencas, documentos_do_filtro, todos_os_documentos, extrair_marcadores, laudos_pendentes, propor_exames, rejeitar_laudo, reprocessar, versoes)
+from gabi.familia.exames import (confirmar_laudo, confirmar_lote, diferencas, documentos_do_filtro, guardar_mensagem, mensagens, todos_os_documentos, extrair_marcadores, laudos_pendentes, propor_exames, rejeitar_laudo, reprocessar, versoes)
 from gabi.familia.extrair import Laudo, extrair
 from gabi.familia.saude import abrir_saude, marcadores, resumo_para_consulta, serie
 
@@ -161,3 +161,26 @@ def test_documentos_do_filtro(tmp_path):
         confirmar_laudo(s, 56, "p3", "boss@x.com")
         assert documentos_do_filtro(s, "p2") == [55] and documentos_do_filtro(s, "p3", de="2026-01-01", ate="2026-12-31") == [56]
         assert documentos_do_filtro(s, "p2", de="2027-01-01") == [] and todos_os_documentos(s) == [55, 56]
+
+
+def test_mensagem_vai_para_o_cofre_e_nao_para_o_banco(tmp_path):
+    from pathlib import Path
+    from gabi.db import conectar, migrar
+    arq = tmp_path / "s.enc"
+    with abrir_saude(arq, CHAVE) as s:
+        assert guardar_mensagem(s, "p2", "2026-10-16T10:00:00+00:00", "dor de cabeça forte desde ontem") == 1
+    assert b"dor de cabe" not in arq.read_bytes()  # cifrado em disco
+    with abrir_saude(arq, CHAVE) as s:
+        assert [m["texto"] for m in mensagens(s, "boss@x.com")] == ["dor de cabeça forte desde ontem"]
+    con = conectar(tmp_path / "g.db")
+    migrar(con, Path(__file__).parent.parent.parent / "migrations")
+    assert "mensagem_saude" not in {r[0] for r in con.execute("select name from sqlite_master")}
+
+
+def test_ler_mensagens_gera_log_de_leitura(tmp_path):
+    with abrir_saude(tmp_path / "s.enc", CHAVE) as s:
+        guardar_mensagem(s, None, "2026-10-16T10:00:00+00:00", "febre")
+        mensagens(s, "mae@x.com")
+        assert [tuple(r) for r in s.con.execute("select quem, o_que from leitura")] == [("mae@x.com", "mensagens")]
+        with pytest.raises(ValueError):
+            guardar_mensagem(s, None, "2026-10-16T10:00:00+00:00", "  ")
