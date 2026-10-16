@@ -47,7 +47,7 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | EV4 | Subagentes por capacidade com ferramentas mínimas (financeiro leitura, cobrança, agenda/e-mail) | R+C | ⏸ junto do H0 | listas por canal testadas |
 | EV5 | Painel de qualidade: taxa de aceite das sugestões, custo por tarefa, latência | C | ⏸ | tela no painel |
 | FU1 | Auditar `agora.date()` e o relógio do servidor (CEST) nos timers; "hoje" sempre Brasília | C | ⏸ | testes com `agora` perto da meia-noite |
-| CP1 | Comprovantes/NF/pedido de pagamento pelo WhatsApp: escuta ganha os tipos `comprovante` e `nota_fiscal` (anexo → Paperless, etiquetas próprias); decidir A automático / B só encaminhado / C ambos, e se lê o que ele envia | R+C | ⏸ aguarda escolha | C1 do bloco 2 destravado |
+| CP1 | ✅ código (opção **B** decidida pelo Ricardo em 16/10): só anexo encaminhado à **caixa de comprovantes** (um grupo de WhatsApp aprovado) vai ao Paperless com a etiqueta `gabi:comprovante`, sem modelo; conversa pessoal nunca vira comprovante; palavra de risco vence. Migração 0027, `POST /api/v1/escuta/grupos/{id}/comprovantes`. **Passo do dono:** criar o grupo (só com ele), esperar a escuta vê-lo, aprovar e marcar como caixa de comprovantes (API; falta botão no painel), depois instalar. Não decidido: se a escuta lê o que ele mesmo envia (o ouvinte só recebe) | R+C | ⏸ instalar e ligar o grupo | C1 do bloco 2 destravado |
 | H0 | Revisão de segurança do Hermes: `platform_toolsets` sem `terminal`/`write_file`/`execute_code` nos canais; `skills.write_approval` e `memory.write_approval`; terminal em Docker | R+C | ⏸ não aprovado | aprovação do Ricardo e teste |
 
 ### 2. Cobrar (Fase 2)

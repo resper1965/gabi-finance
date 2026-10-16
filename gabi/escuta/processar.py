@@ -111,8 +111,8 @@ def _precisa_modelo(con, m, palavras) -> bool:
     if not (m["texto"] or "").strip() or tem_risco(m["texto"] or "", palavras):
         return False
     if m["grupo"]:
-        g = con.execute("select aprovado from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
-        return bool(g and g["aprovado"] == 1)
+        g = con.execute("select aprovado, comprovantes from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
+        return bool(g and g["aprovado"] == 1 and not (g["comprovantes"] and m["anexo_caminho"]))  # caixa de comprovantes: sem modelo
     return estado_remetente(con, m["de"])[0] == "aprovado"
 
 
@@ -121,7 +121,7 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
     Palavra de risco vence tudo: mesmo de remetente aprovado, a classificação é pulada (um pedido na mesma mensagem não é processado)."""
     id_, texto, ativo, anexo = m["id"], m["texto"], modo == "ativo", m["anexo_caminho"]
     if m["grupo"]:
-        g = con.execute("select aprovado from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
+        g = con.execute("select aprovado, comprovantes from escuta_grupo where id_grupo=?", (m["id_grupo"],)).fetchone()
         if not (g and g["aprovado"] == 1):  # grupo fora da lista: não guarda nada
             _fechar(con, id_, agora, apagar_texto=True, apagar_anexo=True)
             apagar.append(anexo)
@@ -148,6 +148,9 @@ def _uma(con, destinos, orcamento, agora, modo, m, palavras, c, apagar: list, sp
             avisar_novo(con, numero, agora)
         _fechar(con, id_, agora, tipo="crise")
         c["classificadas"] += 1
+        return
+    if m["grupo"] and g["comprovantes"] and anexo:  # CP1 B: só o que ele encaminha à caixa de comprovantes; sem modelo
+        _comprovante(con, destinos, m, agora, ativo, c, apagar, spool)
         return
     if not aprovado:
         if _quando(m["recebida_em"]) < _quando(agora) - dt.timedelta(days=retida_dias):
@@ -251,6 +254,16 @@ def _nada(con, destinos, m, agora, ativo: bool, c, apagar: list, confianca, spoo
         apagar.append(m["anexo_caminho"])
     c["documentos"] += 1
     _fechar(con, m["id"], agora, tipo="nada", confianca=confianca, apagar_texto=True, apagar_anexo=ativo)
+
+
+def _comprovante(con, destinos, m, agora, ativo: bool, c, apagar: list, spool) -> None:
+    """Anexo na caixa de comprovantes: no ativo entrega (Paperless) antes de apagar; no registro guarda o anexo."""
+    if ativo:
+        _exigir_dentro(m, spool)
+        destinos.comprovante(con, dict(m))  # se levantar, nada foi apagado (transação desfeita)
+        apagar.append(m["anexo_caminho"])
+    c["documentos"] += 1
+    _fechar(con, m["id"], agora, tipo="nada", apagar_texto=True, apagar_anexo=ativo)
 
 
 def processar(con, destinos: Destinos, cliente: ModeloCliente | None, orcamento: Orcamento, agora: str,

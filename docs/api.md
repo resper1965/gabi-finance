@@ -83,6 +83,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/escuta/contatos/trazer` | Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir. |
 | GET | `/api/v1/escuta/grupos` | Grupos de WhatsApp vistos pela escuta e se já foram aprovados. |
 | POST | `/api/v1/escuta/grupos/{id_grupo}/aprovar` | Aprova um grupo de WhatsApp para a escuta (404 se o grupo nunca foi visto). |
+| POST | `/api/v1/escuta/grupos/{id_grupo}/comprovantes` | Define a caixa de comprovantes (CP1 B): só anexos encaminhados a este grupo vão ao Paperless. Um grupo por vez; troca a anterior. |
 | GET | `/api/v1/escuta/parametros` | Parâmetros da escuta: modo, palavras de risco, horas sem receber e tamanho máximo de anexo (padrões se não definidos). |
 | PUT | `/api/v1/escuta/parametros` | Grava parâmetros da escuta (só os enviados); valida modo, lista de palavras e faixas, e audita só os nomes. |
 | GET | `/api/v1/escuta/remetentes` | Fila de remetentes novos (pendentes) e a lista de aprovados da escuta. |

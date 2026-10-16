@@ -138,7 +138,7 @@ def test_grupos_listar_e_aprovar_404(cli, banco):
     c.execute("insert into escuta_grupo(id_grupo, nome) values ('g1@g.us','Escola')")
     c.close()
     g = cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"]
-    assert g == [{"id_grupo": "g1@g.us", "nome": "Escola", "aprovado": False}]
+    assert g == [{"id_grupo": "g1@g.us", "nome": "Escola", "aprovado": False, "comprovantes": False}]
     assert _post(cli, "/api/v1/escuta/grupos/g1@g.us/aprovar").status_code == 200
     assert cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"][0]["aprovado"] is True
     assert any("g1@g.us" in o for o in _decisoes(banco))
@@ -410,7 +410,7 @@ def test_i5_grupo_visto_no_spool_aparece_aprova_e_e_classificado(cli, banco, tmp
     (spool / "g1.json").write_text(json.dumps(msg))
     c = conectar(banco)
     ingerir_spool(c, spool, "2026-10-16T12:00:00+00:00")
-    assert cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"] == [{"id_grupo": "999@g.us", "nome": None, "aprovado": False}]
+    assert cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"] == [{"id_grupo": "999@g.us", "nome": None, "aprovado": False, "comprovantes": False}]
     assert _post(cli, "/api/v1/escuta/grupos/999@g.us/aprovar").status_code == 200
 
     class M:
@@ -446,3 +446,18 @@ def test_i7_descrever_escuta_anexo_grande():
     from gabi.rotas.avisos import descrever
     t, x = descrever("escuta_anexo_grande", {"numero": N, "nome": "Joana"})
     assert "Joana" in t and "25" not in t and "grande" in (t + x).lower() and x != "{}"
+
+
+def test_grupo_caixa_de_comprovantes_so_um_e_exige_aprovado(cli, banco):
+    c = conectar(banco)
+    c.execute("insert into escuta_grupo(id_grupo, nome, aprovado) values ('a@g.us','A',1), ('b@g.us','B',1), ('c@g.us','C',0)")
+    c.close()
+    assert _post(cli, "/api/v1/escuta/grupos/nao-existe/comprovantes").status_code == 404
+    assert _post(cli, "/api/v1/escuta/grupos/c@g.us/comprovantes").status_code == 409  # não aprovado
+    assert _post(cli, "/api/v1/escuta/grupos/a@g.us/comprovantes").status_code == 200
+    assert _post(cli, "/api/v1/escuta/grupos/b@g.us/comprovantes").status_code == 200  # troca a caixa
+    g = {x["id_grupo"]: x["comprovantes"] for x in cli.get("/api/v1/escuta/grupos", headers=BOSS).json()["dados"]["grupos"]}
+    assert g == {"a@g.us": False, "b@g.us": True, "c@g.us": False}
+    c = conectar(banco)
+    assert c.execute("select count(*) from decisao where o_que like 'escuta: caixa de comprovantes%'").fetchone()[0] == 2
+    c.close()

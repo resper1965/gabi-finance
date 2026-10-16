@@ -23,9 +23,13 @@ class Destinos(Protocol):
     def documento(self, con, msg: dict) -> None:
         """Entrega o anexo da mensagem (Paperless). Se levantar, o anexo NÃO é apagado e a mensagem fica falhou."""
 
+    def comprovante(self, con, msg: dict) -> None:
+        """Anexo encaminhado à caixa de comprovantes (Paperless, etiqueta própria). Se levantar, o anexo NÃO é apagado."""
+
 
 TAG_ENTRADA = "gabi:entrada-whatsapp"
 TAG_SAUDE = "gabi:saude-exame"
+TAG_COMPROVANTE = "gabi:comprovante"
 _JANELA_CRISE = dt.timedelta(minutes=60)
 
 
@@ -128,3 +132,6 @@ class DestinosReais:
 
     def documento(self, con, msg: dict) -> None:
         self._enviar_anexo(msg, TAG_ENTRADA)
+
+    def comprovante(self, con, msg: dict) -> None:
+        self._enviar_anexo(msg, TAG_COMPROVANTE)

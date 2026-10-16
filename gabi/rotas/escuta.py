@@ -148,8 +148,8 @@ def grupos(request: Request):
     """Grupos de WhatsApp vistos pela escuta e se já foram aprovados."""
     con = _con(request)
     try:
-        itens = [{"id_grupo": r["id_grupo"], "nome": r["nome"], "aprovado": bool(r["aprovado"])}
-                 for r in con.execute("select id_grupo, nome, aprovado from escuta_grupo order by nome, id_grupo")]
+        itens = [{"id_grupo": r["id_grupo"], "nome": r["nome"], "aprovado": bool(r["aprovado"]), "comprovantes": bool(r["comprovantes"])}
+                 for r in con.execute("select id_grupo, nome, aprovado, comprovantes from escuta_grupo order by nome, id_grupo")]
         return envelope(con, {"grupos": itens}, agora=_agora(request))
     finally:
         con.close()
@@ -168,6 +168,28 @@ async def aprovar_grupo(id_grupo: str, request: Request, ident: Identidade = Dep
             con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')",
                         (dt.datetime.now(dt.timezone.utc).isoformat(), ident.login, f"escuta: aprovou grupo {id_grupo}"))
         return envelope(con, {"id_grupo": id_grupo, "aprovado": True}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/grupos/{id_grupo}/comprovantes")
+async def grupo_comprovantes(id_grupo: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Define a caixa de comprovantes (CP1 B): só anexos encaminhados a este grupo vão ao Paperless. Um grupo por vez; troca a anterior.
+    404 se o grupo nunca foi visto; 409 se não está aprovado."""
+    await _json(request)
+    con = _con(request)
+    try:
+        with transacao(con):
+            g = con.execute("select aprovado from escuta_grupo where id_grupo=?", (id_grupo,)).fetchone()
+            if g is None:
+                raise erro(404, "nao_encontrado", "grupo não existe")
+            if not g["aprovado"]:
+                raise erro(409, "grupo_nao_aprovado", "aprove o grupo antes de torná-lo caixa de comprovantes")
+            con.execute("update escuta_grupo set comprovantes=0 where comprovantes=1")
+            con.execute("update escuta_grupo set comprovantes=1 where id_grupo=?", (id_grupo,))
+            con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')",
+                        (dt.datetime.now(dt.timezone.utc).isoformat(), ident.login, f"escuta: caixa de comprovantes = grupo {id_grupo}"))
+        return envelope(con, {"id_grupo": id_grupo, "comprovantes": True}, agora=_agora(request))
     finally:
         con.close()
 

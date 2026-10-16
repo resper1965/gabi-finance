@@ -18,6 +18,9 @@ class FakeDestinos:
     def __init__(self, erro=None, erro_doc=None):
         self.pedidos, self.saudes, self.crises, self.docs, self.erro, self.erro_doc = [], [], [], [], erro, erro_doc
 
+    def comprovante(self, con, msg):
+        self.comprovantes = getattr(self, "comprovantes", []) + [msg["id_externo"]]
+
     def documento(self, con, msg):
         if self.erro_doc:
             raise self.erro_doc
@@ -828,3 +831,73 @@ def test_i8_retida_de_nao_aprovado_mais_velha_que_retida_dias_e_apagada(con, tmp
     _msg(con, ext="v2", texto="x", rec="2026-10-05T09:00:00", estado="retida")
     processar(con, FakeDestinos(), None, _orc(), AGORA, "ativo", retida_dias=3)
     assert _msg_row(con, "v2")["estado"] == "processada"
+
+
+def _caixa(con, ligada=True, id_grupo="cx@g.us"):
+    con.execute("insert into escuta_grupo(id_grupo, nome, aprovado, comprovantes) values (?, 'Caixa', 1, ?)", (id_grupo, 1 if ligada else 0))
+
+
+def _anexo(tmp_path, nome="c.pdf"):
+    spool = tmp_path / "spool"
+    (spool / "anexos").mkdir(parents=True, exist_ok=True)
+    arq = spool / "anexos" / nome
+    arq.write_text("x")
+    return spool, arq
+
+
+def test_caixa_de_comprovantes_entrega_sem_modelo_e_apaga(con, tmp_path):
+    _caixa(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto=SEGREDO, grupo=1, id_grupo="cx@g.us", anexo=str(arq))
+    d, cli = FakeDestinos(), FakeModelo()
+    c = _rodar(con, d, cli, spool=spool)
+    assert d.comprovantes == ["m1"] and d.docs == [] and not cli.chamadas
+    m = _msg_row(con)
+    assert m["texto"] is None and m["anexo_caminho"] is None and m["estado"] != "nova"
+    assert not arq.exists() and c["documentos"] == 1
+
+
+def test_caixa_de_comprovantes_no_modo_registro_guarda_o_anexo(con, tmp_path):
+    _caixa(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", grupo=1, id_grupo="cx@g.us", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), modo="registro", spool=spool)
+    assert not getattr(d, "comprovantes", []) and arq.exists()
+
+
+def test_grupo_sem_caixa_nao_vira_comprovante(con, tmp_path):
+    _caixa(con, ligada=False)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", grupo=1, id_grupo="cx@g.us", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), spool=spool)
+    assert not getattr(d, "comprovantes", [])
+
+
+def test_conversa_pessoal_nunca_vira_comprovante(con, tmp_path):
+    _caixa(con)
+    _aprovado(con)
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), spool=spool)
+    assert not getattr(d, "comprovantes", [])
+
+
+def test_caixa_com_palavra_de_risco_avisa_e_nao_entrega(con, tmp_path):
+    _caixa(con)
+    _risco(con, "socorro")
+    spool, arq = _anexo(tmp_path)
+    _msg(con, texto="socorro", grupo=1, id_grupo="cx@g.us", anexo=str(arq))
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo(), spool=spool)
+    assert not getattr(d, "comprovantes", []) and d.crises
+
+
+def test_caixa_sem_anexo_segue_o_fluxo_normal(con):
+    _caixa(con)
+    _msg(con, texto="oi", grupo=1, id_grupo="cx@g.us")
+    d = FakeDestinos()
+    _rodar(con, d, FakeModelo())
+    assert not getattr(d, "comprovantes", [])

@@ -275,3 +275,11 @@ def test_anexo_fora_de_spool_anexos_nome_e_recusado(con, d, tmp_path):
         arq.write_bytes(b"x")
         with pytest.raises(RuntimeError):
             d.pedido(con, "p1", N, _msg(anexo=arq), {"valor": 50})
+
+
+def test_comprovante_envia_com_etiqueta_propria(con, d, srv, tmp_path):
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "pix.pdf"
+    arq.write_bytes(b"%PDF-pix")
+    d.comprovante(con, _msg(anexo=arq))
+    assert b"%PDF-pix" in srv.enviados[0][0] and "gabi:comprovante" in srv.tags and "gabi:entrada-whatsapp" not in srv.tags

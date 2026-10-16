@@ -2300,6 +2300,44 @@
     "summary": "Aprovar Grupo"
    }
   },
+  "/api/v1/escuta/grupos/{id_grupo}/comprovantes": {
+   "post": {
+    "description": "Define a caixa de comprovantes (CP1 B): só anexos encaminhados a este grupo vão ao Paperless. Um grupo por vez; troca a anterior.\n404 se o grupo nunca foi visto; 409 se não está aprovado.",
+    "operationId": "grupo_comprovantes_api_v1_escuta_grupos__id_grupo__comprovantes_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_grupo",
+      "required": true,
+      "schema": {
+       "title": "Id Grupo",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Grupo Comprovantes"
+   }
+  },
   "/api/v1/escuta/parametros": {
    "get": {
     "description": "Parâmetros da escuta: modo, palavras de risco, horas sem receber e tamanho máximo de anexo (padrões se não definidos).",
