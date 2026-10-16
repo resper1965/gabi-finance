@@ -92,7 +92,7 @@ def _a_receber_atrasado(con, hoje: dt.date) -> list[str]:
 
 def _fora_do_normal(con, hoje: dt.date) -> list[str]:
     """Recorrentes cujo valor deste mês foge do normal dos meses fechados (AR8)."""
-    avisos = fora_do_normal(FonteAnalise(con), hoje)
+    avisos = fora_do_normal(FonteAnalise(con, so_liberadas=True), hoje)
     linhas = [f"• ⚠️ Fora do normal: {a['descricao']} {_brl(round(a['valor'] * 100))} (normal ~{_brl(round(a['normal'] * 100))})" for a in avisos[:LIMITE_DESVIOS]]
     if len(avisos) > LIMITE_DESVIOS:
         linhas.append(f"• +{len(avisos) - LIMITE_DESVIOS} fora do normal")

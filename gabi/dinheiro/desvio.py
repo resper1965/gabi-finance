@@ -23,7 +23,10 @@ def fora_do_normal(fonte, hoje: dt.date | None = None) -> list[dict]:
         linhas.setdefault((norm(r["descricao"]), 1 if r["valor"] > 0 else -1), []).append(r)
     out = []
     for rec in analise.recorrentes(fonte, "caixa", hoje):
-        rs = linhas.get((rec["chave"], 1 if rec["sentido"] == "entrada" else -1))
+        rs = linhas.get((rec["chave"].removesuffix(" OUTRO"), 1 if rec["sentido"] == "entrada" else -1))
+        if rs and rec.get("faixa"):  # mesmo favorecido com dois pagamentos: compara só dentro da série (analise._series)
+            lo, hi = rec["faixa"]
+            rs = [r for r in rs if abs(r["valor"]) >= lo and (hi is None or abs(r["valor"]) < hi)]
         if not rs:
             continue
         por_mes: dict[str, float] = {}

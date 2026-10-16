@@ -163,15 +163,17 @@ def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime) 
 class FonteAnalise:
     """Entrega às análises portadas as mesmas formas de dado que o gabi-fin entregava (reais, não centavos)."""
 
-    def __init__(self, con):
+    def __init__(self, con, so_liberadas: bool = False):
+        """`so_liberadas`: só contas do caixa único (estado 'sim', não excluídas), como o saldo oficial; o padrão mantém o gabi-fin."""
         self.con = con
+        self.filtro = " and c.estado='sim' and c.excluido_em is null" if so_liberadas else ""
 
     def visao(self, tipo: str, de: str | None = None, ate: str | None = None) -> list[dict]:
         """Lançamentos cuja natureza contém `tipo` ('caixa' ou 'custo'), por data. `categoria` e `pessoa` já vêm classificados."""
         sql = ("select l.externo_id, c.externo_id as conta, c.tipo as tipo_conta, l.data, l.descricao_original, l.valor_centavos, "
                "coalesce(cat.nome, l.categoria_banco) as categoria, coalesce(p.nome, '') as pessoa, l.parcela, l.parcelas, l.natureza "
                "from lancamento l join conta c on c.id=l.conta_id left join categoria cat on cat.id=l.categoria_id "
-               "left join pessoa p on p.id=l.para_quem_id where l.natureza like ?")
+               "left join pessoa p on p.id=l.para_quem_id where l.natureza like ?" + self.filtro)
         args = [f"%{tipo}%"]
         if de:
             sql += " and l.data>=?"
@@ -185,12 +187,12 @@ class FonteAnalise:
                 for r in self.con.execute(sql + " order by l.data, l.externo_id", args)]
 
     def ultimo_snapshot(self):
-        ts = self.con.execute("select max(em) from saldo").fetchone()[0]
+        ts = self.con.execute("select max(s.em) from saldo s join conta c on c.id=s.conta_id where 1=1" + self.filtro).fetchone()[0]
         if ts is None:
             return None, []
         rows = self.con.execute("select c.externo_id, c.tipo, c.apelido, c.instituicao, s.saldo_centavos, c.limite_centavos, "
                                 "c.disponivel_centavos, c.vencimento_fatura from saldo s join conta c on c.id=s.conta_id "
-                                "where s.em=? order by c.id", (ts,)).fetchall()
+                                "where s.em=?" + self.filtro + " order by c.id", (ts,)).fetchall()
         return ts, [{"account_id": r[0], "tipo": r[1], "nome": r[2], "banco": r[3], "saldo": _real(r[4]), "limite": _real(r[5]),
                      "disponivel": _real(r[6]), "vencimento": r[7]} for r in rows]
 

@@ -279,7 +279,7 @@ def test_analises_so_com_escopo_fin(tokens):
 def test_recorrentes_devolve_a_serie(cli, banco, tokens):
     _academia(banco)
     d = chamar(cli, tokens["fin"], "financeiro_recorrentes")
-    assert [i["valor_medio"] for i in d["dados"]["itens"] if "ACADEMIA" in i["descricao"]] == [200.0]
+    assert [i["valor_medio"] for i in d["dados"]["itens"] if "ACADEMIA" in i["descricao"]] == ["200.00"]
 
 
 def test_recorrentes_sentido_invalido(cli, tokens):
@@ -302,3 +302,19 @@ def test_rumo_formata_valores(cli, tokens):
     out = next(l for l in d["meses"] if l["mes"] == "2026-10")
     assert out["entradas"] == formatar(800000)
     assert chamar(cli, tokens["fin"], "financeiro_rumo", ano=1900)["erro"] == "requisicao_invalida"
+
+
+def test_previsao_parte_do_caixa_unico_e_sem_float(cli, tokens):
+    saldo = chamar(cli, tokens["fin"], "financeiro_saldo")["dados"]["caixa_unico"]
+    p = chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
+    assert p["saldo_inicial"] == saldo == "12345.60" and isinstance(p["menor_saldo"], str)
+
+
+def test_vazamentos_sem_float_em_dinheiro(cli, banco, tokens):
+    c = conectar(banco)
+    for i, m in enumerate(["2026-06", "2026-07", "2026-08", "2026-09"], start=20):
+        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                  "values (1,?,?,-5990,'STREAMING','caixa+custo','posted')", (f"v{i}", f"{m}-05"))
+    c.close()
+    ass = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=4)["dados"]["assinaturas"]
+    assert [a["mensal"] for a in ass if a["item"].startswith("STREAMING")] == ["59.90"]

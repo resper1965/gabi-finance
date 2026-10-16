@@ -33,6 +33,17 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin
                        **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS}
 
 
+def _reais(v, chave: str = ""):
+    """Dinheiro das análises sai como string decimal em reais (R7), nunca float; percentuais (`*_pct`) ficam como número."""
+    if isinstance(v, dict):
+        return {k: _reais(x, k) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_reais(x, chave) for x in v]
+    if isinstance(v, float) and not chave.endswith("_pct"):
+        return f"{v:.2f}"
+    return v
+
+
 ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
 
 
@@ -140,22 +151,22 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
         def f(con, agora):
             if sentido not in (None, "entrada", "saida"):
                 raise ValueError("sentido deve ser entrada ou saida")
-            itens = analise.recorrentes(FonteAnalise(con), "caixa", agora.date())
-            return {"itens": [i for i in itens if not sentido or i["sentido"] == sentido]}
+            itens = analise.recorrentes(FonteAnalise(con, so_liberadas=True), "caixa", agora.date())
+            return _reais({"itens": [i for i in itens if not sentido or i["sentido"] == sentido]})
         return executar("financeiro_recorrentes", f)
 
     @srv.tool()
     def financeiro_previsao(dias: int = 30) -> dict:
         """Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura."""
         def f(con, agora):
-            return analise.previsao(FonteAnalise(con), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date())
+            return _reais(analise.previsao(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date()))
         return executar("financeiro_previsao", f)
 
     @srv.tool()
     def financeiro_vazamentos(meses: int = 3) -> dict:
         """Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura."""
         def f(con, agora):
-            return analise.vazamentos(FonteAnalise(con), ferramentas_trab._inteiro(meses, 1, 12, "meses"), agora.date())
+            return _reais(analise.vazamentos(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(meses, 1, 12, "meses"), agora.date()))
         return executar("financeiro_vazamentos", f)
 
     @srv.tool()

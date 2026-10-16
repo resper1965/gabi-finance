@@ -178,3 +178,23 @@ def test_diaria_limita_a_tres_avisos(con):
         serie(con, f"CONTA {n}", [-30000, -31000, -29000, -30500, -29500, -90000], prefixo=n)
     t = texto(con)
     assert t.count("Fora do normal:") == 3 and "+1 fora do normal" in t
+
+
+def _lanc(con, conta, ext, data, valor, desc):
+    con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                "values (?,?,?,?,?,'caixa+custo','posted')", (conta, ext, data, valor, desc))
+
+
+def test_desvio_ignora_conta_nao_liberada(con):
+    con.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado) values ('b9','X','BANK','Terceiro','nao')")
+    for m, v in zip(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"], [-30000, -31000, -29000, -30500, -29500, -90000]):
+        _lanc(con, 2, f"z{m}", f"{m}-05", v, "ENERGIA")
+    assert "Fora do normal" not in texto(con)
+
+
+def test_desvio_nao_compara_o_reembolso_com_a_pensao(con):
+    for m in ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09"]:
+        _lanc(con, 1, f"p{m}", f"{m}-20", -300000, "PIX MARIA")
+        _lanc(con, 1, f"r{m}", f"{m}-03", -50000, "PIX MARIA")
+    _lanc(con, 1, "r10", "2026-10-03", -50000, "PIX MARIA")  # outubro: só o reembolso saiu até dia 16
+    assert "Fora do normal" not in texto(con)
