@@ -1,11 +1,14 @@
 {
  "dados": {
+  "falhos": [],
   "itens": [
    {
     "marcadores": [
      {
       "em": "2026-10-05",
       "marcador": "Hemoglobina",
+      "observacao": null,
+      "qualitativo": false,
       "ref_max": null,
       "ref_min": null,
       "unidade": "g/dL",
@@ -14,14 +17,18 @@
      {
       "em": "2026-10-05",
       "marcador": "Glicose",
+      "observacao": null,
+      "qualitativo": false,
       "ref_max": "99",
       "ref_min": "70",
       "unidade": "mg/dL",
       "valor": "88"
      }
     ],
+    "origem": "regras",
     "paperless_id": 55,
-    "pessoa_sugerida": "p-lia"
+    "pessoa_sugerida": "p-lia",
+    "versao": 1
    }
   ]
  },

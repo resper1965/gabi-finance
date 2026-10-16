@@ -18,6 +18,7 @@ FONTES = {
     "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
     "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
+    "exames": None, "reembolso-saude": None,          # timers instalados e desligados até o Ricardo ligar; listadas, nunca contam em dados_ate
 }
 COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.

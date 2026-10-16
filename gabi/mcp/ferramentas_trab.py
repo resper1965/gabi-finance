@@ -100,7 +100,7 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
     if d["prioridades"]:
         linhas += ["", f"⭐ *Prioridade:* {_corta(d['prioridades'][0]['titulo'], 90)}"]
     n = len(decisoes.abertas(con))
-    if n:  # só a contagem: as perguntas saem quando ele pedir ("o que preciso decidir?")
+    if n:  # só a contagem: as perguntas saem quando ele pedir ("o que está pendente?")
         linhas += ["", f"🗳 {n} decisão(ões) esperando você. Quer ver?" if n > 1 else "🗳 1 decisão esperando você. Quer ver?"]
     return {"linhas": linhas, "texto": "\n".join(linhas)}
 

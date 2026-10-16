@@ -2,74 +2,60 @@
  "dados": {
   "aceite": {
    "janela_dias": 90,
+   "perguntas": {
+    "abertas": 0,
+    "expiradas": 0,
+    "respondidas": 0
+   },
    "sugestoes": [
     {
-     "tipo": "categoria",
-     "aprovadas": 42,
-     "rejeitadas": 8,
-     "pendentes": 5,
-     "taxa_aceite": 0.84
-    },
-    {
-     "tipo": "regra",
-     "aprovadas": 3,
-     "rejeitadas": 3,
-     "pendentes": 0,
-     "taxa_aceite": 0.5
+     "aprovadas": 0,
+     "pendentes": 1,
+     "rejeitadas": 0,
+     "taxa_aceite": null,
+     "tipo": "categoria"
     }
    ],
-   "taxa_aceite_geral": 0.804,
-   "perguntas": {
-    "respondidas": 4,
-    "expiradas": 1,
-    "abertas": 2
-   }
+   "taxa_aceite_geral": null
   },
   "custo": {
    "janela_dias": 30,
-   "tarefas": [
-    {
-     "tarefa": "classificar",
-     "chamadas": 120,
-     "total_usd": 0.84,
-     "medio_usd": 0.007
-    },
-    {
-     "tarefa": "escuta",
-     "chamadas": 30,
-     "total_usd": 0.3,
-     "medio_usd": 0.01
-    }
-   ],
-   "total_usd": 1.14
+   "tarefas": [],
+   "total_usd": 0
   },
   "latencia": {
-   "janela_dias": 7,
-   "ferramentas": [
-    {
-     "ferramenta": "agenda_financeira",
-     "chamadas": 12,
-     "erros": 0,
-     "mediana_ms": 110,
-     "p95_ms": 260
-    },
-    {
-     "ferramenta": "financeiro_saldo",
-     "chamadas": 8,
-     "erros": 1,
-     "mediana_ms": 50,
-     "p95_ms": 90
-    }
-   ]
+   "ferramentas": [],
+   "janela_dias": 7
   }
  },
- "dados_ate": "2026-10-16T17:00:30Z",
+ "dados_ate": "2026-10-08T17:00:30Z",
  "desatualizado": false,
  "fontes": [
   {
    "estado": "ok",
    "nome": "agenda",
-   "ultima": "2026-10-16T17:00:30Z"
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "comprovantes-paperless",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "notas-nibo",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "trabalho",
+   "ultima": "2026-10-08T17:00:30Z"
   }
- ]
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
 }

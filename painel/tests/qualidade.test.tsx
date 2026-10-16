@@ -3,11 +3,14 @@ import { render, screen } from "@testing-library/react";
 import { Qualidade } from "../src/telas/Gabi/Qualidade";
 import { apiFalsa, amostra } from "./apiFalsa";
 
+// dados de exemplo escritos aqui: a amostra do gerador vem do banco demo, que quase não tem histórico
+const CHEIO = { ...amostra("qualidade"), dados: {"aceite": {"janela_dias": 90, "sugestoes": [{"tipo": "categoria", "aprovadas": 42, "rejeitadas": 8, "pendentes": 5, "taxa_aceite": 0.84}, {"tipo": "regra", "aprovadas": 3, "rejeitadas": 3, "pendentes": 0, "taxa_aceite": 0.5}], "taxa_aceite_geral": 0.804, "perguntas": {"respondidas": 4, "expiradas": 1, "abertas": 2}}, "custo": {"janela_dias": 30, "tarefas": [{"tarefa": "classificar", "chamadas": 120, "total_usd": 0.84, "medio_usd": 0.007}, {"tarefa": "escuta", "chamadas": 30, "total_usd": 0.3, "medio_usd": 0.01}], "total_usd": 1.14}, "latencia": {"janela_dias": 7, "ferramentas": [{"ferramenta": "agenda_financeira", "chamadas": 12, "erros": 0, "mediana_ms": 110, "p95_ms": 260}, {"ferramenta": "financeiro_saldo", "chamadas": 8, "erros": 1, "mediana_ms": 50, "p95_ms": 90}]}} };
+
 beforeEach(() => { window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia; });
 afterEach(() => { vi.unstubAllGlobals(); });
 
 test("mostra aceite, custo por tarefa e latência", async () => {
-  apiFalsa();
+  apiFalsa({ qualidade: CHEIO });
   render(<Qualidade />);
   expect(await screen.findByText("Aceite das sugestões")).toBeTruthy();
   expect(screen.getByText("80%")).toBeTruthy();                 // taxa geral 0,804
