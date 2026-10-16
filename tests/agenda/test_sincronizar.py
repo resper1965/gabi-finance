@@ -233,3 +233,11 @@ def test_grava_ical_uid_e_livre_e_atualiza_na_mudanca(con):
     assert (r["ical_uid"], r["livre"]) == ("u@google.com", 1)
     sincronizar_fonte(con, f, cli, AGORA)
     assert con.execute("select livre from agenda_evento where externo_id='a'").fetchone()[0] == 0
+
+
+def test_auth_delegacao_sem_cliente_nao_chama_o_google(con):
+    """Agenda M9: auth=delegacao ainda não tem cliente; a fonte devolve erro claro e o cliente OAuth nunca é chamado."""
+    f = con.execute("insert into agenda_fonte(conta, provedor, calendario_id, estado, auth) values ('a@x.com','google','primary','sim','delegacao')").lastrowid
+    cli = Falso()
+    assert sincronizar(con, cli, AGORA) == {f: {"erro": "autenticação por delegação sem cliente ainda"}}
+    assert cli.chamadas == []

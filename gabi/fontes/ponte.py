@@ -168,7 +168,7 @@ class PonteModelo:
 
 
 class PonteContatos:
-    """Contatos do Google lidos no serviço de fontes (único com rede e segredos). `listar(conta) -> [{nome, telefone}]`; sem credenciais a fonte não está configurada."""
+    """Contatos do Google lidos no serviço de fontes (único com rede e segredos). `listar(conta) -> [{nome, telefone[, emails]}]`; sem credenciais a fonte não está configurada."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "google_contatos")

@@ -435,3 +435,13 @@ def test_limites_novos_do_banco_alertas_e_dias(con):
     assert pr.alertas_por_dia(con) == 5
     con.execute("insert into parametro(chave, valor) values ('email.max_alertas_dia', '0')")
     assert pr.alertas_por_dia(con) == 5  # inválido cai no padrão
+
+
+@pytest.mark.parametrize("bruto,vai", [("0.5", False), ("0.0", False), ("0.69", False), ("0.7", True)])
+def test_limiar_da_lixeira_tem_piso_07_no_banco_editado_a_mao(con, bruto, vai):
+    """E-mail M9 (fechado): valor abaixo de 0,7 lido do banco cai no padrão 0,9; confiança 0,75 só passa com limiar >= 0,7 e <= 0,75."""
+    con.execute("insert into parametro(chave, valor) values ('email.lixeira_confianca', ?)", (bruto,))
+    f = _fonte(con)
+    _msg(con, f, "m1")
+    pr.processar(con, Modelo(padrao=_json("lixo", 0, "promoção", 0.75)), _orc(), Ponte(), AGORA)
+    assert (_estado(con, "m1")[0] == "na_lixeira") is vai

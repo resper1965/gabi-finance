@@ -18,7 +18,7 @@ function fake(o: Opcoes = {}) {
   let sugerido = o.sugerido ?? [];
   let dispensadas = o.dispensadas ?? [];
   let prioridades = o.prioridades ?? [];
-  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], ...o.parametros };
+  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, retencao_msg_dias: 180, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], ...o.parametros };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
     chamadas.push({ metodo, url, corpo: init?.body ? JSON.parse(String(init.body)) : undefined });
@@ -120,7 +120,10 @@ test("ajustes recusam confiança fora da faixa antes de enviar e mandam só o qu
   const limiar = await screen.findByLabelText(/Confiança mínima/);
   fireEvent.change(limiar, { target: { value: "0,3" } });
   fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
-  expect((await screen.findByRole("alert")).textContent).toContain("de 0,5 a 1");
+  expect((await screen.findByRole("alert")).textContent).toContain("de 0,7 a 1");
+  fireEvent.change(limiar, { target: { value: "0,6" } });  // mesmo piso da API (0,7)
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("de 0,7 a 1");
   expect(mudancas(c)).toEqual([]);
   fireEvent.change(limiar, { target: { value: "0,95" } });
   fireEvent.change(screen.getByLabelText("VIPs"), { target: { value: "chefe@x.com\n\n bia@x.com " } });
@@ -246,4 +249,21 @@ test("a aba Na lixeira continua visível com a conta desligada e avisa", async (
   const li = (await screen.findByText(/Oferta/, { selector: "span" })).closest("li")!;
   expect(li.textContent).toContain("conta desligada");
   expect(within(li).getByRole("button", { name: "Restaurar Oferta" })).toBeTruthy();
+});
+
+test("retenção das mensagens no brain: mostra 180, recusa abaixo do piso de 90 dias e manda só o que mudou", async () => {
+  const c = fake();
+  montar();
+  const campo = (await screen.findByLabelText(/Guardar as mensagens no brain/)) as HTMLInputElement;
+  expect(campo.value).toBe("180");
+  fireEvent.change(campo, { target: { value: "89" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("de 90 a 3650");
+  fireEvent.change(campo, { target: { value: "3651" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("de 90 a 3650"));
+  expect(mudancas(c)).toEqual([]);
+  fireEvent.change(campo, { target: { value: "365" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "PUT", url: "/api/v1/correio/parametros", corpo: { retencao_msg_dias: 365 } }]));
 });

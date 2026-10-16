@@ -23,7 +23,7 @@ def _pagina(nomes, proximo=None):
     return r
 
 
-def test_listar_pagina_e_so_pede_nome_e_telefone():
+def test_listar_pagina_e_so_pede_nome_telefone_e_email():
     chamadas = []
     paginas = {None: _pagina([("Ana", "(11) 91234-5678")], "p2"), "p2": _pagina([("Bia", "11 98888-7777")])}
 
@@ -32,23 +32,23 @@ def test_listar_pagina_e_so_pede_nome_e_telefone():
         u = urlparse(url)
         q = parse_qs(u.query)
         assert u.path == "/v1/people/me/connections"
-        assert q["personFields"] == ["names,phoneNumbers"] and q["sources"] == ["READ_SOURCE_TYPE_CONTACT"]
+        assert q["personFields"] == ["names,phoneNumbers,emailAddresses"] and q["sources"] == ["READ_SOURCE_TYPE_CONTACT"]
         return 200, paginas[q.get("pageToken", [None])[0]]
 
     r = listar_contatos("a@gmail.com", lambda c: "TOK", http=http)
     assert r == [{"nome": "Ana", "telefone": "(11) 91234-5678"}, {"nome": "Bia", "telefone": "11 98888-7777"}]
     assert len(chamadas) == 2 and all(c[2]["Authorization"] == "Bearer TOK" for c in chamadas)
-    assert "photos" not in chamadas[0][1] and "emailAddresses" not in chamadas[0][1]
+    assert "photos" not in chamadas[0][1] and "addresses" not in chamadas[0][1].replace("emailAddresses", "") and "biographies" not in chamadas[0][1]
     assert ESCOPO == "https://www.googleapis.com/auth/contacts.readonly"
 
 
 def test_contato_com_varios_telefones_e_sem_nome_ou_sem_telefone():
     corpo = {"connections": [
-        {"names": [{"displayName": "Ana"}], "phoneNumbers": [{"value": "1"}, {"value": "2"}], "emailAddresses": [{"value": "x@y"}]},
+        {"names": [{"displayName": "Ana"}], "phoneNumbers": [{"value": "1"}, {"value": "2"}], "emailAddresses": [{"value": " X@Y.com "}]},
         {"phoneNumbers": [{"value": "3"}]}, {"names": [{"displayName": "Sem"}]}]}
     r = listar_contatos("a@gmail.com", lambda c: "T", http=lambda *a, **k: (200, corpo))
-    assert r == [{"nome": "Ana", "telefone": "1"}, {"nome": "Ana", "telefone": "2"}, {"nome": None, "telefone": "3"}]
-    assert all(set(x) == {"nome", "telefone"} for x in r)
+    assert r == [{"nome": "Ana", "telefone": "1", "emails": ["x@y.com"]}, {"nome": "Ana", "telefone": "2", "emails": ["x@y.com"]}, {"nome": None, "telefone": "3"}]
+    assert all(set(x) <= {"nome", "telefone", "emails"} for x in r)
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 429, 500])
@@ -301,3 +301,13 @@ def test_ponte_nao_configurada(tmp_path):
 def test_ponte_indisponivel_e_erro_tipado(tmp_path):
     with pytest.raises(ErroGoogleContatos):
         PonteContatos(tmp_path / "nada.sock").listar("a@x.com")
+
+
+def test_emails_do_contato_primario_primeiro_normalizados_sem_repetir_e_contato_so_com_email():
+    corpo = {"connections": [
+        {"names": [{"displayName": "Ana"}], "phoneNumbers": [{"value": "1"}],
+         "emailAddresses": [{"value": "casa@x.com"}, {"value": "Trab@Y.com", "metadata": {"primary": True}}, {"value": "trab@y.com"}, {"value": "lixo"}, {"value": 5}, {"value": "a b@x.com"}]},
+        {"names": [{"displayName": "Só Email"}], "emailAddresses": [{"value": "so@x.com"}]},
+        {"names": [{"displayName": "Nada"}], "emailAddresses": [{"value": "invalido"}]}]}
+    r = listar_contatos("a@gmail.com", lambda c: "T", http=lambda *a, **k: (200, corpo))
+    assert r == [{"nome": "Ana", "telefone": "1", "emails": ["trab@y.com", "casa@x.com"]}, {"nome": "Só Email", "telefone": None, "emails": ["so@x.com"]}]

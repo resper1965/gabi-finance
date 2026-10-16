@@ -184,3 +184,25 @@ def test_descobrir_nao_trava_o_laco_da_api_e_404_vem_antes_do_503(banco):
     assert ag.no_laco is False
     sem_fonte = _cli(banco)
     assert _post(sem_fonte, f"{U}/fontes/999/calendarios/descobrir").status_code == 404  # fonte inexistente: 404 antes do 503
+
+
+def test_conta_e_normalizada_para_minusculas_e_nao_duplica(cli, banco):
+    """Agenda M9: Resper@Gmail.com e resper@gmail.com são a mesma conta."""
+    fid = _criar(cli, "Resper@Gmail.COM")
+    c = conectar(banco)
+    assert c.execute("select conta from agenda_fonte where id=?", (fid,)).fetchone()[0] == "resper@gmail.com"
+    c.close()
+    r = _post(cli, f"{U}/fontes", {"conta": "resper@gmail.com", "provedor": "google"})
+    assert r.status_code == 409
+
+
+def test_desligar_ou_devolver_para_decisao_limpa_o_ultimo_erro(cli, banco):
+    fid = _criar(cli)
+    c = conectar(banco)
+    c.execute("update agenda_fonte set ultimo_erro='calendar.events.list -> 500', estado='sim' where id=?", (fid,))
+    c.commit()
+    c.close()
+    assert _patch(cli, f"{U}/fontes/{fid}", {"estado": "nao"}).status_code == 200
+    c = conectar(banco)
+    assert c.execute("select ultimo_erro from agenda_fonte where id=?", (fid,)).fetchone()[0] is None
+    c.close()

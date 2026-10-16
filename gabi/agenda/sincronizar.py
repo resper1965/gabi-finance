@@ -109,9 +109,12 @@ def _fechar_aviso(con, conta: str, agora: str) -> None:
 def sincronizar(con, listar: Callable, agora: str) -> dict:
     """Por fonte com estado='sim': {fonte_id: resultado | {"erro": msg}}. Uma fonte que falha não derruba as outras nem muda suas linhas."""
     saida = {}
-    for f in con.execute("select id, conta, provedor from agenda_fonte where estado='sim' order by id").fetchall():
+    for f in con.execute("select id, conta, provedor, auth from agenda_fonte where estado='sim' order by id").fetchall():
         if f["provedor"] != "google":
             saida[f["id"]] = {"erro": "provedor sem cliente ainda"}
+            continue
+        if f["auth"] != "oauth":  # `delegacao` ainda não tem cliente: não tenta o OAuth da conta por engano
+            saida[f["id"]] = {"erro": "autenticação por delegação sem cliente ainda"}
             continue
         try:
             saida[f["id"]] = sincronizar_fonte(con, f["id"], listar, agora)

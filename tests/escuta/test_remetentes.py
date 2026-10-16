@@ -220,3 +220,55 @@ def test_i4_id_cru_aprovado_casa_pelo_canal_exato(con):
     d = json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])
     assert f"whatsapp:{lid}" in d["canais"]
     assert estado_remetente(con, lid) == ("aprovado", pid)
+
+
+# ---- e-mail do contato na confirmação do remetente (e-mail M4) ----
+def _contato_email(con, emails, numero=N, conta="resper@gmail.com", nome="Ana"):
+    for e in emails:
+        con.execute("insert or ignore into contato_google_email(conta, email, telefone, nome) values (?,?,?,?)", (conta, e, numero, nome))
+
+
+def _dados(con, pid):
+    return json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])
+
+
+def test_aprovar_com_um_unico_email_do_contato_preenche_o_canal_email(con):
+    _contato_email(con, ["ana@x.com"])
+    _contato_email(con, ["ana@x.com"], conta="resper@ness.com.br")  # o mesmo e-mail em outra conta continua inequívoco
+    pid = aprovar(con, N, "familia", "Ana", "ricardo")
+    d = _dados(con, pid)
+    assert "email:ana@x.com" in d["canais"] and f"whatsapp:{N}" in d["canais"]
+    aprovar(con, N, "familia", "Ana", "ricardo")  # de novo: não duplica
+    assert _dados(con, pid)["canais"].count("email:ana@x.com") == 1
+    assert con.execute("select count(*) from pergunta").fetchone()[0] == 0
+    # a auditoria nunca leva o endereço
+    assert not [r for r in con.execute("select o_que from decisao") if "ana@x.com" in r[0]]
+
+
+def test_aprovar_sem_email_conhecido_nao_mexe_nem_pergunta(con):
+    pid = aprovar(con, N, "familia", "Ana", "ricardo")
+    assert [c for c in _dados(con, pid)["canais"] if c.startswith("email:")] == []
+    assert con.execute("select count(*) from pergunta").fetchone()[0] == 0
+
+
+def test_aprovar_com_varios_emails_pergunta_pelo_canal_e_nao_grava_ate_a_resposta(con):
+    from gabi.decisoes import abertas, responder
+    _contato_email(con, ["ana@x.com", "ana@trabalho.com"])
+    pid = aprovar(con, N, "familia", "Ana", "ricardo")
+    assert [c for c in _dados(con, pid)["canais"] if c.startswith("email:")] == []
+    (p,) = abertas(con)
+    assert [o["rotulo"] for o in p["opcoes"]][:2] == ["ana@trabalho.com", "ana@x.com"] and p["opcoes"][-1]["rotulo"].startswith("Nenhum")
+    aprovar(con, N, "familia", "Ana", "ricardo")  # reaprovar não abre uma segunda pergunta igual
+    assert len(abertas(con)) == 1
+    responder(con, p["id"], 2, "ricardo", "2026-10-16T12:00:00+00:00")  # escolheu ana@x.com
+    assert [c for c in _dados(con, pid)["canais"] if c.startswith("email:")] == ["email:ana@x.com"]
+    assert _dados(con, pid)["escuta_aprovada"] is True  # o efeito não mexe no resto de pessoa.dados
+
+
+def test_responder_nenhum_nao_grava_email(con):
+    from gabi.decisoes import abertas, responder
+    _contato_email(con, ["ana@x.com", "ana@trabalho.com"])
+    pid = aprovar(con, N, "familia", "Ana", "ricardo")
+    (p,) = abertas(con)
+    responder(con, p["id"], len(p["opcoes"]), "ricardo", "2026-10-16T12:00:00+00:00")
+    assert [c for c in _dados(con, pid)["canais"] if c.startswith("email:")] == []

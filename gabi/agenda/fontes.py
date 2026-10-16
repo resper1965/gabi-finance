@@ -38,7 +38,7 @@ def _existe(con, fonte_id: int) -> sqlite3.Row:
 def criar(con, conta, provedor, auth="oauth") -> int:
     """Nova conta (calendário principal), sempre `a_decidir`: nada é lido até o Ricardo liberar."""
     try:
-        conta = conta_valida(conta)
+        conta = conta_valida(conta).lower()
     except ErroGoogleOAuth:
         raise ErroFonte("conta deve ser um e-mail válido") from None
     if provedor not in PROVEDORES:
@@ -55,7 +55,8 @@ def definir_estado(con, fonte_id: int, estado) -> None:
     if estado not in ESTADOS:
         raise ErroFonte(f"estado deve ser um de {list(ESTADOS)}")
     _existe(con, fonte_id)
-    con.execute("update agenda_fonte set estado=? where id=?", (estado, fonte_id))
+    # fonte que sai de "lendo" não carrega o erro antigo (o painel mostraria "Último erro" de algo que ninguém mais lê)
+    con.execute("update agenda_fonte set estado=?, ultimo_erro=case when ?='sim' then ultimo_erro else null end where id=?", (estado, estado, fonte_id))
 
 
 def descobrir_calendarios(con, fonte_id: int, listar_calendarios: Callable[[str], list[dict]]) -> list[dict]:

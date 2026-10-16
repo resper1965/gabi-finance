@@ -9,7 +9,7 @@ from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.escuta import spool_seguro
 from gabi.escuta.caixa import normalizar_telefone
-from gabi.escuta.contatos import nome_do_numero
+from gabi.escuta.contatos import emails_do_numero, nome_do_numero
 
 PAPEIS = ("familia", "prestador", "cobranca")
 
@@ -92,6 +92,32 @@ def garantir_pessoa(con, numero: str, nome: str | None) -> tuple[str, dict, str]
     return pid, d, estado
 
 
+def _canal_email(con, pid: str, d: dict, numero: str) -> list[str]:
+    """E-mail do contato do Google com este número (e-mail M4). Um só e-mail distinto: entra como canal `email:` em `d` (o chamador grava).
+    Mais de um: devolve a lista para perguntar ao Ricardo (nada é gravado). Dentro da transação do chamador."""
+    achados = emails_do_numero(con, numero)
+    canais = d.get("canais") if isinstance(d.get("canais"), list) else []
+    ja = {c.lower() for c in canais if isinstance(c, str)}
+    if len(achados) == 1 and f"email:{achados[0]}" not in ja:
+        d["canais"] = canais + [f"email:{achados[0]}"]
+    if len(achados) > 1 and not any(f"email:{a}" in ja for a in achados):
+        return achados
+    return []
+
+
+def _perguntar_email(con, pid: str, achados: list[str]) -> None:
+    """Pergunta pelo canal de decisão qual e-mail vale (uma pergunta aberta por pessoa). Efeito `adicionar_canal_email` (validado em gabi/decisoes.py)."""
+    from gabi import decisoes
+    for p in con.execute("select opcoes from pergunta where estado='aberta' and tipo='canal_email'"):
+        if any((o.get("parametros") or {}).get("pessoa_id") == pid for o in json.loads(p["opcoes"])):
+            return
+    nome = con.execute("select nome from pessoa where id=?", (pid,)).fetchone()["nome"]
+    opcoes = [{"n": i, "rotulo": a, "efeito": "adicionar_canal_email", "parametros": {"pessoa_id": pid, "email": a}} for i, a in enumerate(achados, 1)]
+    opcoes.append({"n": len(opcoes) + 1, "rotulo": "Nenhum deles (não ligar e-mail a essa pessoa)", "efeito": "registrar_nota"})
+    decisoes.criar_pergunta(con, "canal_email", f"Qual e-mail é de {nome}?", "Os contatos do Google trazem mais de um e-mail para o telefone que você aprovou. O escolhido passa a identificar essa pessoa no e-mail (proteção contra lixeira e fila de contatos).",
+                            opcoes, "escuta", _agora())
+
+
 def aprovar(con, numero: str, papel: str, nome: str | None, por: str) -> str:
     """Decisão explícita do Ricardo: pode reverter ignorado/bloqueado. Reaproveita a pessoa que já tem o número (a aprovada primeiro)."""
     if papel not in PAPEIS:
@@ -99,11 +125,14 @@ def aprovar(con, numero: str, papel: str, nome: str | None, por: str) -> str:
     with transacao(con):
         pid, d, _ = garantir_pessoa(con, numero, nome)
         d.update({"escuta_aprovada": True, "papel_escuta": papel})
+        a_perguntar = _canal_email(con, pid, d, numero)
         con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), pid))
         con.execute(
             "insert into escuta_remetente(numero, nome, estado, vista_em, qtd) values (?,?, 'aprovado', ?, 0) "
             "on conflict(numero) do update set estado='aprovado', nome=coalesce(?, nome)", (numero, nome, _agora(), nome))
         _auditar(con, por, f"escuta: aprovou {numero} como {papel} (pessoa {pid})")
+    if a_perguntar:
+        _perguntar_email(con, pid, a_perguntar)
     return pid
 
 

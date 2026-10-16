@@ -50,6 +50,7 @@ class _Pessoas:
     def __init__(self, con):
         self.por_email: dict[str, tuple[str, str]] = {}
         self.por_numero: dict[str, tuple[str, str]] = {}
+        self.enderecos: dict[str, set[str]] = {}  # pessoa_id -> endereços (minúsculos)
         for p in con.execute("select id, nome, dados from pessoa where excluido_em is null order by id"):
             d, quem = dados(p), (p["id"], p["nome"])
             enderecos = [x for x in (d.get("emails") or []) if isinstance(x, str)]
@@ -65,6 +66,7 @@ class _Pessoas:
             for e in enderecos:
                 if (a := endereco(e)):
                     self.por_email.setdefault(a, quem)
+                    self.enderecos.setdefault(p["id"], set()).add(a)
 
 
 class _Contatos:
@@ -188,6 +190,18 @@ def _whatsapp(con, agora, pessoas, ac: _Contatos) -> None:
         ac.abrir(chave, x["nome"], "whatsapp", "Pediu algo no WhatsApp" + (f" ({n} mensagens)" if n > 1 else ""), 2, x["desde"], agora, qtd=n, detalhe=det, pessoa_id=x["pid"])
 
 
+def _frentes_por_endereco(con) -> dict[str, set[str]]:
+    """Endereço -> nomes das frentes onde um e-mail DESSE remetente foi confirmado (`item_frente` tipo email, estado confirmado, R1) em caixa
+    liberada. É o único vínculo real entre frente e pessoa; `tarefa` e os demais itens não têm remetente, então não entram (nada é inventado)."""
+    por: dict[str, set[str]] = {}
+    for r in con.execute(
+            "select f.nome, i.remetente from item_frente x join frente f on f.id=x.frente_id join item_email i on i.id=x.ref_id "
+            "join caixa_email c on c.id=i.caixa_id where x.tipo='email' and x.estado='confirmado' and c.estado='sim'"):
+        if (a := endereco(r["remetente"])):
+            por.setdefault(a, set()).add(r["nome"])
+    return por
+
+
 def contatos_em_aberto(con, agora: dt.datetime | None = None, *, painel: bool = False) -> dict:
     """`{itens, total}`: contatos com algo em aberto, o mais urgente primeiro (ordem do pior item, depois o mais antigo, depois o nome).
     `painel=True` só na rota do painel (política `agenda.privados=so_painel`)."""
@@ -197,8 +211,11 @@ def contatos_em_aberto(con, agora: dt.datetime | None = None, *, painel: bool = 
     _agenda(con, agora, pessoas, ac, painel)
     _pedidos(con, agora, ac)
     _whatsapp(con, agora, pessoas, ac)
+    frentes = _frentes_por_endereco(con)
     itens = []
     for c in ac.itens.values():
+        enderecos = pessoas.enderecos.get(c["pessoa_id"], set()) if c["pessoa_id"] else {c["chave"][2:]} if c["chave"].startswith("e:") else set()
+        c["frentes"] = sorted({n for a in enderecos for n in frentes.get(a, ())}, key=str.casefold)
         c["abertos"].sort(key=lambda a: (a["ordem"], -(a["dias"] or 0)))
         c["urgencia"] = c["abertos"][0]["ordem"]
         c["dias"] = max((a["dias"] or 0) for a in c["abertos"])

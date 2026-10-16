@@ -221,3 +221,40 @@ def test_main_todas_falham_sai_1(tmp_path, capsys):
 def test_main_falha_inesperada_de_uma_conta_sai_1(tmp_path):
     f = _com_falhas({GMAIL: [{"nome": "A", "telefone": "11912345678"}]}, {NESS: c.ErroGoogleContatos("people.connections.list -> 500")})
     assert c.main(_banco(tmp_path), listar=f) == 1
+
+
+# ---- e-mail dos contatos (migração 0070) ----
+def _emails(con):
+    return sorted((r["conta"], r["email"], r["telefone"], r["nome"]) for r in con.execute("select conta, email, telefone, nome from contato_google_email"))
+
+
+def test_email_do_contato_vai_para_tabela_filha_com_o_telefone_e_sem_telefone(con):
+    dados = {GMAIL: [{"nome": "Ana", "telefone": "(11) 91234-5678", "emails": ["ana@x.com", "ana@y.com"]},
+                     {"nome": "Só Email", "telefone": None, "emails": ["so@x.com"]},
+                     {"nome": "Ramal", "telefone": "11 3333-4444 ramal 22", "emails": ["r@x.com"]},
+                     {"nome": "Sem nada", "telefone": None}]}
+    r = c.sincronizar(con, [GMAIL], _listar(dados))
+    assert r["contas"] == {GMAIL: {"lidos": 4}} and r["total"] == 1 and r["invalidos"] == 2  # o ramal inválido e o item vazio contam; contato só com e-mail não
+    assert _emails(con) == [(GMAIL, "ana@x.com", "+5511912345678", "Ana"), (GMAIL, "ana@y.com", "+5511912345678", "Ana"),
+                            (GMAIL, "r@x.com", "", "Ramal"), (GMAIL, "so@x.com", "", "Só Email")]
+    assert c.emails_do_numero(con, "+5511912345678") == ["ana@x.com", "ana@y.com"]
+    assert c.emails_do_numero(con, "+5511900000000") == []
+
+
+def test_email_invalido_ou_estranho_nao_entra_e_resincronizar_substitui_so_a_conta(con):
+    c.sincronizar(con, [GMAIL, NESS], _listar({GMAIL: [{"nome": "Ana", "telefone": "11912345678", "emails": ["a@x.com", "nao-e-email", 5, "A@X.com"]}],
+                                                NESS: [{"nome": "Ana", "telefone": "11912345678", "emails": ["n@x.com"]}]}))
+    assert _emails(con) == [(GMAIL, "a@x.com", "+5511912345678", "Ana"), (NESS, "n@x.com", "+5511912345678", "Ana")]
+    def so_gmail(conta):
+        if conta == NESS:
+            raise RuntimeError("falhou")
+        return [{"nome": "Ana", "telefone": "11912345678", "emails": ["novo@x.com"]}]
+    c.sincronizar(con, [GMAIL, NESS], so_gmail)
+    assert _emails(con) == [(GMAIL, "novo@x.com", "+5511912345678", "Ana"), (NESS, "n@x.com", "+5511912345678", "Ana")]  # a conta que falhou fica como estava
+    c.sincronizar(con, [GMAIL], _listar({GMAIL: []}))
+    assert _emails(con) == []  # conta tirada do parâmetro some
+
+
+def test_sincronizar_nao_imprime_nem_devolve_email(con, capsys):
+    r = c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "Ana", "telefone": "11912345678", "emails": ["segredo@x.com"]}]}))
+    assert "segredo@x.com" not in json.dumps(r) and "segredo@x.com" not in capsys.readouterr().out

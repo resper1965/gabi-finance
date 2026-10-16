@@ -104,3 +104,44 @@ def test_expirar_so_as_abertas_antigas_e_expirada_nao_responde(con):
 def test_opcoes_sao_json_valido_no_banco(con):
     pid = criar_pergunta(con, "x", "t", None, _opcoes(), "claude", T0)
     assert json.loads(con.execute("select opcoes from pergunta where id=?", (pid,)).fetchone()[0])[1]["efeito"] == "registrar_nota"
+
+
+# ---- efeito adicionar_canal_email: só e-mail do contato da pessoa, nada fora da lista ----
+def _pessoa_com_contato(con, numero="+5511912345678", emails=("ana@x.com",)):
+    con.execute("insert into pessoa(id, nome, dados) values ('p1','Ana', ?)", (json.dumps({"canais": [f"whatsapp:{numero}"], "escuta_aprovada": True}),))
+    for e in emails:
+        con.execute("insert into contato_google_email(conta, email, telefone, nome) values ('c', ?, ?, 'Ana')", (e, numero))
+
+
+def _op(email="ana@x.com", pessoa="p1"):
+    return [{"n": 1, "rotulo": email, "efeito": "adicionar_canal_email", "parametros": {"pessoa_id": pessoa, "email": email}}, {"n": 2, "rotulo": "Nenhum", "efeito": "registrar_nota"}]
+
+
+def test_adicionar_canal_email_grava_so_o_canal(con):
+    _pessoa_com_contato(con)
+    pid = criar_pergunta(con, "canal_email", "Qual e-mail?", None, _op(), "escuta", T0)
+    responder(con, pid, 1, "ricardo", T1)
+    d = json.loads(con.execute("select dados from pessoa where id='p1'").fetchone()[0])
+    assert d == {"canais": ["whatsapp:+5511912345678", "email:ana@x.com"], "escuta_aprovada": True}
+
+
+@pytest.mark.parametrize("op", [
+    {"pessoa_id": "p1", "email": "outro@x.com"},                    # não é e-mail do contato dessa pessoa
+    {"pessoa_id": "p1", "email": "ANA@x.com"},                      # tem de vir já normalizado
+    {"pessoa_id": "naoexiste", "email": "ana@x.com"},
+    {"pessoa_id": "p1", "email": "ana@x.com", "extra": "x"},
+    {"pessoa_id": "p1"}, {"pessoa_id": 5, "email": "ana@x.com"}, {"pessoa_id": "p1", "email": 7}])
+def test_adicionar_canal_email_valida_na_criacao(con, op):
+    _pessoa_com_contato(con)
+    with pytest.raises(ErroDecisao):
+        criar_pergunta(con, "canal_email", "t", None, [{"n": 1, "rotulo": "x", "efeito": "adicionar_canal_email", "parametros": op}], "claude", T0)
+
+
+def test_adicionar_canal_email_revalida_na_resposta_se_o_contato_sumiu(con):
+    _pessoa_com_contato(con)
+    pid = criar_pergunta(con, "canal_email", "Qual?", None, _op(), "escuta", T0)
+    con.execute("delete from contato_google_email")
+    with pytest.raises(ErroDecisao):
+        responder(con, pid, 1, "ricardo", T1)
+    assert json.loads(con.execute("select dados from pessoa where id='p1'").fetchone()[0])["canais"] == ["whatsapp:+5511912345678"]
+    assert con.execute("select estado from pergunta where id=?", (pid,)).fetchone()[0] == "aberta"

@@ -1,6 +1,6 @@
-"""Contatos do Google (nome e telefone, só leitura) para dar nome aos remetentes e trazer gente para a escuta.
-Sem rede: a leitura vem pela ponte do serviço de fontes (`listar` injetável). Só nome e telefone são lidos e gravados; saídas e logs só
-levam contagens. Contas e contas de origem/destino são DADO em `parametro` (JSON). Programa do timer: python -m gabi.escuta.contatos."""
+"""Contatos do Google (nome, telefone e e-mail, só leitura) para dar nome aos remetentes e trazer gente para a escuta.
+Sem rede: a leitura vem pela ponte do serviço de fontes (`listar` injetável). Só nome, telefone e e-mail são lidos e gravados (o e-mail vai para `contato_google_email`, migração 0070); saídas e logs só
+levam contagens, nunca nome, número nem endereço. Contas e contas de origem/destino são DADO em `parametro` (JSON). Programa do timer: python -m gabi.escuta.contatos."""
 import csv
 import io
 import json
@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from gabi.db import conectar, migrar, transacao
+from gabi.correio.regras import endereco
 from gabi.escuta.caixa import normalizar_telefone
 from gabi.fontes.google_contatos import ErroGoogleContatos
 
@@ -18,6 +19,7 @@ CONTAS_PADRAO = ["resper@gmail.com", "resper@ness.com.br"]
 DESTINO_PADRAO, ORIGEM_PADRAO = "resper@gmail.com", "resper@ness.com.br"
 _E164 = re.compile(r"^\+\d{10,15}$")
 _CANONICO = re.compile(r"^\+[1-9]\d{7,14}$")
+MAX_EMAILS = 10
 _RAMAL = re.compile(r"(?i)(ramal|\bext|\br\.|\bx\s*\d|#|;|,)")
 
 
@@ -74,6 +76,12 @@ def _telefone(item) -> str | None:
     return normalizar_telefone(t)
 
 
+def _enderecos(item) -> list[str]:
+    """E-mails do item já normalizados pelo cliente; aqui só se revalida (a ponte é fronteira) com a mesma regra do correio."""
+    brutos = item.get("emails") if isinstance(item, dict) else None
+    return list(dict.fromkeys(a for e in (brutos if isinstance(brutos, list) else []) if isinstance(e, str) and (a := endereco(e))))[:MAX_EMAILS]
+
+
 def _erro(e: Exception) -> str:
     return str(e) if isinstance(e, ErroGoogleContatos) else type(e).__name__
 
@@ -94,23 +102,31 @@ def sincronizar(con, contas: list[str], listar: Callable[[str], list[dict]]) -> 
             resultado[conta] = {"erro": falha}
             continue
         linhas: dict[str, str | None] = {}
+        mails: dict[tuple[str, str], str | None] = {}  # (e-mail, telefone ou '') -> nome
         for it in itens:
             tel = _telefone(it)
-            if tel is None:
-                invalidos += 1
-                continue
             nome = it.get("nome")
             nome = nome.strip()[:200] if isinstance(nome, str) and nome.strip() else None
-            if tel not in linhas or (linhas[tel] is None and nome):
+            enderecos = _enderecos(it)
+            if tel is None:
+                if it.get("telefone") or it.get("canonico") or not enderecos:  # telefone inválido (ramal, DDI estranho) ou item vazio; contato só com e-mail não é inválido
+                    invalidos += 1
+            elif tel not in linhas or (linhas[tel] is None and nome):
                 linhas[tel] = nome
-        lidas[conta] = linhas
+            for a in enderecos:
+                if (a, tel or "") not in mails or (mails[(a, tel or "")] is None and nome):
+                    mails[(a, tel or "")] = nome
+        lidas[conta] = (linhas, mails)
         resultado[conta] = {"lidos": len(itens)}
     with transacao(con):
         marcas = ",".join("?" * len(contas))
         con.execute(f"delete from contato_google where conta not in ({marcas})" if contas else "delete from contato_google", contas)
-        for conta, linhas in lidas.items():
+        con.execute(f"delete from contato_google_email where conta not in ({marcas})" if contas else "delete from contato_google_email", contas)
+        for conta, (linhas, mails) in lidas.items():
             con.execute("delete from contato_google where conta=?", (conta,))
             con.executemany("insert into contato_google(conta, telefone, nome) values (?,?,?)", [(conta, t, n) for t, n in linhas.items()])
+            con.execute("delete from contato_google_email where conta=?", (conta,))
+            con.executemany("insert into contato_google_email(conta, email, telefone, nome) values (?,?,?,?)", [(conta, a, t, n) for (a, t), n in mails.items()])
     total = con.execute("select count(distinct telefone) from contato_google").fetchone()[0]
     return {"contas": resultado, "total": total, "invalidos": invalidos}
 
@@ -121,6 +137,11 @@ def nome_do_numero(con, numero: str) -> str | None:
     r = con.execute("select nome from contato_google where telefone=? and nome is not null and trim(nome)<>'' "
                     "order by conta=? desc, conta limit 1", (numero, destino)).fetchone()
     return r["nome"] if r else None
+
+
+def emails_do_numero(con, numero: str) -> list[str]:
+    """E-mails distintos (minúsculas, em ordem) dos contatos do Google com este telefone, em qualquer conta."""
+    return [r[0] for r in con.execute("select distinct email from contato_google_email where telefone=? order by email", (numero,))]
 
 
 def listar_unicos(con) -> list[dict]:

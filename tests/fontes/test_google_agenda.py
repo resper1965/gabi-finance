@@ -199,3 +199,23 @@ def test_local_de_trabalho_nao_e_compromisso_mas_fora_do_escritorio_e():
     itens = [_ev("casa", eventType="workingLocation"), _ev("ferias", eventType="outOfOffice"), _ev("normal", eventType="default")]
     r = ga.listar_eventos("a@x.com", "primary", None, JANELA, Token(), http=_http([(200, {"items": itens, "nextSyncToken": "S"})], ch))
     assert [e["externo_id"] for e in r.eventos] == ["ferias", "normal"] and r.cancelados == []
+
+
+def _link(**extra):
+    corpo = {"items": [_ev("a", **extra)], "nextSyncToken": "S"}
+    return ga.listar_eventos("a@gmail.com", "primary", None, JANELA, Token(), http=_http([(200, corpo)], [])).eventos[0]["link_reuniao"]
+
+
+def test_link_de_reuniao_vem_do_conference_data_de_qualquer_provedor_e_so_https():
+    """Agenda M8: Zoom/Teams adicionados ao evento chegam em conferenceData.entryPoints (video); hangoutLink continua valendo."""
+    zoom = {"entryPoints": [{"entryPointType": "phone", "uri": "tel:+5511999990000"}, {"entryPointType": "video", "uri": "https://us02web.zoom.us/j/123"}],
+            "conferenceSolution": {"name": "Zoom Meeting"}}
+    assert _link(conferenceData=zoom) == "https://us02web.zoom.us/j/123"
+    assert _link(conferenceData=zoom, hangoutLink="https://meet.google.com/abc") == "https://meet.google.com/abc"  # o Meet nativo vence
+    assert _link(conferenceData={"entryPoints": [{"entryPointType": "video", "uri": "https://teams.microsoft.com/l/meetup-join/x"}]}) == "https://teams.microsoft.com/l/meetup-join/x"
+    # só telefone, esquema que não é https e lixo: sem link
+    assert _link(conferenceData={"entryPoints": [{"entryPointType": "phone", "uri": "tel:+5511999990000"}]}) is None
+    assert _link(conferenceData={"entryPoints": [{"entryPointType": "video", "uri": "javascript:alert(1)"}]}) is None
+    assert _link(conferenceData={"entryPoints": [{"entryPointType": "video", "uri": "http://x.com/j/1"}]}) is None
+    assert _link(conferenceData="lixo") is None and _link(conferenceData={"entryPoints": "x"}) is None
+    assert _link(location="https://zoom.us/j/999") is None  # o local nunca é lido (privacidade)

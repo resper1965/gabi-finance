@@ -345,6 +345,17 @@ def test_delete_apaga_tudo_e_audita(cc, banco):
     assert cc.get(U, headers=BOSS).json()["dados"]["itens"] == []
 
 
+def test_delete_apaga_tambem_os_emails_dos_contatos(cc, banco):
+    _sinc(cc)
+    c = conectar(banco)
+    c.execute("insert into contato_google_email(conta, email, telefone, nome) values ('resper@gmail.com','a@x.com','+5511912345678','Ana')")
+    c.close()
+    assert cc.delete(U, headers=BOSS).status_code == 200
+    c = conectar(banco)
+    assert c.execute("select count(*) from contato_google_email").fetchone()[0] == 0
+    c.close()
+
+
 def test_trazer_e_depois_aprovar_resulta_em_uma_so_pessoa(cc, banco):
     _sinc(cc)
     assert _trazer(cc, ["+5511988887777"]).json()["dados"]["criadas"] == 1

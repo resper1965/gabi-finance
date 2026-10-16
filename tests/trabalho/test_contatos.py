@@ -181,3 +181,57 @@ def test_email_dispensado_pelo_dono_nao_aparece(con):
     assert len(itens(con)) == 1
     con.execute("update email_msg set dispensada_em=? where id=?", (iso(), i))
     assert itens(con) == []
+
+
+# ---- frente por pessoa: só o vínculo real (item_frente de e-mail CONFIRMADO liga a frente ao remetente) ----
+def _item_email(con, cx, remetente, ext):
+    return con.execute("insert into item_email(caixa_id, message_id, remetente, assunto, recebido_em) values (?,?,?,?,?)",
+                       (cx, ext, remetente, "ASSUNTO-SECRETO", iso(days=-1))).lastrowid
+
+
+def _frente(con, nome, tipo="cliente"):
+    return con.execute("insert into frente(nome, tipo) values (?,?)", (nome, tipo)).lastrowid
+
+
+def _liga(con, frente, item, estado="confirmado"):
+    con.execute("insert into item_frente(frente_id, tipo, ref_id, origem, estado) values (?, 'email', ?, 'manual', ?)", (frente, item, estado))
+
+
+def test_contato_so_com_endereco_mostra_a_frente_do_email_confirmado(con):
+    cx = caixa(con)
+    fr = _frente(con, "Cliente Alfa")
+    _liga(con, fr, _item_email(con, cx, "Ana Souza <Ana@Y.com>", "i1"))
+    msg(con, fonte(con), "ana@y.com")
+    [c] = itens(con)
+    assert c["frentes"] == ["Cliente Alfa"]
+
+
+def test_pessoa_cadastrada_herda_a_frente_de_qualquer_email_seu(con):
+    cx = caixa(con)
+    pessoa(con, "p-ana", "Ana", canais=["email:ana@y.com"], emails=["ana@trabalho.com"])
+    _liga(con, _frente(con, "Projeto Beta", "projeto"), _item_email(con, cx, "ana@trabalho.com", "i1"))
+    _liga(con, _frente(con, "Cliente Alfa"), _item_email(con, cx, "ana@y.com", "i2"))
+    msg(con, fonte(con), "ana@y.com")
+    [c] = itens(con)
+    assert c["frentes"] == ["Cliente Alfa", "Projeto Beta"]
+
+
+def test_frente_sugerida_ou_de_outro_remetente_ou_caixa_nao_liberada_nao_conta(con):
+    cx = caixa(con)
+    fechada = con.execute("insert into caixa_email(endereco, provedor, estado) values ('off@x.com','google','nao')").lastrowid
+    fr = _frente(con, "Cliente Alfa")
+    _liga(con, fr, _item_email(con, cx, "ana@y.com", "i1"), estado="sugerido")      # só sugerido: a Gabi sugere, o Ricardo decide (R1)
+    _liga(con, fr, _item_email(con, cx, "outro@y.com", "i2"))                       # remetente diferente
+    _liga(con, _frente(con, "Fechada"), _item_email(con, fechada, "ana@y.com", "i3"))  # caixa desligada: leitura não liberada
+    msg(con, fonte(con), "ana@y.com")
+    [c] = itens(con)
+    assert c["frentes"] == []
+
+
+def test_contato_sem_vinculo_tem_lista_vazia_e_tarefa_nao_cria_linha(con):
+    """Tarefa não tem vínculo com pessoa (esquema: origem, externo_id, titulo, prazo): nunca vira linha em Contatos."""
+    con.execute("insert into tarefa(origem, externo_id, titulo) values ('linear','1','Entregar relatório para Ana')")
+    assert itens(con) == []
+    msg(con, fonte(con), "bia@y.com")
+    [c] = itens(con)
+    assert c["frentes"] == []

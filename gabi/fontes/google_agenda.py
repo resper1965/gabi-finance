@@ -59,13 +59,26 @@ def listar_calendarios(conta: str, token: Callable[[str], str], http=_http_real)
     raise ErroGoogleOAuth("paginação sem fim")
 
 
+def _link_reuniao(item: dict) -> str | None:
+    """`hangoutLink` (Meet nativo) ou o primeiro ponto de entrada de vídeo de `conferenceData` (Zoom, Teams e outros add-ons). Só https; o local do
+    evento nunca é lido."""
+    hangout = item.get("hangoutLink")
+    if isinstance(hangout, str) and hangout.startswith("https://"):
+        return hangout
+    conf = item.get("conferenceData")
+    pontos = conf.get("entryPoints") if isinstance(conf, dict) else None
+    for p in pontos if isinstance(pontos, list) else []:
+        if isinstance(p, dict) and p.get("entryPointType") == "video" and isinstance(p.get("uri"), str) and p["uri"].startswith("https://"):
+            return p["uri"]
+    return None
+
+
 def _evento(item: dict) -> dict:
     attendees = item.get("attendees")
-    hangout = item.get("hangoutLink")
     resumo = item.get("summary")
     return {"externo_id": item["id"], "inicio": item.get("start"), "fim": item.get("end"),
             "titulo": resumo if isinstance(resumo, str) else None,
-            "link_reuniao": hangout if isinstance(hangout, str) else None,
+            "link_reuniao": _link_reuniao(item),
             "participantes_qtd": len([a for a in attendees if isinstance(a, dict)]) if isinstance(attendees, list) else 0,
             "status": item.get("status") if isinstance(item.get("status"), str) else None,
             "etag": item.get("etag") if isinstance(item.get("etag"), str) else None,

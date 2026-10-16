@@ -9,12 +9,12 @@ import { amostra, apiFalsa } from "./apiFalsa";
 const rota = (area: string, aba: string | null) => ({ area, aba });
 const aberto = (o: object) => ({ qtd: 1, desde: null, dias: null, quando: null, detalhe: null, ...o });
 const CHEIO = { ...amostra("contatos"), dados: { total: 3, itens: [
-  { chave: "p:ana", pessoa_id: "ana", nome: "Ana <b>Souza</b>", urgencia: 0, dias: 5, tipos: ["email", "whatsapp"], abertos: [
+  { chave: "p:ana", pessoa_id: "ana", nome: "Ana <b>Souza</b>", frentes: ["Cliente <i>Alfa</i>", "Projeto Beta"], urgencia: 0, dias: 5, tipos: ["email", "whatsapp"], abertos: [
     aberto({ tipo: "email", rotulo: "E-mail emergencial sem resposta (2)", qtd: 2, dias: 5, rota: rota("msgs", "prioridades") }),
     aberto({ tipo: "whatsapp", rotulo: "Pediu algo no WhatsApp", dias: 1, rota: rota("cadastros", "escuta") })] },
-  { chave: "e:bia@y.com", pessoa_id: null, nome: "bia@y.com", urgencia: 1, dias: 0, tipos: ["agenda"], abertos: [
+  { chave: "e:bia@y.com", pessoa_id: null, nome: "bia@y.com", frentes: [], urgencia: 1, dias: 0, tipos: ["agenda"], abertos: [
     aberto({ tipo: "agenda", rotulo: "Reunião amanhã", quando: "2026-10-09T17:00:00+00:00", detalhe: "Compromisso privado", rota: rota("agenda", null) })] },
-  { chave: "w:abc", pessoa_id: null, nome: "+55 *******4321", urgencia: 2, dias: 3, tipos: ["whatsapp"], abertos: [
+  { chave: "w:abc", pessoa_id: null, nome: "+55 *******4321", frentes: [], urgencia: 2, dias: 3, tipos: ["whatsapp"], abertos: [
     aberto({ tipo: "whatsapp", rotulo: "Pediu algo no WhatsApp (2 mensagens)", qtd: 2, dias: 3, rota: rota("cadastros", "escuta") })] },
 ] } };
 
@@ -81,4 +81,14 @@ test("erro da API aparece como erro, sem derrubar a tela", async () => {
   montar();
   const alerta = await screen.findByRole("alert");
   expect(within(alerta).getByText(/banco fora do ar/)).toBeInTheDocument();
+});
+
+test("mostra a frente do contato como texto puro, só onde há vínculo", async () => {
+  apiFalsa({ contatos: CHEIO });
+  montar();
+  await screen.findByText("Ana <b>Souza</b>");
+  const ana = screen.getByText("Ana <b>Souza</b>").closest("[data-contato]") as HTMLElement;
+  expect(within(ana).getByText("frente: Cliente <i>Alfa</i>, Projeto Beta")).toBeInTheDocument();
+  expect(ana.querySelector("i")).toBeNull(); // R14: nada vira HTML
+  expect(document.querySelectorAll("[data-frente]").length).toBe(1);
 });

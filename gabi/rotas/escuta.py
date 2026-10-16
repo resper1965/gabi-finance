@@ -1,6 +1,6 @@
 """Painel da escuta (/api/v1/escuta): fila de remetentes, grupos e parâmetros. Só o boss.
 A API NÃO toca o spool: ignorar/bloquear só anulam ponteiros no banco; o timer da escuta apaga os arquivos órfãos.
-Número, nome e palavras de risco nunca vão para log; a auditoria de parâmetros leva só os nomes das chaves. Contatos do Google: só nome e telefone, lidos pela ponte do serviço de fontes (a API não tem rede). Consome: escuta.remetentes, escuta.caixa, escuta.contatos."""
+Número, nome e palavras de risco nunca vão para log; a auditoria de parâmetros leva só os nomes das chaves. Contatos do Google: só nome, telefone e e-mail, lidos pela ponte do serviço de fontes (a API não tem rede). Consome: escuta.remetentes, escuta.caixa, escuta.contatos."""
 import datetime as dt
 import json
 
@@ -221,7 +221,7 @@ async def gravar_parametros(request: Request, ident: Identidade = Depends(exigir
         con.close()
 
 
-# ---------------- contatos do Google (só nome e telefone) ----------------
+# ---------------- contatos do Google (só nome, telefone e e-mail) ----------------
 MAX_TRAZER = 100
 
 
@@ -240,7 +240,7 @@ def _numeros_de_pessoas(con) -> set[str]:
 
 @router.post("/contatos/sincronizar")
 def sincronizar_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve contagens e o erro de cada conta que falhou.
+    """Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.
     200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar."""
     fabrica = request.app.state.fontes.get("google_contatos")
     fonte = fabrica() if fabrica else None
@@ -329,6 +329,7 @@ def apagar_contatos(request: Request, ident: Identidade = Depends(exigir("boss")
     try:
         with transacao(con):
             n = con.execute("delete from contato_google").rowcount
+            con.execute("delete from contato_google_email")  # revogar leva também os e-mails dos contatos (migração 0070)
             _audit(con, ident.login, f"escuta: apagou contatos do Google ({n} linha(s))")
         return envelope(con, {"apagados": n}, agora=_agora(request))
     finally:

@@ -268,3 +268,9 @@ Nada a instalar nem ligar: a tela e a rota `GET /api/v1/contatos` leem tabelas q
 - **Se uma pessoa não aparece:** e-mail já respondido (qualquer resposta sua àquele endereço na conta conta como resposta), e-mail dispensado, lixeira, lista de distribuição, janela `email.dias_em_aberto`, e WhatsApp mais antigo que `escuta.retida_dias` (14).
 - **Nome:** pessoa cadastrada (`pessoa.dados.emails` e `canais` `email:`/`whatsapp:`), senão o nome do cabeçalho; WhatsApp sem nome sai como `+55 *******1234`.
 - **Reunião:** vem da tabela `evento` (a agenda nova só guarda a contagem de participantes). Como ela não marca compromisso privado, com `agenda.privados` diferente de `mostrar` o título sai como "Compromisso privado" (no painel, `so_painel` mostra).
+
+### Pacote de fechamento de 16/10 (curto)
+- **Instalar** (`instalar-brain.sh`, por você) aplica a migração **0070** (`contato_google_email`). Sem mais nada a ligar. Ao aprovar um remetente da escuta, o e-mail do contato do Google com aquele telefone vira o canal `email:<endereço>` da pessoa (um só) ou a Gabi pergunta qual pelo canal de decisão (vários); os e-mails só existem depois da próxima rodada do timer de contatos (precisa do consentimento `contacts.readonly`, G12). Revogar: `DELETE /api/v1/escuta/contatos` apaga telefones e e-mails.
+- **Cadastros › E-mail** tem agora o campo de retenção das mensagens (90 a 3650 dias; padrão 180). **Mensagens › Contatos** mostra "frente: <nome>" só para quem teve um e-mail confirmado numa frente.
+- **Agenda:** o link da reunião também vem de `conferenceData` (Zoom/Teams adicionados ao evento); vale a partir da próxima recarga de cada calendário. `auth=delegacao` ainda não tem cliente (a fonte mostra o erro, não tenta OAuth).
+

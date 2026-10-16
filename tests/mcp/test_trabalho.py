@@ -110,3 +110,14 @@ def test_resumo_avisa_so_a_contagem_de_decisoes_esperando(tmp_path):
     assert t1.rstrip().endswith("🗳 1 decisão esperando você. Quer ver?") and "secreta" not in t1
     criar_pergunta(c, "t", "Pergunta B?", None, [{"n": 1, "rotulo": "Sim", "efeito": "registrar_nota"}], "claude", "2026-10-10T10:00:00+00:00")
     assert resumo_da_manha(c, AGORA)["texto"].rstrip().endswith("🗳 2 decisão(ões) esperando você. Quer ver?")
+
+
+def test_bloco_agenda_nao_cita_o_inicio_de_ontem_como_horario_de_hoje():
+    """Agenda M6: evento com horário que começou ontem e continua hoje não aparece como "07:00" de hoje."""
+    from gabi.mcp.ferramentas_trab import _bloco_agenda
+    ontem = {"titulo": "Viagem", "dia_inteiro": False, "inicio_local": "2026-10-09T22:00:00-03:00", "dia_local": "2026-10-09", "dia_fim_local": "2026-10-10"}
+    hoje = {"titulo": "Reunião", "dia_inteiro": False, "inicio_local": "2026-10-10T09:30:00-03:00", "dia_local": "2026-10-10", "dia_fim_local": "2026-10-10"}
+    linhas = _bloco_agenda([ontem, hoje], "2026-10-10")
+    assert "• 09:30 Reunião" in linhas
+    assert not any(l.startswith("• 22:00") for l in linhas)
+    assert any("Viagem" in l and "desde 09/10 22:00" in l for l in linhas)

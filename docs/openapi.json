@@ -2457,7 +2457,7 @@
   },
   "/api/v1/escuta/contatos/sincronizar": {
    "post": {
-    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome e telefone; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
+    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
     "operationId": "sincronizar_contatos_api_v1_escuta_contatos_sincronizar_post",
     "responses": {
      "200": {

@@ -6,7 +6,7 @@ import { useIr } from "../../lib/ocultar";
 
 type Tipo = "email" | "agenda" | "pedido" | "whatsapp";
 interface Aberto { tipo: Tipo; rotulo: string; qtd: number; desde: string | null; dias: number | null; quando: string | null; detalhe: string | null; rota: { area: string; aba: string | null } }
-interface Contato { chave: string; pessoa_id: string | null; nome: string; urgencia: number; dias: number; tipos: Tipo[]; abertos: Aberto[] }
+interface Contato { chave: string; pessoa_id: string | null; nome: string; frentes?: string[]; urgencia: number; dias: number; tipos: Tipo[]; abertos: Aberto[] }
 interface Dados { total: number; itens: Contato[] }
 
 const FILTROS: [string, string][] = [["todos", "Todos"], ["email", "E-mail"], ["agenda", "Agenda"], ["whatsapp", "WhatsApp"]];
@@ -39,6 +39,7 @@ export function Contatos() {
                 {itens.map((c) => (
                   <li key={c.chave} data-contato style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 8 }}>
                     <strong>{c.nome}</strong>
+                    {c.frentes && c.frentes.length > 0 && <small data-frente style={{ ...suave, marginLeft: 8 }}>{`frente: ${c.frentes.join(", ")}`}</small>}
                     <ul style={{ margin: "4px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
                       {c.abertos.filter((a) => filtro === "todos" || a.tipo === filtro).map((a, i) => (
                         <li key={i} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
