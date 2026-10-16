@@ -21,7 +21,7 @@ from gabi.fontes.paperless import ErroPaperless
 MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar", "por_etiqueta", "texto", "restringir"}),
-    "openrouter": frozenset({"completar"}),
+    "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
@@ -151,6 +151,16 @@ class PonteModelo:
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
         r = self._ponte._chamar("completar", (prompt,), {"forte": forte})
+        if (not isinstance(r, (list, tuple)) or len(r) != 2 or not isinstance(r[0], str)
+                or isinstance(r[1], bool) or not isinstance(r[1], (int, float))):
+            raise ErroOpenRouter("resposta inválida do serviço de fontes")
+        return r[0], float(r[1])
+
+
+    def completar_pdf(self, pdf: bytes, prompt: str, *, forte: bool = False, max_bytes: int | None = None, max_paginas: int | None = None) -> tuple[str, float]:
+        """PDF digitalizado lido por visão no serviço de fontes (R5: a chave e a rede ficam lá). Os tetos só podem baixar os do serviço."""
+        kw = {"forte": forte, **({"max_bytes": max_bytes} if max_bytes else {}), **({"max_paginas": max_paginas} if max_paginas else {})}
+        r = self._ponte._chamar("completar_pdf", (bytes(pdf), prompt), kw)
         if (not isinstance(r, (list, tuple)) or len(r) != 2 or not isinstance(r[0], str)
                 or isinstance(r[1], bool) or not isinstance(r[1], (int, float))):
             raise ErroOpenRouter("resposta inválida do serviço de fontes")

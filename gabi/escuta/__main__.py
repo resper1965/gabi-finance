@@ -87,8 +87,9 @@ class ModeloComCusto:
     classificação paga NÃO se perde; a linha fica pendente e é regravada na próxima chamada completada e em `fechar()`.
     Erro do cliente propaga (recusa antes do envio não grava)."""
 
-    def __init__(self, cliente, banco: Path, relogio=None, tarefa: str = "escuta"):
+    def __init__(self, cliente, banco: Path, relogio=None, tarefa: str = "escuta", tarefa_visao: str | None = None):
         self._cliente, self._relogio, self._tarefa = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc)), tarefa
+        self._tarefa_visao = tarefa_visao or f"{tarefa}-visao"  # leitura de PDF por imagem tem custo próprio (exames-visao, reembolso-visao)
         self._con = conectar(banco)
         self.pendentes: list[tuple[str, float]] = []
 
@@ -100,14 +101,14 @@ class ModeloComCusto:
                 return
             self.pendentes.pop(0)
 
-    def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
+    def _registrar(self, tarefa: str, chamada) -> tuple[str, float]:
         try:
-            texto, custo = self._cliente.completar(prompt, forte=forte)
+            texto, custo = chamada()
         except Exception as e:
             # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
-            # Recusa antes do envio (não configurado, teto, limite, prompt grande) não cobra nada.
+            # Recusa antes do envio (não configurado, teto, limite, prompt grande, PDF inválido ou grande) não cobra nada.
             if recusa_sem_envio(e) is None:
-                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), reserva_falha_usd(self._con, self._tarefa, self._relogio()), f"{self._tarefa}-falha"))
+                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), reserva_falha_usd(self._con, tarefa, self._relogio()), f"{tarefa}-falha"))
                 self._gravar_pendentes()
             raise
         try:
@@ -115,9 +116,23 @@ class ModeloComCusto:
         except TypeError:
             ok = False
         custo = float(custo) if ok else CUSTO_RESERVA_USD
-        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, self._tarefa))
+        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, tarefa))
         self._gravar_pendentes()
         return texto, custo
+
+    def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
+        return self._registrar(self._tarefa, lambda: self._cliente.completar(prompt, forte=forte))
+
+    @property
+    def completar_pdf(self):
+        """Só existe se o cliente de baixo sabe ler PDF (quem chama testa com getattr: sem o método, o PDF sem texto continua `falhou`)."""
+        interno = getattr(self._cliente, "completar_pdf", None)
+        if not callable(interno):
+            raise AttributeError("completar_pdf")
+
+        def completar_pdf(pdf: bytes, prompt: str, *, forte: bool = False, **tetos) -> tuple[str, float]:
+            return self._registrar(self._tarefa_visao, lambda: interno(pdf, prompt, forte=forte, **tetos))
+        return completar_pdf
 
     def fechar(self) -> None:
         self._gravar_pendentes()

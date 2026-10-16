@@ -44,7 +44,7 @@ def main(banco: Path | None = None, *, paperless=None, cliente=_AUTO, cofre=_AUT
     if cliente is _AUTO:
         cliente = cliente_da_ponte(sock)
         if cliente is not None:
-            cliente = ModeloComCusto(cliente, banco, tarefa="reembolso-saude")
+            cliente = ModeloComCusto(cliente, banco, tarefa="reembolso-saude", tarefa_visao="reembolso-visao")
     try:
         try:
             with registrar_rodada(con, "reembolso-saude") as rod:

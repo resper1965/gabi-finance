@@ -13,6 +13,7 @@ from gabi.dinheiro.modelo import Orcamento
 from gabi.familia import exames
 from gabi.familia.extrair import _chamar, extrair
 from gabi.mascara import mascarar_texto
+from gabi import visao_pdf
 
 AVISO_RESTRINGIR = "gabi-brain-exames: o Paperless não permite restringir os exames ao dono (veja o runbook)"
 ETIQUETA_EXAME = "gabi:saude-exame"
@@ -97,11 +98,16 @@ def extrair_documento(con, s, paperless, cliente, orcamento: Orcamento, doc: dic
     pid = doc["id"]
     texto = doc.get("content") or ""
     pdf = None
-    if not texto.strip() and callable(getattr(cliente, "completar_pdf", None)):
+    if not texto.strip() and visao_pdf.tem_leitura(cliente):  # PDF digitalizado: leitura por imagem só com `saude.visao_pdf` ligado (o PDF vai a um provedor externo)
+        cfg = visao_pdf.config(con)
+        if cfg is None:
+            return "falhou", "falhou", visao_pdf.MOTIVO_DESLIGADA, 0
         pdf = paperless.baixar(pid)
+        if not visao_pdf.dentro_do_teto(pdf, cfg):
+            return "falhou", "falhou", visao_pdf.MOTIVO_GRANDE, 0
     laudo = extrair(texto, cliente, orcamento, pdf)
     if laudo is None:
-        return "falhou", "falhou", "sem texto legível", 0
+        return "falhou", "falhou", visao_pdf.MOTIVO_SEM_LEITURA if pdf else "sem texto legível", 0
     if not laudo.marcadores:
         return "falhou", "falhou", "nenhum marcador reconhecido", 0
     dono = dono_proposto(con, laudo.paciente)
@@ -168,10 +174,11 @@ def rodar(con, abrir_cofre, paperless, cliente, orcamento: Orcamento, agora: str
     return r
 
 
-def reprocessar_documentos(s, paperless, cliente, orcamento: Orcamento, ids: list[int], por: str) -> tuple[dict, dict[int, int]]:
+def reprocessar_documentos(s, paperless, cliente, orcamento: Orcamento, ids: list[int], por: str, visao: visao_pdf.Config | None = None) -> tuple[dict, dict[int, int]]:
     """Relê cada documento no Paperless e extrai de novo (versão nova; a anterior fica). Documento que sumiu do Paperless ou que não dá para ler
     é contado em `falhos` e os dados já extraídos continuam. -> ({documentos, versoes_novas, diferentes, falhos}, {paperless_id: versão atual});
-    quem chama grava a versão em `exame_doc` só depois que o cofre for salvo."""
+    quem chama grava a versão em `exame_doc` só depois que o cofre for salvo.
+    `visao` = `visao_pdf.config(con)` de quem chama; None (padrão) = leitura por imagem desligada: PDF sem texto não vai ao modelo."""
     r, versoes = {"documentos": 0, "versoes_novas": 0, "diferentes": 0, "falhos": 0}, {}
     for pid in ids:
         r["documentos"] += 1
@@ -179,8 +186,12 @@ def reprocessar_documentos(s, paperless, cliente, orcamento: Orcamento, ids: lis
         try:
             achados = paperless.docs(id=pid)
             doc = next((d for d in achados if d["id"] == pid), None)
-            laudo = extrair((doc or {}).get("content") or "", cliente, orcamento,
-                            paperless.baixar(pid) if doc and not (doc.get("content") or "").strip() and callable(getattr(cliente, "completar_pdf", None)) else None) if doc else None
+            texto = (doc or {}).get("content") or ""
+            pdf = None
+            if doc and not texto.strip() and visao is not None and visao_pdf.tem_leitura(cliente):
+                pdf = paperless.baixar(pid)
+                pdf = pdf if visao_pdf.dentro_do_teto(pdf, visao) else None
+            laudo = extrair(texto, cliente, orcamento, pdf) if doc else None
             if laudo is None or not laudo.marcadores:
                 raise LookupError("sem leitura")
             antes = exames._versao_atual(s, pid)

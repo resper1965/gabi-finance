@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from gabi.dinheiro.modelo import ModeloCliente, Orcamento
 from gabi.mascara import mascarar_texto
+from gabi.visao_pdf import INSTRUCAO_ANEXO
 from gabi.reembolso_saude.tipos import TIPOS_DOC, caso_valido, tipo_do_documento
 
 TEXTO_MAX = 30000
@@ -92,14 +93,21 @@ def interpretar(resposta) -> Pista | None:
                  _texto(b.get("especialidade"), 60), float(conf))
 
 
-def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento) -> Resultado:
+def classificar(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento, pdf: bytes | None = None) -> Resultado:
+    """Com texto, classifica o texto (CPF mascarado). Sem texto e com `pdf`, usa a visão do cliente (`completar_pdf`, o CPF não é mascarado: pixels);
+    quem chama só passa `pdf` com `saude.visao_pdf` ligado e dentro dos tetos."""
     if cliente is None:
         return Resultado("espera", motivo="modelo não configurado")
     if not orcamento.permite():
         return Resultado("espera", motivo="teto de custo do modelo")
-    dados = json.dumps({"texto": mascarar_texto(texto or "")[:TEXTO_MAX]}, ensure_ascii=False).replace("<", "\\u003c")
+    ler = getattr(cliente, "completar_pdf", None)
+    visao = not (texto or "").strip() and bool(pdf) and callable(ler)
     try:
-        resposta, custo = cliente.completar(f"{INSTRUCAO}<dados>{dados}</dados>\n", forte=False)
+        if visao:
+            resposta, custo = ler(pdf, INSTRUCAO + INSTRUCAO_ANEXO, forte=False)
+        else:
+            dados = json.dumps({"texto": mascarar_texto(texto or "")[:TEXTO_MAX]}, ensure_ascii=False).replace("<", "\\u003c")
+            resposta, custo = cliente.completar(f"{INSTRUCAO}<dados>{dados}</dados>\n", forte=False)
     except Exception:  # noqa: BLE001 - a mensagem do erro pode carregar texto do documento: só o código fixo sai daqui
         return Resultado("espera", motivo="falha temporária do modelo", temporaria=True)
     orcamento.registrar(custo)

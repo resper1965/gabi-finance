@@ -7,6 +7,7 @@ import datetime as dt
 import json
 from zoneinfo import ZoneInfo
 
+from gabi import visao_pdf
 from gabi.avisos import _novo
 from gabi.dinheiro.modelo import LIMIAR, Orcamento
 from gabi.fontes.paperless import ErroPaperless
@@ -116,11 +117,23 @@ def rodar(con, abrir_cofre, paperless, cliente, orcamento: Orcamento, agora: dt.
             raw, legado = fontes[pid]
             tent = vistos[pid]["tentativas"] if pid in vistos else 0
             texto = raw.get("content") or ""
+            pdf = None
             if not texto.strip():
-                gravar_doc_ref.append((pid, "falhou", "sem texto legível", tent))
-                r["falhos"] += 1
-                continue
-            res = clf.classificar(texto, cliente, orcamento)
+                motivo = "sem texto legível"
+                if visao_pdf.tem_leitura(cliente):  # PDF digitalizado: só com `saude.visao_pdf` ligado (o PDF vai a um provedor externo)
+                    cfg = visao_pdf.config(con)
+                    if cfg is None:
+                        motivo = visao_pdf.MOTIVO_DESLIGADA
+                    elif not orcamento.permite():
+                        motivo = None  # teto estourado: `classificar` devolve espera, sem baixar o PDF
+                    else:
+                        pdf = paperless.baixar(pid)
+                        motivo = None if visao_pdf.dentro_do_teto(pdf, cfg) else visao_pdf.MOTIVO_GRANDE
+                if motivo:
+                    gravar_doc_ref.append((pid, "falhou", motivo, tent))
+                    r["falhos"] += 1
+                    continue
+            res = clf.classificar(texto, cliente, orcamento, pdf or None)
             if res.estado == "espera":
                 if res.temporaria:
                     tent += 1

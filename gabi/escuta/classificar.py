@@ -50,7 +50,8 @@ _INVALIDA = Classificacao("nada", 0.0, {}, invalida=True)
 # Recusas que acontecem ANTES do envio ao modelo (nada foi cobrado; não são falha temporária). Trecho da mensagem -> motivo curto.
 RECUSAS_SEM_ENVIO = {"não está configurado": "modelo não configurado", "chave ausente": "modelo não configurado",
                      "teto diário": "teto diário do serviço de modelo", "muitas chamadas": "limite de chamadas por minuto",
-                     "prompt grande demais": "mensagem grande demais para o modelo"}
+                     "prompt grande demais": "mensagem grande demais para o modelo",
+                     "pdf inválido": "PDF inválido", "pdf grande demais": "PDF grande demais", "pdf com páginas demais": "PDF com páginas demais"}
 
 
 def recusa_sem_envio(e: BaseException) -> str | None:

@@ -3,6 +3,7 @@ brain chega aqui pela ponte. A chave nunca entra em log, em erro nem em texto de
 Custo (USD): `usage.cost` da resposta; ausente/inválido/NaN/<=0 -> estimativa pessimista por tokens x preço por milhão; sem tokens -> valor fixo.
 Nunca é 0 numa chamada bem-sucedida (o teto de gasto depende disso). Tetos no serviço: prompt, max_tokens, USD por dia (BRT), chamadas por minuto.
 Modelos e variáveis padrão: docs/fontes/openrouter.md."""
+import base64
 import json
 import math
 import threading
@@ -14,12 +15,17 @@ from zoneinfo import ZoneInfo
 import urllib.error
 import urllib.request
 
+from gabi.visao_pdf import paginas as _paginas_pdf
+
 URL = "https://openrouter.ai/api/v1/chat/completions"
 MODELO_RAPIDO_PADRAO = "deepseek/deepseek-v4-flash"
 MODELO_FORTE_PADRAO = "anthropic/claude-sonnet-5.5"
 
 
 BRT = ZoneInfo("America/Sao_Paulo")
+CHARS_POR_PAGINA = 4500       # reserva: ~1500 tokens de entrada por página de PDF (len/3 tokens, como no prompt)
+OCR_USD_PAGINA = 0.002        # reserva: OCR do provedor (~US$ 2 por mil páginas), no pior caso
+PDF_MOTOR_PADRAO = "mistral-ocr"  # único motor do plugin de arquivos que lê PDF digitalizado com qualquer modelo (o `pdf-text` só extrai texto)
 
 
 class ErroOpenRouter(Exception):
@@ -45,6 +51,8 @@ class Limites:
     max_prompt_chars: int = 50000
     teto_dia_usd: float = 3.0
     max_chamadas_min: int = 30
+    max_pdf_bytes: int = 8 * 1024 * 1024   # leitura de PDF por visão: tetos conservadores (a chamada pode baixá-los, nunca subi-los)
+    max_pdf_paginas: int = 10
 
     @classmethod
     def do_ambiente(cls, env) -> "Limites":
@@ -56,7 +64,9 @@ class Limites:
                    _num(env, "OPENROUTER_MAX_TOKENS_STRONG", d.max_tokens_forte, int),
                    _num(env, "OPENROUTER_MAX_PROMPT_CHARS", d.max_prompt_chars, int),
                    _num(env, "OPENROUTER_TETO_DIA_USD", d.teto_dia_usd, float, True),
-                   _num(env, "OPENROUTER_MAX_CHAMADAS_MIN", d.max_chamadas_min, int, True))
+                   _num(env, "OPENROUTER_MAX_CHAMADAS_MIN", d.max_chamadas_min, int, True),
+                   _num(env, "OPENROUTER_MAX_PDF_BYTES", d.max_pdf_bytes, int),
+                   _num(env, "OPENROUTER_MAX_PDF_PAGINAS", d.max_pdf_paginas, int))
 
 
 def _valido(x):
@@ -89,18 +99,18 @@ class OpenRouter:
     def _max_tokens(self, forte: bool) -> int:
         return self.limites.max_tokens_forte if forte else self.limites.max_tokens_rapido
 
-    def _reserva(self, prompt: str, forte: bool) -> float:
+    def _reserva(self, prompt: str, forte: bool, extra_chars: int = 0, extra_usd: float = 0.0) -> float:
         """Pior caso: max_tokens no preço de saída + prompt (len/3 tokens) no de entrada; nunca menos que o custo padrão."""
         lim = self.limites
-        est = (self._max_tokens(forte) * lim.preco_saida_usd_m + (len(prompt) / 3) * lim.preco_entrada_usd_m) / 1_000_000
+        est = (self._max_tokens(forte) * lim.preco_saida_usd_m + ((len(prompt) + extra_chars) / 3) * lim.preco_entrada_usd_m) / 1_000_000 + extra_usd
         return max(lim.custo_padrao_usd, est)
 
-    def _reservar(self, prompt: str, forte: bool) -> float:
+    def _reservar(self, prompt: str, forte: bool, extra_chars: int = 0, extra_usd: float = 0.0) -> float:
         """Verifica os tetos antes de qualquer rede e reserva o custo pessimista (tudo sob a trava). Recusa não cobra nada."""
         lim = self.limites
         if len(prompt) > lim.max_prompt_chars:
             raise ErroOpenRouter("prompt grande demais")
-        reserva = self._reserva(prompt, forte)
+        reserva = self._reserva(prompt, forte, extra_chars, extra_usd)
         with self._trava:
             dia = datetime.fromtimestamp(self._relogio(), BRT).date()
             if dia != self._dia:
@@ -139,6 +149,36 @@ class OpenRouter:
         reserva = self._reservar(prompt, forte)
         corpo = {"model": self.modelo_forte if forte else self.modelo_rapido, "usage": {"include": True},
                  "max_tokens": self._max_tokens(forte), "messages": [{"role": "user", "content": prompt}]}
+        return self._enviar(corpo, reserva, forte)
+
+    def completar_pdf(self, pdf: bytes, prompt: str, *, forte: bool = False, max_bytes: int | None = None,
+                      max_paginas: int | None = None, motor: str = PDF_MOTOR_PADRAO) -> tuple[str, float]:
+        """Lê um PDF (digitalizado) pelo suporte nativo de arquivos do OpenRouter: o PDF vai em base64 (`type: file`) e o plugin `file-parser` o lê
+        (sem rasterizador no venv). Tetos de tamanho e de páginas vêm de `Limites`; a chamada só pode BAIXÁ-LOS. Recusa antes de qualquer rede
+        (PDF inválido, grande demais, páginas demais, teto diário, chamadas por minuto) e não cobra nada. Falha depois do envio mantém a reserva.
+        Páginas contadas por aproximação (índice comprimido = 0): vale então o teto de bytes."""
+        if not self._chave:
+            raise ErroOpenRouter("chave ausente")
+        if not isinstance(pdf, (bytes, bytearray)) or not bytes(pdf[:5]) == b"%PDF-":
+            raise ErroOpenRouter("pdf inválido")
+        lim = self.limites
+        teto_b = min(max_bytes, lim.max_pdf_bytes) if isinstance(max_bytes, int) and not isinstance(max_bytes, bool) and max_bytes > 0 else lim.max_pdf_bytes
+        teto_p = min(max_paginas, lim.max_pdf_paginas) if isinstance(max_paginas, int) and not isinstance(max_paginas, bool) and max_paginas > 0 else lim.max_pdf_paginas
+        if len(pdf) > teto_b:
+            raise ErroOpenRouter("pdf grande demais")
+        pag = _paginas_pdf(bytes(pdf))
+        if pag > teto_p:
+            raise ErroOpenRouter("pdf com páginas demais")
+        n = max(pag, 1)
+        reserva = self._reservar(prompt, forte, extra_chars=n * CHARS_POR_PAGINA, extra_usd=n * OCR_USD_PAGINA)
+        dados = "data:application/pdf;base64," + base64.b64encode(bytes(pdf)).decode()
+        corpo = {"model": self.modelo_forte if forte else self.modelo_rapido, "usage": {"include": True}, "max_tokens": self._max_tokens(forte),
+                 "plugins": [{"id": "file-parser", "pdf": {"engine": motor}}],
+                 "messages": [{"role": "user", "content": [{"type": "text", "text": prompt},
+                                                           {"type": "file", "file": {"filename": "documento.pdf", "file_data": dados}}]}]}
+        return self._enviar(corpo, reserva, forte)
+
+    def _enviar(self, corpo: dict, reserva: float, forte: bool) -> tuple[str, float]:
         falha = None
         try:
             status, resp = self._http("POST", URL, corpo, {"Authorization": f"Bearer {self._chave}"})

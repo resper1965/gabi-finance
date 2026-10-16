@@ -3,6 +3,7 @@
 Só o serviço `gabi-brain-fontes` tem rede e a chave (R5). API, MCP e escuta chamam pela ponte Unix (`GABI_FONTES_SOCKET`):
 
 - `PonteModelo(socket).completar(prompt, *, forte) -> (texto, custo_usd)`, mesmo contrato de `gabi.dinheiro.modelo.ModeloCliente`.
+- `PonteModelo(socket).completar_pdf(pdf, prompt, *, forte=False) -> (texto, custo_usd)`: PDF digitalizado lido por visão (base64 + plugin `file-parser`, motor `mistral-ocr`); tetos `OPENROUTER_MAX_PDF_BYTES` (8 MB) e `OPENROUTER_MAX_PDF_PAGINAS` (10), recusa antes da rede (`pdf inválido`, `pdf grande demais`, `pdf com páginas demais`). Uso e privacidade: `runbook#visao-pdf`.
 - `Ponte(socket, "paperless").enviar(conteudo, nome, tags)`: toda etiqueta tem de começar com `gabi:` (rejeitada antes de qualquer rede).
 
 ## Variáveis (arquivo `/etc/gabi/openrouter.env`, que o Ricardo coloca; `EnvironmentFile=-` opcional)

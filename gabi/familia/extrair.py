@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from gabi.dinheiro.modelo import ModeloCliente, Orcamento
 from gabi.familia.exames import _DATA, extrair_marcadores
 from gabi.mascara import mascarar_texto
+from gabi.visao_pdf import INSTRUCAO_ANEXO
 
 TEXTO_MAX = 30000
 _PACIENTE = re.compile(r"^\s*paciente\s*[:\-]\s*(?P<n>.+?)\s*(?:\s{2,}|\t|\|\s*|$|\s+(?:data|idade|nasc\w*|cpf|sexo|prontu\w+)\b)", re.I | re.M)
@@ -26,6 +27,7 @@ INSTRUCAO = (
     "\"ref_min\": <número ou null>, \"ref_max\": <número ou null>, \"qualitativo\": <true se o resultado não é número>, \"observacao\": <texto curto ou null>}]}.\n"
     "Transcreva só o que está escrito; não calcule nem invente.\n"
 )
+INSTRUCAO_PDF = INSTRUCAO + INSTRUCAO_ANEXO  # PDF digitalizado: o CPF não é mascarado (pixels), por isso a leitura por imagem fica atrás de `saude.visao_pdf`
 
 
 @dataclass(frozen=True)
@@ -163,7 +165,7 @@ def extrair(texto: str, cliente: ModeloCliente | None, orcamento: Orcamento, pdf
         ler = getattr(cliente, "completar_pdf", None)
         if not pdf or ler is None:
             return None
-        resposta = _chamar(cliente, orcamento, lambda: ler(pdf, INSTRUCAO, forte=False))
+        resposta = _chamar(cliente, orcamento, lambda: ler(pdf, INSTRUCAO_PDF, forte=False))
         itens = interpretar_modelo(resposta) if resposta else []
         if not itens:
             return None
