@@ -20,7 +20,8 @@ LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_conta
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "pedidos_estado", "avisos_pendentes", "avisos_confirmar_entrega",
                "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar", "pessoas_dado"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}  # só leitura do Trabalho
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
 
 @pytest.fixture

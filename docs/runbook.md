@@ -45,7 +45,7 @@ Pacote semanal criptografado, para o Ricardo puxar; a chave privada nunca fica n
 
 ## Servidor MCP e tokens de agentes (Fase 1)
 - O MCP escuta **só em 127.0.0.1:8081** (`gabi-brain-mcp.service`), Streamable HTTP em `/mcp`, e exige `Authorization: Bearer <token>`. Para agentes fora da VPS (Claude Code no seu Windows): `sudo tailscale serve --bg --https=8443 http://127.0.0.1:8081` (TLS na rede privada; o token continua obrigatório).
-- Emitir (o token aparece **uma vez**; o banco guarda só o hash): `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens emitir hermes fin` (escopos: `fin,docs,trabalho,pedidos,propostas,sensivel`). Você cola o token no agente; eu não o vejo.
+- Emitir (o token aparece **uma vez**; o banco guarda só o hash): `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens emitir hermes fin` (escopos: `fin,docs,trabalho,pedidos,propostas,decisoes,sensivel`). Você cola o token no agente; eu não o vejo.
 - Listar: `... -m gabi.mcp.tokens listar` · Revogar um: `... revogar <id>` · Revogar todos: `POST /api/revogar-tudo` (ver acima).
 - Cada chamada fica em `chamada_mcp` (token, ferramenta, escopo, status `ok|sem_escopo|erro|nao_autenticado`). Para ver: `sqlite3 $BANCO "select quando, ferramenta, status from chamada_mcp order by id desc limit 20"`.
 - Só existem ferramentas de **leitura** (`docs/api.md#mcp`). Não há como enviar, pagar, apagar, aprovar nem ligar regra por MCP (R13).
@@ -217,3 +217,12 @@ Somente leitura (`calendar.readonly`). `python -m gabi.agenda` (unit `gabi-brain
 
 ## Ferramentas de análise no Hermes (MC1) {#analise-hermes}
 Somente leitura, escopo `fin`: `financeiro_recorrentes`, `financeiro_previsao`, `financeiro_vazamentos`, `financeiro_rumo`. **Passo do dono:** em `~/.hermes/config.yaml`, em `mcp_servers › gabi_brain › tools › include`, acrescente as quatro (lista oficial em `docs/fontes/hermes.md`) e `sudo systemctl restart hermes-gateway`; reinicie também o serviço do MCP do brain para ele expor as novas.
+
+
+## Canal de decisão (DC1) {#decisoes}
+O brain guarda **perguntas com opções numeradas**; o Hermes as mostra no Telegram/WhatsApp e, quando o Ricardo responde com um número, grava a decisão como dele (origem `canal`). O canal só **lê** perguntas (`decisoes_abertas`) e **grava o número** (`decisao_responder`); criar pergunta é da API (boss) e o efeito de cada opção vem de uma lista fechada no código (`registrar_nota`, `marcar_conta_nao`, `marcar_conta_sim`). Resposta só uma vez; repetir o mesmo número é inofensivo, outro número é recusado.
+**Passos do dono, nesta ordem (segredo é seu, R5):**
+1. Instalar a versão nova (`sudo ~/instalar-brain.sh`; aplica a migração 0028).
+2. Emitir um token do Hermes com o escopo novo (`... -m gabi.mcp.tokens emitir hermes fin,docs,trabalho,propostas,pedidos,decisoes`), trocá-lo em `GABI_BRAIN_TOKEN` do Hermes e revogar o antigo (`... revogar <id>`). Sem o escopo `decisoes` as duas ferramentas respondem `sem_escopo`.
+3. Em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`) acrescentar `decisoes_abertas` e `decisao_responder`; instalar a skill de `docs/fontes/hermes-skill-decisoes.md`; `sudo systemctl restart hermes-gateway`.
+**Criar uma pergunta (boss, à mão ou por script):** `POST /api/v1/decisoes/perguntas` com `{tipo, titulo, contexto, opcoes:[{n, rotulo, efeito, parametros}]}`; ver `GET /api/v1/decisoes/perguntas?estado=aberta`. Mensagens de terceiros nunca viram opção.

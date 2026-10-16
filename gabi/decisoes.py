@@ -1,0 +1,104 @@
+"""Canal de decisão: perguntas com opções numeradas que o Ricardo responde pelo Telegram/WhatsApp (o Hermes só apresenta e repassa o número).
+R1: a Gabi pergunta, o Ricardo decide. R2: nada é enviado daqui. `efeito` vem de uma lista FECHADA e validada; nunca código livre.
+Responder grava a decisão (origem 'canal') e aplica o efeito na mesma transação; só uma resposta por pergunta."""
+import json
+
+from gabi.db import transacao
+
+
+class ErroDecisao(Exception):
+    def __init__(self, codigo: str, mensagem: str):
+        super().__init__(mensagem)
+        self.codigo, self.mensagem = codigo, mensagem
+
+
+def _conta_estado(estado: str):
+    def aplicar(con, p: dict) -> None:
+        r = con.execute("update conta set estado=? where id=? and excluido_em is null", (estado, p["conta_id"]))
+        if r.rowcount != 1:
+            raise ErroDecisao("conta_inexistente", "a conta não existe mais")
+    return aplicar
+
+
+def _conta_existe(con, p: dict) -> None:
+    if not isinstance(p.get("conta_id"), int) or isinstance(p.get("conta_id"), bool) or \
+            con.execute("select 1 from conta where id=? and excluido_em is null", (p["conta_id"],)).fetchone() is None:
+        raise ErroDecisao("opcoes_invalidas", "conta_id não existe")
+
+
+# efeito -> (validação na criação, aplicação na resposta). Acrescentar um efeito é mudança de código revisada, nunca dado.
+EFEITOS = {
+    "registrar_nota": (lambda con, p: None, lambda con, p: None),
+    "marcar_conta_nao": (_conta_existe, _conta_estado("nao")),
+    "marcar_conta_sim": (_conta_existe, _conta_estado("sim")),
+}
+
+
+def _validar(con, opcoes) -> list[dict]:
+    if not isinstance(opcoes, list) or not 1 <= len(opcoes) <= 9:
+        raise ErroDecisao("opcoes_invalidas", "informe de 1 a 9 opções")
+    limpas = []
+    for i, o in enumerate(opcoes, 1):
+        if not isinstance(o, dict) or o.get("n") != i or isinstance(o.get("n"), bool) or not str(o.get("rotulo") or "").strip():
+            raise ErroDecisao("opcoes_invalidas", "as opções devem ser numeradas 1, 2, 3... e ter rótulo")
+        efeito = o.get("efeito")
+        if efeito not in EFEITOS:
+            raise ErroDecisao("opcoes_invalidas", f"efeito fora da lista: {sorted(EFEITOS)}")
+        params = o.get("parametros") or {}
+        if not isinstance(params, dict):
+            raise ErroDecisao("opcoes_invalidas", "parametros deve ser um objeto")
+        EFEITOS[efeito][0](con, params)
+        limpas.append({"n": i, "rotulo": str(o["rotulo"]).strip(), "efeito": efeito, "parametros": params})
+    return limpas
+
+
+def criar_pergunta(con, tipo: str, titulo: str, contexto: str | None, opcoes, origem: str, agora: str) -> int:
+    if not str(tipo or "").strip() or not str(titulo or "").strip():
+        raise ErroDecisao("requisicao_invalida", "tipo e titulo são obrigatórios")
+    limpas = _validar(con, opcoes)
+    with transacao(con, imediata=True):
+        cur = con.execute("insert into pergunta(tipo, titulo, contexto, opcoes, estado, criada_em, origem) values (?,?,?,?, 'aberta', ?, ?)",
+                          (tipo.strip(), titulo.strip(), contexto, json.dumps(limpas, ensure_ascii=False), agora, origem))
+    return cur.lastrowid
+
+
+def _linha(r) -> dict:
+    return {"id": r["id"], "tipo": r["tipo"], "titulo": r["titulo"], "contexto": r["contexto"], "estado": r["estado"],
+            "criada_em": r["criada_em"], "respondida_em": r["respondida_em"], "escolha": r["escolha"],
+            "opcoes": [{"n": o["n"], "rotulo": o["rotulo"]} for o in json.loads(r["opcoes"])]}  # o efeito não sai: é decisão do código, não do canal
+
+
+def abertas(con) -> list[dict]:
+    return [_linha(r) for r in con.execute("select * from pergunta where estado='aberta' order by id")]
+
+
+def todas(con, limite: int = 50) -> list[dict]:
+    return [_linha(r) for r in con.execute("select * from pergunta order by id desc limit ?", (limite,))]
+
+
+def expirar(con, criadas_antes_de: str) -> int:
+    with transacao(con, imediata=True):
+        return con.execute("update pergunta set estado='expirada' where estado='aberta' and criada_em<?", (criadas_antes_de,)).rowcount
+
+
+def responder(con, pergunta_id: int, n, quem: str, agora: str) -> dict:
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise ErroDecisao("opcao_invalida", "a opção deve ser um número inteiro")
+    with transacao(con, imediata=True):
+        p = con.execute("select * from pergunta where id=?", (pergunta_id,)).fetchone()
+        if p is None:
+            raise ErroDecisao("nao_encontrada", "pergunta não existe")
+        if p["estado"] == "expirada":
+            raise ErroDecisao("expirada", "a pergunta expirou")
+        if p["estado"] == "respondida":
+            if p["escolha"] == n:
+                return {"id": p["id"], "estado": "respondida", "escolha": n, "ja_respondida": True}
+            raise ErroDecisao("ja_respondida", f"a pergunta já foi respondida com a opção {p['escolha']}")
+        opcao = next((o for o in json.loads(p["opcoes"]) if o["n"] == n), None)
+        if opcao is None:
+            raise ErroDecisao("opcao_invalida", "número fora das opções")
+        EFEITOS[opcao["efeito"]][1](con, opcao.get("parametros") or {})
+        con.execute("update pergunta set estado='respondida', respondida_em=?, escolha=? where id=?", (agora, n, pergunta_id))
+        con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'canal')",
+                    (agora, quem, f"pergunta {pergunta_id} ({p['titulo']}): {n}) {opcao['rotulo']}"))
+    return {"id": pergunta_id, "estado": "respondida", "escolha": n, "ja_respondida": False}

@@ -2013,6 +2013,66 @@
     "summary": "Custo"
    }
   },
+  "/api/v1/decisoes/perguntas": {
+   "get": {
+    "description": "Perguntas do canal de decisão (padrão: todas, as mais novas primeiro; `estado=aberta` só as que esperam resposta).",
+    "operationId": "perguntas_api_v1_decisoes_perguntas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Estado"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Perguntas"
+   },
+   "post": {
+    "description": "Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim).",
+    "operationId": "criar_api_v1_decisoes_perguntas_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar"
+   }
+  },
   "/api/v1/destino": {
    "get": {
     "description": "Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior.",
