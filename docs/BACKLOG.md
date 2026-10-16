@@ -49,7 +49,7 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | EV5 | Painel de qualidade: taxa de aceite das sugestões, custo por tarefa, latência | C | ⏸ | tela no painel |
 | FU1 | Auditar `agora.date()` e o relógio do servidor (CEST) nos timers; "hoje" sempre Brasília | C | ⏸ | testes com `agora` perto da meia-noite |
 | CP1 | ✅ código (opção **B** decidida pelo Ricardo em 16/10): só anexo encaminhado à **caixa de comprovantes** (um grupo de WhatsApp aprovado) vai ao Paperless com a etiqueta `gabi:comprovante`, sem modelo; conversa pessoal nunca vira comprovante; palavra de risco vence. Migração 0027, `POST /api/v1/escuta/grupos/{id}/comprovantes`. **Passo do dono:** criar o grupo (só com ele), esperar a escuta vê-lo, aprovar e marcar como caixa de comprovantes (API; falta botão no painel), depois instalar. Não decidido: se a escuta lê o que ele mesmo envia (o ouvinte só recebe) | R+C | ⏸ instalar e ligar o grupo | C1 do bloco 2 destravado |
-| H0 | Revisão de segurança do Hermes: `platform_toolsets` sem `terminal`/`write_file`/`execute_code` nos canais; `skills.write_approval` e `memory.write_approval`; terminal em Docker | R+C | ⏸ não aprovado | aprovação do Ricardo e teste |
+| H0 | ✅ 16/10 17:05 (backup `~/.hermes/config.yaml.bak-antes-h0`; gateway reiniciado 17:06). Telegram e WhatsApp sem `terminal`, `file`, `code_execution`, `browser`, `delegation`; `skills.write_approval` e `memory.write_approval` = true; `tool_progress: log` (menos ruído). Terminal em Docker: dispensado nos canais (não têm terminal); o `cli` segue local. Falta só um teste real pelo canal (pedir algo que exigiria terminal e ver a recusa) | C | ✅ | teste pelo canal |
 
 ### 2. Cobrar (Fase 2)
 | # | Item | Dono | Status | Pronto quando |
