@@ -94,8 +94,8 @@ def test_saude_nunca_aparece_no_banco_principal(tmp_path):
     migrar(con, Path(__file__).parent.parent.parent / "migrations")
     nomes = [r[0].lower() for r in con.execute("select name from sqlite_master")] + \
             [r[1].lower() for t in [r[0] for r in con.execute("select name from sqlite_master where type='table'")] for r in con.execute(f"pragma table_info({t})")]
-    # única exceção: `exame_doc` (referência do documento e estado; sem valor, marcador nem paciente)
-    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo")) and n != "exame_doc"]
+    # única exceção: `exame_doc` e o índice automático dela (referência do documento e estado; sem valor, marcador nem paciente)
+    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo")) and n != "exame_doc" and not n.startswith("sqlite_autoindex_exame_doc")]
 
 
 def test_cofre_antigo_abre_e_ganha_colunas(arq, monkeypatch):

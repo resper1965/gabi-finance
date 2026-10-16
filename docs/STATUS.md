@@ -4,6 +4,8 @@
 **O que falta para completar: ver `docs/BACKLOG.md` (fonte única, 16/10/2026).** Este arquivo é só o histórico.
 Atualizado: 11/10/2026. Se a máquina caiu, leia só este arquivo e `.superpowers/sdd/progress.md`.
 
+- **Exames (16/10/2026): tarefas 1-10 no código, nada ligado.** Cofre v2, apelidos, extração regras+modelo, versões/reprocessar, rodada `gabi-brain-exames` (timer instalado, NÃO habilitado), lote e API, restrição no Paperless, tela Saúde, mensagem de saúde no cofre e blindagem. Migrações 0031 (`exame_doc`) e 0032 (estado `descartado`). Passos do Ricardo e como ligar: `docs/runbook.md#exames`.
+
 ## Onde estamos
 - **Código da Fase 1 pronto, commitado e instalado na VPS** (641 testes: `.venv/bin/pytest -q`). Api, mcp, backup e timers de captura ativos.
 - Repos: `/home/ricardo/gabi-brain` (app), `/home/ricardo/gabi-brain-migracao` (export/staging/congelar). Docs: `/home/ricardo/handoff/docs/superpowers/{specs,plans}/` (plano mestre com R1–R17, G1–G14).

@@ -26,7 +26,7 @@ install -d -o root -g root -m 755 /opt/gabi-brain
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/
 # Utilitário de administração (seeds editáveis): carregadores de seeds e o comparador da escuta, a correção de moeda e o comparador do G21, não o diretório tools inteiro.
-install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/comparar_escuta.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" /opt/gabi-brain/tools/
+install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/comparar_escuta.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" "$AQUI/tools/medir_exames.py" /opt/gabi-brain/tools/
 # App do ouvinte (código + package.json + lockfile). NÃO roda npm aqui: instalar dependência é passo do Ricardo (ver abaixo).
 install -d -o root -g root -m 755 /opt/escuta-ouvinte
 rm -rf /opt/escuta-ouvinte/src /opt/escuta-ouvinte/vendor
@@ -50,6 +50,7 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
   "$AQUI"/deploy/gabi-brain-exames.service "$AQUI"/deploy/gabi-brain-exames.timer \
+  "$AQUI"/deploy/gabi-brain-reembolso-saude.service "$AQUI"/deploy/gabi-brain-reembolso-saude.timer \
   "$AQUI"/deploy/gabi-brain-escuta.service "$AQUI"/deploy/gabi-brain-escuta.timer "$AQUI"/deploy/gabi-brain-escuta.path \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer "$AQUI"/deploy/escuta-ouvinte.service /etc/systemd/system/
 systemctl daemon-reload
@@ -59,6 +60,7 @@ systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mc
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
 # O timer da agenda do Google (gabi-brain-agenda.timer) também fica instalado e DESLIGADO (liga quando houver fonte liberada na aba Agenda; precisa de calendar.readonly no /etc/gabi/google.env).
 # O timer dos exames em PDF (gabi-brain-exames.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: precisa da chave do cofre de saúde (a mesma da api) e do Paperless e do modelo na ponte).
+# O timer do reembolso de saúde (gabi-brain-reembolso-saude.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: mesmas precondições dos exames mais o modelo na ponte; runbook#reembolso-saude).
 # O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
 # O timer e o path da escuta (gabi-brain-escuta.timer, gabi-brain-escuta.path) ficam instalados mas DESLIGADOS até o Ricardo mandar ligar.
 # O ouvinte (escuta-ouvinte.service) fica instalado e DESLIGADO. Passos do Ricardo, nesta ordem (docs/runbook.md#escuta):
