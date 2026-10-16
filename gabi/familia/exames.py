@@ -219,6 +219,12 @@ def guardar_mensagem(s: Cofre, de_pessoa: str | None, recebida_em: str, texto: s
 
 
 def mensagens(s: Cofre, quem: str) -> list[dict]:
-    """Mensagens de saúde guardadas, da mais antiga para a mais nova; a leitura entra no log `leitura`."""
+    """Mensagens de saúde guardadas, da mais antiga para a mais nova; a leitura entra no log `leitura`. `lida_em` vazio = ainda não marcada como lida."""
     _log(s, quem, None, "mensagens")
-    return [dict(r) for r in s.con.execute("select id, de_pessoa, recebida_em, texto from mensagem_saude order by recebida_em, id")]
+    return [dict(r) for r in s.con.execute("select id, de_pessoa, recebida_em, texto, lida_em from mensagem_saude order by recebida_em, id")]
+
+
+def marcar_lida(s: Cofre, mensagem_id: int, quem: str, quando: str) -> bool:
+    """Marca a mensagem como lida (nada é apagado). False se o id não existe; marcar de novo mantém a primeira data. Entra no log `leitura`."""
+    _log(s, quem, None, f"mensagem-lida:{mensagem_id}")
+    return bool(s.con.execute("update mensagem_saude set lida_em=coalesce(lida_em, ?) where id=?", (quando, mensagem_id)).rowcount)

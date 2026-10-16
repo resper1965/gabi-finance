@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { dataCurta } from "../lib/formato";
 import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
-import { FilaExames, Serie, TabelaExames, type Medicao, type Pessoa, type Ponto } from "./FamiliaSaude";
+import { FilaExames, MensagensSaude, Serie, TabelaExames, type Medicao, type Pessoa, type Ponto } from "./FamiliaSaude";
 
 interface Marcador { marcador: string; valor: string; unidade: string | null; em: string; fora_da_faixa: boolean; qualitativo?: boolean }
 
@@ -56,6 +56,7 @@ export function Familia() {
             </label>
             {atual ? <Exames key={atual.id} pessoa={atual} /> : <p style={{ color: "var(--ink2)" }}>Nenhuma pessoa liberada para você.</p>}
             <FilaExames pessoas={d.itens} />
+            <MensagensSaude pessoas={d.itens} />
           </div>
         );
       }}

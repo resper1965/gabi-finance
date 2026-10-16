@@ -269,6 +269,25 @@ def versoes_do_laudo(pessoa_id: str, paperless_id: int, request: Request, ident:
     return _resp(request, {"paperless_id": paperless_id, "versoes": vs, "diferencas": dif})
 
 
+# ---- mensagens de saúde sem anexo (ficam só no cofre; só boss com grau total) ----
+@router.get("/mensagens")
+def mensagens_de_saude(request: Request, ident: Identidade = SO_BOSS):
+    """Mensagens de saúde guardadas no cofre (id, de_pessoa, recebida_em, texto, lida_em); a leitura entra no log do cofre. O texto é dado de terceiros (R14)."""
+    with _TRAVA, _cofre(request) as s:
+        itens = exames.mensagens(s, ident.login)
+    return _resp(request, {"itens": itens})
+
+
+@router.post("/mensagens/{mensagem_id}/lida")
+def mensagem_lida(mensagem_id: int, request: Request, ident: Identidade = SO_BOSS):
+    """Marca a mensagem como lida, no cofre. Não apaga nada."""
+    with _TRAVA, _cofre(request) as s:
+        achou = exames.marcar_lida(s, mensagem_id, ident.login, _agora(request).astimezone(dt.timezone.utc).isoformat())
+    if not achou:
+        raise erro(404, "nao_encontrado", "mensagem não existe")
+    return _resp(request, {"id": mensagem_id, "lida": True})
+
+
 # ---- apelidos de marcador ----
 @router.get("/marcadores/apelidos")
 def listar_apelidos(request: Request, ident: Identidade = SO_BOSS):

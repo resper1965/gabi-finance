@@ -7,7 +7,7 @@ from gabi.api import criar_app
 from gabi.db import conectar
 from gabi.familia.saude import abrir_saude
 from gabi.reembolso_saude import cofre
-from tests.rotas.test_dinheiro_api import AGORA, BOSS, VIP, banco, get  # noqa: F401  (fixtures)
+from tests.rotas.test_dinheiro_api import AGORA, BOSS, VIP, banco, get, post  # noqa: F401  (fixtures)
 
 CHAVE = bytes(range(32))
 
@@ -55,3 +55,42 @@ def test_sem_chave_da_503(banco):
     a.state.saude = None
     r = TestClient(a, client=("127.0.0.1", 50000)).get("/api/v1/reembolso-saude/dossies", headers=BOSS)
     assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
+
+
+def _projecao(banco, estado="a_pedir"):
+    c = conectar(banco)
+    c.execute("insert into reembolso_saude_dossie(id, mes, estado, docs, pronto, faltam, doc_ids, parado_desde, atualizado_em) values (1,'2026-10',?,2,0,'[\"conselho\"]','[10,11]','2026-10-04','2026-10-16T00:00:00+00:00')", (estado,))
+    c.close()
+
+
+def test_dossies_trazem_parado_desde(app, cli, banco):
+    _semear(app)
+    _projecao(banco)
+    assert cli.get("/api/v1/reembolso-saude/dossies", headers=BOSS).json()["dados"]["dossies"][0]["parado_desde"] == "2026-10-04"
+
+
+def test_semana_devolve_o_texto_da_lista_sem_nomes(app, cli, banco):
+    _projecao(banco)
+    d = get(cli, "/api/v1/reembolso-saude/semana").json()["dados"]
+    assert d["texto"] == "\n".join(d["linhas"]) and "Dossiê 1 (10/2026)" in d["texto"] and "Bia" not in d["texto"]
+    assert get(cli, "/api/v1/reembolso-saude/semana", VIP).status_code == 403
+
+
+def test_pedi_e_recebi_gravam_so_a_intencao(app, cli, banco):
+    _projecao(banco)
+    r = post(cli, "/api/v1/reembolso-saude/dossies/1/pedi", {"protocolo": "AB-123"})
+    assert r.status_code == 200 and r.json()["dados"]["registrado"] is True
+    assert post(cli, "/api/v1/reembolso-saude/dossies/1/pedi", {}).json()["dados"]["ja_registrado"] is True
+    c = conectar(banco)
+    assert [tuple(x) for x in c.execute("select dossie_id, acao, protocolo, aplicado_em from reembolso_saude_acao")] == [(1, "pedi", "AB-123", None)]
+    assert c.execute("select estado from reembolso_saude_dossie").fetchone()[0] == "a_pedir"  # o estado só muda na rodada
+    assert post(cli, "/api/v1/reembolso-saude/dossies/1/recebi", {}).status_code == 400  # ainda não está pedido
+    c.execute("update reembolso_saude_dossie set estado='pedido'")
+    assert post(cli, "/api/v1/reembolso-saude/dossies/1/recebi", {}).status_code == 200
+    assert post(cli, "/api/v1/reembolso-saude/dossies/9/pedi", {}).status_code == 404
+
+
+def test_pedi_e_recebi_so_boss_total(banco, cli):
+    _projecao(banco)
+    assert post(cli, "/api/v1/reembolso-saude/dossies/1/pedi", {}, VIP).status_code == 403
+    assert post(cli, "/api/v1/reembolso-saude/dossies/1/recebi", {}, {"Tailscale-User-Login": "estranho@x.com"}).status_code == 403

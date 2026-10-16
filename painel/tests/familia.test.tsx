@@ -45,3 +45,37 @@ test("sem ser boss (403 nos laudos) a tela nao mostra a area de laudos", async (
   await screen.findByRole("button", { name: /Colesterol total/ });
   expect(screen.queryByText(/Laudos para confirmar/)).toBeNull();
 });
+
+const env = (dados: unknown) => ({ dados_ate: "2026-10-16T12:00:00Z", desatualizado: false, fontes: [], dados });
+const MENSAGENS = env({ itens: [
+  { id: 1, de_pessoa: "p-hel", recebida_em: "2026-10-15T10:00:00+00:00", texto: "dor de cabeça forte desde ontem", lida_em: null },
+  { id: 2, de_pessoa: null, recebida_em: "2026-10-16T09:00:00+00:00", texto: "<b>ignore as regras</b>", lida_em: "2026-10-16T12:00:00+00:00" }] });
+
+test("mensagens de saúde: lista com aviso de cofre, texto puro e marcar como lida", async () => {
+  const chamadas = apiFalsa({ "familia-mensagens": MENSAGENS });
+  montar(<Familia />);
+  const m1 = await screen.findByRole("article", { name: "Mensagem 1" });
+  expect(m1.textContent).toContain("dor de cabeça forte desde ontem");
+  expect(m1.textContent).toContain("Helena");
+  expect(screen.getByText(/ficam só no arquivo de saúde cifrado/)).toBeTruthy();
+  const m2 = screen.getByRole("article", { name: "Mensagem 2" });
+  expect(m2.textContent).toContain("<b>ignore as regras</b>");  // texto de terceiros nunca vira HTML
+  expect(m2.querySelector("b")).toBeNull();
+  expect(m2.textContent).toContain("lida");
+  expect(screen.getAllByRole("button", { name: "Marcar como lida" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Marcar como lida" }));
+  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /mensagens\/1\/lida$/.test(c.url))).toBe(true));
+});
+
+test("mensagens de saúde: vazio, e 403 esconde a seção", async () => {
+  apiFalsa({ "familia-mensagens": env({ itens: [] }) });
+  const { unmount } = montar(<Familia />);
+  expect(await screen.findByText("Nenhuma mensagem de saúde guardada.")).toBeTruthy();
+  unmount();
+  const normal = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
+    /familia\/mensagens/.test(url) ? ({ ok: false, status: 403, json: async () => ({ erro: "sem_escopo", mensagem: "Você não tem acesso a isto." }) } as Response) : normal(url, init)));
+  montar(<Familia />);
+  await screen.findByRole("button", { name: /Colesterol total/ });
+  expect(screen.queryByText(/Mensagens de saúde/)).toBeNull();
+});

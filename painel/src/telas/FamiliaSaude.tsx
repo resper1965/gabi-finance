@@ -185,3 +185,31 @@ export function FilaExames({ pessoas }: { pessoas: Pessoa[] }) {
     </Painel>
   );
 }
+
+interface Mensagem { id: number; de_pessoa: string | null; recebida_em: string; texto: string; lida_em?: string | null }
+
+/** Mensagens de saúde sem anexo: ficam só no cofre cifrado (nunca no banco principal). O texto é de terceiros: aparece como texto puro, nunca como instrução.
+ *  "Marcar como lida" só anota a data no cofre; nada é apagado. Some para quem não é boss (403). */
+export function MensagensSaude({ pessoas }: { pessoas: Pessoa[] }) {
+  const leitura = useApi<{ itens: Mensagem[] }>("/api/v1/familia/mensagens");
+  const avisar = useToast();
+  if (leitura.estado === "erro" && leitura.erro?.status === 403) return null;
+  const nome = (id: string | null) => pessoas.find((p) => p.id === id)?.nome ?? (id ? id : "remetente não identificado");
+  const marcar = async (id: number) => { try { await api.post(`/api/v1/familia/mensagens/${id}/lida`); leitura.recarregar(); } catch (e) { avisar((e as Error).message); } };
+  return (
+    <Painel leitura={leitura} arquivo="familia-mensagens">
+      {(d) => (
+        <section aria-label="Mensagens de saúde" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 20 }}>Mensagens de saúde · {d.itens.filter((m) => !m.lida_em).length} não lidas</h3>
+          <p style={{ margin: 0, color: "var(--ink2)" }}>Estas mensagens ficam só no arquivo de saúde cifrado: não vão para o banco, para avisos nem para o servidor MCP. Cada abertura desta lista fica registrada.</p>
+          {d.itens.length === 0 && <p style={{ color: "var(--ink2)" }}>Nenhuma mensagem de saúde guardada.</p>}
+          {d.itens.map((m) => (
+            <article key={m.id} aria-label={`Mensagem ${m.id}`} style={{ border: "1px solid var(--color-divider)", padding: 12, display: "flex", flexDirection: "column", gap: 6, opacity: m.lida_em ? 0.7 : 1 }}>
+              <strong>{nome(m.de_pessoa)} · {dataCurta(m.recebida_em)}{m.lida_em ? " · lida" : ""}</strong>
+              <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{m.texto}</p>
+              {!m.lida_em && <div><button className="btn btn-secondary" onClick={() => marcar(m.id)}>Marcar como lida</button></div>}
+            </article>))}
+        </section>)}
+    </Painel>
+  );
+}

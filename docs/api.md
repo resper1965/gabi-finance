@@ -108,6 +108,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/familia/marcadores/apelidos` | Apelidos de marcador definidos e sugestões de grafias parecidas para juntar. |
 | PUT | `/api/v1/familia/marcadores/apelidos` | Define um apelido (`{apelido, marcador}`); vale para as próximas extrações e para `reaplicar`. |
 | POST | `/api/v1/familia/marcadores/reaplicar` | Reescreve os marcadores de exames e propostas conforme os apelidos, sem chamar o modelo. |
+| GET | `/api/v1/familia/mensagens` | Mensagens de saúde guardadas no cofre (id, de_pessoa, recebida_em, texto, lida_em); a leitura entra no log do cofre. O texto é dado de terceiros (R14). |
+| POST | `/api/v1/familia/mensagens/{mensagem_id}/lida` | Marca a mensagem como lida, no cofre. Não apaga nada. |
 | GET | `/api/v1/familia/pessoas` | Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria). |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/frentes` | Frentes de trabalho com a contagem de itens confirmados. |
@@ -122,6 +124,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/mensagens` | E-mails recentes (cabeçalho e trecho) e os ids que o expurgo sugere (nada é apagado aqui). |
 | GET | `/api/v1/parcelas` | Parcelas: comprometido por mês e andamento de cada compra parcelada. |
 | GET | `/api/v1/reembolso-saude/dossies` | Dossiês (número, paciente, prestador, mês, estado, o que falta e os documentos com tipo e estado); o acesso fica no log de saúde. |
+| POST | `/api/v1/reembolso-saude/dossies/{dossie_id}/pedi` | "Marquei como pedido": registra que o Ricardo pediu (corpo opcional `{protocolo}`); aplica na próxima rodada. |
+| POST | `/api/v1/reembolso-saude/dossies/{dossie_id}/recebi` | "Recebi": registra que o reembolso chegou; aplica na próxima rodada. |
+| GET | `/api/v1/reembolso-saude/semana` | Texto da lista de segunda ("Resumo da semana"), o mesmo da ferramenta MCP e do aviso; sem nomes (lê só a projeção do `gabi.db`). |
 | GET | `/api/v1/regras` | Regras de classificação. |
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
 | GET | `/api/v1/rodadas` | Últimas rodadas de ingestão e se foram conferidas. |

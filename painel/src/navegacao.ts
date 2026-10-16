@@ -19,7 +19,7 @@ export const GRUPOS: Grupo[] = [
     { id: "regras", rotulo: "Regras", pergunta: "O que a Gabi sugere classificar?", abas: [["regras", "Regras", "O que a Gabi sugere classificar?"]] },
   ] },
   { titulo: "Casa", areas: [
-    { id: "familia", rotulo: "Família", pergunta: "Como está a saúde de cada um?", abas: [["familia", "Família"]] },
+    { id: "familia", rotulo: "Família", pergunta: "Como está a saúde de cada um?", abas: [["familia", "Família"], ["reembolso", "Reembolso de saúde", "Quais reembolsos de saúde faltam pedir?"]] },
     { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["escuta", "Escuta", "Quem a Gabi escuta no WhatsApp?"], ["agendas", "Agenda", "Quais agendas a Gabi lê?"], ["correio", "E-mail", "Quais caixas a Gabi lê?"], ["setup", "Configuração", "Está tudo conectado?"]] },
     { id: "gabi", rotulo: "Gabi", pergunta: "A Gabi está saudável e barata?", abas: [["saude", "Saúde e custo", "A Gabi está saudável e barata?"], ["ingestao", "Ingestão", "Os dados chegaram certos?"], ["conectores", "Integrações", "De onde a Gabi lê?"], ["seguranca", "Segurança", "Quem entra, por onde, e com quê?"], ["mcp", "Servidor MCP", "O que agentes externos podem fazer?"], ["receitas", "Receitas", "Como conecto meu agente?"], ["llm", "Modelos", "Quem classifica, e quanto custa?"], ["qualidade", "Qualidade", "A Gabi acerta e responde rápido?"]] },
   ] },

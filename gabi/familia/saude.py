@@ -35,6 +35,7 @@ create table if not exists mensagem_saude(id integer primary key, de_pessoa text
 COLUNAS_V2 = {
     "exame": (("versao", "integer not null default 1"), ("qualitativo", "integer not null default 0"), ("observacao", "text"), ("laboratorio", "text")),
     "proposta_exame": (("versao", "integer not null default 1"), ("origem", "text"), ("qualitativo", "integer not null default 0"), ("observacao", "text")),
+    "mensagem_saude": (("lida_em", "text"),),
 }
 
 

@@ -2994,6 +2994,61 @@
     "summary": "Reaplicar Apelidos"
    }
   },
+  "/api/v1/familia/mensagens": {
+   "get": {
+    "description": "Mensagens de saúde guardadas no cofre (id, de_pessoa, recebida_em, texto, lida_em); a leitura entra no log do cofre. O texto é dado de terceiros (R14).",
+    "operationId": "mensagens_de_saude_api_v1_familia_mensagens_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Mensagens De Saude"
+   }
+  },
+  "/api/v1/familia/mensagens/{mensagem_id}/lida": {
+   "post": {
+    "description": "Marca a mensagem como lida, no cofre. Não apaga nada.",
+    "operationId": "mensagem_lida_api_v1_familia_mensagens__mensagem_id__lida_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Mensagem Lida"
+   }
+  },
   "/api/v1/familia/pessoas": {
    "get": {
     "description": "Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria).",
@@ -3504,6 +3559,99 @@
      }
     },
     "summary": "Listar"
+   }
+  },
+  "/api/v1/reembolso-saude/dossies/{dossie_id}/pedi": {
+   "post": {
+    "description": "\"Marquei como pedido\": registra que o Ricardo pediu (corpo opcional `{protocolo}`); aplica na próxima rodada.",
+    "operationId": "pedi_api_v1_reembolso_saude_dossies__dossie_id__pedi_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "dossie_id",
+      "required": true,
+      "schema": {
+       "title": "Dossie Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Pedi"
+   }
+  },
+  "/api/v1/reembolso-saude/dossies/{dossie_id}/recebi": {
+   "post": {
+    "description": "\"Recebi\": registra que o reembolso chegou; aplica na próxima rodada.",
+    "operationId": "recebi_api_v1_reembolso_saude_dossies__dossie_id__recebi_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "dossie_id",
+      "required": true,
+      "schema": {
+       "title": "Dossie Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Recebi"
+   }
+  },
+  "/api/v1/reembolso-saude/semana": {
+   "get": {
+    "description": "Texto da lista de segunda (\"Resumo da semana\"), o mesmo da ferramenta MCP e do aviso; sem nomes (lê só a projeção do `gabi.db`).",
+    "operationId": "semana_api_v1_reembolso_saude_semana_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Semana"
    }
   },
   "/api/v1/regras": {

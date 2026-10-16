@@ -1,0 +1,65 @@
+{
+ "dados": {
+  "dossies": [
+   {
+    "documentos": [
+     {
+      "caso": "consulta",
+      "data": "2026-10-03",
+      "documento": "nf",
+      "estado": "a_pedir",
+      "id": 21
+     },
+     {
+      "caso": "consulta",
+      "data": "2026-10-03",
+      "documento": "comprovante",
+      "estado": "a_pedir",
+      "id": 22
+     }
+    ],
+    "dossie": 1,
+    "estado": "a_pedir",
+    "faltam": [
+     "CPF/CNPJ do profissional",
+     "CRM/CRP",
+     "especialidade"
+    ],
+    "mes": "2026-10",
+    "paciente": "Helena (sintética)",
+    "parado_desde": null,
+    "prestador": "Dra. Prestadora (sintética)"
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "agenda",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "comprovantes-paperless",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "notas-nibo",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "trabalho",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}
