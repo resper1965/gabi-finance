@@ -18,11 +18,13 @@ mcp_servers:
       - avisos_confirmar_entrega
       - avisos_pendentes
       - classificar_lancamento
+      - cobranca_rascunho
       - decisao_responder
       - decisoes_abertas
       - documentos_baixar
       - documentos_buscar
       - email_listar
+      - fechamento_dia
       - financeiro_contas_a_pagar
       - financeiro_lancamentos
       - financeiro_para_onde_vai
