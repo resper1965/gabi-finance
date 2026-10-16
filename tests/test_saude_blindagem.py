@@ -54,8 +54,10 @@ def test_banco_sem_valor_de_exame(tmp_path, capsys):
         assert s.con.execute("select count(*) from proposta_exame").fetchone()[0] == 2
     con = conectar(banco)
     tudo = "\n".join(con.iterdump())  # esquema e dados de TODAS as tabelas
-    for proibido in ("Teixeira", "Açaí", "Colesterol", "Glicose", "238", "117"):
+    for proibido in ("Teixeira", "Açaí", "Colesterol", "Glicose"):
         assert proibido not in tudo, proibido
+    for numero in ("238", "117"):  # valor de exame; não pode casar com pedaço de outro número (microssegundos de timestamp)
+        assert not re.search(rf"(?<![\d.]){numero}(?![\d])", tudo), numero
     assert "paciente" not in " ".join(c[1] for t in con.execute("select name from sqlite_master where type='table'").fetchall() for c in con.execute(f"pragma table_info({t[0]})"))
     saida = capsys.readouterr()
     for proibido in ("Teixeira", "Açaí", "Colesterol", "238"):
