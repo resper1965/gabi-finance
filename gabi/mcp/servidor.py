@@ -16,7 +16,8 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro import agenda_financeira as agenda_fin, consultas, contas_pagar as cp
+from gabi.dinheiro import agenda_financeira as agenda_fin, analise, consultas, contas_pagar as cp, rumo
+from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
 from gabi.mcp import ferramentas_prop, ferramentas_trab
@@ -28,6 +29,7 @@ _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin",
+                       "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS}
 
 
@@ -131,6 +133,41 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
             linhas = agenda_fin.montar(con, agora, dias=30 if semanal else d, semanal=semanal)
             return {"linhas": linhas, "texto": "\n".join(linhas)}
         return executar("agenda_financeira", f)
+
+    @srv.tool()
+    def financeiro_recorrentes(sentido: str | None = None) -> dict:
+        """Entradas e saídas recorrentes aprendidas dos últimos 6 meses (valor médio, dia típico, fixo ou variável). `sentido`: entrada ou saida. Só leitura."""
+        def f(con, agora):
+            if sentido not in (None, "entrada", "saida"):
+                raise ValueError("sentido deve ser entrada ou saida")
+            itens = analise.recorrentes(FonteAnalise(con), "caixa", agora.date())
+            return {"itens": [i for i in itens if not sentido or i["sentido"] == sentido]}
+        return executar("financeiro_recorrentes", f)
+
+    @srv.tool()
+    def financeiro_previsao(dias: int = 30) -> dict:
+        """Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura."""
+        def f(con, agora):
+            return analise.previsao(FonteAnalise(con), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date())
+        return executar("financeiro_previsao", f)
+
+    @srv.tool()
+    def financeiro_vazamentos(meses: int = 3) -> dict:
+        """Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura."""
+        def f(con, agora):
+            return analise.vazamentos(FonteAnalise(con), ferramentas_trab._inteiro(meses, 1, 12, "meses"), agora.date())
+        return executar("financeiro_vazamentos", f)
+
+    @srv.tool()
+    def financeiro_rumo(ano: int | None = None) -> dict:
+        """Rumo mês a mês do `ano` (padrão: o atual): entradas, saídas, poupança, gasto e patrimônio. Só leitura."""
+        def f(con, agora):
+            a = ferramentas_trab._inteiro(ano if ano is not None else agora.year, 2000, 2100, "ano")
+            meses = [{"mes": l.mes, "entradas": formatar(l.entradas), "saidas": formatar(l.saidas), "poupanca": formatar(l.poupanca),
+                      "gasto": formatar(l.gasto), "patrimonio": None if l.patrimonio is None else formatar(l.patrimonio)}
+                     for l in rumo.rumo_mensal(con, a)]
+            return {"ano": a, "meses": meses}
+        return executar("financeiro_rumo", f)
 
     @srv.tool()
     def financeiro_lancamentos(de: str | None = None, ate: str | None = None, conta: str | None = None, categoria: int | None = None,

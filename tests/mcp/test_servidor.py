@@ -8,13 +8,15 @@ import pytest
 from starlette.testclient import TestClient
 
 from gabi.db import conectar, migrar
+from gabi.dinheiro.valor import formatar
 from gabi.mcp.servidor import criar_mcp
 from gabi.mcp.tokens import emitir, revogar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
-LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira"}
+LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
+                 "financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo"}
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "pedidos_estado", "avisos_pendentes", "avisos_confirmar_entrega",
                "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar", "pessoas_dado"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}  # só leitura do Trabalho
@@ -255,3 +257,48 @@ def test_smoke_cliente_oficial_streamable_http(banco, tokens):
     finally:
         servidor.should_exit = True
         t.join(timeout=10)
+
+
+# ---------------- MC1: análises somente leitura ----------------
+ANALISE = ("financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo")
+
+
+def _academia(banco):
+    c = conectar(banco)
+    for i, m in enumerate(["2026-06", "2026-07", "2026-08", "2026-09"], start=10):
+        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                  "values (1,?,?,-20000,'ACADEMIA','caixa+custo','posted')", (f"a{i}", f"{m}-05"))
+    c.close()
+
+
+def test_analises_so_com_escopo_fin(tokens):
+    from gabi.mcp.servidor import ferramentas_do_token
+    assert set(ANALISE) <= set(ferramentas_do_token(["fin"])) and not set(ANALISE) & set(ferramentas_do_token(["docs"]))
+
+
+def test_recorrentes_devolve_a_serie(cli, banco, tokens):
+    _academia(banco)
+    d = chamar(cli, tokens["fin"], "financeiro_recorrentes")
+    assert [i["valor_medio"] for i in d["dados"]["itens"] if "ACADEMIA" in i["descricao"]] == [200.0]
+
+
+def test_recorrentes_sentido_invalido(cli, tokens):
+    assert chamar(cli, tokens["fin"], "financeiro_recorrentes", sentido="x")["erro"] == "requisicao_invalida"
+
+
+def test_previsao_e_dias_invalido(cli, tokens):
+    assert "eventos" in chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
+    assert chamar(cli, tokens["fin"], "financeiro_previsao", dias=9999)["erro"] == "requisicao_invalida"
+
+
+def test_vazamentos_traz_chaves_e_meses_invalido(cli, tokens):
+    d = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=3)["dados"]
+    assert {"assinaturas", "aumentos"} <= set(d)
+    assert chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=0)["erro"] == "requisicao_invalida"
+
+
+def test_rumo_formata_valores(cli, tokens):
+    d = chamar(cli, tokens["fin"], "financeiro_rumo", ano=2026)["dados"]
+    out = next(l for l in d["meses"] if l["mes"] == "2026-10")
+    assert out["entradas"] == formatar(800000)
+    assert chamar(cli, tokens["fin"], "financeiro_rumo", ano=1900)["erro"] == "requisicao_invalida"
