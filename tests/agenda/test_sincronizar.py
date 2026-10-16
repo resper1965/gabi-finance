@@ -183,3 +183,42 @@ def test_sincronizacao_idempotente(con):
     antes = [tuple(r) for r in con.execute("select * from agenda_evento order by id")]
     sincronizar_fonte(con, f, cli, AGORA)
     assert [tuple(r) for r in con.execute("select * from agenda_evento order by id")] == antes
+
+
+def test_excecao_qualquer_numa_fonte_nao_derruba_as_outras_nem_vaza_texto(con):
+    a = _fonte(con, "a@x.com"); b = _fonte(con, "b@x.com")
+    cli = Falso(RuntimeError("segredo do titulo"), ResultadoEventos([_ev("e1")], [], "T", False))
+    saida = sincronizar(con, cli, AGORA)
+    assert saida[a] == {"erro": "RuntimeError"} and saida[b]["gravados"] == 1
+    assert con.execute("select ultimo_erro from agenda_fonte where id=?", (a,)).fetchone()[0] == "RuntimeError"
+    assert _avisos(con) == []
+
+
+def test_parametro_de_janela_corrompido_usa_o_padrao(con):
+    f = _fonte(con)
+    con.execute("insert into parametro(chave, valor) values ('agenda.janela_passado_dias', '\"abc\"'), ('agenda.janela_futuro_dias', '[1]')")
+    cli = Falso(ResultadoEventos([_ev("e1")], [], "T", False))
+    assert sincronizar_fonte(con, f, cli, AGORA)["gravados"] == 1
+
+
+def test_recarga_vazia_nao_apaga_o_que_ja_existe(con):
+    f = _fonte(con)
+    sincronizar_fonte(con, f, Falso(ResultadoEventos([_ev("e1"), _ev("e2")], [], "T", False)), AGORA)
+    r = sincronizar_fonte(con, f, Falso(ResultadoEventos([], [], None, True)), "2026-10-12T12:15:00+00:00")
+    assert _ids(con) == ["e1", "e2"] and r["apagados"] == 0
+    assert "vazia" in con.execute("select ultimo_erro from agenda_fonte where id=?", (f,)).fetchone()[0]
+
+
+def test_403_sem_motivo_so_avisa_na_segunda_falha_seguida(con):
+    _fonte(con)
+    cli = Falso(*[ErroGoogleOAuth("calendar.events.list -> 403")] * 3, ResultadoEventos([], [], "T", False))
+    sincronizar(con, cli, AGORA)
+    assert _avisos(con) == []
+    sincronizar(con, cli, "2026-10-12T12:15:00+00:00")
+    assert len(_avisos(con)) == 1
+
+
+def test_400_nao_e_credencial(con):
+    _fonte(con)
+    sincronizar(con, Falso(ErroGoogleOAuth("calendar.events.list -> 400")), AGORA)
+    assert _avisos(con) == []

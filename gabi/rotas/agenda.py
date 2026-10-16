@@ -1,6 +1,7 @@
 """Fontes e parâmetros da agenda pelo painel (/api/v1/agenda/fontes, /api/v1/agenda/parametros). Só o boss.
 A API não tem rede nem segredo: descobrir calendários passa pela ponte do serviço de fontes. A auditoria leva só ids e nomes de chave, nunca valores nem títulos.
 (GET /api/v1/agenda — os compromissos — fica em `gabi.rotas.trabalho`.) Consome: agenda.fontes."""
+import asyncio
 import datetime as dt
 
 from fastapi import APIRouter, Depends, Request
@@ -58,13 +59,20 @@ async def descobrir(fonte_id: int, request: Request, ident: Identidade = Depends
     await _json(request)
     fabrica = request.app.state.fontes.get("google_agenda")
     fonte = fabrica() if fabrica else None
-    if fonte is None:
-        raise erro(503, "fonte_indisponivel", "a agenda do Google não está configurada")
     con = _con(request)
     try:
+        try:
+            f = fn._existe(con, fonte_id)  # 404 antes de 503 e de qualquer chamada de rede
+            if fonte is None:
+                raise erro(503, "fonte_indisponivel", "a agenda do Google não está configurada")
+            achados = await asyncio.to_thread(fonte.listar_calendarios, f["conta"]) if f["provedor"] == "google" else []  # rede bloqueante: fora do laço da API
+        except fn.ErroFonte as e:
+            raise _traduzir(e) from None
+        except ErroGoogleOAuth as e:
+            raise erro(503, "fonte_indisponivel", str(e)) from None
         with transacao(con):
             try:
-                cals = fn.descobrir_calendarios(con, fonte_id, fonte.listar_calendarios)
+                cals = fn.descobrir_calendarios(con, fonte_id, lambda _conta: achados)
             except fn.ErroFonte as e:
                 raise _traduzir(e) from None
             except ErroGoogleOAuth as e:

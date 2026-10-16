@@ -12,7 +12,8 @@ from gabi.db import transacao
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 
 RECARGA_DIAS = 7
-CREDENCIAL = re.compile(r"-> (400|401|403)\b|invalid_grant|não autorizada|token recusado")
+CREDENCIAL = re.compile(r"-> 401\b|invalid_grant|não autorizada|token recusado")
+SO_STATUS_403 = re.compile(r"-> 403$")  # 403 sem motivo também é cota/API desligada: só vira "reconectar" na 2ª falha seguida
 PRIVADO = "Compromisso privado"
 
 
@@ -24,6 +25,11 @@ def _parametro(con, chave: str, padrao):
         return padrao
 
 
+def _dias(con, chave: str, padrao: int) -> int:
+    v = _parametro(con, chave, padrao)
+    return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 3650 else padrao
+
+
 def _agora(agora: str) -> dt.datetime:
     d = dt.datetime.fromisoformat(agora)
     return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
@@ -32,8 +38,8 @@ def _agora(agora: str) -> dt.datetime:
 def _janela(con, agora: dt.datetime, fuso: str) -> dict:
     """{"de","ate"} em UTC: da meia-noite local de (hoje − passado) à de (hoje + futuro + 1)."""
     hoje = agora.astimezone(tempo._zona(fuso)).date()
-    passado = int(_parametro(con, "agenda.janela_passado_dias", 7))
-    futuro = int(_parametro(con, "agenda.janela_futuro_dias", 90))
+    passado = _dias(con, "agenda.janela_passado_dias", 7)
+    futuro = _dias(con, "agenda.janela_futuro_dias", 90)
     zona = tempo._zona(fuso)
     de = dt.datetime.combine(hoje - dt.timedelta(days=passado), dt.time(0, 0), zona)
     ate = dt.datetime.combine(hoje + dt.timedelta(days=futuro + 1), dt.time(0, 0), zona)
@@ -58,6 +64,10 @@ def sincronizar_fonte(con, fonte_id: int, listar: Callable, agora: str) -> dict:
     completa = _precisa_recarga(f, now)
     res = listar(f["conta"], f["calendario_id"], None if completa else f["sync_token"], _janela(con, now, fuso))
     completa = completa or bool(res.recarga_completa)
+    if completa and not res.eventos and not res.cancelados and con.execute("select 1 from agenda_evento where fonte_id=?", (fonte_id,)).fetchone():
+        # recarga que volta vazia numa fonte com eventos é mais provável erro do que calendário esvaziado: nada é apagado, o token e a data da recarga ficam, tenta de novo na próxima
+        con.execute("update agenda_fonte set ultimo_erro=? where id=?", ("recarga vazia: eventos mantidos", fonte_id))
+        return {"lidos": 0, "gravados": 0, "apagados": 0, "pulados": 0, "recarga": False}
     linhas, pulados = [], 0
     for e in res.eventos:
         try:
@@ -105,11 +115,12 @@ def sincronizar(con, listar: Callable, agora: str) -> dict:
             continue
         try:
             saida[f["id"]] = sincronizar_fonte(con, f["id"], listar, agora)
-        except ErroGoogleOAuth as ex:
-            msg = str(ex)
+        except Exception as ex:  # noqa: BLE001 - uma fonte nunca derruba as outras; só texto tipado do cliente entra no erro, de resto só o nome da classe
+            msg = str(ex) if isinstance(ex, ErroGoogleOAuth) else type(ex).__name__
+            anterior = con.execute("select ultimo_erro from agenda_fonte where id=?", (f["id"],)).fetchone()[0]
             saida[f["id"]] = {"erro": msg}
             con.execute("update agenda_fonte set ultimo_erro=? where id=?", (msg, f["id"]))
-            if CREDENCIAL.search(msg):
+            if CREDENCIAL.search(msg) or (SO_STATUS_403.search(msg) and anterior == msg):
                 _novo(con, _agora(agora), "agenda_reconectar", f["conta"], {"conta": f["conta"]})
             continue
         _fechar_aviso(con, f["conta"], agora)

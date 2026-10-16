@@ -93,13 +93,17 @@ def _mensagem(msg: dict) -> dict | None:
             "recebida_em": recebida, "trecho": html.unescape(snippet)[:TAM_TRECHO] if isinstance(snippet, str) else "", "lista": _lista(cab)}
 
 
+_VENENO = (400, 410, 413, 422)  # 4xx que é do id (e não da credencial, cota ou servidor: 401/403/429/5xx continuam parando a leitura)
+_ACOES_MOVER = ("trash", "untrash")
+
+
 def _metadados(conta, ids, token, http, cabecalhos=_CABECALHOS) -> list[dict]:
     saida = []
     q = "&".join("metadataHeaders=" + urllib.parse.quote(h) for h in cabecalhos)
     for i in ids:
         status, resp = _pegar(http, token, conta, "GET", f"{BASE}/messages/{i}?format=metadata&{q}")
-        if status == 404:
-            continue  # apagada entre a listagem e a leitura
+        if status == 404 or status in _VENENO:
+            continue  # apagada entre a listagem e a leitura; ou "veneno" (4xx persistente só naquele id): pula, não trava a conta
         if status >= 400:
             raise ErroGoogleOAuth(f"messages.get -> {status}")
         if not isinstance(resp, dict):
@@ -188,6 +192,8 @@ def listar_novos(conta: str, history_id: str | None, janela_dias: int, token: Ca
 
 
 def _mover(conta: str, ids, acao: str, token, http) -> dict[str, str]:
+    if acao not in _ACOES_MOVER:  # as únicas escritas que o cliente faz; qualquer outra ação é recusada antes de chamar o Google
+        raise ErroGoogleOAuth("ação não permitida")
     conta = conta_valida(conta)
     if not isinstance(ids, (list, tuple)) or len(ids) > MAX_IDS_POR_CHAMADA:
         raise ErroGoogleOAuth(f"no máximo {MAX_IDS_POR_CHAMADA} ids por chamada")

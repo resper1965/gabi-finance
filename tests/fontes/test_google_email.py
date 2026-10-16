@@ -253,3 +253,27 @@ def test_respondeu_a_recusa_endereco_invalido_e_lote_grande_sem_chamar_o_google(
     for ruim in (["nao e email"], ['a@x.com" OR in:inbox'], [3], "bia@x.com", ["a@x.com"] * 0 + [f"u{i}@x.com" for i in range(21)]):
         with pytest.raises(ErroGoogleOAuth):
             ge.respondeu_a("a@x.com", ruim, Token(), http=nunca)
+
+
+def test_mensagem_veneno_4xx_e_pulada_e_as_outras_entram():
+    rotas = {("GET", "/profile"): [(200, {"historyId": "500"})],
+             ("GET", "/messages"): [(200, {"messages": [{"id": ID(1)}, {"id": ID(2)}, {"id": ID(3)}]})],
+             ("GET", "/messages/{id}"): [(200, _msg(1)), (400, {}), (200, _msg(3))]}
+    r = ge.listar_novos("a@x.com", None, 14, Token(), http=Falso(rotas))
+    assert [m["externo_id"] for m in r.mensagens] == [ID(1), ID(3)]
+
+
+@pytest.mark.parametrize("status", [403, 429, 500, 503])
+def test_status_de_credencial_cota_ou_servidor_ainda_para_a_leitura(status):
+    rotas = {("GET", "/profile"): [(200, {"historyId": "500"})],
+             ("GET", "/messages"): [(200, {"messages": [{"id": ID(1)}]})],
+             ("GET", "/messages/{id}"): [(status, {})]}
+    with pytest.raises(ErroGoogleOAuth, match=str(status)):
+        ge.listar_novos("a@x.com", None, 14, Token(), http=Falso(rotas))
+
+
+@pytest.mark.parametrize("acao", ["delete", "modify", "batchDelete", "trash/../delete", "", "TRASH"])
+def test_mover_so_aceita_trash_e_untrash(acao):
+    nunca = lambda *a, **k: pytest.fail("não deveria chamar")  # noqa: E731
+    with pytest.raises(ErroGoogleOAuth):
+        ge._mover("a@x.com", [ID(1)], acao, Token(), nunca)

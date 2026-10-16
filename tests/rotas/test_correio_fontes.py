@@ -215,3 +215,24 @@ def test_parametros_novos_gravam_e_normalizam_as_palavras(cli):
 def test_palavras_protegidas_nao_aparecem_na_auditoria(cli, banco):
     _put(cli, {"palavras_protegidas": ["PALAVRA-SECRETA"]})
     assert "PALAVRA-SECRETA" not in " | ".join(_decisoes(banco)) and "email.palavras_protegidas" in " | ".join(_decisoes(banco))
+
+
+def test_restaurar_nao_trava_o_laco_da_api(banco):
+    import asyncio
+    fonte = _Email()
+    original = fonte.restaurar
+    fonte.no_laco = None
+
+    def restaurar(conta, ids):
+        try:
+            asyncio.get_running_loop()
+            fonte.no_laco = True  # a chamada de rede bloqueante rodou dentro do laço de eventos
+        except RuntimeError:
+            fonte.no_laco = False
+        return original(conta, ids)
+    fonte.restaurar = restaurar
+    cli = _cli(banco, fonte)
+    f = _criar(cli); _patch(cli, f"{U}/fontes/{f}", {"estado": "sim"})
+    mid = _msg(banco, f, "ab12cd", "na_lixeira", "lixo", 0, "Promo")
+    assert _post(cli, f"{U}/mensagens/{mid}/restaurar").status_code == 200
+    assert fonte.no_laco is False

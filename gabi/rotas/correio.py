@@ -1,6 +1,7 @@
 """Painel do correio (/api/v1/correio): contas, parâmetros, fila de prioridades, lixeira e restaurar. Só o boss.
 A API não tem rede nem segredo: restaurar passa pela ponte do serviço de fontes. A auditoria leva só ids e nomes de chave, nunca valores,
 remetente nem assunto. Consome: correio.fontes, correio.consulta, correio.processar."""
+import asyncio
 import datetime as dt
 
 from fastapi import APIRouter, Depends, Request
@@ -137,7 +138,7 @@ async def restaurar(mensagem_id: int, request: Request, ident: Identidade = Depe
         if fonte is None:
             raise erro(503, "fonte_indisponivel", "o e-mail do Google não está configurado")
         try:
-            resultado = fonte.restaurar(m["conta"], [m["externo_id"]])
+            resultado = await asyncio.to_thread(fonte.restaurar, m["conta"], [m["externo_id"]])  # rede bloqueante: fora do laço da API
         except ErroGoogleOAuth as e:
             raise erro(503, "fonte_indisponivel", str(e)) from None
         if not isinstance(resultado, dict) or resultado.get(m["externo_id"]) != "ok":

@@ -162,3 +162,25 @@ def test_mudar_parametro_forca_recarga_completa_na_proxima_rodada(cli, banco):
     c.close()
     assert linha["recarga_em"] is None  # dia_local, título mascarado e janela foram calculados com o valor antigo: refaz tudo
     assert _put(cli, {"privados": "inexistente"}).status_code == 400  # pedido inválido não força nada
+
+
+def test_descobrir_nao_trava_o_laco_da_api_e_404_vem_antes_do_503(banco):
+    import asyncio
+    ag = _Agenda([{"id": "resper@gmail.com", "nome": "Ricardo", "principal": True}])
+    original = ag.listar_calendarios
+    ag.no_laco = None
+
+    def listar(conta):
+        try:
+            asyncio.get_running_loop()
+            ag.no_laco = True  # a chamada de rede bloqueante rodou dentro do laço de eventos
+        except RuntimeError:
+            ag.no_laco = False
+        return original(conta)
+    ag.listar_calendarios = listar
+    cli = _cli(banco, ag)
+    fid = _criar(cli)
+    assert _post(cli, f"{U}/fontes/{fid}/calendarios/descobrir").status_code == 200
+    assert ag.no_laco is False
+    sem_fonte = _cli(banco)
+    assert _post(sem_fonte, f"{U}/fontes/999/calendarios/descobrir").status_code == 404  # fonte inexistente: 404 antes do 503
