@@ -222,3 +222,14 @@ def test_400_nao_e_credencial(con):
     _fonte(con)
     sincronizar(con, Falso(ErroGoogleOAuth("calendar.events.list -> 400")), AGORA)
     assert _avisos(con) == []
+
+
+def test_grava_ical_uid_e_livre_e_atualiza_na_mudanca(con):
+    f = _fonte(con)
+    cli = Falso(ResultadoEventos([_ev("a", ical_uid="u@google.com", livre=True)], [], "T1", False),
+                ResultadoEventos([_ev("a", ical_uid="u@google.com", livre=False)], [], "T2", False))
+    sincronizar_fonte(con, f, cli, AGORA)
+    r = con.execute("select ical_uid, livre from agenda_evento where externo_id='a'").fetchone()
+    assert (r["ical_uid"], r["livre"]) == ("u@google.com", 1)
+    sincronizar_fonte(con, f, cli, AGORA)
+    assert con.execute("select livre from agenda_evento where externo_id='a'").fetchone()[0] == 0

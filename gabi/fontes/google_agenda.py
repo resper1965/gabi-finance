@@ -70,7 +70,9 @@ def _evento(item: dict) -> dict:
             "status": item.get("status") if isinstance(item.get("status"), str) else None,
             "etag": item.get("etag") if isinstance(item.get("etag"), str) else None,
             "atualizado_origem": item.get("updated") if isinstance(item.get("updated"), str) else None,
-            "privado": item.get("visibility") in ("private", "confidential")}
+            "privado": item.get("visibility") in ("private", "confidential"),
+            "ical_uid": item["iCalUID"] if isinstance(item.get("iCalUID"), str) and item["iCalUID"] else None,
+            "livre": item.get("transparency") == "transparent"}
 
 
 def _recusado_por_mim(item: dict) -> bool:

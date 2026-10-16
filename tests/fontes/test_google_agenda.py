@@ -97,6 +97,14 @@ def test_visibilidade_private_e_confidential_marcam_privado():
     assert {e["externo_id"]: e["privado"] for e in r.eventos} == {"a": False, "b": True, "c": True, "d": False, "e": False}
 
 
+def test_ical_uid_e_transparencia_livre_vem_do_google():
+    corpo = {"items": [_ev("a", iCalUID="uid-a@google.com"), _ev("b", transparency="transparent"), _ev("c", transparency="opaque")], "nextSyncToken": "S"}
+    r = ga.listar_eventos("a@gmail.com", "primary", None, JANELA, Token(), http=_http([(200, corpo)], []))
+    por_id = {e["externo_id"]: e for e in r.eventos}
+    assert por_id["a"]["ical_uid"] == "uid-a@google.com" and por_id["b"]["ical_uid"] is None
+    assert {k: v["livre"] for k, v in por_id.items()} == {"a": False, "b": True, "c": False}
+
+
 def test_nao_extrai_email_nem_local_so_a_contagem_de_participantes():
     corpo = {"items": [_ev("a", attendees=[{"email": "x@y.com"}, {"email": "z@w.com"}], location="Rua Secreta 1, São Paulo",
                            hangoutLink="https://meet.google.com/abc", organizer={"email": "o@x.com"})], "nextSyncToken": "S"}
@@ -104,7 +112,8 @@ def test_nao_extrai_email_nem_local_so_a_contagem_de_participantes():
     assert e["participantes_qtd"] == 2 and e["link_reuniao"] == "https://meet.google.com/abc"
     assert e == {"externo_id": "a", "inicio": {"dateTime": "2026-10-12T10:00:00-03:00"}, "fim": {"dateTime": "2026-10-12T11:00:00-03:00"},
                  "titulo": "Reunião", "link_reuniao": "https://meet.google.com/abc", "participantes_qtd": 2, "status": "confirmed",
-                 "etag": '"e1"', "atualizado_origem": "2026-10-10T10:00:00.000Z", "privado": False}
+                 "etag": '"e1"', "atualizado_origem": "2026-10-10T10:00:00.000Z", "privado": False,
+                 "ical_uid": None, "livre": False}
     blob = repr(e)
     assert "x@y.com" not in blob and "Secreta" not in blob and "o@x.com" not in blob
 

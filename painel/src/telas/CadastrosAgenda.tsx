@@ -15,9 +15,16 @@ const suave = { color: "var(--ink2)" } as const;
 const linha = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", padding: "8px 0" } as const;
 const lista = { listStyle: "none", margin: 0, padding: 0 } as const;
 const inteiro = (v: string, min: number, max: number) => (/^\d+$/.test(v.trim()) && Number(v) >= min && Number(v) <= max ? Number(v) : null);
-const quando = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "nunca");
+/** A última leitura vem em UTC: mostra no fuso da agenda (padrão Brasília; fuso inválido cai no padrão). */
+const quando = (iso: string | null, fuso = "America/Sao_Paulo") => {
+  if (!iso) return "nunca";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "nunca";
+  const fmt = (tz: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
+  try { return fmt(fuso); } catch { return fmt("America/Sao_Paulo"); }
+};
 
-function Fontes({ leitura, acao }: { leitura: Leitura<{ fontes: Fonte[] }>; acao: Acao }) {
+function Fontes({ leitura, acao, fuso }: { leitura: Leitura<{ fontes: Fonte[] }>; acao: Acao; fuso?: string }) {
   const { ocupado, erros, agir } = acao;
   const [conta, setConta] = useState("");
   const [provedor, setProvedor] = useState<"google" | "graph">("google");
@@ -33,7 +40,7 @@ function Fontes({ leitura, acao }: { leitura: Leitura<{ fontes: Fonte[] }>; acao
                 const rotulo = f.nome ? `${f.conta} (${f.nome})` : f.conta;
                 return (
                   <li key={f.id} style={linha}>
-                    <span><strong>{rotulo}</strong> <span style={suave}>· {f.provedor === "google" ? "Google" : "Microsoft"} · {ESTADO[f.estado]} · {f.eventos} compromisso(s) · última leitura {quando(f.sincronizada_em)}</span></span>
+                    <span><strong>{rotulo}</strong> <span style={suave}>· {f.provedor === "google" ? "Google" : "Microsoft"} · {ESTADO[f.estado]} · {f.eventos} compromisso(s) · última leitura {quando(f.sincronizada_em, fuso)}</span></span>
                     <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {f.estado !== "sim" && <button className="btn btn-primary" disabled={ocupado} aria-label={`Liberar ${rotulo}`} onClick={() => agir(`f${f.id}`, () => api.patch(`/api/v1/agenda/fontes/${f.id}`, { estado: "sim" }), "Agenda liberada.", leitura.recarregar)}>Liberar</button>}
                       {f.estado !== "nao" && <button className="btn btn-secondary" disabled={ocupado} aria-label={`Desligar ${rotulo}`} onClick={() => agir(`f${f.id}`, () => api.patch(`/api/v1/agenda/fontes/${f.id}`, { estado: "nao" }), "Agenda desligada.", leitura.recarregar)}>Desligar</button>}
@@ -116,7 +123,7 @@ export function CadastrosAgenda() {
   if ([fontes, parametros].some((l) => l.estado === "erro" && l.erro?.status === 403)) return <Vazio frase="Só o dono configura a agenda." />;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <Fontes leitura={fontes} acao={acao} />
+      <Fontes leitura={fontes} acao={acao} fuso={parametros.env?.dados.fuso} />
       <Ajustes leitura={parametros} acao={acao} />
     </div>
   );

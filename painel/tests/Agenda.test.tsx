@@ -4,6 +4,7 @@ import { ToastProvider } from "../src/lib/toast";
 import { FiltrosProvider } from "../src/lib/filtros";
 import { CadastrosAgenda } from "../src/telas/CadastrosAgenda";
 import { Agenda, diaLocal } from "../src/telas/Trabalho/Agenda";
+import { Hoje } from "../src/telas/Trabalho/Hoje";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
 interface Chamada { metodo: string; url: string; corpo: unknown }
@@ -61,6 +62,16 @@ test("fonte liberada oferece desligar, não liberar", async () => {
   expect(screen.queryByRole("button", { name: /Liberar/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Desligar a@x.com (Ricardo)" }));
   await waitFor(() => expect(mudancas(c)[0].corpo).toEqual({ estado: "nao" }));
+});
+
+test("a última leitura (UTC) aparece no fuso da agenda, não como se fosse local", async () => {
+  fake({ fontes: [{ ...FONTE, estado: "sim", sincronizada_em: "2026-10-12T09:00:00+00:00" }] });
+  const { unmount } = montar();
+  expect((await screen.findByText(/última leitura/)).textContent).toContain("12/10, 06:00");
+  unmount();
+  fake({ fontes: [{ ...FONTE, estado: "sim", sincronizada_em: "2026-10-12T09:00:00+00:00" }], parametros: { fuso: "America/Manaus" } });
+  montar();
+  await waitFor(() => expect(screen.getByText(/última leitura/).textContent).toContain("12/10, 05:00"));
 });
 
 test("descobrir calendários chama a rota e mostra o resumo", async () => {
@@ -146,4 +157,13 @@ test("escolher Amanhã pede só o dia de amanhã", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Amanhã" }));
   await waitFor(() => expect(c.some((x) => x.url === `/api/v1/agenda?de=${diaLocal(1)}&ate=${diaLocal(1)}`)).toBe(true));
   expect(screen.getByRole("button", { name: "Amanhã" }).getAttribute("aria-pressed")).toBe("true");
+});
+
+test("o link da reunião em Hoje abre em nova aba com rel noopener noreferrer", async () => {
+  const evento = { id: 1, titulo: "Daily", inicio_local: "2026-10-12T09:00:00-03:00", fim_local: "2026-10-12T09:30:00-03:00", dia_local: "2026-10-12", dia_fim_local: "2026-10-12", dia_inteiro: false, link_reuniao: "https://meet.google.com/abc", fonte: "a@x.com", privado: false };
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => env({ filtro: "", prioridades: [], agenda: [evento], emails_importantes: [], dinheiro: null }) }) as Response));
+  montar(<Hoje />);
+  const a = await screen.findByRole("link", { name: "entrar" });
+  expect(a.getAttribute("target")).toBe("_blank");
+  expect(a.getAttribute("rel")).toBe("noopener noreferrer");
 });

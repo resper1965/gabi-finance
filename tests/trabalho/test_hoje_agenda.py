@@ -25,12 +25,12 @@ def _fonte(con, conta="a@x.com", estado="sim"):
     return con.execute("insert into agenda_fonte(conta, provedor, estado) values (?, 'google', ?)", (conta, estado)).lastrowid
 
 
-def _ev(con, fonte, ext, ini, fim, titulo="Reunião", inteiro=False, privado=False, link=None):
+def _ev(con, fonte, ext, ini, fim, titulo="Reunião", inteiro=False, privado=False, link=None, ical=None, livre=False):
     """ini/fim: ISO com offset (horário) ou 'AAAA-MM-DD' (dia inteiro, fim exclusivo)."""
     from gabi.agenda import tempo
     j = (tempo.de_google({"date": ini}, {"date": fim}, BRT) if inteiro else tempo.de_google({"dateTime": ini}, {"dateTime": fim}, BRT))
-    return con.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, link_reuniao, privado)"
-                       " values (?,?,?,?,?,?,?,?,?,?)", (fonte, ext, j.inicio_utc, j.fim_utc, j.dia_local, j.dia_fim_local, int(inteiro), titulo, link, int(privado))).lastrowid
+    return con.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, link_reuniao, privado, ical_uid, livre)"
+                       " values (?,?,?,?,?,?,?,?,?,?,?,?)", (fonte, ext, j.inicio_utc, j.fim_utc, j.dia_local, j.dia_fim_local, int(inteiro), titulo, link, int(privado), ical, int(livre))).lastrowid
 
 
 def test_evento_das_22h_aparece_no_dia_certo(con):
@@ -74,6 +74,36 @@ def test_mesmo_evento_em_duas_contas_aparece_uma_vez_no_resumo_e_nos_conflitos(c
     assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 1
     assert consulta.conflitos(con, "2026-10-12", "2026-10-12") == []
     assert "📅 *Agenda* (1)" in resumo_da_manha(con, AGORA)["linhas"]
+
+
+def test_mesmo_ical_uid_com_titulo_diferente_em_duas_contas_aparece_uma_vez(con):
+    f1, f2 = _fonte(con, "a@x.com"), _fonte(con, "b@x.com")
+    _ev(con, f1, "1", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Reunião IONIC", ical="uid-1@google.com")
+    _ev(con, f2, "9", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Alinhamento (ness)", ical="uid-1@google.com")
+    assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 1
+    assert consulta.conflitos(con, "2026-10-12", "2026-10-12") == []
+
+
+def test_instancias_da_mesma_serie_com_mesmo_ical_uid_nao_se_fundem(con):
+    f = _fonte(con)
+    _ev(con, f, "s_1", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Semanal", ical="serie@google.com")
+    _ev(con, f, "s_2", "2026-10-12T15:00:00-03:00", "2026-10-12T16:00:00-03:00", "Semanal", ical="serie@google.com")
+    assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 2
+
+
+def test_ical_uid_diferente_com_mesmo_titulo_e_hora_nao_funde(con):
+    f1, f2 = _fonte(con, "a@x.com"), _fonte(con, "b@x.com")
+    _ev(con, f1, "1", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Dentista", ical="u1")
+    _ev(con, f2, "2", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Dentista", ical="u2")
+    assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 2
+
+
+def test_evento_livre_nao_gera_conflito_mas_continua_na_agenda(con):
+    f = _fonte(con)
+    _ev(con, f, "a", "2026-10-12T10:00:00-03:00", "2026-10-12T11:00:00-03:00", "Reunião")
+    _ev(con, f, "b", "2026-10-12T10:30:00-03:00", "2026-10-12T11:30:00-03:00", "Lembrete (livre)", livre=True)
+    assert consulta.conflitos(con, "2026-10-12", "2026-10-12") == []
+    assert len(consulta.agenda_do_dia(con, "2026-10-12", BRT)) == 2
 
 
 def test_fonte_desligada_nao_aparece(con):

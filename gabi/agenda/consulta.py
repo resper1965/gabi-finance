@@ -46,12 +46,13 @@ def _normalizar(titulo) -> str:
 def _linhas(con, de: str, ate: str) -> list[dict]:
     """Eventos das fontes liberadas que tocam [de, ate] (datas locais), sem duplicados, por início."""
     brutas = con.execute(
-        "select e.id, e.inicio_utc, e.fim_utc, e.dia_local, e.dia_fim_local, e.dia_inteiro, e.titulo, e.link_reuniao, e.privado, f.conta as fonte "
+        "select e.id, e.inicio_utc, e.fim_utc, e.dia_local, e.dia_fim_local, e.dia_inteiro, e.titulo, e.link_reuniao, e.privado, e.ical_uid, e.livre, f.conta as fonte "
         "from agenda_evento e join agenda_fonte f on f.id=e.fonte_id "
         "where f.estado='sim' and e.dia_local<=? and e.dia_fim_local>=? order by e.inicio_utc, e.dia_inteiro desc, e.id", (ate, de)).fetchall()
     vistos, saida = set(), []
     for r in brutas:
-        chave = (r["inicio_utc"], r["fim_utc"], _normalizar(r["titulo"]))
+        # iCalUID (+ início, pois as instâncias de uma série dividem o uid) quando o Google o devolve; senão o título normalizado é a reserva
+        chave = ("uid", r["ical_uid"], r["inicio_utc"], r["fim_utc"]) if r["ical_uid"] else (r["inicio_utc"], r["fim_utc"], _normalizar(r["titulo"]))
         if chave in vistos:
             continue
         vistos.add(chave)
@@ -80,10 +81,10 @@ def agenda_do_dia(con, dia: str, fuso: str, *, painel: bool = False) -> list[dic
 
 
 def conflitos(con, de: str, ate: str, fuso: str | None = None) -> list[Conflito]:
-    """Pares que se sobrepõem por INSTANTE (dia inteiro nunca conflita; encostar não é conflito; duplicado não conflita consigo).
+    """Pares que se sobrepõem por INSTANTE (dia inteiro e evento livre nunca conflitam; encostar não é conflito; duplicado não conflita consigo).
     `sugestao_inicio` = quando os dois terminam (ISO local)."""
     fuso = fuso or fuso_da_agenda(con)
-    ev = [r for r in _linhas(con, de, ate) if not r["dia_inteiro"]]
+    ev = [r for r in _linhas(con, de, ate) if not r["dia_inteiro"] and not r["livre"]]  # "livre" (transparente no Google) não ocupa o horário
     jan = lambda r: tempo.Janela(r["inicio_utc"], r["fim_utc"], r["dia_local"], r["dia_fim_local"], False)  # noqa: E731
     achados = []
     for i, a in enumerate(ev):
