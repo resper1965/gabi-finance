@@ -4,7 +4,7 @@ import os
 
 from gabi.fontes.nibo_escrita import NiboEscrita
 from gabi.fontes.paperless import Paperless
-from gabi.fontes.ponte import Ponte, PonteAgenda, PonteEmail
+from gabi.fontes.ponte import Ponte, PonteAgenda, PonteEmail, PonteModelo
 
 
 def fontes_do_ambiente() -> dict:
@@ -14,6 +14,7 @@ def fontes_do_ambiente() -> dict:
         ok = lambda p: p if p.configurada() else None  # noqa: E731
         fontes = {n: (lambda n=n: ok(Ponte(caminho, n))) for n in ("nibo", "paperless", "google_contatos")}
         fontes["google_agenda"] = lambda: ok(PonteAgenda(caminho))  # validação da forma da resposta; só leitura
+        fontes["modelo"] = lambda: PonteModelo(caminho) if Ponte(caminho, "openrouter").configurada() else None  # reprocessar exames pela API
         fontes["google_email"] = lambda: ok(PonteEmail(caminho))  # leitura e lixeira; sem enviar nem apagar
         return fontes
     return {

@@ -134,3 +134,32 @@ def rodar(con, abrir_cofre, paperless, cliente, orcamento: Orcamento, agora: str
     for pid, estado, motivo, versao in gravar:
         _gravar_doc(con, pid, estado, motivo, agora, versao)
     return r
+
+
+def reprocessar_documentos(s, paperless, cliente, orcamento: Orcamento, ids: list[int], por: str) -> tuple[dict, dict[int, int]]:
+    """Relê cada documento no Paperless e extrai de novo (versão nova; a anterior fica). Documento que sumiu do Paperless ou que não dá para ler
+    é contado em `falhos` e os dados já extraídos continuam. -> ({documentos, versoes_novas, diferentes, falhos}, {paperless_id: versão atual});
+    quem chama grava a versão em `exame_doc` só depois que o cofre for salvo."""
+    r, versoes = {"documentos": 0, "versoes_novas": 0, "diferentes": 0, "falhos": 0}, {}
+    for pid in ids:
+        r["documentos"] += 1
+        s.con.execute("savepoint rep")
+        try:
+            achados = paperless.docs(id=pid)
+            doc = next((d for d in achados if d["id"] == pid), None)
+            laudo = extrair((doc or {}).get("content") or "", cliente, orcamento,
+                            paperless.baixar(pid) if doc and not (doc.get("content") or "").strip() and callable(getattr(cliente, "completar_pdf", None)) else None) if doc else None
+            if laudo is None or not laudo.marcadores:
+                raise LookupError("sem leitura")
+            antes = exames._versao_atual(s, pid)
+            res = exames.reprocessar(s, pid, laudo, por)
+            s.con.execute("release rep")
+        except Exception:  # noqa: BLE001 - o motivo não carrega texto do laudo
+            s.con.execute("rollback to rep")
+            s.con.execute("release rep")
+            r["falhos"] += 1
+            continue
+        r["versoes_novas"] += res["versao"] > antes
+        r["diferentes"] += res["diferentes"]
+        versoes[pid] = res["versao"]
+    return r, versoes

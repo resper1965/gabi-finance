@@ -5,10 +5,15 @@ from fastapi.testclient import TestClient
 from gabi.api import criar_app
 from gabi.db import conectar
 from gabi.familia.saude import abrir_saude
+from gabi.familia.exames import versoes
 from tests.rotas.test_dinheiro_api import AGORA, BOSS, VIP, banco, get, post  # noqa: F401  (fixtures)
 
 CHAVE = bytes(range(32))
 LAUDO = "Paciente: Ana   Data da coleta: 10/07/2026\nColesterol total ... 215 mg/dL Valor de referência: 0 a 200 mg/dL\nGlicose: 92 mg/dL\n"
+
+
+LAUDO2 = "Paciente: Ana   Data da coleta: 11/08/2026\nHemoglobina 13,5 g/dL\n"
+CONTEUDOS = {55: LAUDO, 56: LAUDO2}  # compartilhado entre instâncias: o teste troca o texto para simular um reprocessamento
 
 
 class PaperlessFalso:
@@ -17,7 +22,18 @@ class PaperlessFalso:
 
     def docs(self, **f):
         self.pedidos.append(f)
-        return [{"id": f["id"], "content": LAUDO, "created": "2026-07-11T10:00:00-03:00"}] if f.get("id") == 55 else []
+        return [{"id": f["id"], "content": CONTEUDOS[f["id"]], "created": "2026-07-11T10:00:00-03:00"}] if f.get("id") in CONTEUDOS else []
+
+    def baixar(self, id):
+        return b"%PDF"
+
+
+@pytest.fixture(autouse=True)
+def _conteudos():
+    antigo = dict(CONTEUDOS)
+    yield
+    CONTEUDOS.clear()
+    CONTEUDOS.update(antigo)
 
 
 @pytest.fixture
@@ -121,3 +137,102 @@ def test_edicoes_externas_listar_e_decidir(app, cli, banco):
     assert post(cli, "/api/v1/familia/edicoes/1/decidir", {"estado": "rejeitada"}).status_code == 200
     assert get(cli, "/api/v1/familia/edicoes").json()["dados"]["itens"] == []
     assert post(cli, "/api/v1/familia/edicoes/1/decidir", {"estado": "aprovada"}).status_code == 404
+
+
+def _estado(banco, pid):
+    c = conectar(banco)
+    try:
+        r = c.execute("select estado, versao from exame_doc where paperless_id=?", (pid,)).fetchone()
+        return tuple(r) if r else None
+    finally:
+        c.close()
+
+
+def test_lote_confirma_varios_documentos(app, cli, banco):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 56})
+    assert _estado(banco, 55) == ("extraido", 1)
+    r = post(cli, "/api/v1/familia/laudos/lote", {"itens": [{"paperless_id": 55, "pessoa_id": "p2"}, {"paperless_id": 56, "pessoa_id": "p2"}]})
+    assert r.status_code == 200 and r.json()["dados"] == {"confirmados": 2, "exames": 3}
+    assert {m["marcador"] for m in get(cli, "/api/v1/familia/exames/p2").json()["dados"]["marcadores"]} == {"Colesterol total", "Glicose", "Hemoglobina"}
+    assert _estado(banco, 55)[0] == "confirmado" and _estado(banco, 56)[0] == "confirmado"
+    assert get(cli, "/api/v1/familia/laudos").json()["dados"]["itens"] == []
+
+
+def test_lote_e_atomico(app, cli, banco):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    for itens in ([{"paperless_id": 55, "pessoa_id": "p2"}, {"paperless_id": 999, "pessoa_id": "p2"}],   # sem propostas
+                  [{"paperless_id": 55, "pessoa_id": "p2"}, {"paperless_id": 56, "pessoa_id": "naoexiste"}],  # pessoa desconhecida
+                  [{"paperless_id": 55, "pessoa_id": "p2"}, {"paperless_id": 55, "pessoa_id": "p2"}], []):
+        assert post(cli, "/api/v1/familia/laudos/lote", {"itens": itens}).status_code == 400
+    assert get(cli, "/api/v1/familia/exames/p2").json()["dados"]["marcadores"] == []
+    assert [l["paperless_id"] for l in get(cli, "/api/v1/familia/laudos").json()["dados"]["itens"]] == [55]
+    assert _estado(banco, 55) == ("extraido", 1)
+
+
+def test_reprocessar_por_filtro_e_por_documento(app, cli, banco):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    assert post(cli, "/api/v1/familia/exames/reprocessar", {}).status_code == 400
+    r = post(cli, "/api/v1/familia/exames/reprocessar", {"pessoa_id": "p2"}).json()["dados"]
+    assert r == {"documentos": 1, "versoes_novas": 0, "diferentes": 0, "falhos": 0, "restantes": 0}  # nada mudou: nenhuma versão nova
+    CONTEUDOS[55] = LAUDO.replace("215", "180")
+    r = post(cli, "/api/v1/familia/exames/reprocessar", {"pessoa_id": "p2"}).json()["dados"]
+    assert (r["versoes_novas"], r["diferentes"], r["falhos"]) == (1, 1, 0)
+    assert [p["valor"] for p in get(cli, "/api/v1/familia/exames/p2/serie?marcador=Colesterol total").json()["dados"]["pontos"]] == ["180"]
+    assert _estado(banco, 55) == ("confirmado", 2)
+    d = get(cli, "/api/v1/familia/exames/p2/laudos/55/versoes").json()["dados"]
+    assert [v["versao"] for v in d["versoes"]] == [1, 2] and d["diferencas"][0]["antes"] == "215" and d["diferencas"][0]["depois"] == "180"
+    assert post(cli, "/api/v1/familia/exames/reprocessar", {"paperless_id": 55}).json()["dados"]["documentos"] == 1
+    assert post(cli, "/api/v1/familia/exames/reprocessar", {"todos": True}).json()["dados"]["documentos"] == 1
+
+
+def test_reprocessar_documento_que_sumiu_do_paperless_conta_falho_e_mantem_os_dados(app, cli):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    del CONTEUDOS[55]
+    r = post(cli, "/api/v1/familia/exames/reprocessar", {"paperless_id": 55}).json()["dados"]
+    assert r["falhos"] == 1 and r["versoes_novas"] == 0
+    assert len(get(cli, "/api/v1/familia/exames/p2").json()["dados"]["marcadores"]) == 2
+
+
+def test_apelidos_e_reaplicar(app, cli):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    r = cli.put("/api/v1/familia/marcadores/apelidos", json={"apelido": "Glicose", "marcador": "Glicemia"}, headers=BOSS)
+    assert r.status_code == 200 and r.json()["dados"]["itens"] == [{"apelido": "glicose", "marcador": "Glicemia"}]
+    assert cli.put("/api/v1/familia/marcadores/apelidos", json={"apelido": "", "marcador": "x"}, headers=BOSS).status_code == 400
+    assert post(cli, "/api/v1/familia/marcadores/reaplicar", {}).json()["dados"]["alterados"] == 2  # a linha do exame e a da proposta confirmada
+    assert {m["marcador"] for m in get(cli, "/api/v1/familia/exames/p2").json()["dados"]["marcadores"]} == {"Colesterol total", "Glicemia"}
+    assert get(cli, "/api/v1/familia/marcadores/apelidos").json()["dados"]["itens"][0]["marcador"] == "Glicemia"
+
+
+def test_parcial_recebe_403_nas_rotas_de_gestao(app, cli):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    for metodo, caminho, corpo in (("get", "/api/v1/familia/laudos", None), ("post", "/api/v1/familia/laudos/lote", {"itens": []}),
+                                   ("post", "/api/v1/familia/exames/reprocessar", {"todos": True}), ("get", "/api/v1/familia/marcadores/apelidos", None),
+                                   ("put", "/api/v1/familia/marcadores/apelidos", {"apelido": "a", "marcador": "b"}), ("post", "/api/v1/familia/marcadores/reaplicar", {}),
+                                   ("get", "/api/v1/familia/exames/p2/laudos/55/versoes", None), ("get", "/api/v1/familia/laudos/contagem", None)):
+        r = getattr(cli, metodo)(caminho, headers=VIP, **({"json": corpo} if corpo is not None else {}))
+        assert r.status_code == 403, caminho
+
+
+def test_contagem_nao_vaza_marcador_nem_nome(app, cli):
+    assert get(cli, "/api/v1/familia/laudos/contagem").json()["dados"] == {"a_confirmar": 0}
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    r = get(cli, "/api/v1/familia/laudos/contagem")
+    assert r.json()["dados"] == {"a_confirmar": 1}
+    for proibido in ("Colesterol", "Glicose", "215", "Ana", "p2"):
+        assert proibido not in r.text
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    assert get(cli, "/api/v1/familia/laudos/contagem").json()["dados"] == {"a_confirmar": 0}
+
+
+def test_rejeitar_marca_o_documento_descartado_e_documento_falho_aparece_com_motivo(app, cli, banco):
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/rejeitar", {})
+    assert _estado(banco, 55)[0] == "descartado"
+    c = conectar(banco)
+    c.execute("insert into exame_doc(paperless_id, estado, motivo, atualizado_em) values (77, 'falhou', 'sem texto legível', 'x')")
+    c.close()
+    assert get(cli, "/api/v1/familia/laudos").json()["dados"]["falhos"] == [{"paperless_id": 77, "motivo": "sem texto legível"}]

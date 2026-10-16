@@ -200,3 +200,8 @@ def test_exame_doc_estado_invalido_rejeitado(con):
     con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (1, 'novo', 'x')")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (2, 'qualquer', 'x')")
+
+
+def test_exame_doc_aceita_descartado_e_a_0032_mantem_as_colunas(con):
+    assert [r[1] for r in con.execute("pragma table_info(exame_doc)")] == ["paperless_id", "estado", "versao", "motivo", "atualizado_em"]
+    con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (3, 'descartado', 'x')")

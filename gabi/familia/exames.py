@@ -109,6 +109,50 @@ def confirmar_laudo(s: Cofre, paperless_id: int, pessoa_id: str, por: str) -> in
     return len(ps)
 
 
+def confirmar_lote(s: Cofre, itens: list[dict], por: str) -> dict:
+    """Confirma vários laudos de uma vez (`itens = [{paperless_id, pessoa_id}]`): todos ou nenhum. Qualquer item inválido levanta ValueError e nada entra."""
+    if not por or not por.strip():
+        raise ValueError("informe quem confirmou")
+    if not itens:
+        raise ValueError("nenhum laudo para confirmar")
+    vistos = set()
+    for i in itens:
+        pid, pessoa = i.get("paperless_id") if isinstance(i, dict) else None, i.get("pessoa_id") if isinstance(i, dict) else None
+        if not isinstance(pid, int) or isinstance(pid, bool) or not isinstance(pessoa, str) or not pessoa.strip():
+            raise ValueError("cada item precisa de paperless_id e pessoa_id")
+        if pid in vistos:
+            raise ValueError(f"documento {pid} repetido no lote")
+        vistos.add(pid)
+    s.con.execute("savepoint lote")
+    try:
+        exames = 0
+        for i in itens:
+            n = confirmar_laudo(s, i["paperless_id"], i["pessoa_id"], por)
+            if not n:
+                raise ValueError(f"documento {i['paperless_id']} não tem propostas a confirmar")
+            exames += n
+    except BaseException:
+        s.con.execute("rollback to lote")
+        s.con.execute("release lote")
+        raise
+    s.con.execute("release lote")
+    return {"confirmados": len(itens), "exames": exames}
+
+
+def documentos_do_filtro(s: Cofre, pessoa_id: str | None = None, laboratorio: str | None = None, de: str | None = None, ate: str | None = None) -> list[int]:
+    """Documentos já no histórico (de uma pessoa, laboratório, período) para reprocessar."""
+    onde, args = ["paperless_id is not null"], []
+    for coluna, valor, op in (("pessoa_id", pessoa_id, "="), ("laboratorio", laboratorio, "="), ("em", de, ">="), ("em", ate, "<=")):
+        if valor:
+            onde.append(f"{coluna} {op} ?")
+            args.append(valor)
+    return [r[0] for r in s.con.execute(f"select distinct paperless_id from exame where {' and '.join(onde)} order by paperless_id", args)]
+
+
+def todos_os_documentos(s: Cofre) -> list[int]:
+    return [r[0] for r in s.con.execute("select paperless_id from exame where paperless_id is not null union select paperless_id from proposta_exame order by 1")]
+
+
 def reprocessar(s: Cofre, paperless_id: int, laudo: 'Laudo', por: str) -> dict:
     """Extração nova do mesmo documento = versão nova; a anterior fica. Se o dono já estava confirmado, a versão nova entra como exame com o mesmo dono.
     Resultado idêntico ao da versão atual não cria versão (rodar duas vezes seguidas não duplica). Devolve {versao, novos, iguais, diferentes}."""

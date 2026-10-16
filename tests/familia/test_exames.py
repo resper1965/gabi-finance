@@ -4,11 +4,14 @@ import pytest
 
 from gabi.dinheiro.modelo import Orcamento
 from gabi.familia import marcadores as apelidos
-from gabi.familia.exames import (confirmar_laudo, diferencas, extrair_marcadores, laudos_pendentes, propor_exames, rejeitar_laudo, reprocessar, versoes)
+from gabi.familia.exames import (confirmar_laudo, confirmar_lote, diferencas, documentos_do_filtro, todos_os_documentos, extrair_marcadores, laudos_pendentes, propor_exames, rejeitar_laudo, reprocessar, versoes)
 from gabi.familia.extrair import Laudo, extrair
 from gabi.familia.saude import abrir_saude, marcadores, resumo_para_consulta, serie
 
 CHAVE = bytes(range(32))
+
+
+TABELA_OUTRO = "Paciente: Zé\nData da coleta: 01/02/2026\nHemoglobina 13,5 g/dL\n"
 
 
 def _laudo(texto=None, **mudar):
@@ -138,3 +141,23 @@ def test_qualitativo_fica_fora_da_serie(tmp_path):
         confirmar_laudo(s, 70, "p1", "boss@x.com")
         assert serie(s, "p1", "HIV", "boss@x.com") == []
         assert [(m["valor"], m["qualitativo"], m["fora_da_faixa"]) for m in marcadores(s, "p1", "boss@x.com")] == [("Não reagente", True, False)]
+
+
+def test_confirmar_lote_e_atomico_no_cofre(tmp_path):
+    with abrir_saude(tmp_path / "s.enc", CHAVE) as s:
+        propor_exames(s, 55, _laudo(), "p2")
+        with pytest.raises(ValueError):
+            confirmar_lote(s, [{"paperless_id": 55, "pessoa_id": "p2"}, {"paperless_id": 99, "pessoa_id": "p2"}], "boss@x.com")
+        assert s.con.execute("select count(*) from exame").fetchone()[0] == 0
+        assert s.con.execute("select count(*) from proposta_exame where estado='proposta'").fetchone()[0] == 3
+        assert confirmar_lote(s, [{"paperless_id": 55, "pessoa_id": "p2"}], "boss@x.com") == {"confirmados": 1, "exames": 3}
+
+
+def test_documentos_do_filtro(tmp_path):
+    with abrir_saude(tmp_path / "s.enc", CHAVE) as s:
+        propor_exames(s, 55, _laudo(), "p2")
+        propor_exames(s, 56, _laudo(TABELA_OUTRO), "p3")
+        confirmar_laudo(s, 55, "p2", "boss@x.com")
+        confirmar_laudo(s, 56, "p3", "boss@x.com")
+        assert documentos_do_filtro(s, "p2") == [55] and documentos_do_filtro(s, "p3", de="2026-01-01", ate="2026-12-31") == [56]
+        assert documentos_do_filtro(s, "p2", de="2027-01-01") == [] and todos_os_documentos(s) == [55, 56]
