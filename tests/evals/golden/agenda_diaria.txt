@@ -1,5 +1,6 @@
 💰 *Financeiro*
 Saldo: R$ 26.800,00
+Por banco: C6 BANK R$ 25.000,00 · itau R$ 1.800,00
 • ⚠️ Atrasadas: 1 (R$ 3.200,00)
 • Hoje: Condominio R$ 1.180,50
 • ⚠️ A receber atrasado: Cliente Exemplo Ltda ~R$ 10.208,00 (costuma cair até o dia 8)

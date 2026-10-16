@@ -3,8 +3,7 @@ import { Bloco } from "../../componentes/Bloco";
 import { Painel } from "../../componentes/Painel";
 import { useCelular } from "../../componentes/Shell";
 import { Valor } from "../../componentes/Valor";
-import { Sankey, corDestino, type Fluxo, type No } from "../../graficos/Sankey";
-import { Treemap } from "../../graficos/Treemap";
+import { corDestino, type Fluxo, type No } from "../../graficos/Sankey";
 import { useFiltros } from "../../lib/filtros";
 import { dataCurta, num } from "../../lib/formato";
 import { useApi } from "../../lib/useApi";
@@ -14,8 +13,8 @@ interface Destino {
   comparacao: { categoria: string; atual: string; anterior: string; variacao: string }[];
 }
 interface Agrupado { itens: { nome: string; valor: string; pct: number; variacao: string }[]; total: string }
-type Vista = "sankey" | "treemap" | "fornecedor" | "pessoa";
-const ROTULO: Record<Vista, string> = { sankey: "Sankey", treemap: "Treemap", fornecedor: "Fornecedores", pessoa: "Por pessoa" };
+type Vista = "categoria" | "fornecedor" | "pessoa";
+const ROTULO: Record<Vista, string> = { categoria: "Categorias", fornecedor: "Fornecedores", pessoa: "Por pessoa" };
 const MES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const ROTULO_PERIODO: Record<string, string> = { semana: "Últimos 7 dias", "12m": "Últimos 12 meses" };
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
@@ -23,10 +22,10 @@ const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%
 export function ParaOndeVai() {
   const { periodo } = useFiltros();
   const celular = useCelular();
-  const [vista, setVista] = useState<Vista>(celular ? "fornecedor" : "sankey");
+  const [vista, setVista] = useState<Vista>("categoria");
   const [escolhido, setEscolhido] = useState<{ nome: string; tipo: string } | null>(null);
   const destino = useApi<Destino>(`/api/v1/destino?periodo=${periodo}`);
-  const agrupado = useApi<Agrupado>(vista === "sankey" || vista === "treemap" ? null : `/api/v1/destino/agrupado?periodo=${periodo}&por=${vista}`);
+  const agrupado = useApi<Agrupado>(`/api/v1/destino/agrupado?periodo=${periodo}&por=${vista}`);
   const categorias = useApi<{ itens: { id: number; nome: string }[] }>("/api/v1/cadastros/categorias").env?.dados.itens ?? [];
   const empresas = useApi<{ itens: { id: string | number; nome: string }[] }>("/api/v1/cadastros/empresas").env?.dados.itens ?? [];
   const pessoas = useApi<{ itens: { id: string | number; nome: string }[] }>("/api/v1/cadastros/pessoas").env?.dados.itens ?? [];
@@ -84,19 +83,11 @@ export function ParaOndeVai() {
               ))}
             </div>
             <Bloco>
-              {vista === "sankey" && <>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 12, color: "var(--ink2)" }}><span>origem → categoria → destino final</span><span>toque num nó ou num fluxo para ver os lançamentos</span></div>
-                <Sankey nos={d.nos} fluxos={d.fluxos} escolhido={escolhido?.nome} aoEscolher={(n) => setEscolhido({ nome: n.nome, tipo: n.tipo })} />
-              </>}
-              {vista === "treemap" && <>
-                <span style={{ fontSize: 12, color: "var(--ink2)" }}>área = quanto saiu</span>
-                <Treemap itens={d.comparacao.map((c) => ({ nome: c.categoria, valor: c.atual }))} aoEscolher={(nome) => setEscolhido({ nome, tipo: "categoria" })} />
-              </>}
-              {vista === "fornecedor" && agrupado.env && <>
-                <span style={{ fontSize: 12, color: "var(--ink2)" }}>maiores fornecedores do período</span>
+              {(vista === "fornecedor" || vista === "categoria") && agrupado.env && <>
+                <span style={{ fontSize: 12, color: "var(--ink2)" }}>{vista === "categoria" ? "para onde foi o dinheiro, por categoria" : "maiores fornecedores do período"} · toque para ver os lançamentos</span>
                 <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}>
                   {agrupado.env.dados.itens.map((r, i) => (
-                    <li key={r.nome} onClick={() => setEscolhido({ nome: r.nome, tipo: "texto" })} style={{ display: "grid", gridTemplateColumns: "22px minmax(0,1fr) auto", gap: "2px 10px", padding: "9px 0", borderTop: "1px solid var(--line2)", alignItems: "center", cursor: "pointer" }}>
+                    <li key={r.nome} onClick={() => setEscolhido({ nome: r.nome, tipo: vista === "categoria" ? "categoria" : "texto" })} style={{ display: "grid", gridTemplateColumns: "22px minmax(0,1fr) auto", gap: "2px 10px", padding: "9px 0", borderTop: "1px solid var(--line2)", alignItems: "center", cursor: "pointer" }}>
                       <span style={{ font: "500 11px var(--mono)", color: "var(--ink2)" }}>{i + 1}</span>
                       <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                         <span style={{ fontWeight: 600 }}>{r.nome}</span>

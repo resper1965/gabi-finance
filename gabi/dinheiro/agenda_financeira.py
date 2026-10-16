@@ -50,14 +50,16 @@ def _linha_saldo(caixa, agora: dt.datetime) -> str:
 
 
 def _contas_negativas(caixa) -> list[str]:
-    """Conta liberada com saldo abaixo de zero, mesmo que o caixa total esteja positivo; a mais funda primeiro, com onde há saldo para cobrir."""
-    negativas = sorted((c for c in caixa.contas if c["saldo_centavos"] < 0), key=lambda c: c["saldo_centavos"])
-    if not negativas:
+    """Saldo por banco, sempre separado (o caixa total pode estar positivo com uma conta negativa): a conta negativa vira aviso em linha própria
+    e a lista "Por banco" traz todas, da maior para a menor, com ⚠️ nas negativas."""
+    if not caixa.contas:
         return []
-    linhas = ["⚠️ Saldo negativo: " + "; ".join(f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in negativas)]
-    com_saldo = sorted((c for c in caixa.contas if c["saldo_centavos"] > 0), key=lambda c: -c["saldo_centavos"])
-    if com_saldo:
-        linhas.append("Cobre com saldo em: " + "; ".join(f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in com_saldo))
+    ordem = sorted(caixa.contas, key=lambda c: -c["saldo_centavos"])
+    linhas = []
+    negativas = [c for c in reversed(ordem) if c["saldo_centavos"] < 0]  # a mais funda primeiro
+    if negativas:
+        linhas.append("⚠️ Saldo negativo: " + "; ".join(f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in negativas))
+    linhas.append("Por banco: " + " · ".join(("⚠️ " if c["saldo_centavos"] < 0 else "") + f"{c['apelido']} {_brl(c['saldo_centavos'])}" for c in ordem))
     return linhas
 
 

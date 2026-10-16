@@ -1,5 +1,6 @@
 💰 *Financeiro: próximos 30 dias*
 Saldo: R$ 26.800,00
+Por banco: C6 BANK R$ 25.000,00 · itau R$ 1.800,00
 • 20/10–25/10: sai R$ 4.643,50, menor saldo R$ 22.156,50
 • 26/10–01/11: sai R$ 4.500,00, menor saldo R$ 17.656,50
 • 02/11–08/11: sai R$ 9.000,00, menor saldo R$ 8.656,50

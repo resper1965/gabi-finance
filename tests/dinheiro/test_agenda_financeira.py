@@ -130,7 +130,7 @@ def test_conta_negativa_vira_aviso_mesmo_com_caixa_total_positivo(con):
 
 def test_conta_negativa_diz_onde_ha_saldo_para_cobrir(con):
     conta_bank(con, "Santander", -73707)
-    assert "Cobre com saldo em: Itaú R$ 10.000,00" in texto(con)
+    assert "Por banco: Itaú R$ 10.000,00 · ⚠️ Santander -R$ 737,07" in texto(con)
 
 
 def test_varias_contas_negativas_somam_e_listam_a_mais_funda_primeiro(con):
@@ -218,3 +218,15 @@ def test_semanal_traz_cenario_com_recorrentes_esperadas(con):
 
 def test_semanal_sem_recorrentes_nao_ganha_o_segundo_cenario(con):
     assert "Com recorrentes esperadas" not in texto(con, dias=30, semanal=True)
+
+
+def test_saldo_por_banco_aparece_separado_mesmo_sem_conta_negativa(con):
+    conta_bank(con, "Bradesco", 18875)
+    t = texto(con)
+    assert "Por banco: Itaú R$ 10.000,00 · Bradesco R$ 188,75" in t and "⚠️" not in t.split("Por banco:")[1].splitlines()[0]
+    assert "Saldo negativo" not in t
+
+
+def test_saldo_por_banco_tambem_na_semanal(con):
+    conta_bank(con, "Santander", -73707)
+    assert "Por banco: Itaú R$ 10.000,00 · ⚠️ Santander -R$ 737,07" in texto(con, dias=30, semanal=True)

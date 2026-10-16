@@ -63,19 +63,23 @@ test("Regras chave liga desliga chama PATCH", async () => {
   expect(chamadas.find((c) => c.metodo === "PATCH")!.url).toBe("/api/v1/regras/1");
 });
 
-test("ParaOndeVai celular abre em Fornecedores", async () => {
+test("ParaOndeVai abre em Categorias, em lista simples, e não oferece mais Sankey nem Treemap", async () => {
+  celular(false);
+  apiFalsa();
+  montar(<ParaOndeVai />);
+  expect(await screen.findByRole("button", { name: "Categorias" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByRole("button", { name: "Sankey" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Treemap" })).toBeNull();
+  expect(await screen.findByText(/para onde foi o dinheiro, por categoria/)).toBeInTheDocument();
+});
+
+test("ParaOndeVai no celular também abre em Categorias e troca para Fornecedores", async () => {
   celular(true);
   apiFalsa();
   montar(<ParaOndeVai />);
-  const aba = await screen.findByRole("button", { name: "Fornecedores" });
-  expect(aba).toHaveAttribute("aria-pressed", "true");
-  expect(await screen.findByText("maiores fornecedores do período")).toBeInTheDocument();
-});
-
-test("ParaOndeVai desktop abre em Sankey", async () => {
-  apiFalsa();
-  montar(<ParaOndeVai />);
-  expect(await screen.findByRole("button", { name: "Sankey" })).toHaveAttribute("aria-pressed", "true");
+  expect(await screen.findByRole("button", { name: "Categorias" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Fornecedores" }));
+  expect(await screen.findByText(/maiores fornecedores do período/)).toBeInTheDocument();
 });
 
 test("Resumo mostra os 5 instrumentos e a atencao leva a tela certa", async () => {
@@ -191,4 +195,16 @@ test("Assinaturas mostra 'parou de cobrar' nas inativas e conta so as ativas", a
   expect(await screen.findByText("SAAS ANTIGO")).toBeTruthy();
   expect(screen.getAllByText("parou de cobrar")).toHaveLength(1);
   expect(screen.getByText("1 assinaturas ativas")).toBeTruthy();
+});
+
+test("Resumo mostra o saldo de cada banco separado e destaca a conta negativa", async () => {
+  celular(false);
+  const base = amostra("caixa-resumo");
+  base.dados.detalhe.saldo_por_conta = [{ apelido: "C6 BANK", saldo: "25000.00" }, { apelido: "Santander", saldo: "-737.07" }];
+  apiFalsa({ "caixa-resumo": base });
+  montar(<Resumo />);
+  const bloco = (await screen.findByText("Saldo por banco")).closest("section")!;
+  expect(within(bloco).getByText("C6 BANK")).toBeInTheDocument();
+  expect(within(bloco).getByText("Santander")).toBeInTheDocument();
+  expect(within(bloco).getAllByText("negativo")).toHaveLength(1);
 });

@@ -57,6 +57,15 @@ export function Resumo() {
               <Kpi rotulo="Fatura aberta · cartões" nota={`${plural(det.cartoes_abertos, "cartão", "cartões")}${det.proxima_fatura ? ` · a próxima vence em ${dataCurta(det.proxima_fatura)}` : ""}`} aoClicar={() => ir("gastos", "cartao")}><Valor valor={d.kpis.faturas_abertas} /></Kpi>
               <Kpi rotulo="Assinaturas por mês" nota={`${plural(det.assinaturas_ativas, "ativa", "ativas")} · ${det.assinaturas_a_conferir} a conferir`} aoClicar={() => ir("gastos", "assin")}><Valor valor={d.kpis.assinaturas_mes} /></Kpi>
             </GradeKpi>
+            <Bloco titulo="Saldo por banco" nota="cada conta liberada, separada: o total pode esconder uma conta negativa">
+              {[...det.saldo_por_conta].sort((a, b) => num(b.saldo) - num(a.saldo)).map((c, i) => (
+                <div key={`${c.apelido}-${i}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", gap: 10, padding: "9px 0", borderTop: "1px solid var(--line2)", alignItems: "baseline" }}>
+                  <span style={{ fontWeight: 600 }}>{c.apelido}</span>
+                  <span>{num(c.saldo) < 0 && <Etiqueta tipo="erro" texto="negativo" />}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, color: num(c.saldo) < 0 ? "var(--danger)" : undefined }}><Valor valor={c.saldo} /></span>
+                </div>
+              ))}
+            </Bloco>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,420px),1fr))", gap: 22, alignItems: "start" }}>
               <Bloco titulo="Saldo do caixa único" nota={`${d.serie_saldo.filter((p) => !p.projecao).length} dias realizados · ${proj.length} projetados`}>
                 <LinhaSaldo pontos={d.serie_saldo} oculto={oculto} />
