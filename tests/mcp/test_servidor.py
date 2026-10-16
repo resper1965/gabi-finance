@@ -21,7 +21,8 @@ NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "p
                "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar", "pessoas_dado"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens"}  # só leitura do Trabalho
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+NOVAS_REEMBOLSO_SAUDE = {"reembolso_saude_pendentes", "reembolso_saude_segunda", "reembolso_saude_dossie", "reembolso_saude_pedi", "reembolso_saude_recebi"}  # leitura da projeção + intenção "pedi/recebi"
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_REEMBOLSO_SAUDE  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
 
 @pytest.fixture

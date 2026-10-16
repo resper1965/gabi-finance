@@ -38,6 +38,11 @@ mcp_servers:
       - hoje_resumo
       - pedidos_estado
       - pedidos_registrar
+      - reembolso_saude_dossie
+      - reembolso_saude_pedi
+      - reembolso_saude_pendentes
+      - reembolso_saude_recebi
+      - reembolso_saude_segunda
       - reembolsos_listar
       - reembolsos_preparar_email
       - regras_sugerir

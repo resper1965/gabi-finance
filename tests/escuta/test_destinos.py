@@ -283,3 +283,20 @@ def test_comprovante_envia_com_etiqueta_propria(con, d, srv, tmp_path):
     arq.write_bytes(b"%PDF-pix")
     d.comprovante(con, _msg(anexo=arq))
     assert b"%PDF-pix" in srv.enviados[0][0] and "gabi:comprovante" in srv.tags and "gabi:entrada-whatsapp" not in srv.tags
+
+
+def test_saude_de_reembolso_vai_com_a_etiqueta_do_reembolso(con, d, srv, tmp_path):
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "nf.pdf"
+    arq.write_bytes(b"%PDF-nf")
+    d.saude(con, _msg("nota da consulta", arq), {"documento": "Nota Fiscal", "caso": "consulta", "paciente": "Bia"})
+    assert "gabi:saude-reembolso" in srv.tags and "gabi:saude-exame" not in srv.tags
+    assert [t for t, vs in _tudo(con) if any("Bia" in v for v in vs)] == []  # o campo do paciente nunca vai ao banco
+
+
+def test_saude_sem_sinal_de_reembolso_continua_exame(con, d, srv, tmp_path):
+    (tmp_path / "anexos").mkdir(exist_ok=True)
+    arq = tmp_path / "anexos" / "e.pdf"
+    arq.write_bytes(b"%PDF-e")
+    d.saude(con, _msg("resultado", arq), {"documento": "resultado de exame", "paciente": "Bia"})
+    assert "gabi:saude-exame" in srv.tags and "gabi:saude-reembolso" not in srv.tags

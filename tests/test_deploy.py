@@ -523,3 +523,23 @@ def test_unidades_exames_seguem_o_padrao():
 def test_instalar_nao_liga_o_timer_dos_exames():
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert ligadas and all("gabi-brain-exames" not in l for l in ligadas)
+
+
+# ---------------- reembolso de saúde: serviço e timer (instalados, NÃO habilitados) ----------------
+def test_unidades_reembolso_saude_seguem_o_padrao():
+    srv, t = _ler("gabi-brain-reembolso-saude.service"), _ler("gabi-brain-reembolso-saude.timer")
+    assert "-m gabi.reembolso_saude" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv  # a chave é arquivo próprio, não variável de ambiente
+    assert "OnUnitActiveSec=15min" in t and "Unit=gabi-brain-reembolso-saude.service" in t
+    assert hasattr(importlib.import_module("gabi.reembolso_saude.__main__"), "main")
+    for nome in ("gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer"):
+        assert nome in INSTALAR
+
+
+def test_instalar_nao_liga_o_timer_do_reembolso_de_saude():
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and all("gabi-brain-reembolso-saude" not in l for l in ligadas)

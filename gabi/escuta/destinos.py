@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from gabi.cobrar import pedidos
 from gabi.escuta import spool_seguro
 from gabi.fontes.paperless import Paperless
+from gabi.reembolso_saude.tipos import ETIQUETA_ENTRADA as TAG_REEMBOLSO, e_de_reembolso
 
 
 class Destinos(Protocol):
@@ -111,9 +112,10 @@ class DestinosReais:
             pix_chave=pix, linha_digitavel=linha, para_quem=None, enviar_ao_paperless=enviar)
 
     def saude(self, con, msg: dict, campos: dict) -> None:
-        """Nunca grava texto nem campos no gabi.db. Com anexo: Paperless. Sem anexo: só um aviso para abrir a conversa."""
+        """Nunca grava texto nem campos no gabi.db. Com anexo: Paperless (documento de reembolso do plano, `gabi:saude-reembolso`; o resto, `gabi:saude-exame`;
+        o brain classifica o reembolso depois, pelo texto do documento). Sem anexo: só um aviso para abrir a conversa."""
         if msg.get("anexo_caminho"):
-            self._enviar_anexo(msg, TAG_SAUDE)
+            self._enviar_anexo(msg, TAG_REEMBOLSO if e_de_reembolso(campos) else TAG_SAUDE)
             return
         numero = msg["de"]
         con.execute("insert into aviso(tipo, payload, criado_em) values ('escuta_saude', ?, ?)",

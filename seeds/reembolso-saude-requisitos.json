@@ -1,0 +1,11 @@
+{
+  "operadora": "SulAmérica",
+  "operadora_extrato": "SULAMERICA",
+  "dias_guarda_nao_reembolsavel": 90,
+  "dias_sem_credito": 30,
+  "consulta_exige": ["nf"],
+  "tratamento_exige": ["nf", "autorizacao"],
+  "todos": ["comprovante", "paciente", "data", "valor", "prestador", "doc_prestador", "conselho", "especialidade"],
+  "tratamento": ["pedido_medico", "relatorio"],
+  "rotulos": {"doc_prestador": "CPF/CNPJ do profissional", "conselho": "CRM/CRP", "nf": "nota fiscal", "autorizacao": "aprovação da operadora"}
+}

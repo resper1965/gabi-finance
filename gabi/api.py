@@ -183,6 +183,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_trabalho)
     from gabi.rotas.familia import router as rotas_familia
     app.include_router(rotas_familia)
+    from gabi.rotas.reembolso_saude import router as rotas_reembolso_saude
+    app.include_router(rotas_reembolso_saude)
     from gabi.rotas.setup import router as rotas_setup
     app.include_router(rotas_setup)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")

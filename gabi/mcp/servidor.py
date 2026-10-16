@@ -21,7 +21,7 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, cobranca_atr
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_dec, ferramentas_prop, ferramentas_trab
+from gabi.mcp import ferramentas_dec, ferramentas_prop, ferramentas_reembolso, ferramentas_trab
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
@@ -31,7 +31,7 @@ MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "cobranca_rascunho": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
-                       **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS, **ferramentas_dec.ESCOPOS}
+                       **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_reembolso.ESCOPOS}
 
 
 def _reais(v, chave: str = ""):
@@ -231,6 +231,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     ferramentas_prop.registrar(srv, executar, paperless)
     ferramentas_trab.registrar(srv, executar)
     ferramentas_dec.registrar(srv, executar)
+    ferramentas_reembolso.registrar(srv, executar)
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada

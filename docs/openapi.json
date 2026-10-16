@@ -2616,6 +2616,23 @@
     "summary": "Decidir Edicao"
    }
   },
+  "/api/v1/familia/exames/reprocessar": {
+   "post": {
+    "description": "Relê no Paperless e extrai de novo (versão nova; a anterior fica). Corpo: {paperless_id} ou {pessoa_id, laboratorio?, de?, ate?} ou {todos: true}.\nAté 30 documentos por chamada; o que sobrar vem em `restantes`. Devolve só contagens.",
+    "operationId": "reprocessar_api_v1_familia_exames_reprocessar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Reprocessar"
+   }
+  },
   "/api/v1/familia/exames/{pessoa_id}": {
    "get": {
     "description": "Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde.",
@@ -2652,6 +2669,53 @@
      }
     },
     "summary": "Lista"
+   }
+  },
+  "/api/v1/familia/exames/{pessoa_id}/laudos/{paperless_id}/versoes": {
+   "get": {
+    "description": "Versões da extração de um documento (para comparar a atual com a anterior).",
+    "operationId": "versoes_do_laudo_api_v1_familia_exames__pessoa_id__laudos__paperless_id__versoes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pessoa_id",
+      "required": true,
+      "schema": {
+       "title": "Pessoa Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "paperless_id",
+      "required": true,
+      "schema": {
+       "title": "Paperless Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Versoes Do Laudo"
    }
   },
   "/api/v1/familia/exames/{pessoa_id}/resumo": {
@@ -2741,7 +2805,7 @@
   },
   "/api/v1/familia/laudos": {
    "get": {
-    "description": "Laudos lidos do Paperless esperando a confirmação de quem é o laudo (só boss).",
+    "description": "Laudos lidos do Paperless esperando a confirmação de quem é o laudo, e os documentos que falharam com o motivo (só boss).",
     "operationId": "laudos_api_v1_familia_laudos_get",
     "responses": {
      "200": {
@@ -2769,6 +2833,40 @@
      }
     },
     "summary": "Ler Laudo"
+   }
+  },
+  "/api/v1/familia/laudos/contagem": {
+   "get": {
+    "description": "Quantos documentos esperam a confirmação do dono. É o ÚNICO dado de exame fora da tela de saúde: só a contagem, lida do `gabi.db` (sem chave, sem valor, sem nome).",
+    "operationId": "contagem_api_v1_familia_laudos_contagem_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Contagem"
+   }
+  },
+  "/api/v1/familia/laudos/lote": {
+   "post": {
+    "description": "Confirma o dono de vários laudos de uma vez (`itens: [{paperless_id, pessoa_id}]`): todos ou nenhum.",
+    "operationId": "confirmar_em_lote_api_v1_familia_laudos_lote_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Confirmar Em Lote"
    }
   },
   "/api/v1/familia/laudos/{paperless_id}/confirmar": {
@@ -2845,6 +2943,55 @@
      }
     },
     "summary": "Rejeitar"
+   }
+  },
+  "/api/v1/familia/marcadores/apelidos": {
+   "get": {
+    "description": "Apelidos de marcador definidos e sugestões de grafias parecidas para juntar.",
+    "operationId": "listar_apelidos_api_v1_familia_marcadores_apelidos_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar Apelidos"
+   },
+   "put": {
+    "description": "Define um apelido (`{apelido, marcador}`); vale para as próximas extrações e para `reaplicar`.",
+    "operationId": "definir_apelido_api_v1_familia_marcadores_apelidos_put",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Definir Apelido"
+   }
+  },
+  "/api/v1/familia/marcadores/reaplicar": {
+   "post": {
+    "description": "Reescreve os marcadores de exames e propostas conforme os apelidos, sem chamar o modelo.",
+    "operationId": "reaplicar_apelidos_api_v1_familia_marcadores_reaplicar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Reaplicar Apelidos"
    }
   },
   "/api/v1/familia/pessoas": {
@@ -3340,6 +3487,23 @@
      }
     },
     "summary": "Parcelas"
+   }
+  },
+  "/api/v1/reembolso-saude/dossies": {
+   "get": {
+    "description": "Dossiês (número, paciente, prestador, mês, estado, o que falta e os documentos com tipo e estado); o acesso fica no log de saúde.",
+    "operationId": "listar_api_v1_reembolso_saude_dossies_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar"
    }
   },
   "/api/v1/regras": {
