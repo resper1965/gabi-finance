@@ -4,11 +4,13 @@ from urllib.parse import unquote
 
 
 class PaperlessFalso:
-    def __init__(self, docs=None, tags=None, campos=None):
+    def __init__(self, docs=None, tags=None, campos=None, usuarios_visiveis=None, negar_permissoes=False):
         self.docs = {d["id"]: d for d in (docs or [])}
         self.tags = dict(tags or {})  # nome -> id
         self.campos = dict(campos or {})  # nome -> id
         self.usuarios = {}
+        self.usuarios_visiveis = dict(usuarios_visiveis or {})  # username -> id (GET /api/users/)
+        self.negar_permissoes = negar_permissoes
         self.chamadas = []  # (metodo, caminho, corpo, token)
         self._prox = 100
         self.enviados = []  # (corpo multipart em bytes, cabecalhos)
@@ -37,6 +39,8 @@ class PaperlessFalso:
             if metodo == "GET":
                 return 200, d
             if metodo == "PATCH":
+                if "set_permissions" in corpo and self.negar_permissoes:
+                    return 403, {"detail": "sem permissão"}
                 d.update(corpo)
                 return 200, d
         if rota == "/api/documents/post_document/" and metodo == "POST":
@@ -58,6 +62,10 @@ class PaperlessFalso:
                 self._prox += 1
                 self.campos[corpo["name"]] = self._prox
                 return 201, {"id": self._prox, "name": corpo["name"]}
+        if rota == "/api/users/" and metodo == "GET":
+            nome = unquote(re.search(r"username__iexact=([^&]+)", qs).group(1)).lower() if "username__iexact" in qs else None
+            res = [{"id": i, "username": n} for n, i in self.usuarios_visiveis.items() if nome is None or n.lower() == nome]
+            return 200, {"count": len(res), "next": None, "results": res}
         if rota == "/api/users/" and metodo == "POST":
             self.usuarios[corpo["username"]] = corpo
             return 201, {"id": 7, "username": corpo["username"]}

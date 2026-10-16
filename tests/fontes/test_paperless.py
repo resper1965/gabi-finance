@@ -63,3 +63,18 @@ def test_por_etiqueta_so_traz_os_documentos_da_etiqueta_e_nao_cria_nada():
 def test_texto_devolve_o_ocr_do_documento():
     cli, _ = _cli(docs=[{"id": 1, "tags": [], "content": "Glicose 90"}, {"id": 2, "tags": []}])
     assert cli.texto(1) == "Glicose 90" and cli.texto(2) == ""
+
+
+def test_restringir_envia_set_permissions_so_do_dono():
+    cli, srv = _cli(docs=[{"id": 1, "tags": [5]}], usuarios_visiveis={"ricardo": 9})
+    assert cli.restringir(1, "Ricardo") is True
+    metodo, caminho, corpo, _ = srv.chamadas[-1]
+    assert (metodo, caminho) == ("PATCH", "/api/documents/1/")
+    assert corpo == {"set_permissions": {"view": {"users": [9], "groups": []}, "change": {"users": [9], "groups": []}}}
+    assert cli.restringir(1, "desconhecido") is False  # dono que o gabi não enxerga: nada é enviado
+    assert sum(1 for c in srv.chamadas if c[0] == "PATCH") == 1
+
+
+def test_sem_permissao_devolve_false():
+    cli, _ = _cli(docs=[{"id": 1, "tags": []}], usuarios_visiveis={"ricardo": 9}, negar_permissoes=True)
+    assert cli.restringir(1, "ricardo") is False

@@ -22,7 +22,9 @@ TIPO_CAMPO = {"CPF": "string", "valor": "string", "vencimento": "date", "pessoa"
 
 
 class ErroPaperless(Exception):
-    pass
+    def __init__(self, msg="", status: int | None = None):
+        super().__init__(msg)
+        self.status = status  # HTTP, quando o erro veio de uma resposta (None = rede)
 
 
 def _http_real(metodo, url, corpo=None, cabecalhos=None):
@@ -49,7 +51,7 @@ class Paperless:
     def _pedir(self, metodo, caminho, corpo=None, token=None, cabecalhos=None):
         status, resp = self._http(metodo, self.base + caminho, corpo, {"Authorization": f"Token {token or self.token}", **(cabecalhos or {})})
         if status >= 400:
-            raise ErroPaperless(f"{metodo} {caminho.split('?')[0]} -> {status}")
+            raise ErroPaperless(f"{metodo} {caminho.split('?')[0]} -> {status}", status)
         return resp
 
     def _paginas(self, caminho):
@@ -57,7 +59,7 @@ class Paperless:
         while url:
             status, resp = self._http("GET", url, None, {"Authorization": f"Token {self.token}"})
             if status >= 400:
-                raise ErroPaperless(f"GET {caminho.split('?')[0]} -> {status}")
+                raise ErroPaperless(f"GET {caminho.split('?')[0]} -> {status}", status)
             yield from resp["results"]
             url = resp.get("next")
 
@@ -94,6 +96,21 @@ class Paperless:
         doc = self._pedir("GET", f"/api/documents/{int(id)}/")
         ids = set(doc.get("tags") or []) | {self._etiqueta(t) for t in tags}
         self._pedir("PATCH", f"/api/documents/{int(id)}/", {"tags": sorted(ids)})
+
+    def restringir(self, id: int, dono_usuario: str) -> bool:
+        """Deixa só o usuário `dono_usuario` ver e alterar o documento (PATCH `set_permissions`). `False` se o usuário `gabi` não tem permissão
+        para isso (ou não enxerga o dono): quem chama avisa e segue. Não mexe em etiquetas nem apaga nada."""
+        try:
+            dono = next(iter(self._paginas("/api/users/?" + urlencode({"username__iexact": dono_usuario}))), None)
+            if not dono:
+                return False
+            so_ele = {"users": [dono["id"]], "groups": []}
+            self._pedir("PATCH", f"/api/documents/{int(id)}/", {"set_permissions": {"view": so_ele, "change": so_ele}})
+            return True
+        except ErroPaperless as e:
+            if e.status in (401, 403):
+                return False
+            raise
 
     def enviar(self, conteudo: bytes, nome: str, tags: list[str]) -> int | str:
         """Envia um documento novo (POST multipart em /api/documents/post_document/) com etiquetas `gabi:*`; devolve o identificador

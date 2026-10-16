@@ -3,15 +3,18 @@ no cofre cifrado; no `gabi.db` fica só a referência (`exame_doc`: id do docume
 zero ou mais de uma candidata = sem sugestão) e o Ricardo confirma. Documentos de e-mail (`entrada-email`) ainda sem classificar passam por UMA chamada ao modelo
 com título e primeiras linhas (exame ou outro). Nada de nome, valor ou texto de exame em log, aviso ou `gabi.db` (ADR-014).
 Consome: familia.{extrair,exames,marcadores}, fontes.paperless (pela ponte), dinheiro.modelo."""
+import datetime as dt
 import json
 import re
 import unicodedata
 
+from gabi.avisos import registrar_servico_falhou
 from gabi.dinheiro.modelo import Orcamento
 from gabi.familia import exames
 from gabi.familia.extrair import _chamar, extrair
 from gabi.mascara import mascarar_texto
 
+AVISO_RESTRINGIR = "gabi-brain-exames: o Paperless não permite restringir os exames ao dono (veja o runbook)"
 ETIQUETA_EXAME = "gabi:saude-exame"
 ETIQUETA_NAO_EXAME = "gabi:nao-exame"  # documento de e-mail que o modelo disse não ser exame: não é reclassificado
 ETIQUETAS_EMAIL = ("entrada-email", "gabi:entrada-email")
@@ -106,12 +109,41 @@ def extrair_documento(con, s, paperless, cliente, orcamento: Orcamento, doc: dic
     return ("extraido" if dono else "sem_dono"), "extraido", None, exames._versao_atual(s, pid)
 
 
+def _dono_paperless(con) -> str | None:
+    r = con.execute("select valor from parametro where chave='exames.dono_paperless'").fetchone()
+    try:
+        v = json.loads(r[0]) if r else None
+    except (ValueError, TypeError):
+        return None
+    return v.strip() if isinstance(v, str) and v.strip() else None
+
+
+def _restringir(con, paperless, docs: list[dict], agora: str) -> int:
+    """Só o dono vê o documento no Paperless (segundo lugar onde o exame vive). Sem dono configurado, não faz nada; sem permissão, UM aviso por dia e segue."""
+    dono = _dono_paperless(con)
+    if not dono or not docs:
+        return 0
+    feitos = 0
+    for d in docs:
+        try:
+            ok = paperless.restringir(d["id"], dono)
+        except Exception:  # noqa: BLE001 - restringir nunca derruba a extração
+            ok = False
+        if ok:
+            feitos += 1
+        else:
+            registrar_servico_falhou(con, AVISO_RESTRINGIR, dt.datetime.fromisoformat(agora))
+            break  # a causa é a mesma para todos: não repete
+    return feitos
+
+
 def rodar(con, abrir_cofre, paperless, cliente, orcamento: Orcamento, agora: str) -> dict:
     """-> {novos, extraidos, falhos, sem_dono, classificados}. Um documento que falha não derruba o lote."""
     r = {"novos": 0, "extraidos": 0, "falhos": 0, "sem_dono": 0, "classificados": _classificar_emails(paperless, cliente, orcamento)}
     ja = {x[0] for x in con.execute("select paperless_id from exame_doc")}
     novos = [d for d in paperless.por_etiqueta(ETIQUETA_EXAME) if d["id"] not in ja]
     r["novos"] = len(novos)
+    r["restritos"] = _restringir(con, paperless, novos, agora)
     if not novos:
         return r
     gravar = []  # `exame_doc` só depois que o cofre for salvo: se ele não gravar, o documento continua "novo" e a próxima rodada tenta de novo

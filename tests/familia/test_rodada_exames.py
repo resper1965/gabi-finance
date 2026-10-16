@@ -174,3 +174,28 @@ def test_sem_chave_do_cofre_nao_roda_e_avisa(tmp_path, capsys):
     c = sqlite3.connect(banco)
     assert c.execute("select count(*) from aviso where tipo='servico_falhou'").fetchone()[0] == 1
     assert c.execute("select count(*) from exame_doc").fetchone()[0] == 0
+
+
+def _dono_paperless(con, nome="ricardo"):
+    con.execute("insert into parametro(chave, valor) values ('exames.dono_paperless', ?)", (json.dumps(nome),))
+
+
+def test_rodada_restringe_so_com_dono_configurado(con, tmp_path):
+    p, srv = _sistema([_doc(10, LAUDO)], tmp_path)
+    srv.usuarios_visiveis["ricardo"] = 9
+    assert _rodar(con, tmp_path, p)["restritos"] == 0 and "set_permissions" not in srv.docs[10]
+    con.execute("delete from exame_doc")
+    _dono_paperless(con)
+    assert _rodar(con, tmp_path, p)["restritos"] == 1 and srv.docs[10]["set_permissions"]["view"]["users"] == [9]
+
+
+def test_rodada_avisa_uma_vez_quando_nao_consegue_restringir(con, tmp_path):
+    p, srv = _sistema([_doc(10, LAUDO), _doc(11, LAUDO)], tmp_path)
+    srv.usuarios_visiveis["ricardo"], srv.negar_permissoes = 9, True
+    _dono_paperless(con)
+    r = _rodar(con, tmp_path, p)
+    assert r["restritos"] == 0 and r["extraidos"] == 2  # a extração segue
+    con.execute("delete from exame_doc")
+    _rodar(con, tmp_path, p)  # mesmo dia: não repete
+    avisos = con.execute("select tipo, payload from aviso").fetchall()
+    assert len(avisos) == 1 and avisos[0]["tipo"] == "servico_falhou" and "runbook" in avisos[0]["payload"]
