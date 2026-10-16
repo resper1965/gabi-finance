@@ -4,6 +4,7 @@ Não altera `analise.recorrentes` (protegido por golden): usa a lista dele para 
 medir o normal (média e desvio dos meses fechados anteriores). Só gera aviso; nunca decide nada."""
 import datetime as dt
 import statistics as st
+from zoneinfo import ZoneInfo
 
 from gabi.dinheiro import analise
 from gabi.dinheiro.caixa import meses_atras, norm
@@ -14,7 +15,7 @@ PISO_REL = 0.10    # e pelo menos 10% do normal (série fixa tem desvio 0: 1 cen
 
 
 def fora_do_normal(fonte, hoje: dt.date | None = None) -> list[dict]:
-    hoje = hoje or dt.date.today()
+    hoje = hoje or dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     ini = meses_atras(6, hoje).isoformat(); mes = hoje.strftime("%Y-%m")
     linhas: dict[tuple[str, int], list[dict]] = {}
     for r in fonte.visao("caixa", ini):

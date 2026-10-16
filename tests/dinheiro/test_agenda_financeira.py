@@ -198,3 +198,11 @@ def test_desvio_nao_compara_o_reembolso_com_a_pensao(con):
         _lanc(con, 1, f"r{m}", f"{m}-03", -50000, "PIX MARIA")
     _lanc(con, 1, "r10", "2026-10-03", -50000, "PIX MARIA")  # outubro: só o reembolso saiu até dia 16
     assert "Fora do normal" not in texto(con)
+
+
+def test_falha_no_desvio_nao_derruba_a_diaria(con, monkeypatch):
+    def estoura(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr("gabi.dinheiro.agenda_financeira.fora_do_normal", estoura)
+    t = texto(con)
+    assert t.startswith("💰 *Financeiro*") and "Fora do normal" not in t

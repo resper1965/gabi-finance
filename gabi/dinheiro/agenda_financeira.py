@@ -2,6 +2,7 @@
 Só lê; sem rede nem modelo. A previsão é a do painel (`projecao.projetar`): saídas dos compromissos e entradas só das NFS-e previstas.
 Consome: contas_pagar (contas_a_pagar, caixa_unico), projecao, avisos (CONFIRMADO via conciliacao)."""
 import datetime as dt
+import logging
 from zoneinfo import ZoneInfo
 
 from gabi.dinheiro import contas_pagar
@@ -11,6 +12,7 @@ from gabi.dinheiro.esperados import entradas_esperadas
 from gabi.dinheiro.projecao import projetar
 from gabi.dinheiro.repositorio import FonteAnalise
 
+log = logging.getLogger(__name__)
 BRT = ZoneInfo("America/Sao_Paulo")
 LIMITE_ITENS = 12
 LEITURA_VELHA_HORAS = 6
@@ -92,7 +94,11 @@ def _a_receber_atrasado(con, hoje: dt.date) -> list[str]:
 
 def _fora_do_normal(con, hoje: dt.date) -> list[str]:
     """Recorrentes cujo valor deste mês foge do normal dos meses fechados (AR8)."""
-    avisos = fora_do_normal(FonteAnalise(con, so_liberadas=True), hoje)
+    try:
+        avisos = fora_do_normal(FonteAnalise(con, so_liberadas=True), hoje)
+    except Exception:  # aviso acessório: nunca derruba a diária
+        log.exception("fora_do_normal falhou; a diária segue sem ele")
+        return []
     linhas = [f"• ⚠️ Fora do normal: {a['descricao']} {_brl(round(a['valor'] * 100))} (normal ~{_brl(round(a['normal'] * 100))})" for a in avisos[:LIMITE_DESVIOS]]
     if len(avisos) > LIMITE_DESVIOS:
         linhas.append(f"• +{len(avisos) - LIMITE_DESVIOS} fora do normal")
