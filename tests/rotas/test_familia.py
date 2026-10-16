@@ -290,3 +290,19 @@ def test_mensagem_de_saude_nunca_no_banco_principal(app, cli, banco):
     assert "dor de cabe" not in todo and "apague tudo" not in todo
     assert "mensagem_saude" not in {r[0] for r in con.execute("select name from sqlite_master")}
 
+
+
+def test_reprocessar_passa_a_config_da_visao_so_quando_o_parametro_esta_ligado(app, cli, banco, monkeypatch):
+    import json as _j
+    from gabi.rotas import familia as rota
+    vistos = []
+    real = rota.reprocessar_documentos
+    monkeypatch.setattr(rota, "reprocessar_documentos", lambda *a, **k: (vistos.append(k.get("visao")), real(*a, **k))[1])
+    post(cli, "/api/v1/familia/laudos", {"paperless_id": 55})
+    post(cli, "/api/v1/familia/laudos/55/confirmar", {"pessoa_id": "p2"})
+    post(cli, "/api/v1/familia/exames/reprocessar", {"paperless_id": 55})
+    c = conectar(banco)
+    c.execute("insert or replace into parametro(chave, valor) values ('saude.visao_pdf', ?)", (_j.dumps(True),))
+    c.close()
+    post(cli, "/api/v1/familia/exames/reprocessar", {"paperless_id": 55})
+    assert vistos[0] is None and vistos[1] is not None

@@ -11,6 +11,7 @@ from gabi.dinheiro.modelo import Orcamento, orcamento_do_banco
 from gabi.envelope import envelope
 from gabi.familia import exames, marcadores as apelidos
 from gabi.familia.extrair import extrair
+from gabi import visao_pdf
 from gabi.familia.rodada_exames import reprocessar_documentos
 from gabi.familia.saude import abrir_saude, historico, marcadores, pode_ver, resumo_para_consulta, serie
 from gabi.identidade import Identidade, exigir, exigir_informacao, grau
@@ -229,6 +230,7 @@ async def reprocessar(request: Request, ident: Identidade = SO_BOSS):
     con = _con(request)
     try:
         orcamento = orcamento_do_banco(con, _agora(request).astimezone(BRT).date())
+        visao = visao_pdf.config(con)  # None = leitura por imagem desligada (saude.visao_pdf)
     finally:
         con.close()
     try:
@@ -240,7 +242,7 @@ async def reprocessar(request: Request, ident: Identidade = SO_BOSS):
             else:
                 ids = exames.documentos_do_filtro(s, corpo["pessoa_id"], corpo.get("laboratorio"), corpo.get("de"), corpo.get("ate"))
             lote = ids[:LIMITE_REPROCESSAR]
-            r, versoes = reprocessar_documentos(s, paperless, cliente, orcamento, lote, ident.login)
+            r, versoes = reprocessar_documentos(s, paperless, cliente, orcamento, lote, ident.login, visao=visao)
     finally:
         if cliente is not None:
             cliente.fechar()
