@@ -189,3 +189,14 @@ def test_correio_respondido_tem_chave_composta_e_exige_a_fonte(con):
     con.execute("pragma foreign_keys=on")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into email_respondido(fonte_id, endereco, em) values (999, 'z@x.com', '2026-10-12T10:00:00+00:00')")
+
+
+def test_exame_doc_sem_dado_de_saude(con):
+    cols = [r[1] for r in con.execute("pragma table_info(exame_doc)")]
+    assert cols == ["paperless_id", "estado", "versao", "motivo", "atualizado_em"]
+
+
+def test_exame_doc_estado_invalido_rejeitado(con):
+    con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (1, 'novo', 'x')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (2, 'qualquer', 'x')")

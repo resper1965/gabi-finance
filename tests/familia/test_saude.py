@@ -94,4 +94,31 @@ def test_saude_nunca_aparece_no_banco_principal(tmp_path):
     migrar(con, Path(__file__).parent.parent.parent / "migrations")
     nomes = [r[0].lower() for r in con.execute("select name from sqlite_master")] + \
             [r[1].lower() for t in [r[0] for r in con.execute("select name from sqlite_master where type='table'")] for r in con.execute(f"pragma table_info({t})")]
-    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo"))]
+    # única exceção: `exame_doc` (referência do documento e estado; sem valor, marcador nem paciente)
+    assert not [n for n in nomes if any(p in n for p in ("exame", "saude", "saúde", "marcador", "laudo")) and n != "exame_doc"]
+
+
+def test_cofre_antigo_abre_e_ganha_colunas(arq, monkeypatch):
+    from gabi.familia import saude
+    antigo = """
+    create table if not exists exame(
+      id integer primary key, pessoa_id text not null, marcador text not null, valor text not null, valor_num real, unidade text,
+      em text not null, ref_min text, ref_max text, paperless_id integer, confirmado_por text not null, criado_em text not null);
+    create table if not exists proposta_exame(
+      id integer primary key, paperless_id integer not null, pessoa_sugerida text, marcador text not null, valor text not null, unidade text,
+      em text, ref_min text, ref_max text, estado text not null default 'proposta', criado_em text not null);
+    create table if not exists leitura(id integer primary key, quando text not null, quem text not null, pessoa_id text, o_que text not null);
+    """
+    with monkeypatch.context() as m:
+        m.setattr(saude, "ESQUEMA", antigo)
+        m.setattr(saude, "_migrar", lambda con: None)
+        with abrir_saude(arq, CHAVE) as s:
+            registrar_exame(s, "p1", "Glicose", "90", "mg/dL", D(2026, 1, 1), None, 1, "boss@x.com")
+            assert "versao" not in {r[1] for r in s.con.execute("pragma table_info(exame)")}
+    with abrir_saude(arq, CHAVE) as s:
+        r = s.con.execute("select * from exame").fetchone()
+        assert (r["marcador"], r["valor"], r["versao"], r["qualitativo"]) == ("Glicose", "90", 1, 0)
+        assert {"origem", "versao"} <= {c[1] for c in s.con.execute("pragma table_info(proposta_exame)")}
+        assert s.con.execute("select count(*) from marcador_apelido").fetchone()[0] == 0
+    with abrir_saude(arq, CHAVE):  # abrir de novo é idempotente
+        pass

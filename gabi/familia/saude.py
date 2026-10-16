@@ -17,13 +17,31 @@ MAGICO = b"GSAUDE1\0"
 ESQUEMA = """
 create table if not exists exame(
   id integer primary key, pessoa_id text not null, marcador text not null, valor text not null, valor_num real, unidade text,
-  em text not null, ref_min text, ref_max text, paperless_id integer, confirmado_por text not null, criado_em text not null);
+  em text not null, ref_min text, ref_max text, paperless_id integer, confirmado_por text not null, criado_em text not null,
+  versao integer not null default 1, qualitativo integer not null default 0, observacao text, laboratorio text);
 create index if not exists exame_serie on exame(pessoa_id, marcador, em);
 create table if not exists proposta_exame(
   id integer primary key, paperless_id integer not null, pessoa_sugerida text, marcador text not null, valor text not null, unidade text,
-  em text, ref_min text, ref_max text, estado text not null default 'proposta' check (estado in ('proposta','confirmada','rejeitada')), criado_em text not null);
+  em text, ref_min text, ref_max text, estado text not null default 'proposta' check (estado in ('proposta','confirmada','rejeitada')), criado_em text not null,
+  versao integer not null default 1, origem text, qualitativo integer not null default 0, observacao text);
 create table if not exists leitura(id integer primary key, quando text not null, quem text not null, pessoa_id text, o_que text not null);
+create table if not exists marcador_apelido(apelido text primary key, marcador text not null);
+create table if not exists mensagem_saude(id integer primary key, de_pessoa text, recebida_em text not null, texto text not null);
 """
+# Colunas acrescentadas no cofre v2: um cofre antigo ganha o que falta ao abrir (sem perder dado).
+COLUNAS_V2 = {
+    "exame": (("versao", "integer not null default 1"), ("qualitativo", "integer not null default 0"), ("observacao", "text"), ("laboratorio", "text")),
+    "proposta_exame": (("versao", "integer not null default 1"), ("origem", "text"), ("qualitativo", "integer not null default 0"), ("observacao", "text")),
+}
+
+
+def _migrar(con: sqlite3.Connection) -> None:
+    """Idempotente: acrescenta as colunas da v2 que o cofre antigo não tem."""
+    for tabela, colunas in COLUNAS_V2.items():
+        tem = {r[1] for r in con.execute(f"pragma table_info({tabela})")}
+        for nome, tipo in colunas:
+            if nome not in tem:
+                con.execute(f"alter table {tabela} add column {nome} {tipo}")
 
 
 class ChaveInvalida(Exception):
@@ -61,6 +79,7 @@ class Cofre:
                 raise ChaveInvalida("chave errada ou arquivo adulterado") from e
             self.con.deserialize(dados)
         self.con.executescript(ESQUEMA)
+        _migrar(self.con)
         return self
 
     def __exit__(self, tipo, valor, tb) -> bool:
