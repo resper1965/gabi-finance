@@ -19,6 +19,7 @@ mcp_servers:
       - avisos_pendentes
       - classificar_lancamento
       - cobranca_rascunho
+      - contatos_em_aberto
       - decisao_responder
       - decisoes_abertas
       - documentos_baixar

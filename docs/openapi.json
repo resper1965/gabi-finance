@@ -1822,6 +1822,23 @@
     "summary": "Marcar Paga"
    }
   },
+  "/api/v1/contatos": {
+   "get": {
+    "description": "Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura.",
+    "operationId": "contatos_api_v1_contatos_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Contatos"
+   }
+  },
   "/api/v1/correio/fontes": {
    "get": {
     "description": "Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens.",

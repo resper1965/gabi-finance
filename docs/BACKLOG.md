@@ -111,7 +111,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 - Obsidian por pessoa (T4.6 está codificado; uso real fica para depois).
 - Ação "Dispensar" no e-mail (precisa de coluna nova); lixeira "lixo sugerido" visível antes de ligar.
 - Ideias do Vercel Eve, só como prática: evals de mensagem (resumo, fechamento, avisos), manifesto único por capacidade, retomada por passo nos jobs com modelo, aprovação explícita por ferramenta de escrita. Não reestruturar o brain nesse modelo.
-- Fase 3 (Trabalho): contatos e Entregas seguem "ainda não construída".
+- Fase 3 (Trabalho): Entregas segue "ainda não construída". Contatos (16/10) feita; ficou de fora: tarefa/frente por pessoa (`tarefa` e `item_frente` não têm vínculo com pessoa), reunião da agenda nova por participante (guarda só `participantes_qtd`, ADR-017), e "respondido" por conversa (o brain só sabe o endereço, `email_respondido`).
 
 ## Obsoleto (não fazer)
 - **G16** reconectar XP Investimentos: a conexão saiu do mcp.ai em 11/10. Issue `docs/issues/0001` vale só para o C6.

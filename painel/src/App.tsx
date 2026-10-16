@@ -29,6 +29,7 @@ import { Hoje } from "./telas/Trabalho/Hoje";
 import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
 import { Mensagens } from "./telas/Trabalho/Mensagens";
+import { Contatos } from "./telas/Trabalho/Contatos";
 import { Tarefas } from "./telas/Trabalho/Tarefas";
 import { Entregas } from "./telas/Trabalho/Entregas";
 import { Configuracao } from "./telas/Configuracao";
@@ -43,7 +44,7 @@ const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros, escuta: Escuta, agendas: CadastrosAgenda, correio: CadastrosCorreio, prioridades: Prioridades, setup: Configuracao,
-  qualidade: Qualidade, hoje: Hoje, temas: Frentes, familia: Familia, reembolso: Reembolso, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
+  qualidade: Qualidade, hoje: Hoje, temas: Frentes, familia: Familia, reembolso: Reembolso, agenda: Agenda, emails: Mensagens, contatos: Contatos, tarefas: Tarefas, entregas: Entregas,
 };
 
 function tela(area: Area, aba: string) {

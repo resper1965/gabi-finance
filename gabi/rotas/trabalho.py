@@ -8,7 +8,7 @@ from gabi.envelope import envelope
 from gabi.identidade import exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _data, _json, erro
 from gabi.agenda import consulta
-from gabi.trabalho import email, frentes, hoje as modulo_hoje
+from gabi.trabalho import contatos as modulo_contatos, email, frentes, hoje as modulo_hoje
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
 
@@ -113,6 +113,16 @@ def mensagens(request: Request, limite: int = 50):
             "select i.id, i.remetente, i.assunto, i.recebido_em, i.relevante, i.motivo, i.estado, c.endereco as caixa from item_email i "
             "join caixa_email c on c.id=i.caixa_id order by i.recebido_em desc limit ?", (min(max(limite, 1), 200),))]
         return envelope(con, {"itens": itens, "expurgo_sugerido": email.expurgo_sugerido(con)}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.get("/contatos")
+def contatos(request: Request):
+    """Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura."""
+    con = _con(request)
+    try:
+        return envelope(con, modulo_contatos.contatos_em_aberto(con, _agora(request), painel=True), agora=_agora(request))
     finally:
         con.close()
 
