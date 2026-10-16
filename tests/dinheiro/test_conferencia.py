@@ -358,3 +358,36 @@ def test_conta_de_movimento_irregular_reprova_quatro_dias_uteis_seguidos_vazios(
     _conta_irregular(con, vazios={dt.date(2026, 10, 5), dt.date(2026, 10, 6), dt.date(2026, 10, 7)} | {dt.date(2026, 10, 2)})
     r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["dias_sem_buraco"]
     assert r.ok is False and "2026-10-02" in r.detalhe
+
+
+def test_saldo_que_ja_traz_lancamentos_do_dia_base_lidos_depois_do_saldo_passa(con):
+    # o saldo de 07/10 foi lido às 15h; entrou um crédito de 07/10 à noite; o saldo de 08/10 já o traz (caso real C6, 15/10 -> 16/10)
+    _saldo(con, "2026-10-07T15:00:00", 100000)
+    _lanc(con, 1, "2026-10-07", 83144)
+    _saldo(con, "2026-10-08T15:00:00", 183144)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"]
+    assert r.ok is True and "2026-10-07" in r.detalhe
+
+
+def test_saldo_divergente_que_nao_bate_nem_com_o_dia_base_continua_reprovando(con):
+    _saldo(con, "2026-10-07T15:00:00", 100000)
+    _lanc(con, 1, "2026-10-07", 83144)
+    _saldo(con, "2026-10-08T15:00:00", 190000)  # sobrou 6.856, que nenhum lançamento explica
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False
+
+
+def test_dia_sem_lancamento_e_sem_mudanca_de_saldo_nao_reprova_o_volume(con):
+    base = {(HOJE - dt.timedelta(days=k)).isoformat(): 10 for k in range(2, 16)}
+    _volume(con, base)  # ontem (07/10): nenhum lançamento
+    _saldo(con, "2026-10-06T22:00:00", 50000)
+    _saldo(con, "2026-10-07T22:00:00", 50000)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["volume_proximo"]
+    assert r.ok is True and "dia vazio" in r.detalhe
+
+
+def test_dia_sem_lancamento_mas_saldo_mudou_continua_reprovando_o_volume(con):
+    base = {(HOJE - dt.timedelta(days=k)).isoformat(): 10 for k in range(2, 16)}
+    _volume(con, base)
+    _saldo(con, "2026-10-06T22:00:00", 50000)
+    _saldo(con, "2026-10-07T22:00:00", 70000)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["volume_proximo"].ok is False

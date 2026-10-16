@@ -152,7 +152,7 @@ def processar(con, cliente, orcamento, ponte, agora: str, limites: Limites | Non
     corte = (_utc(agora) - dt.timedelta(days=janela)).isoformat()
     criterios = _parametro(con, "email.criterios_emergencia", "")
     limiar = _parametro(con, "email.lixeira_confianca", LIMIAR_PADRAO)
-    limiar = float(limiar) if isinstance(limiar, (int, float)) and not isinstance(limiar, bool) and 0 <= limiar <= 1 else LIMIAR_PADRAO
+    limiar = float(limiar) if isinstance(limiar, (int, float)) and not isinstance(limiar, bool) and 0.7 <= limiar <= 1 else LIMIAR_PADRAO  # piso 0,7: valor menor (banco editado à mão) cai no padrão
     c = {"classificadas": 0, "emergenciais": 0, "lixeira": 0, "adiadas": 0, "falhou": 0, "invalidas": 0, "sem_modelo": 0, "tempo": False}
     pendentes = con.execute(
         "select m.*, f.conta, f.lixeira as conta_lixeira from email_msg m join email_fonte f on f.id=m.fonte_id "

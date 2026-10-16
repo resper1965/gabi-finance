@@ -58,6 +58,28 @@ def custo_padrao_usd() -> float:
     return v if math.isfinite(v) and v > 0 else CUSTO_RESERVA_USD
 
 
+PISO_RESERVA_USD = 0.001    # a reserva de falha nunca fica abaixo disto
+FATOR_RESERVA = 5           # reserva = 5 x a mediana do custo real da própria tarefa
+MIN_AMOSTRAS_RESERVA = 10   # com menos chamadas completadas que isto, vale o padrão conservador
+JANELA_RESERVA = dt.timedelta(days=14)
+
+
+def reserva_falha_usd(con, tarefa: str, agora: dt.datetime) -> float:
+    """Custo a gravar quando uma chamada falha DEPOIS do envio. Seguir o custo real da tarefa (A6): a reserva fixa de US$ 0,05 contra
+    chamadas de US$ 0,0001 fazia 20 timeouts por dia (US$ 1) estourarem o teto diário e bloquearem o modelo. Sem histórico suficiente, o padrão
+    conservador (`custo_padrao_usd`) continua valendo, e ele também é o teto da reserva."""
+    padrao = custo_padrao_usd()
+    try:
+        desde = (agora - JANELA_RESERVA).astimezone(BRT).isoformat()
+        custos = sorted(r[0] for r in con.execute("select custo_usd from custo_modelo where tarefa=? and em>=?", (tarefa, desde)) if r[0] is not None)
+    except sqlite3.Error:
+        return padrao
+    if len(custos) < MIN_AMOSTRAS_RESERVA:
+        return padrao
+    mediana = custos[len(custos) // 2]
+    return min(padrao, max(PISO_RESERVA_USD, FATOR_RESERVA * mediana))
+
+
 class ModeloComCusto:
     """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa `tarefa`, padrão 'escuta'; chamada que falhou depois do envio: tarefa
     '<tarefa>-falha' com custo conservador, `em` = instante da chamada em BRT), numa
@@ -85,7 +107,7 @@ class ModeloComCusto:
             # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
             # Recusa antes do envio (não configurado, teto, limite, prompt grande) não cobra nada.
             if recusa_sem_envio(e) is None:
-                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo_padrao_usd(), f"{self._tarefa}-falha"))
+                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), reserva_falha_usd(self._con, self._tarefa, self._relogio()), f"{self._tarefa}-falha"))
                 self._gravar_pendentes()
             raise
         try:

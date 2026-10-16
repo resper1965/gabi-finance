@@ -101,8 +101,8 @@ def validar_parametros(corpo) -> dict:
                 raise ErroFonte("vips tem um endereço de e-mail inválido")
             v = list(dict.fromkeys(normal))
         elif k == "lixeira_confianca":
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0.5 <= v <= 1.0:
-                raise ErroFonte("lixeira_confianca deve ser um número de 0,5 a 1,0")
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0.7 <= v <= 1.0:
+                raise ErroFonte("lixeira_confianca deve ser um número de 0,7 a 1,0")
             v = float(v)
         elif k == "janela_dias":
             _inteiro(v, k, 1, 60)

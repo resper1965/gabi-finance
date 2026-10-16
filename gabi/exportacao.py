@@ -10,6 +10,7 @@ from pathlib import Path
 from gabi.backup import TABELAS_CONTAGEM, backup_db, testar_restauracao
 from gabi.db import conectar, migrar
 from gabi.rodada import registrar_rodada
+from gabi.hoje import hoje_brt
 
 MANTER = 8
 
@@ -53,7 +54,7 @@ def main(banco: Path, destino_dir: Path, chave_publica: Path, hoje: date | None 
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
     try:
-        print(f"exportação: {exportar(con, destino_dir, chave_publica, hoje or date.today())}")
+        print(f"exportação: {exportar(con, destino_dir, chave_publica, hoje or hoje_brt())}")
     except (RuntimeError, FileNotFoundError, FileExistsError) as e:
         print(f"exportação FALHOU: {e}")
         return 1

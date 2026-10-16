@@ -10,6 +10,7 @@ from pathlib import Path
 from gabi.db import conectar, migrar
 from gabi.dinheiro import planilha, repositorio
 from gabi.rodada import registrar_rodada
+from gabi.hoje import hoje_brt
 
 MIGRACOES = Path(__file__).resolve().parent.parent / "migrations"
 TABELAS = ("pessoa", "pet", "empresa", "compromisso_fixo", "matriz_acesso", "allowlist_vip", "compromisso",
@@ -129,7 +130,7 @@ def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | N
     except BaseException:
         con.execute("rollback")
         raise
-    _semear_cadastros(con, fin.get("planilha"), dt.date.today(), relatorio)
+    _semear_cadastros(con, fin.get("planilha"), hoje_brt(), relatorio)
     return {t: con.execute(f"select count(*) from {t}").fetchone()[0] for t in TABELAS}
 
 

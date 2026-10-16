@@ -15,6 +15,7 @@ from gabi.db import conectar, migrar
 from gabi.fontes.ambiente import fontes_do_ambiente
 from gabi.fontes.paperless import ErroPaperless
 from gabi.rodada import registrar_rodada
+from gabi.hoje import hoje_brt
 
 ETIQUETA = "gabi:comprovante"
 
@@ -66,7 +67,7 @@ def main(banco: Path, paperless=None) -> int:
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     try:
         with registrar_rodada(con, "comprovantes-paperless") as r:
-            resumo = ingerir(con, paperless, dt.date.today())
+            resumo = ingerir(con, paperless, hoje_brt())
             r.lidos, r.novos = resumo.lidos, resumo.novos
             if resumo.sem_valor or resumo.sem_etiqueta:
                 r.aviso = f"{resumo.sem_valor} comprovante(s) sem valor legível; {resumo.sem_etiqueta} sem etiqueta"

@@ -8,6 +8,7 @@ import datetime as dt
 import statistics as st
 
 from gabi.dinheiro.caixa import TAXA_CAT, TAXA_RE, meses_atras, norm
+from gabi.hoje import hoje_brt
 
 D = dt.date
 
@@ -43,7 +44,7 @@ def _recorrente(rs, nd, sinal, ult4, fim_mes):
             'ultimo': round(ult, 2), 'dia_ultimo': int(ultr['data'][8:10]), 'mediana_anterior': round(st.median(prev), 2) if prev else None}
 
 def recorrentes(fonte, visao_nome='caixa', hoje=None):
-    hoje = hoje or D.today(); ini = meses_atras(6, hoje).isoformat(); fim_mes = hoje.replace(day=1)
+    hoje = hoje or hoje_brt(); ini = meses_atras(6, hoje).isoformat(); fim_mes = hoje.replace(day=1)
     grupos = {}
     for r in fonte.visao(visao_nome, ini):
         if r['parcelas'] and r['parcelas'] > 1: continue
@@ -62,7 +63,7 @@ def recorrentes(fonte, visao_nome='caixa', hoje=None):
     return sorted(out, key=lambda x: -x['valor_medio'])
 
 def previsao(fonte, dias=30, extra=None, hoje=None):
-    hoje = hoje or D.today(); fim = hoje + dt.timedelta(days=dias)
+    hoje = hoje or hoje_brt(); fim = hoje + dt.timedelta(days=dias)
     ts, contas = fonte.ultimo_snapshot()
     saldo = sum(x['saldo'] or 0 for x in contas if x['tipo'] != 'CREDIT')
     ev = []
@@ -112,7 +113,7 @@ def gastos(fonte, de, ate, por='categoria'):
     return {'de': de, 'ate': ate, 'por': por, 'total_custo': round(tot, 2), 'itens': [{'chave': k, 'valor': round(v, 2)} for k, v in sorted(agg.items(), key=lambda x: -x[1])]}
 
 def vazamentos(fonte, meses=3, hoje=None):
-    hoje = hoje or D.today(); ini = meses_atras(meses, hoje).isoformat(); fim = (hoje.replace(day=1) - dt.timedelta(days=1)).isoformat()
+    hoje = hoje or hoje_brt(); ini = meses_atras(meses, hoje).isoformat(); fim = (hoje.replace(day=1) - dt.timedelta(days=1)).isoformat()
     custo = fonte.visao('custo', ini, fim); out = {'periodo': [ini, fim]}
     taxas = {}
     for r in custo:

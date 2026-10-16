@@ -255,9 +255,32 @@ def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -
     return lidos, novos
 
 
+JANELA_RETOMADA = dt.timedelta(hours=3)
+
+
+def _retomar(con, hoje: dt.date, agora: dt.datetime) -> dict[str, tuple[int, int]]:
+    """EV2. Quem chama `capturar` já tem o lock exclusivo, então qualquer rodada 'rodando' é de um processo morto: vira erro 'interrompida'.
+    Devolve account_id -> (lidos, novos) das contas que a última rodada não concluída do mesmo dia já gravou, se foi há menos de 3 h
+    e nenhuma rodada ok veio depois dela."""
+    agora_utc = agora.astimezone(dt.timezone.utc)
+    con.execute("update rodada set status='erro', erro='interrompida', fim=? where fonte='open-finance' and status='rodando'", (agora_utc.isoformat(),))
+    ultima = con.execute("select id, status, inicio from rodada where fonte='open-finance' order by id desc limit 1").fetchone()
+    if ultima is None or ultima["status"] == "ok":
+        return {}
+    try:
+        inicio = dt.datetime.fromisoformat(ultima["inicio"])
+    except ValueError:
+        return {}
+    if agora_utc - inicio > JANELA_RETOMADA:
+        return {}
+    return {r["account_id"]: (r["lidos"], r["novos"]) for r in con.execute(
+        "select account_id, lidos, novos from captura_conta where rodada_id=? and dia=?", (ultima["id"], hoje.isoformat()))}
+
+
 def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, *, bancos_pj=frozenset(),
              sincronizar_antes: bool = False, dorme=time.sleep) -> ResumoCaptura:
     """Uma rodada de captura. Erro numa conta entra em `falhas` e as outras seguem (rodada ok, com aviso)."""
+    prontas = _retomar(con, hoje, agora)
     with registrar_rodada(con, "open-finance") as rodada:
         sync, problemas = None, {}
         if sincronizar_antes:
@@ -272,6 +295,9 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
         falhas: dict[str, str] = {}
         for a in contas:
             aid = a["account_id"]
+            if aid in prontas:  # já gravada por uma rodada interrompida de hoje (EV2): não refaz
+                lidos, novos = lidos + prontas[aid][0], novos + prontas[aid][1]
+                continue
             try:
                 itens, faturas = _buscar_conta(con, a, ids[aid], cliente, hoje)
                 rotulo = f"{agora:%H%M%S}-{re.sub(r'[^A-Za-z0-9._-]', '', aid[-6:])}"
@@ -281,6 +307,8 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
                 con.execute("begin")
                 try:
                     n_lidos, n_novos = _processar_conta(con, a, ids[aid], itens, faturas, hoje, donos, bruto.name)
+                    con.execute("insert or replace into captura_conta(rodada_id, account_id, dia, lidos, novos, concluida_em) values (?,?,?,?,?,?)",
+                                (rodada.id, aid, hoje.isoformat(), n_lidos, n_novos, agora.isoformat(timespec="seconds")))
                     con.execute("commit")
                 except BaseException:
                     con.execute("rollback")

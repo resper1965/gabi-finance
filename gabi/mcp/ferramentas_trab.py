@@ -51,6 +51,8 @@ def _quando(iso: str | None) -> str:
 def agenda_listar(con, agora: dt.datetime, de: str, ate: str) -> dict:
     """Compromissos entre duas datas (AAAA-MM-DD, inclusive), em horário local, no máximo 31 dias. Só leitura."""
     try:
+        if not all(isinstance(x, str) and len(x) == 10 for x in (de, ate)):  # fromisoformat aceita "20261011": devolveria vazio em silêncio
+            raise ValueError
         d1, d2 = dt.date.fromisoformat(de), dt.date.fromisoformat(ate)
     except (TypeError, ValueError):
         raise ValueError("de/ate devem ser datas AAAA-MM-DD") from None

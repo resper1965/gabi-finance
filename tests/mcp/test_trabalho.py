@@ -81,3 +81,21 @@ def test_resumo_desatualizado_nomeia_a_fonte_que_causa(tmp_path):
     c.execute("insert into rodada(fonte, inicio, fim, status) values ('comprovantes-paperless','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
     primeira = resumo_da_manha(c, AGORA)["linhas"][0]
     assert primeira.startswith("⚠️") and "desatualizados" in primeira and "notas-nibo" not in primeira
+
+
+def test_agenda_listar_recusa_data_compacta_em_vez_de_devolver_vazio(tmp_path):
+    import datetime as dt
+    from gabi.db import conectar, migrar
+    from gabi.mcp.ferramentas_trab import agenda_listar
+    from pathlib import Path
+    con = conectar(tmp_path / "t.db")
+    migrar(con, Path(__file__).parent.parent.parent / "migrations")
+    agora = dt.datetime(2026, 10, 16, 8, 0, tzinfo=dt.timezone.utc)
+    for de, ate in [("20261011", "2026-10-12"), ("2026-10-11", "20261012"), (None, "2026-10-12")]:
+        try:
+            agenda_listar(con, agora, de, ate)
+        except ValueError as e:
+            assert "AAAA-MM-DD" in str(e)
+        else:
+            raise AssertionError(f"aceitou {de!r}..{ate!r}")
+    assert agenda_listar(con, agora, "2026-10-11", "2026-10-12")["eventos"] == []

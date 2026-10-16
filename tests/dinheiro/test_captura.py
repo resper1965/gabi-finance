@@ -267,3 +267,59 @@ def test_guarda_a_categoria_do_banco_para_a_equivalencia(con, tmp_path):
     _rodar(con, FakeFin([BANCO], txs), tmp_path)
     L = _lancs(con)
     assert L["t1"]["categoria_banco"] == "Groceries" and L["t2"]["categoria_banco"] is None
+
+
+# ---------------- EV2: rodada interrompida retoma sem refazer contas prontas ----------------
+class Cai(FakeFin):
+    """Como o FakeFin, mas o processo 'morre' (BaseException) ao pedir o extrato de `morre_em`."""
+
+    def __init__(self, *a, morre_em=None, **k):
+        super().__init__(*a, **k)
+        self.morre_em = morre_em
+
+    def __call__(self, ferramenta, args, tent=5):
+        if ferramenta == "openfinance_list_transactions" and args["account_id"] == self.morre_em:
+            self.pedidos.append((ferramenta, args))
+            raise KeyboardInterrupt()
+        return super().__call__(ferramenta, args, tent)
+
+
+BANCO2 = {**BANCO, "account_id": "acc-bank-2222", "name": "Conta Itau", "bank": "Itau"}
+TXS = {"acc-bank-1111": [tx("a1", "2026-10-07", "PIX A", 10.0)], "acc-bank-2222": [tx("b1", "2026-10-07", "PIX B", 20.0)]}
+
+
+def _extratos_pedidos(fin):
+    return [a["account_id"] for f, a in fin.pedidos if f == "openfinance_list_transactions"]
+
+
+def test_rodada_interrompida_nao_refaz_a_conta_pronta(con, tmp_path):
+    with pytest.raises(KeyboardInterrupt):
+        _rodar(con, Cai([BANCO, BANCO2], TXS, morre_em="acc-bank-2222"), tmp_path)
+    assert con.execute("select count(*) from lancamento").fetchone()[0] == 1  # a primeira conta ficou gravada
+    fin = FakeFin([BANCO, BANCO2], TXS)
+    r = _rodar(con, fin, tmp_path)
+    assert _extratos_pedidos(fin) == ["acc-bank-2222"]  # a 1111 não foi lida de novo
+    assert r.lidos == 2 and r.novos == 2 and con.execute("select count(*) from lancamento").fetchone()[0] == 2
+    assert con.execute("select count(*) from rodada where fonte='open-finance' and status='erro'").fetchone()[0] == 1
+
+
+def test_rodada_ok_anterior_nao_pula_nada(con, tmp_path):
+    _rodar(con, FakeFin([BANCO, BANCO2], TXS), tmp_path)
+    fin = FakeFin([BANCO, BANCO2], TXS)
+    _rodar(con, fin, tmp_path)
+    assert sorted(_extratos_pedidos(fin)) == ["acc-bank-1111", "acc-bank-2222"]
+
+
+def test_checkpoint_de_outro_dia_ou_velho_demais_nao_vale(con, tmp_path):
+    with pytest.raises(KeyboardInterrupt):
+        _rodar(con, Cai([BANCO, BANCO2], TXS, morre_em="acc-bank-2222"), tmp_path)
+    fin = FakeFin([BANCO, BANCO2], TXS)
+    capturar(con, fin, HOJE + dt.timedelta(days=1), AGORA + dt.timedelta(days=1), tmp_path / "bruto")  # no dia seguinte
+    assert sorted(_extratos_pedidos(fin)) == ["acc-bank-1111", "acc-bank-2222"]
+
+
+def test_rodada_presa_em_rodando_vira_interrompida(con, tmp_path):
+    con.execute("insert into rodada(fonte, inicio, status) values ('open-finance', '2026-10-08T10:00:00+00:00', 'rodando')")
+    _rodar(con, FakeFin([BANCO], {}), tmp_path)
+    r = con.execute("select status, erro from rodada where id=1").fetchone()
+    assert r["status"] == "erro" and r["erro"] == "interrompida"

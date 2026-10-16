@@ -12,6 +12,7 @@ from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
 from gabi.cobrar.util import agora as _agora
 from gabi.escuta.caixa import normalizar_telefone
+from gabi.hoje import hoje_brt
 
 CANAL_ESCUTA = "escuta"  # pedido lido pela escuta do WhatsApp: a Gabi nunca responde ao terceiro (R2)
 
@@ -110,7 +111,7 @@ def _decidir(con, pedido_id: int, acao: str, por: str, conta_id: int | None, ben
         conta = con.execute("select apelido from conta where id=?", (conta_id,)).fetchone()
         if conta is None:
             raise LookupError(f"conta {conta_id} não existe")
-        dia = dt.date.fromisoformat(p["vencimento"]) if p["vencimento"] else dt.date.today() + dt.timedelta(days=7)
+        dia = dt.date.fromisoformat(p["vencimento"]) if p["vencimento"] else hoje_brt() + dt.timedelta(days=7)
         forma = "pix" if p["pix_chave"] else ("boleto" if p["linha_digitavel"] else "")
         con.execute(
             "insert into compromisso_linha(id, nome, extrato, vencimento, valor_tipo, valor_padrao_centavos, forma, conta, documento, pix, valido_de, valido_ate, obs) "

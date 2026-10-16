@@ -9,6 +9,7 @@ import unicodedata
 from datetime import date
 
 from gabi.dinheiro.caixa import conferir_boleto
+from gabi.hoje import hoje_brt
 
 # ponytail: so o padrao 000201...6304+CRC; Pix com quebra de linha no meio do codigo nao e juntado
 _PIX = re.compile(r"000201.*")
@@ -113,7 +114,7 @@ def tipo_documento(texto, hoje=None):
     t = _sem_acento(texto or "")
     if "DOCUMENTO DE ARRECADACAO DO ESOCIAL" in t or ("ESOCIAL" in t and re.search(r"\bDAE\b", t)):
         return "dae_esocial"
-    if "COMPROVANTE" in t and re.search(r"\bPIX\b", t) and not _achar_linha(texto, hoje or date.today()):
+    if "COMPROVANTE" in t and re.search(r"\bPIX\b", t) and not _achar_linha(texto, hoje or hoje_brt()):
         return "comprovante_pix"
     return None
 

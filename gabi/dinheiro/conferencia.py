@@ -61,6 +61,11 @@ def _saldo_final(con, conta_id: int, tipo: str) -> tuple[bool, str]:
         (conta_id, base["em"][:10], dia)).fetchone()[0]
     if pendentes and dif == pendentes:  # o banco já abateu o pendente do saldo, mas ele ainda não é lançamento postado
         return True, f"diferença de {dif} centavos explicada por lançamento(s) pendente(s)"
+    do_dia_base = con.execute(
+        "select coalesce(sum(valor_centavos),0) from lancamento where conta_id=? and status='posted' and data=?",
+        (conta_id, base["em"][:10])).fetchone()[0]
+    if do_dia_base and dif == do_dia_base:  # o último saldo do dia-base foi lido antes de lançamentos desse mesmo dia entrarem (visto em 15/10, C6 e XP)
+        return True, f"diferença de {dif} centavos = lançamentos de {base['em'][:10]} que o saldo daquele dia ainda não trazia"
     from gabi.dinheiro.contas_pagar import faturas_abertas  # import tardio: contas_pagar não depende de conferência
     for f in faturas_abertas(con, _d(dia)):  # saída do saldo = débito de fatura que o banco ainda não publicou como lançamento
         if dif == -f["total_centavos"]:
@@ -115,6 +120,15 @@ def _maior_sequencia(dias: list[dt.date]) -> int:
     return melhor
 
 
+def _saldo_igual(con, conta_id: int, dia: dt.date) -> bool:
+    """O último saldo lido até o fim de `dia` é igual ao último lido até o fim do dia anterior (e os dois existem)."""
+    def fim(d: dt.date):
+        r = con.execute("select saldo_centavos from saldo where conta_id=? and substr(em,1,10)<=? order by em desc limit 1", (conta_id, d.isoformat())).fetchone()
+        return None if r is None else r[0]
+    a, b = fim(dia), fim(dia - dt.timedelta(days=1))
+    return a is not None and b is not None and a == b
+
+
 def _volume_proximo(con, conta_id: int, hoje: dt.date, tipo: str = "BANK") -> tuple[bool, str]:
     if tipo == "CREDIT":
         return True, "cartão: sem conferência de volume (gasto irregular)"
@@ -132,6 +146,8 @@ def _volume_proximo(con, conta_id: int, hoje: dt.date, tipo: str = "BANK") -> tu
     if med < MEDIANA_MINIMA:
         return True, f"mediana baixa ({med}); ontem {n}"
     if n < VOLUME_MINIMO * med:
+        if n == 0 and _saldo_igual(con, conta_id, ontem):
+            return True, f"ontem sem lançamentos e com o saldo igual ao do dia anterior: dia vazio de verdade (mediana {med})"
         return False, f"ontem {n} lançamentos; mediana dos dias úteis anteriores {med}"
     return True, f"ontem {n} lançamentos; mediana {med}"
 

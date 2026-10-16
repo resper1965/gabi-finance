@@ -9,6 +9,7 @@ from pathlib import Path
 
 from gabi.db import conectar, migrar
 from gabi.rodada import registrar_rodada
+from gabi.hoje import hoje_brt
 
 TABELAS_CONTAGEM = ["pessoa", "empresa", "compromisso", "fatura", "memoria", "acesso", "decisao"]
 
@@ -64,7 +65,7 @@ def testar_restauracao(arquivo: Path, tabelas: list[str]) -> dict:
 def main(banco: Path, destino_dir: Path, hoje: date | None = None, testar: bool = False) -> int:
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
-    hoje = hoje or date.today()
+    hoje = hoje or hoje_brt()
     if (Path(destino_dir) / f"gabi-brain-{hoje.isoformat()}.sqlite").exists():
         print(f"backup de {hoje} já existe; nada a fazer")  # reexecução no mesmo dia (instalação) não é falha
         return 0

@@ -8,6 +8,7 @@ from gabi.cobrar.reembolso import ItemReembolso, itens_a_reembolsar
 from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.cobrar.util import brl as _brl
+from gabi.hoje import hoje_brt
 
 
 class NaoPermitido(Exception):
@@ -33,7 +34,7 @@ def montar(con, empresa_id: str, itens: list[int] | None, *, hoje: dt.date | Non
 
 
 def _montar(con, empresa_id: str, itens: list[int] | None, hoje: dt.date | None) -> Cobranca:
-    hoje = hoje or dt.date.today()
+    hoje = hoje or hoje_brt()
     emp = con.execute("select nome, dados from empresa where id=? and excluido_em is null", (empresa_id,)).fetchone()
     if emp is None:
         raise LookupError(f"empresa {empresa_id} não existe")

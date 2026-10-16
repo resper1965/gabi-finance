@@ -207,3 +207,55 @@ def test_modelo_com_custo_falha_depois_do_envio_grava_tarefa_falha(banco):
         w.completar("p", forte=False)
     w.fechar()
     assert [t for t, _ in _linhas_custo(banco)] == ["email-falha"]
+
+
+def _historico_de_custo(banco, tarefa, n, custo):
+    c = conectar(banco)
+    for i in range(n):
+        c.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,?)",
+                  ((dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=i)).astimezone(escuta_prog.BRT).isoformat(), custo, tarefa))
+    c.close()
+
+
+class _Quebra:
+    def completar(self, prompt, *, forte):
+        raise RuntimeError("timeout")
+
+
+def test_reserva_de_falha_segue_o_custo_real_da_tarefa(banco):
+    _historico_de_custo(banco, "email", 12, 0.0001)
+    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    with pytest.raises(RuntimeError):
+        w.completar("p", forte=False)
+    w.fechar()
+    assert _linhas_custo(banco)[-1] == ("email-falha", 0.001)  # 5 x 0,0001 = 0,0005, abaixo do piso de 0,001
+
+
+def test_reserva_de_falha_sem_historico_suficiente_usa_o_padrao_conservador(banco):
+    _historico_de_custo(banco, "email", 3, 0.0001)
+    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    with pytest.raises(RuntimeError):
+        w.completar("p", forte=False)
+    w.fechar()
+    assert _linhas_custo(banco)[-1] == ("email-falha", 0.05)
+
+
+def test_reserva_de_falha_nunca_passa_do_padrao(banco):
+    _historico_de_custo(banco, "email", 12, 0.5)  # chamadas caras: 5 x 0,5 > 0,05
+    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    with pytest.raises(RuntimeError):
+        w.completar("p", forte=False)
+    w.fechar()
+    assert _linhas_custo(banco)[-1] == ("email-falha", 0.05)
+
+
+def test_vinte_timeouts_do_email_nao_estouram_o_teto_diario(banco):
+    _historico_de_custo(banco, "email", 30, 0.0001)
+    for _ in range(20):
+        w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+        with pytest.raises(RuntimeError):
+            w.completar("p", forte=False)
+        w.fechar()
+    c = conectar(banco)
+    gasto = c.execute("select sum(custo_usd) from custo_modelo where tarefa='email-falha'").fetchone()[0]
+    assert gasto == pytest.approx(0.02) and gasto < 0.7

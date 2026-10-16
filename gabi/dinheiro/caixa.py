@@ -6,6 +6,7 @@ Provado contra tests/golden/finlib.json (tests/dinheiro/test_golden_caixa.py). C
 import datetime as dt
 import re
 import unicodedata
+from gabi.hoje import hoje_brt
 
 D = dt.date
 
@@ -54,7 +55,7 @@ def aplica_regras(r, rg):
     return r['categoria'] or 'sem categoria', ''
 
 def meses_atras(n, hoje=None):
-    h = hoje or D.today(); y, m = h.year, h.month - n
+    h = hoje or hoje_brt(); y, m = h.year, h.month - n
     while m <= 0: m += 12; y -= 1
     return D(y, m, 1)
 
@@ -72,7 +73,7 @@ def _m11(s, base=False):
     return 0 if r in (0, 1) else 11 - r
 BANCOS = {'001': 'Banco do Brasil', '033': 'Santander', '104': 'Caixa', '237': 'Bradesco', '341': 'Itau', '260': 'Nubank', '077': 'Inter', '336': 'C6', '208': 'BTG', '102': 'XP', '422': 'Safra', '748': 'Sicredi', '756': 'Sicoob', '212': 'Original', '623': 'Pan', '655': 'Votorantim', '041': 'Banrisul', '070': 'BRB', '389': 'Mercantil', '745': 'Citibank'}
 def conferir_boleto(linha, hoje=None):
-    d = re.sub(r'\D', '', linha or ''); hoje = hoje or D.today()
+    d = re.sub(r'\D', '', linha or ''); hoje = hoje or hoje_brt()
     if len(d) == 47:
         c1, c2, c3 = d[0:9], d[10:20], d[21:31]
         dvs = [_m10(c1) == int(d[9]), _m10(c2) == int(d[20]), _m10(c3) == int(d[31])]

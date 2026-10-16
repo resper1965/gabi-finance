@@ -114,7 +114,7 @@ def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
 
 
 @pytest.mark.parametrize("corpo", [{}, {"outra": 1}, {"vips": "chefe@x.com"}, {"vips": ["nao-e-email"]}, {"vips": [3]}, {"vips": ["a@x.com"] * 0 + [f"u{i}@x.com" for i in range(201)]},
-                                   {"criterios_emergencia": 5}, {"criterios_emergencia": "x" * 2001}, {"lixeira_confianca": 0.49}, {"lixeira_confianca": 1.01},
+                                   {"criterios_emergencia": 5}, {"criterios_emergencia": "x" * 2001}, {"lixeira_confianca": 0.49}, {"lixeira_confianca": 0.69}, {"lixeira_confianca": 1.01},
                                    {"lixeira_confianca": "0.9"}, {"lixeira_confianca": True}, {"janela_dias": 0}, {"janela_dias": 61}, {"janela_dias": 1.5},
                                    {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_dias": True},
                                    {"dias_em_aberto": 0}, {"dias_em_aberto": 31}, {"dias_em_aberto": True}, {"max_alertas_dia": 0}, {"max_alertas_dia": 51}, {"max_alertas_dia": 2.5},
