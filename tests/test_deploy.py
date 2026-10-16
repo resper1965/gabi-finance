@@ -503,3 +503,23 @@ def test_unidades_do_correio_seguem_o_padrao_e_nao_sao_habilitadas():
 def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
     unit = _ler("gabi-brain-fontes.service")
     assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
+
+
+# ---------------- exames em PDF: serviço e timer (instalados, NÃO habilitados) ----------------
+def test_unidades_exames_seguem_o_padrao():
+    srv, t = _ler("gabi-brain-exames.service"), _ler("gabi-brain-exames.timer")
+    assert "-m gabi.familia" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv  # a chave é arquivo próprio, não variável de ambiente
+    assert "OnUnitActiveSec=30min" in t and "Unit=gabi-brain-exames.service" in t
+    assert hasattr(importlib.import_module("gabi.familia.__main__"), "main")
+    for nome in ("gabi-brain-exames.service", "gabi-brain-exames.timer"):
+        assert nome in INSTALAR
+
+
+def test_instalar_nao_liga_o_timer_dos_exames():
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and all("gabi-brain-exames" not in l for l in ligadas)

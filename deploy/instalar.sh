@@ -49,6 +49,7 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-contatos.service "$AQUI"/deploy/gabi-brain-contatos.timer \
   "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
+  "$AQUI"/deploy/gabi-brain-exames.service "$AQUI"/deploy/gabi-brain-exames.timer \
   "$AQUI"/deploy/gabi-brain-escuta.service "$AQUI"/deploy/gabi-brain-escuta.timer "$AQUI"/deploy/gabi-brain-escuta.path \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer "$AQUI"/deploy/escuta-ouvinte.service /etc/systemd/system/
 systemctl daemon-reload
@@ -57,6 +58,7 @@ systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-bra
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
 # O timer da agenda do Google (gabi-brain-agenda.timer) também fica instalado e DESLIGADO (liga quando houver fonte liberada na aba Agenda; precisa de calendar.readonly no /etc/gabi/google.env).
+# O timer dos exames em PDF (gabi-brain-exames.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: precisa da chave do cofre de saúde (a mesma da api) e do Paperless e do modelo na ponte).
 # O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
 # O timer e o path da escuta (gabi-brain-escuta.timer, gabi-brain-escuta.path) ficam instalados mas DESLIGADOS até o Ricardo mandar ligar.
 # O ouvinte (escuta-ouvinte.service) fica instalado e DESLIGADO. Passos do Ricardo, nesta ordem (docs/runbook.md#escuta):

@@ -20,6 +20,9 @@ class PaperlessFalso:
         rota, _, qs = caminho.partition("?")
         if metodo == "GET" and rota == "/api/documents/":
             itens = list(self.docs.values())
+            filtro = re.search(r"tags__id__all=(\d+)", qs)
+            if filtro:
+                itens = [d for d in itens if int(filtro.group(1)) in (d.get("tags") or [])]
             pagina = int(re.search(r"page=(\d+)", qs).group(1)) if "page=" in qs else 1
             ps = int(re.search(r"page_size=(\d+)", qs).group(1)) if "page_size=" in qs else 100
             fatia = itens[(pagina - 1) * ps: pagina * ps]

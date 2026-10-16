@@ -52,3 +52,14 @@ def test_enviar_erro_nao_vaza_token_nem_conteudo():
     with pytest.raises(ErroPaperless) as e:
         cli.enviar(b"CONTEUDO-SECRETO", "a.pdf", ["gabi:x"])
     assert "tok-secreto" not in str(e.value) and "CONTEUDO-SECRETO" not in str(e.value) and "500" in str(e.value)
+
+
+def test_por_etiqueta_so_traz_os_documentos_da_etiqueta_e_nao_cria_nada():
+    cli, srv = _cli(docs=[{"id": 1, "tags": [5], "content": "a"}, {"id": 2, "tags": [6], "content": "b"}], tags={"gabi:saude-exame": 5})
+    assert [d["id"] for d in cli.por_etiqueta("gabi:saude-exame")] == [1]
+    assert cli.por_etiqueta("inexistente") == [] and not any(c[0] == "POST" for c in srv.chamadas)
+
+
+def test_texto_devolve_o_ocr_do_documento():
+    cli, _ = _cli(docs=[{"id": 1, "tags": [], "content": "Glicose 90"}, {"id": 2, "tags": []}])
+    assert cli.texto(1) == "Glicose 90" and cli.texto(2) == ""

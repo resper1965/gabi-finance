@@ -20,7 +20,7 @@ from gabi.fontes.paperless import ErroPaperless
 
 MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
-    "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar"}),
+    "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar", "por_etiqueta", "texto"}),
     "openrouter": frozenset({"completar"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),

@@ -67,6 +67,17 @@ class Paperless:
         paginas = self._paginas("/api/documents/?" + urlencode(filtros))
         return list(itertools.islice(paginas, limite) if limite else paginas)
 
+    def por_etiqueta(self, nome: str) -> list[dict]:
+        """Documentos que têm a etiqueta `nome` (qualquer nome; só leitura, não cria a etiqueta). Etiqueta inexistente = lista vazia."""
+        achada = next(iter(self._paginas("/api/tags/?" + urlencode({"name__iexact": nome}))), None)
+        if not achada:
+            return []
+        return [d for d in self.docs(tags__id__all=achada["id"]) if achada["id"] in (d.get("tags") or [])]
+
+    def texto(self, id: int) -> str:
+        """Texto (OCR) do documento."""
+        return self._pedir("GET", f"/api/documents/{int(id)}/").get("content") or ""
+
     def baixar(self, id: int) -> bytes:
         return self._pedir("GET", f"/api/documents/{int(id)}/download/")
 
