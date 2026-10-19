@@ -207,3 +207,152 @@ def test_contatos_conta_nao_permitida_sem_rede():
     with pytest.raises(ErroGraphNess, match="conta não permitida"):
         gr.contatos("outro@ness.com.br")
     assert http.chamadas == []
+
+
+# ---------------- agenda ----------------
+from gabi.agenda import tempo  # noqa: E402
+
+JANELA = {"de": "2026-10-12T03:00:00+00:00", "ate": "2027-01-17T03:00:00+00:00"}
+CONTA = "resper@ness.com.br"
+PRIMEIRA = g.BASE + "/users/resper%40ness.com.br/calendarView/delta"
+
+
+def _ev(id_="a", **kw):
+    e = {"id": id_, "@odata.etag": 'W/"x"', "subject": "Reunião", "isAllDay": False, "isCancelled": False, "sensitivity": "normal", "showAs": "busy",
+         "iCalUId": "uid-" + id_, "lastModifiedDateTime": "2026-10-10T10:00:00Z", "attendees": [],
+         "start": {"dateTime": "2026-10-12T13:00:00.0000000", "timeZone": "UTC"}, "end": {"dateTime": "2026-10-12T14:00:00.0000000", "timeZone": "UTC"}}
+    e.update(kw)
+    return e
+
+
+def test_calendarios():
+    gr, http = _graph([(200, {"value": [{"id": "AAA=", "name": "Calendar", "isDefaultCalendar": True}, {"id": "BBB=", "name": "Feriados"}, {"name": "sem id"}]})])
+    assert gr.listar_calendarios(CONTA) == [{"id": "AAA=", "nome": "Calendar", "principal": True}, {"id": "BBB=", "nome": "Feriados", "principal": False}]
+    assert urlsplit(http.chamadas[0][1]).path == "/v1.0/users/resper%40ness.com.br/calendars"
+
+
+def test_calendarios_conta_nao_permitida():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="conta não permitida"):
+        gr.listar_calendarios("outro@ness.com.br")
+    assert http.chamadas == []
+
+
+def test_eventos_carga_completa_pede_delta_com_janela():
+    p2 = g.BASE + "/users/resper%40ness.com.br/calendarView/delta?$skiptoken=P2"
+    delta = g.BASE + "/users/resper%40ness.com.br/calendarView/delta?$deltatoken=D1"
+    gr, http = _graph([(200, {"value": [_ev("a")], "@odata.nextLink": p2}), (200, {"value": [_ev("b")], "@odata.deltaLink": delta})])
+    r = gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert [e["externo_id"] for e in r["eventos"]] == ["a", "b"] and r["novo_sync_token"] == delta and r["recarga_completa"] is False
+    u = urlsplit(http.chamadas[0][1])
+    assert u.path == "/v1.0/users/resper%40ness.com.br/calendarView/delta"
+    q = parse_qs(u.query)
+    assert q["startDateTime"] == [JANELA["de"]] and q["endDateTime"] == [JANELA["ate"]]
+    assert http.chamadas[0][3]["Prefer"] == 'outlook.timezone="UTC", odata.maxpagesize=200' and http.chamadas[1][1] == p2
+
+
+def test_eventos_de_outro_calendario_usam_o_id_na_url():
+    gr, http = _graph([(200, {"value": [], "@odata.deltaLink": g.BASE + "/x?$deltatoken=1"})])
+    gr.listar_eventos(CONTA, "BBB=", None, JANELA)
+    assert urlsplit(http.chamadas[0][1]).path == "/v1.0/users/resper%40ness.com.br/calendars/BBB%3D/calendarView/delta"
+
+
+def test_eventos_incremental_usa_o_delta_link():
+    link = g.BASE + "/users/resper%40ness.com.br/calendarView/delta?$deltatoken=abc"
+    gr, http = _graph([(200, {"value": [_ev("a")], "@odata.deltaLink": g.BASE + "/x?$deltatoken=def"})])
+    r = gr.listar_eventos(CONTA, "primary", link, JANELA)
+    assert http.chamadas[0][1] == link and r["novo_sync_token"].endswith("def") and r["recarga_completa"] is False
+
+
+def test_sync_token_de_outro_host_e_recusado():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="token de sincronização inválido"):
+        gr.listar_eventos(CONTA, "primary", "https://evil.example/d?$deltatoken=1", JANELA)
+    assert http.chamadas == []
+
+
+def test_mapeamento():
+    gr, _ = _graph([(200, {"value": [
+        _ev("comum", attendees=[{}, {}, {}], onlineMeeting={"joinUrl": "https://teams.microsoft.com/l/x"}),
+        _ev("dia", isAllDay=True, start={"dateTime": "2026-10-12T00:00:00.0000000", "timeZone": "UTC"}, end={"dateTime": "2026-10-13T00:00:00.0000000", "timeZone": "UTC"}),
+        _ev("http", onlineMeeting={"joinUrl": "http://x"}), _ev("priv", sensitivity="private"), _ev("livre", showAs="free"),
+        _ev("semtitulo", subject=None)], "@odata.deltaLink": g.BASE + "/x?$deltatoken=1"})])
+    ev = {e["externo_id"]: e for e in gr.listar_eventos(CONTA, "primary", None, JANELA)["eventos"]}
+    c = ev["comum"]
+    assert c["inicio"] == {"dateTime": "2026-10-12T13:00:00Z"} and c["fim"] == {"dateTime": "2026-10-12T14:00:00Z"}
+    assert c["titulo"] == "Reunião" and c["participantes_qtd"] == 3 and c["link_reuniao"] == "https://teams.microsoft.com/l/x"
+    assert c["status"] == "confirmed" and c["etag"] == 'W/"x"' and c["atualizado_origem"] == "2026-10-10T10:00:00Z" and c["ical_uid"] == "uid-comum"
+    assert (c["privado"], c["livre"]) == (False, False)
+    assert ev["dia"]["inicio"] == {"date": "2026-10-12"} and ev["dia"]["fim"] == {"date": "2026-10-13"}
+    assert ev["http"]["link_reuniao"] is None and ev["priv"]["privado"] is True and ev["livre"]["livre"] is True and ev["semtitulo"]["titulo"] is None
+    j = tempo.de_google(c["inicio"], c["fim"], "America/Sao_Paulo")
+    assert j.dia_local == "2026-10-12" and not j.dia_inteiro
+    d = tempo.de_google(ev["dia"]["inicio"], ev["dia"]["fim"], "America/Sao_Paulo")
+    assert d.dia_inteiro and d.dia_local == "2026-10-12" and d.dia_fim_local == "2026-10-12"
+
+
+def test_removido_cancelado_e_recusado_vao_para_cancelados():
+    gr, _ = _graph([(200, {"value": [
+        {"id": "r", "@removed": {"reason": "deleted"}}, _ev("c", isCancelled=True), _ev("d", responseStatus={"response": "declined"}),
+        _ev("ok", responseStatus={"response": "accepted"})], "@odata.deltaLink": g.BASE + "/x?$deltatoken=1"})])
+    r = gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert r["cancelados"] == ["r", "c", "d"] and [e["externo_id"] for e in r["eventos"]] == ["ok"]
+
+
+def test_410_incremental_vira_recarga():
+    link = g.BASE + "/users/resper%40ness.com.br/calendarView/delta?$deltatoken=velho"
+    gr, http = _graph([(410, {}), (200, {"value": [_ev("a")], "@odata.deltaLink": g.BASE + "/x?$deltatoken=novo"})])
+    r = gr.listar_eventos(CONTA, "primary", link, JANELA)
+    assert r["recarga_completa"] is True and r["novo_sync_token"].endswith("novo") and len(http.chamadas) == 2
+    assert "startDateTime" in http.chamadas[1][1]
+    gr, _ = _graph([(410, {})])
+    with pytest.raises(ErroGraphNess, match="-> 410"):
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+
+
+def test_429_nao_e_repetido():
+    gr, http = _graph([(429, {})])
+    with pytest.raises(ErroGraphNess, match="-> 429"):
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert len(http.chamadas) == 1
+
+
+def test_eventos_pagina_sem_fim_e_link_de_outro_host():
+    p = g.BASE + "/users/resper%40ness.com.br/calendarView/delta?$skiptoken=P"
+    gr, _ = _graph([(200, {"value": [], "@odata.nextLink": p})] * 3)
+    with pytest.raises(ErroGraphNess, match="paginação sem fim"):
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+    gr, http = _graph([(200, {"value": [], "@odata.nextLink": "https://evil.example/p"})])
+    with pytest.raises(ErroGraphNess, match="link inválido"):
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert len(http.chamadas) == 1
+
+
+def test_resposta_sem_delta_link_e_erro():
+    gr, _ = _graph([(200, {"value": [_ev("a")]})])
+    with pytest.raises(ErroGraphNess, match="resposta inválida do Graph"):
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+
+
+def test_calendario_e_janela_invalidos():
+    gr, http = _graph([])
+    for cal in ("a/b", "a b", "", None, "x" * 400):
+        with pytest.raises(ErroGraphNess, match="calendário inválido"):
+            gr.listar_eventos(CONTA, cal, None, JANELA)
+    for jan in ({}, {"de": "x"}, None):
+        with pytest.raises(ErroGraphNess, match="janela inválida"):
+            gr.listar_eventos(CONTA, "primary", None, jan)
+    assert http.chamadas == []
+
+
+def test_evento_sem_id_e_pulado():
+    gr, _ = _graph([(200, {"value": [{"subject": "x"}, {"id": 5}, _ev("ok")], "@odata.deltaLink": g.BASE + "/x?$deltatoken=1"})])
+    r = gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert [e["externo_id"] for e in r["eventos"]] == ["ok"] and r["cancelados"] == []
+
+
+def test_erro_nao_leva_titulo_do_evento():
+    gr, _ = _graph([(500, {"error": {"message": "Reunião secreta"}})])
+    with pytest.raises(ErroGraphNess) as e:
+        gr.listar_eventos(CONTA, "primary", None, JANELA)
+    assert "secreta" not in str(e.value)
