@@ -434,3 +434,79 @@ def test_ponte_email_respondeu_a_cruza_e_valida_a_forma(sock_email):
     with pytest.raises(ErroGoogleOAuth) as e:
         p.respondeu_a("ruim@x.com", ["bia@x.com"])
     assert str(e.value) == "messages.list -> 500"
+
+
+# ---- Graph da ness pela ponte ----
+from gabi.fontes.graph_ness import ErroGraphNess  # noqa: E402
+from gabi.fontes.ponte import PonteGraph  # noqa: E402
+
+
+class _FalsoGraph:
+    def contas(self):
+        return ["resper@ness.com.br"]
+
+    def contatos(self, conta):
+        return [{"nome": "Ana", "telefone": "1"}]
+
+    def listar_calendarios(self, conta):
+        return [{"id": "A=", "nome": "Calendar", "principal": True}]
+
+    def listar_eventos(self, conta, calendario_id, sync_token, janela):
+        if conta == "malformada@x.com":
+            return {"eventos": []}
+        if conta == "boom@x.com":
+            raise ErroGraphNess("GET /v1.0/users/x/calendarView/delta -> 401")
+        return {"eventos": [{"externo_id": "a"}], "cancelados": ["b"], "novo_sync_token": "S", "recarga_completa": False}
+
+    def enviar(self):
+        return "nunca"
+
+
+@pytest.fixture
+def sock_graph(tmp_path):
+    srv = Servidor(tmp_path / "gr.sock", {"graph_ness": _FalsoGraph(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield tmp_path / "gr.sock"
+    srv.shutdown(); srv.server_close()
+
+
+def test_graph_ness_metodos_permitidos(sock_graph):
+    assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos"})
+    assert ERROS["graph_ness"] is ErroGraphNess
+    with pytest.raises(ErroGraphNess, match="metodo_proibido"):
+        Ponte(sock_graph, "graph_ness")._chamar("enviar")
+
+
+def test_ponte_graph_cruza_resultados(sock_graph):
+    p = PonteGraph(sock_graph)
+    assert p.configurada() and p.contas() == ["resper@ness.com.br"]
+    assert p.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": "1"}]
+    assert p.listar_calendarios("resper@ness.com.br")[0]["principal"] is True
+    r = p.listar_eventos("resper@ness.com.br", "primary", None, JANELA_AG)
+    assert isinstance(r, ResultadoEventos) and r.cancelados == ["b"] and r.novo_sync_token == "S"
+
+
+def test_ponte_graph_valida_forma(sock_graph):
+    with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+        PonteGraph(sock_graph).listar_eventos("malformada@x.com", "primary", None, JANELA_AG)
+    with pytest.raises(ErroGraphNess, match="-> 401"):
+        PonteGraph(sock_graph).listar_eventos("boom@x.com", "primary", None, JANELA_AG)
+
+
+def test_ponte_graph_nao_configurada(tmp_path):
+    srv = Servidor(tmp_path / "n.sock", {"graph_ness": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        assert PonteGraph(tmp_path / "n.sock").configurada() is False
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ambiente_com_socket_expoe_graph_ness(tmp_path, monkeypatch):
+    srv = Servidor(tmp_path / "e.sock", {"graph_ness": _FalsoGraph()})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("GABI_FONTES_SOCKET", str(tmp_path / "e.sock"))
+        assert isinstance(fontes_do_ambiente()["graph_ness"](), PonteGraph)
+    finally:
+        srv.shutdown(); srv.server_close()

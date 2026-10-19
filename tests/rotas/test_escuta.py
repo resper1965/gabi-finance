@@ -472,3 +472,33 @@ def test_grupo_caixa_de_comprovantes_so_um_e_exige_aprovado(cli, banco):
     c = conectar(banco)
     assert c.execute("select count(*) from decisao where o_que like 'escuta: caixa de comprovantes%'").fetchone()[0] == 2
     c.close()
+
+
+class _GraphContatos:
+    def __init__(self, contas, dados):
+        self._contas, self.dados, self.pedidas = contas, dados, []
+
+    def contas(self):
+        return self._contas
+
+    def contatos(self, conta):
+        self.pedidas.append(conta)
+        return self.dados.get(conta, [])
+
+
+def test_sincronizar_manda_a_conta_da_ness_ao_graph(banco):
+    google = _Contatos({GMAIL: [{"nome": "Ana", "telefone": "(11) 91234-5678"}]})
+    graph = _GraphContatos([NESS], {NESS: [{"nome": "Zé", "telefone": "11 98888-7777"}]})
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA,
+                               fontes={"google_contatos": (lambda: google), "graph_ness": (lambda: graph)}), client=("127.0.0.1", 50000))
+    r = cli.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}")
+    assert r.status_code == 200, r.text
+    assert r.json()["dados"]["contas"] == {GMAIL: {"lidos": 1}, NESS: {"lidos": 1}} and graph.pedidas == [NESS]
+
+
+def test_sincronizar_so_com_o_graph_configurado(banco):
+    graph = _GraphContatos([NESS], {NESS: [{"nome": "Zé", "telefone": "11 98888-7777"}]})
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"graph_ness": (lambda: graph)}), client=("127.0.0.1", 50000))
+    r = cli.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}")
+    assert r.status_code == 200, r.text  # a conta do Gmail cai como "não autorizada" sem derrubar a da ness
+    assert r.json()["dados"]["contas"][NESS] == {"lidos": 1} and "erro" in r.json()["dados"]["contas"][GMAIL]

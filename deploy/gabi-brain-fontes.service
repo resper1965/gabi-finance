@@ -17,6 +17,8 @@ EnvironmentFile=-/etc/gabi/openrouter.env
 # O ÚLTIMO EnvironmentFile vence: o antigo (só contatos) vem primeiro e o canônico google.env (contatos + agenda) por último.
 EnvironmentFile=-/etc/gabi/google-contatos.env
 EnvironmentFile=-/etc/gabi/google.env
+# M365_TENANT_ID, M365_CLIENT_ID, M365_CLIENT_SECRET (e, se quiser, M365_CONTAS) do Graph da ness: opcional; formato KEY=valor, sem espaço ao redor do '='.
+EnvironmentFile=-/etc/gabi/graph-ness.env
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock
 # Pasta e socket para o dono e o grupo gabibrain (a API e o MCP); mais ninguém na VPS alcança a ponte.
 RuntimeDirectory=gabi-brain-fontes
