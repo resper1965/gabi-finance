@@ -2,8 +2,9 @@
 O texto da mensagem nunca chega aqui (a ponte não o devolve); o único texto livre persistido é `de_nome`.
 
 Erros pela ponte: o serviço de fontes devolve só o tipo e a mensagem; um `_ErroStatus` do Graph chega como `ErroGraphNess` com a mensagem
-`_ErroStatus: GET <caminho> -> <status>`. O status é lido desse texto (regex `-> (\\d{3})$`): 403/404 pulam o chat; 429 encerra a conta nesta rodada;
-qualquer outro erro encerra a conta e vai (curto, sem corpo de resposta) para `teams_fonte.ultimo_erro`."""
+`_ErroStatus: GET <caminho> -> <status>`. O status é lido desse texto (regex `-> (\\d{3})\\b`): qualquer erro COM status (403, 404, 400, 500...) pula só o chat (um chat "envenenado" não trava os
+outros) e é contado em `puladas`; 429 encerra a conta nesta rodada; erro SEM status (transporte/indisponível) encerra a conta e vai
+(curto) para `teams_fonte.ultimo_erro`. Nunca se grava o texto de um erro com status."""
 import datetime as dt
 import re
 
@@ -11,7 +12,7 @@ from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.teams.regra import _dt, _parametro
 
 JANELA_INICIAL_HORAS = 24
-_STATUS = re.compile(r"-> (\d{3})\s*$")
+_STATUS = re.compile(r"-> (\d{3})\b")
 
 
 def _status(e: Exception) -> int | None:
@@ -58,17 +59,18 @@ def _chat(con, ponte, conta: str, c: dict, agora: dt.datetime, janela: float) ->
 
 
 def _conta(con, ponte, conta: str, agora: dt.datetime, janela: float) -> dict:
-    chats = novas = 0
+    chats = novas = puladas = 0
     for c in ponte.teams_chats(conta):
         try:
             lido, n = _chat(con, ponte, conta, c, agora, janela)
         except ErroGraphNess as e:
             st = _status(e)
-            if st in (403, 404):
-                continue  # chat sem acesso ou que sumiu: pula só ele
-            raise
+            if st is not None and st != 429:
+                puladas += 1  # este chat falhou (sem acesso, sumiu, 4xx/5xx): pula só ele
+                continue
+            raise  # 429 ou erro sem status: encerra a conta
         chats, novas = chats + lido, novas + n
-    return {"chats": chats, "novas": novas}
+    return {"chats": chats, "novas": novas, **({"puladas": puladas} if puladas else {})}
 
 
 def coletar(con, ponte, agora: dt.datetime) -> dict[str, dict]:
@@ -83,6 +85,7 @@ def coletar(con, ponte, agora: dt.datetime) -> dict[str, dict]:
             r = {"erro": msg}
             con.execute("update teams_fonte set ultimo_erro=? where id=?", (msg, f["id"]))
         else:
-            con.execute("update teams_fonte set coletada_em=?, ultimo_erro=null where id=?", (agora.isoformat(), f["id"]))
+            aviso = f"{r['puladas']} chat(s) pulado(s) por erro" if r.get("puladas") else None
+            con.execute("update teams_fonte set coletada_em=?, ultimo_erro=? where id=?", (agora.isoformat(), aviso, f["id"]))
         saida[f["conta"]] = r
     return saida

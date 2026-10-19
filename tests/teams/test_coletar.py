@@ -115,8 +115,8 @@ def test_chat_com_403_e_pulado_e_conta_segue(con):
               {("a@ness.com.br", "c2"): [_msg("1", "2026-10-20T13:00:00+00:00")]},
               {("a@ness.com.br", "c1"): ErroGraphNess("_ErroStatus: GET /chats/c1/messages -> 403")})
     r = coletar(con, p, AGORA)
-    assert r["a@ness.com.br"] == {"chats": 1, "novas": 1} and _conv(con, "c2") is not None
-    assert con.execute("select ultimo_erro, coletada_em from teams_fonte").fetchone()["ultimo_erro"] is None
+    assert r["a@ness.com.br"] == {"chats": 1, "novas": 1, "puladas": 1} and _conv(con, "c2") is not None
+    assert con.execute("select coletada_em from teams_fonte").fetchone()["coletada_em"] == AGORA.isoformat()
 
 
 def test_429_encerra_a_conta_sem_derrubar_a_outra(con):
@@ -148,15 +148,53 @@ def test_conta_nao_liberada_nao_e_lida(con):
     assert coletar(con, p, AGORA) == {} and p.chamadas == []
 
 
-def test_nenhum_texto_em_banco_nem_saida(con, capsys):
+def test_chat_com_500_ou_400_e_pulado_e_os_outros_seguem(con):
     _fonte(con)
-    p = Falsa({"a@ness.com.br": [_chat()]}, {("a@ness.com.br", "c1"): [_msg("1", "2026-10-20T13:00:00+00:00", nome="Ana")]})
-    coletar(con, p, AGORA)
-    texto = []
-    for t in ("teams_fonte", "teams_conversa"):
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2"), _chat("c3")]},
+              {("a@ness.com.br", "c3"): [_msg("1", "2026-10-20T13:00:00+00:00")]},
+              {("a@ness.com.br", "c1"): ErroGraphNess("_ErroStatus: GET /chats/c1/messages -> 500"),
+               ("a@ness.com.br", "c2"): ErroGraphNess("_ErroStatus: GET /chats/c2/messages -> 400")})
+    r = coletar(con, p, AGORA)
+    assert r["a@ness.com.br"] == {"chats": 1, "novas": 1, "puladas": 2}
+    f = con.execute("select ultimo_erro, coletada_em from teams_fonte").fetchone()
+    assert f["coletada_em"] == AGORA.isoformat() and "2" in f["ultimo_erro"]
+
+
+def test_erro_sem_status_encerra_a_conta(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")]}, erros={("a@ness.com.br", "c1"): ErroGraphNess("serviço de fontes indisponível")})
+    r = coletar(con, p, AGORA)
+    assert r["a@ness.com.br"] == {"erro": "serviço de fontes indisponível"} and [c for c in p.chamadas if c[1] == "c2"] == []
+
+
+SENTINELAS = ("SENT_CORPO", "SENT_ASSUNTO", "SENT_ANEXO", "SENT_TEXTO", "SENT_ERRO")
+
+
+def _todo_texto(con):
+    saida = []
+    for (t,) in con.execute("select name from sqlite_master where type='table' and name not like 'sqlite_%'").fetchall():
         for r in con.execute(f"select * from {t}"):
-            texto += [v for v in tuple(r) if isinstance(v, str)]
-    livres = [v for v in texto if "Ana" in v]
-    assert livres == ["Ana"]
+            saida += [str(v) for v in tuple(r) if v is not None]
+    return "\n".join(saida)
+
+
+def test_nenhum_texto_em_banco_nem_saida(tmp_path, capsys):
+    from gabi.teams.__main__ import main
+    banco = tmp_path / "t.db"
+    c = conectar(banco)
+    migrar(c, MIGR)
+    c.execute("insert into teams_fonte(conta, estado) values ('a@ness.com.br','sim'), ('b@ness.com.br','sim')")
+    c.close()
+    sujo = {**_msg("1", "2026-10-20T13:00:00+00:00", nome="Ana"), "corpo": "SENT_CORPO", "assunto": "SENT_ASSUNTO", "anexos": ["SENT_ANEXO"], "texto": "SENT_TEXTO"}
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")], "b@ness.com.br": [_chat("c3")]},
+              {("a@ness.com.br", "c1"): [sujo]},
+              {("a@ness.com.br", "c2"): ErroGraphNess("_ErroStatus: GET /chats/c2/messages -> 500 SENT_ERRO"),
+               ("b@ness.com.br", "c3"): ErroGraphNess("_ErroStatus: GET /chats/c3/messages -> 429 SENT_ERRO")})
+    p.configurada = lambda: True
+    assert main(banco, ponte=p) == 0
     cap = capsys.readouterr()
-    assert "Ana" not in cap.out + cap.err
+    c = conectar(banco)
+    tudo = _todo_texto(c) + cap.out + cap.err
+    assert "Ana" in _todo_texto(c) and "Ana" not in cap.out + cap.err
+    assert not [s for s in SENTINELAS if s in tudo]
+    assert c.execute("select count(*) from rodada where fonte='teams'").fetchone()[0] == 1

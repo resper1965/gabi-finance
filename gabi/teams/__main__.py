@@ -38,7 +38,7 @@ def main(banco: Path | None = None, *, ponte=None) -> int:
     finally:
         con.close()
     ok = [v for v in r.values() if "erro" not in v]
-    print(f"teams: contas={len(r)} ok={len(ok)} chats={sum(v['chats'] for v in ok)} novas={sum(v['novas'] for v in ok)}")
+    print(f"teams: contas={len(r)} ok={len(ok)} chats={sum(v['chats'] for v in ok)} novas={sum(v['novas'] for v in ok)} puladas={sum(v.get('puladas', 0) for v in ok)}")
     for conta, v in r.items():
         if "erro" in v:
             print(f"AVISO: conta {conta} falhou: {v['erro']}", file=sys.stderr)
