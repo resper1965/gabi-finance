@@ -274,3 +274,11 @@ Nada a instalar nem ligar: a tela e a rota `GET /api/v1/contatos` leem tabelas q
 - **Cadastros › E-mail** tem agora o campo de retenção das mensagens (90 a 3650 dias; padrão 180). **Mensagens › Contatos** mostra "frente: <nome>" só para quem teve um e-mail confirmado numa frente.
 - **Agenda:** o link da reunião também vem de `conferenceData` (Zoom/Teams adicionados ao evento); vale a partir da próxima recarga de cada calendário. `auth=delegacao` ainda não tem cliente (a fonte mostra o erro, não tenta OAuth).
 
+## Graph da ness (contatos e agenda): instalar e ligar {#graph-ness}
+Fonte: `docs/fontes/graph-ness.md`; decisão: `docs/adr/019-graph-ness.md`. O instalador instala e NADA liga. Passos do Ricardo, nesta ordem:
+1. **No Entra ID da ness (app `ness-automacao`):** deixar só `Calendars.Read` e `Contacts.Read` (mais as de e-mail/Teams quando essas partes entrarem) e remover `Calendars.ReadWrite.All`, `Contacts.ReadWrite`, `Application.ReadWrite.All` e `Sites.FullControl.All`; pedir ao administrador a política de acesso do Exchange que restringe o app a `resper@ness.com.br`.
+2. **Arquivo de ambiente:** `sudo bash deploy/normalizar-env-graph.sh` (tira os espaços ao redor do `=` em `/etc/gabi/graph-ness.env`, faz backup e imprime só os nomes das chaves).
+3. **Instalar:** `deploy/instalar.sh`, depois `sudo systemctl restart gabi-brain-fontes` e conferir no `journalctl -u gabi-brain-fontes` a linha `fontes configuradas` com `graph_ness: True`.
+4. **Agenda:** Painel › Cadastros › Agenda › tipo **Microsoft**, conta `resper@ness.com.br`, **Descobrir calendários**, **Liberar** os que quer ler. Teste à mão antes do timer: `sudo -u gabibrain env GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock /opt/gabi-brain/venv/bin/python -m gabi.agenda` (imprime só contagens). Depois `sudo systemctl enable --now gabi-brain-agenda.timer` (o mesmo timer lê Google e Microsoft).
+5. **Contatos:** Painel › Escuta › Contatos › Sincronizar (a conta da ness passa a vir do Graph; `resper@ness.com.br` já está em `escuta.contas_contatos`).
+
