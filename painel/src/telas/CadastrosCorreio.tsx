@@ -21,6 +21,7 @@ export const quandoBRT = (iso: string | null) => (iso ? new Intl.DateTimeFormat(
 function Contas({ leitura, acao }: { leitura: Leitura<{ fontes: Fonte[] }>; acao: Acao }) {
   const { ocupado, erros, agir } = acao;
   const [conta, setConta] = useState("");
+  const [provedor, setProvedor] = useState<"google" | "graph">("google");
   const [confirmando, setConfirmando] = useState<number | null>(null);
   return (
     <Painel leitura={leitura} arquivo="correio-contas">
@@ -53,9 +54,10 @@ function Contas({ leitura, acao }: { leitura: Leitura<{ fontes: Fonte[] }>; acao
           <form style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }} onSubmit={async (e) => {
             e.preventDefault();
             if (ocupado || !conta.trim()) return;
-            if (await agir("geral", () => api.post("/api/v1/correio/fontes", { conta: conta.trim(), provedor: "google" }), "Conta cadastrada.", leitura.recarregar)) setConta("");
+            if (await agir("geral", () => api.post("/api/v1/correio/fontes", { conta: conta.trim(), provedor }), "Conta cadastrada.", leitura.recarregar)) setConta("");
           }}>
-            <label>Conta (e-mail do Google)<br /><input aria-label="Conta de e-mail" value={conta} onChange={(e) => setConta(e.target.value)} /></label>
+            <label>Provedor<br /><select aria-label="Provedor da conta" value={provedor} onChange={(e) => setProvedor(e.target.value as "google" | "graph")}><option value="google">Google</option><option value="graph">Microsoft (ness)</option></select></label>
+            <label>Conta (e-mail)<br /><input aria-label="Conta de e-mail" value={conta} onChange={(e) => setConta(e.target.value)} /></label>
             <button className="btn btn-primary" type="submit" disabled={ocupado}>Cadastrar conta</button>
           </form>
         </Bloco>

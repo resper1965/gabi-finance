@@ -13,8 +13,11 @@ from gabi.correio.processar import fechar_alerta
 from gabi.db import transacao
 from gabi.envelope import envelope
 from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
+
+_FONTE_EMAIL = {"google": "google_email", "graph": "graph_email"}  # chave de `app.state.fontes` por provedor da conta
 
 router = APIRouter(prefix="/api/v1/correio", dependencies=[Depends(exigir("boss"))])
 
@@ -142,7 +145,7 @@ def dispensadas(request: Request):
 
 
 def _mensagem(con, mensagem_id: int):
-    m = con.execute("select m.id, m.externo_id, m.thread_id, m.estado, m.classe, m.dispensada_em, f.conta, f.estado as conta_estado, f.lixeira as conta_lixeira "
+    m = con.execute("select m.id, m.externo_id, m.thread_id, m.estado, m.classe, m.dispensada_em, f.conta, f.provedor, f.estado as conta_estado, f.lixeira as conta_lixeira "
                     "from email_msg m join email_fonte f on f.id=m.fonte_id where m.id=?", (mensagem_id,)).fetchone()
     if m is None:
         raise erro(404, "nao_encontrado", "mensagem não existe")
@@ -165,13 +168,13 @@ async def mover_para_lixeira(mensagem_id: int, request: Request, ident: Identida
             raise erro(409, "conflito", "a conta está desligada")
         if not m["conta_lixeira"]:
             raise erro(409, "conflito", "ligue a lixeira desta conta (Cadastros › E-mail) para mover")
-        fabrica = request.app.state.fontes.get("google_email")
+        fabrica = request.app.state.fontes.get(_FONTE_EMAIL[m["provedor"]])
         fonte = fabrica() if fabrica else None
         if fonte is None:
             raise erro(503, "fonte_indisponivel", "o e-mail do Google não está configurado")
         try:
             resultado = await asyncio.to_thread(fonte.lixeira, m["conta"], [m["externo_id"]])  # rede bloqueante: fora do laço da API
-        except ErroGoogleOAuth as e:
+        except (ErroGoogleOAuth, ErroGraphNess) as e:
             raise erro(503, "fonte_indisponivel", str(e)) from None
         if not isinstance(resultado, dict) or resultado.get(m["externo_id"]) != "ok":
             raise erro(503, "fonte_indisponivel", "o Gmail não confirmou o movimento; tente de novo")
@@ -248,20 +251,20 @@ async def restaurar(mensagem_id: int, request: Request, ident: Identidade = Depe
     await _json(request)
     con = _con(request)
     try:
-        m = con.execute("select m.id, m.externo_id, m.thread_id, m.estado, f.conta from email_msg m join email_fonte f on f.id=m.fonte_id where m.id=?", (mensagem_id,)).fetchone()
+        m = con.execute("select m.id, m.externo_id, m.thread_id, m.estado, f.conta, f.provedor from email_msg m join email_fonte f on f.id=m.fonte_id where m.id=?", (mensagem_id,)).fetchone()
         if m is None:
             raise erro(404, "nao_encontrado", "mensagem não existe")
         if m["estado"] == "restaurada":
             return envelope(con, {"id": mensagem_id, "estado": "restaurada"}, agora=_agora(request))
         if m["estado"] != "na_lixeira":
             raise erro(409, "conflito", "a mensagem não está na lixeira")
-        fabrica = request.app.state.fontes.get("google_email")
+        fabrica = request.app.state.fontes.get(_FONTE_EMAIL[m["provedor"]])
         fonte = fabrica() if fabrica else None
         if fonte is None:
             raise erro(503, "fonte_indisponivel", "o e-mail do Google não está configurado")
         try:
             resultado = await asyncio.to_thread(fonte.restaurar, m["conta"], [m["externo_id"]])  # rede bloqueante: fora do laço da API
-        except ErroGoogleOAuth as e:
+        except (ErroGoogleOAuth, ErroGraphNess) as e:
             raise erro(503, "fonte_indisponivel", str(e)) from None
         if not isinstance(resultado, dict) or resultado.get(m["externo_id"]) != "ok":
             raise erro(503, "fonte_indisponivel", "o Gmail não confirmou a restauração; tente de novo")

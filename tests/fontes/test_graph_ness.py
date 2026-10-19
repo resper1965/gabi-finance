@@ -149,11 +149,11 @@ def test_do_ambiente():
     assert g.graph_ness_do_ambiente({**env, "M365_CONTAS": "a@x.com, B@x.com"}).contas() == ["a@x.com", "b@x.com"]
 
 
-def test_so_leitura_no_codigo():
+def test_so_leitura_no_codigo_fora_do_move():
     texto = Path(g.__file__).read_text()
     for proibido in ("PATCH", "PUT", "DELETE"):
         assert proibido not in texto
-    assert texto.count('"POST"') == 1
+    assert texto.count('"POST"') == 2  # token e /move da lixeira (travado em test_graph_ness_email)
 
 
 # ---------------- contatos ----------------

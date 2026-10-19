@@ -25,7 +25,8 @@ PERMITIDOS = {
     "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
-    "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos"}),
+    "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
+                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
@@ -243,17 +244,18 @@ class PonteGraph:
         return ResultadoEventos(r["eventos"], r["cancelados"], r.get("novo_sync_token"), r["recarga_completa"])
 
 
-def _resultado_por_id(r) -> dict:
+def _resultado_por_id(r, erro: type[Exception] = ErroGoogleOAuth) -> dict:
     if not isinstance(r, dict) or not all(isinstance(k, str) and v in ("ok", "erro") for k, v in r.items()):
-        raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+        raise erro("resposta inválida do serviço de fontes")
     return r
 
 
 class PonteEmail:
-    """Gmail lido (e movido para a lixeira) no serviço de fontes (único com rede e segredos). Lista fixa de métodos; sem enviar nem apagar."""
+    """Correio (Gmail ou Graph da ness) lido e movido para a lixeira no serviço de fontes (único com rede e segredos). Lista fixa de métodos; sem
+    enviar nem apagar. `fonte`/`erro` escolhem o lado: `google_email` (padrão) ou `graph_ness` com `ErroGraphNess`."""
 
-    def __init__(self, caminho):
-        self._ponte = Ponte(caminho, "google_email")
+    def __init__(self, caminho, fonte: str = "google_email", erro: type[Exception] = ErroGoogleOAuth):
+        self._ponte, self._erro = Ponte(caminho, fonte), erro
 
     def configurada(self) -> bool:
         return self._ponte.configurada()
@@ -262,24 +264,24 @@ class PonteEmail:
         r = self._ponte._chamar("listar_novos", (conta, history_id, janela_dias))
         if (not isinstance(r, dict) or not isinstance(r.get("mensagens"), list) or not all(isinstance(m, dict) for m in r["mensagens"])
                 or not isinstance(r.get("recarga_completa"), bool) or not (r.get("novo_history_id") is None or isinstance(r.get("novo_history_id"), str))):
-            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+            raise self._erro("resposta inválida do serviço de fontes")
         return ResultadoEmail(r["mensagens"], r.get("novo_history_id"), r["recarga_completa"])
 
     def lixeira(self, conta: str, ids: list[str]) -> dict:
-        return _resultado_por_id(self._ponte._chamar("lixeira", (conta, list(ids))))
+        return _resultado_por_id(self._ponte._chamar("lixeira", (conta, list(ids))), self._erro)
 
     def restaurar(self, conta: str, ids: list[str]) -> dict:
-        return _resultado_por_id(self._ponte._chamar("restaurar", (conta, list(ids))))
+        return _resultado_por_id(self._ponte._chamar("restaurar", (conta, list(ids))), self._erro)
 
     def enviados_recentes(self, conta: str, dias: int) -> list[str]:
         r = self._ponte._chamar("enviados_recentes", (conta, dias))
         if not isinstance(r, list) or not all(isinstance(x, str) for x in r):
-            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+            raise self._erro("resposta inválida do serviço de fontes")
         return r
 
     def respondeu_a(self, conta: str, enderecos: list[str]) -> dict:
         r = self._ponte._chamar("respondeu_a", (conta, list(enderecos)))
         if not isinstance(r, dict) or not all(isinstance(k, str) and isinstance(v, bool) for k, v in r.items()):
-            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+            raise self._erro("resposta inválida do serviço de fontes")
         return r
 

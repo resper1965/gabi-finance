@@ -9,6 +9,7 @@ from gabi.avisos import _novo
 from gabi.correio.regras import endereco
 from gabi.db import transacao
 from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 
 RECARGA_DIAS = 7
 JANELA_PADRAO = 14
@@ -80,13 +81,10 @@ def sincronizar(con, listar: Callable, agora: str) -> dict:
     Credencial recusada → aviso `email_reconectar` (1 por dia, fecha sozinho quando a conta volta)."""
     saida = {}
     for f in con.execute("select id, conta, provedor from email_fonte where estado='sim' order by id").fetchall():
-        if f["provedor"] != "google":
-            saida[f["id"]] = {"erro": "provedor sem cliente ainda"}
-            continue
         try:
             saida[f["id"]] = sincronizar_fonte(con, f["id"], listar, agora)
         except Exception as ex:  # noqa: BLE001 - uma fonte nunca derruba as outras; só texto tipado do cliente entra no erro, de resto só o nome da classe
-            msg = str(ex) if isinstance(ex, ErroGoogleOAuth) else type(ex).__name__
+            msg = str(ex) if isinstance(ex, (ErroGoogleOAuth, ErroGraphNess)) else type(ex).__name__
             saida[f["id"]] = {"erro": msg}
             con.execute("update email_fonte set ultimo_erro=? where id=?", (msg, f["id"]))
             if CREDENCIAL.search(msg):

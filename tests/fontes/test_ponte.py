@@ -471,7 +471,8 @@ def sock_graph(tmp_path):
 
 
 def test_graph_ness_metodos_permitidos(sock_graph):
-    assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos"})
+    assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
+                                                  "enviados_recentes", "respondeu_a"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -508,5 +509,30 @@ def test_ambiente_com_socket_expoe_graph_ness(tmp_path, monkeypatch):
     try:
         monkeypatch.setenv("GABI_FONTES_SOCKET", str(tmp_path / "e.sock"))
         assert isinstance(fontes_do_ambiente()["graph_ness"](), PonteGraph)
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ponte_do_graph_aceita_o_correio_e_valida_a_forma_com_o_erro_da_ness(tmp_path):
+    from gabi.fontes.graph_ness import ErroGraphNess
+    assert {"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"} <= PERMITIDOS["graph_ness"]
+    for proibido in ("enviar", "apagar", "send", "delete", "responder"):
+        assert proibido not in PERMITIDOS["graph_ness"]
+
+    class Falsa(_FalsaEmail):
+        pass
+    srv = Servidor(tmp_path / "gm.sock", {"graph_ness": Falsa(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        p = PonteEmail(tmp_path / "gm.sock", "graph_ness", ErroGraphNess)
+        assert p.configurada()
+        assert p.listar_novos("a@x.com", None, 14).novo_history_id == "H"
+        assert p.lixeira("a@x.com", ["a1"]) == {"a1": "ok"}
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.listar_novos("malformada@x.com", None, 14)
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.lixeira("malformada@x.com", ["a1"])
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.enviados_recentes("malformada@x.com", 365)
     finally:
         srv.shutdown(); srv.server_close()

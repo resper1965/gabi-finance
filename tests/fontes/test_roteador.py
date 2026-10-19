@@ -65,3 +65,33 @@ def test_contatos_pela_ponte_roteia_a_ness_ao_graph(tmp_path):
             listar(GMAIL)
     finally:
         srv.shutdown(); srv.server_close()
+
+
+# ---- correio ----
+class _Correio:
+    def __init__(self, nome):
+        self.nome, self.chamadas = nome, []
+
+    def __getattr__(self, metodo):
+        def chamar(conta, *a):
+            self.chamadas.append((metodo, conta))
+            return self.nome
+        return chamar
+
+
+def test_correio_roteia_cada_metodo_por_conta_cadastrada_como_graph():
+    from gabi.fontes.roteador import RoteadorEmail
+    google, graph = _Correio("g"), _Correio("m")
+    r = RoteadorEmail(google, graph, [NESS])
+    assert r.listar_novos(NESS, None, 14) == "m" and r.listar_novos("RESPER@Ness.com.br", None, 14) == "m" and r.listar_novos(GMAIL, None, 14) == "g"
+    for metodo, args in (("lixeira", (["a"],)), ("restaurar", (["a"],)), ("enviados_recentes", (365,)), ("respondeu_a", (["a@x.com"],))):
+        assert getattr(r, metodo)(NESS, *args) == "m" and getattr(r, metodo)(GMAIL, *args) == "g"
+    assert {c for _, c in google.chamadas} == {GMAIL}
+
+
+def test_correio_lado_ausente_vira_nao_autorizada():
+    from gabi.fontes.roteador import RoteadorEmail
+    with pytest.raises(ErroGoogleOAuth, match="^conta não autorizada: " + NESS):
+        RoteadorEmail(_Correio("g"), None, [NESS]).lixeira(NESS, ["a"])
+    with pytest.raises(ErroGoogleOAuth, match="^conta não autorizada: " + GMAIL):
+        RoteadorEmail(None, _Correio("m"), [NESS]).listar_novos(GMAIL, None, 14)

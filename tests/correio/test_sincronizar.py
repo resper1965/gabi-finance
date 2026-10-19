@@ -182,3 +182,14 @@ def test_atualizar_respondidos_grava_enderecos_validos_e_a_marca_de_conferencia(
     assert sz.respondidos_prontos(con, f) is True
     assert sz.atualizar_respondidos(con, f, [], "2026-10-19T12:00:00+00:00") == 0  # lista vazia também vale como "conferi"
     assert sz.respondidos_prontos(con, f) is True
+
+
+def test_conta_graph_sincroniza_pelo_mesmo_motor_e_erro_do_graph_vira_mensagem_curta(con):
+    from gabi.fontes.graph_ness import ErroGraphNess
+    f = con.execute("insert into email_fonte(conta, provedor, estado) values ('n@ness.com.br', 'graph', 'sim')").lastrowid
+    r = sz.sincronizar(con, Falso(ResultadoEmail([_m("AAMk1=")], "https://graph.microsoft.com/v1.0/x?$deltatoken=D", False)), AGORA)
+    assert r[f]["novos"] == 1 and _ids(con) == ["AAMk1="]
+    assert con.execute("select history_id from email_fonte where id=?", (f,)).fetchone()[0].startswith("https://graph.microsoft.com/")
+    r = sz.sincronizar(con, Falso(ErroGraphNess("GET /v1.0/users/n/messages/x -> 403")), AGORA)
+    assert r[f] == {"erro": "GET /v1.0/users/n/messages/x -> 403"}
+    assert con.execute("select count(*) from aviso where tipo='email_reconectar'").fetchone()[0] == 1  # 403 = credencial/permissão: pede reconectar

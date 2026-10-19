@@ -4,6 +4,7 @@ import os
 
 from gabi.fontes.nibo_escrita import NiboEscrita
 from gabi.fontes.paperless import Paperless
+from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.fontes.ponte import Ponte, PonteAgenda, PonteEmail, PonteGraph, PonteModelo
 
 
@@ -17,6 +18,7 @@ def fontes_do_ambiente() -> dict:
         fontes["modelo"] = lambda: PonteModelo(caminho) if Ponte(caminho, "openrouter").configurada() else None  # reprocessar exames pela API
         fontes["graph_ness"] = lambda: ok(PonteGraph(caminho))  # Graph da ness: só leitura
         fontes["google_email"] = lambda: ok(PonteEmail(caminho))  # leitura e lixeira; sem enviar nem apagar
+        fontes["graph_email"] = lambda: ok(PonteEmail(caminho, "graph_ness", ErroGraphNess))  # correio da ness: leitura e Itens Excluídos
         return fontes
     return {
         "nibo": lambda: NiboEscrita(os.environ["NIBO_TOKEN"]) if os.environ.get("NIBO_TOKEN") else None,

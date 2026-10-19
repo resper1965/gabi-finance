@@ -114,6 +114,15 @@ test("cadastrar conta envia POST e limpa o campo", async () => {
   await waitFor(() => expect((screen.getByLabelText("Conta de e-mail") as HTMLInputElement).value).toBe(""));
 });
 
+test("cadastrar conta Microsoft envia provedor graph", async () => {
+  const c = fake();
+  montar();
+  fireEvent.change(await screen.findByLabelText("Provedor da conta"), { target: { value: "graph" } });
+  fireEvent.change(screen.getByLabelText("Conta de e-mail"), { target: { value: "resper@ness.com.br" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cadastrar conta" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "POST", url: "/api/v1/correio/fontes", corpo: { conta: "resper@ness.com.br", provedor: "graph" } }]));
+});
+
 test("ajustes recusam confiança fora da faixa antes de enviar e mandam só o que mudou", async () => {
   const c = fake();
   montar();

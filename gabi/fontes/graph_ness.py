@@ -1,7 +1,10 @@
-"""Microsoft Graph da ness (resper@ness.com.br), SÓ leitura: contatos e agenda. Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
+"""Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; a única escrita é MOVER mensagem de e-mail entre a Caixa de
+Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
+escrever em agenda ou contatos: o POST é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
 o resto do brain chega aqui pela ponte (`PonteGraph`). Autenticação do app por client credentials com secret (M365_TENANT_ID, M365_CLIENT_ID,
 M365_CLIENT_SECRET no ambiente do serviço). O app tem permissão no tenant inteiro: a conta lida vem sempre de `M365_CONTAS` (padrão só
 resper@ness.com.br), nunca de entrada livre. Segredo, token e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/graph-ness.md."""
+import datetime as dt
 import json
 import re
 import time
@@ -13,6 +16,8 @@ from typing import Callable
 
 from gabi.fontes.google_agenda import ResultadoEventos
 from gabi.fontes.google_contatos import MAX_EMAILS, _EMAIL
+from gabi.fontes.google_email import (MAX_CARGA_MSGS, MAX_ENDERECOS, MAX_ENDERECOS_CONSULTA, MAX_ENVIADOS_MSGS, MAX_IDS_POR_CHAMADA, TAM_ASSUNTO,
+                                      TAM_TRECHO, ResultadoEmail, _endereco, _lista)
 
 BASE = "https://graph.microsoft.com/v1.0"
 HOST = "https://graph.microsoft.com/"
@@ -21,6 +26,11 @@ MAX_PAGINAS = 200
 FOLGA_S = 300
 CONTAS_PADRAO = ["resper@ness.com.br"]
 _CALENDARIO = re.compile(r"^[A-Za-z0-9=_.-]{1,300}$")  # "primary" ou id do Graph (base64 com "="): nunca "/" nem espaço
+_ID_MSG = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id imutável de mensagem (base64url): nunca "/" nem espaço
+_IMUTAVEL = 'IdType="ImmutableId"'  # o id não muda quando a mensagem vai e volta dos Itens Excluídos (restaurar usa o mesmo id)
+_DESTINOS = {"trash": "deleteditems", "untrash": "inbox"}  # as únicas escritas: destino fixo, nunca vindo de fora
+_VENENO = (400, 404, 410, 413, 422)  # 4xx que é do id (401/403/429/5xx continuam parando a leitura)
+_CAMPOS_MSG = "id,conversationId,from,subject,receivedDateTime,bodyPreview,isDraft,internetMessageHeaders"
 
 
 class ErroGraphNess(Exception):
@@ -110,8 +120,8 @@ class TokenApp:
 class GraphNess:
     """Objeto da ponte (JSON puro, só GET). Sem o token provider nada sai."""
 
-    def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real):
-        self._token, self._contas, self._http = token, [c.lower() for c in contas], http
+    def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time):
+        self._token, self._contas, self._http, self._agora = token, [c.lower() for c in contas], http, agora
 
     def __repr__(self):
         return "GraphNess(<oculto>)"
@@ -154,10 +164,10 @@ class GraphNess:
                                   "principal": c.get("isDefaultCalendar") is True})
         return saida
 
-    def _delta(self, url: str) -> tuple[list[dict], str]:
+    def _delta(self, url: str, extra: dict | None = None) -> tuple[list[dict], str]:
         """Todas as páginas do delta -> (itens, deltaLink). Sem deltaLink no fim a resposta é inválida."""
         itens, delta = [], None
-        for pagina in self._paginas(url, {"Prefer": 'outlook.timezone="UTC", odata.maxpagesize=200'}):
+        for pagina in self._paginas(url, extra or {"Prefer": 'outlook.timezone="UTC", odata.maxpagesize=200'}):
             itens += [i for i in pagina.get("value") or [] if isinstance(i, dict)]
             delta = pagina.get("@odata.deltaLink")
         if not isinstance(delta, str) or not delta:
@@ -234,6 +244,166 @@ class GraphNess:
                 if emails and not telefones:
                     saida.append({"nome": nome, "telefone": None, "emails": emails})
         return saida
+
+    # ---------------- e-mail ----------------
+    def _desde(self, dias: int) -> str:
+        return (dt.datetime.fromtimestamp(self._agora(), dt.timezone.utc) - dt.timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _caixa(self, conta: str) -> str:
+        return f"{BASE}/users/{urllib.parse.quote(self._conta(conta), safe='')}"
+
+    def listar_novos(self, conta: str, history_id: str | None, janela_dias: int) -> dict:
+        """Mensagens novas na Caixa de Entrada. Sem `history_id`: carga pela janela. Com ele (o deltaLink anterior): só o que mudou; 410 (delta expirado)
+        ou mais de MAX_CARGA_MSGS de uma vez → recarga da janela (`recarga_completa=True`). Rascunho e mensagem fora da entrada nunca entram.
+        Devolve JSON puro (`asdict(ResultadoEmail)`); o campo `novo_history_id` leva o deltaLink."""
+        base = self._caixa(conta)
+        if not isinstance(janela_dias, int) or isinstance(janela_dias, bool) or not 1 <= janela_dias <= 365:
+            raise ErroGraphNess("janela inválida")
+        if history_id is not None and not (isinstance(history_id, str) and history_id.startswith(HOST)):
+            raise ErroGraphNess("token de sincronização inválido")
+        pref = {"Prefer": f'{_IMUTAVEL}, odata.maxpagesize=100'}
+        completa = (f"{base}/mailFolders/inbox/messages/delta?$select=receivedDateTime&$filter="
+                    + urllib.parse.quote(f"receivedDateTime ge {self._desde(janela_dias)}", safe=""))
+
+        def carga() -> tuple[list[str], str]:
+            itens, delta = self._delta(completa, pref)
+            recentes = {i["id"]: i.get("receivedDateTime") or "" for i in itens if "@removed" not in i and isinstance(i.get("id"), str)}
+            return [k for k, _ in sorted(recentes.items(), key=lambda p: p[1], reverse=True)][:MAX_CARGA_MSGS], delta
+
+        recarga = False
+        if history_id is None:
+            ids, delta = carga()
+        else:
+            try:
+                itens, delta = self._delta(history_id, pref)
+                ids = list(dict.fromkeys(i["id"] for i in itens if "@removed" not in i and isinstance(i.get("id"), str)))
+            except _ErroStatus as e:
+                if e.status != 410:
+                    raise
+                recarga, (ids, delta) = True, carga()
+            if len(ids) > MAX_CARGA_MSGS:  # chegou muita coisa de uma vez: lê só as mais recentes da janela (cabe no tempo da ponte) e avisa que recarregou
+                recarga, (ids, delta) = True, carga()
+        msgs = []
+        for i in ids:
+            if not _ID_MSG.match(i):
+                continue
+            try:
+                resp = self._get(f"{base}/messages/{urllib.parse.quote(i, safe='')}?$select={_CAMPOS_MSG}", {"Prefer": _IMUTAVEL})
+            except _ErroStatus as e:
+                if e.status in _VENENO:
+                    continue  # apagada entre a listagem e a leitura, ou 4xx persistente só naquele id: pula, não trava a conta
+                raise
+            m = _mensagem(resp)
+            if m:
+                msgs.append(m)
+        return asdict(ResultadoEmail(msgs, delta, recarga))
+
+    def _enviar_mover(self, url: str, destino: str) -> int:
+        """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""
+        corpo = json.dumps({"destinationId": destino}).encode()
+        for tentativa in (1, 2):
+            cab = {"Authorization": f"Bearer {self._token()}", "Content-Type": "application/json", "Prefer": _IMUTAVEL}
+            status, _ = _chamar(self._http, "POST", url, corpo, cab)
+            if status == 401 and tentativa == 1 and hasattr(self._token, "invalidar"):
+                self._token.invalidar()
+                continue
+            return status
+        return 401
+
+    def _mover(self, conta: str, ids, acao: str) -> dict[str, str]:
+        if acao not in _DESTINOS:  # as únicas escritas que o cliente faz; qualquer outra ação é recusada antes de chamar o Graph
+            raise ErroGraphNess("ação não permitida")
+        base = self._caixa(conta)
+        if not isinstance(ids, (list, tuple)) or len(ids) > MAX_IDS_POR_CHAMADA:
+            raise ErroGraphNess(f"no máximo {MAX_IDS_POR_CHAMADA} ids por chamada")
+        for i in ids:
+            if not isinstance(i, str) or not _ID_MSG.match(i):
+                raise ErroGraphNess("id de mensagem inválido")
+        resultado = {}
+        for i in ids:
+            try:
+                status = self._enviar_mover(f"{base}/messages/{urllib.parse.quote(i, safe='')}/move", _DESTINOS[acao])
+                resultado[i] = "ok" if status < 300 else "erro"
+            except ErroGraphNess:
+                resultado[i] = "erro"  # falha de um id não aborta o lote
+        return resultado
+
+    def lixeira(self, conta: str, ids) -> dict:
+        """Move para os Itens Excluídos (o Exchange os esvazia sozinho). Por id: `ok` ou `erro`; a falha de um não aborta os outros."""
+        return self._mover(conta, ids, "trash")
+
+    def restaurar(self, conta: str, ids) -> dict:
+        """Devolve à Caixa de Entrada (id imutável: é o mesmo id de antes de ir para os Itens Excluídos)."""
+        return self._mover(conta, ids, "untrash")
+
+    def enviados_recentes(self, conta: str, dias: int) -> list[str]:
+        """Endereços de To/Cc dos e-mails que o dono enviou (os MAX_ENVIADOS_MSGS mais recentes na janela), minúsculos e sem repetir."""
+        base = self._caixa(conta)
+        if not isinstance(dias, int) or isinstance(dias, bool) or not 1 <= dias <= 3650:
+            raise ErroGraphNess("janela inválida")
+        q = urllib.parse.quote(f"sentDateTime ge {self._desde(dias)}", safe="")
+        url = f"{base}/mailFolders/sentitems/messages?$select=toRecipients,ccRecipients&$top=100&$orderby=sentDateTime%20desc&$filter={q}"
+        vistos: dict[str, None] = {}
+        lidas = 0
+        for pagina in self._paginas(url):
+            for m in pagina.get("value") or []:
+                if not isinstance(m, dict):
+                    continue
+                lidas += 1
+                for campo in ("toRecipients", "ccRecipients"):
+                    for r in m.get(campo) or []:
+                        a = _endereco((r.get("emailAddress") or {}).get("address") if isinstance(r, dict) and isinstance(r.get("emailAddress"), dict) else None)
+                        if a:
+                            vistos.setdefault(a)
+            if lidas >= MAX_ENVIADOS_MSGS:
+                break
+        return list(vistos)[:MAX_ENDERECOS]
+
+    def respondeu_a(self, conta: str, enderecos) -> dict:
+        """O dono já escreveu (To ou Cc) para cada endereço? Consulta exata nos Enviados, sem o limite da lista dos enviados recentes. Erro do Graph é erro
+        tipado: quem chama trata como "não confirmado" (na dúvida o e-mail fica na caixa), nunca como "não respondeu"."""
+        base = self._caixa(conta)
+        if not isinstance(enderecos, (list, tuple)) or not 1 <= len(enderecos) <= MAX_ENDERECOS_CONSULTA:
+            raise ErroGraphNess(f"de 1 a {MAX_ENDERECOS_CONSULTA} endereços por chamada")
+        normais = []
+        for e in enderecos:
+            a = _endereco(e) if isinstance(e, str) and e.strip().lower() == _endereco(e) else ""
+            if not a:
+                raise ErroGraphNess("endereço inválido")
+            normais.append(a)
+        saida = {}
+        for a in normais:
+            achou = False
+            literal = a.replace("'", "''")  # _ENDERECO aceita apóstrofo no nome (o'neil@x.com): em OData ele se escapa dobrando
+            for campo in ("toRecipients", "ccRecipients"):
+                q = urllib.parse.quote(f"{campo}/any(r:r/emailAddress/address eq '{literal}')", safe="")
+                resp = self._get(f"{base}/mailFolders/sentitems/messages?$select=id&$top=1&$filter={q}")
+                achou = achou or bool(resp.get("value"))
+            saida[a] = achou
+        return saida
+
+
+def _mensagem(m: dict) -> dict | None:
+    """None se é rascunho ou vem malformada. Só cabeçalhos úteis e o trecho curto (`bodyPreview`); o corpo nunca é lido."""
+    if not isinstance(m, dict) or not isinstance(m.get("id"), str) or not _ID_MSG.match(m["id"]) or m.get("isDraft") is True:
+        return None
+    try:
+        recebida = dt.datetime.fromisoformat(m["receivedDateTime"].replace("Z", "+00:00"))
+        recebida = (recebida if recebida.tzinfo else recebida.replace(tzinfo=dt.timezone.utc)).astimezone(dt.timezone.utc)
+    except (KeyError, AttributeError, TypeError, ValueError):
+        return None
+    de = m.get("from")
+    de = de.get("emailAddress") if isinstance(de, dict) else None
+    cab = {}
+    for h in m.get("internetMessageHeaders") or []:
+        if isinstance(h, dict) and isinstance(h.get("name"), str) and isinstance(h.get("value"), str):
+            cab.setdefault(h["name"].lower(), h["value"])
+    assunto, previa, conversa = m.get("subject"), m.get("bodyPreview"), m.get("conversationId")
+    return {"externo_id": m["id"], "thread_id": conversa if isinstance(conversa, str) and conversa else m["id"],
+            "remetente": _endereco(de.get("address") if isinstance(de, dict) else None),
+            "assunto": assunto[:TAM_ASSUNTO] if isinstance(assunto, str) else "",
+            "recebida_em": recebida.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+            "trecho": " ".join(previa.split())[:TAM_TRECHO] if isinstance(previa, str) else "", "lista": _lista(cab)}
 
 
 def _hora(campo, dia_inteiro: bool):
