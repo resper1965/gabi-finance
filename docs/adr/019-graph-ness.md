@@ -10,3 +10,7 @@ Data: 19/10/2026 · Estado: aceito (código completo, nada ligado; passos do don
 4. **`deltaLink` do banco só vai ao host do Graph.** Sem isso um valor adulterado em `agenda_fonte.sync_token` levaria o Bearer do app para fora.
 5. **E-mail da ness (19/10, mesmo molde do ADR-018):** provedor `graph` no correio, sobre `mailFolders/inbox/messages/delta`. Única escrita: `move` para `deleteditems`/`inbox` (destino fixo, `Prefer: IdType="ImmutableId"` para o id sobreviver à mudança de pasta). Nunca envia, responde, encaminha nem apaga de vez; corpo da mensagem nunca é lido. Risco aceito: `Mail.ReadWrite` é mais amplo que a lixeira; a garantia é a lista branca da ponte + teste de varredura (e a política do Exchange, quando existir).
 6. **Fora desta fase:** Teams (sem guardar texto), com plano próprio.
+
+## Teams (20/10/2026)
+7. **Só metadados, sem texto e sem modelo na fase 1.** O Teams da ness é lido pela ponte `graph_ness` (`teams_chats`, `teams_mensagens`) apenas para saber quem escreveu, quando e se houve resposta; o conteúdo das mensagens não é guardado nem enviado a modelo. Mesma trava do restante: só leitura e só a conta cadastrada (a permissão `Chat.Read.All` alcança o tenant, a restrição é o código).
+8. **Fora desta fase:** responder (exigiria exceção à R2 em ADR próprio), canais, modelo (fase 2) e a ionic. A ionic pode ter o acesso mais restrito pelo administrador; o acesso delegado `Chat.Read` é a alternativa, não implementada.

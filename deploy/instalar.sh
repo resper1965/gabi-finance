@@ -49,6 +49,7 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-contatos.service "$AQUI"/deploy/gabi-brain-contatos.timer \
   "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
+  "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
   "$AQUI"/deploy/gabi-brain-exames.service "$AQUI"/deploy/gabi-brain-exames.timer \
   "$AQUI"/deploy/gabi-brain-reembolso-saude.service "$AQUI"/deploy/gabi-brain-reembolso-saude.timer \
   "$AQUI"/deploy/gabi-brain-escuta.service "$AQUI"/deploy/gabi-brain-escuta.timer "$AQUI"/deploy/gabi-brain-escuta.path \
@@ -62,6 +63,7 @@ systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mc
 # O timer dos exames em PDF (gabi-brain-exames.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: precisa da chave do cofre de saúde (a mesma da api) e do Paperless e do modelo na ponte).
 # O timer do reembolso de saúde (gabi-brain-reembolso-saude.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: mesmas precondições dos exames mais o modelo na ponte; runbook#reembolso-saude).
 # O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
+# O timer do Teams (gabi-brain-teams.timer) também fica instalado e DESLIGADO (liga quando houver conta de Teams liberada; runbook#graph-ness passo 7).
 # O timer e o path da escuta (gabi-brain-escuta.timer, gabi-brain-escuta.path) ficam instalados mas DESLIGADOS até o Ricardo mandar ligar.
 # O ouvinte (escuta-ouvinte.service) fica instalado e DESLIGADO. Passos do Ricardo, nesta ordem (docs/runbook.md#escuta):
 #   cd /opt/escuta-ouvinte && sudo npm ci --ignore-scripts --legacy-peer-deps   (como root: node_modules fica só leitura para o serviço; confira antes o pacote/versão em ouvinte/README.md)

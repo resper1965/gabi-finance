@@ -11,3 +11,10 @@
 - **Lixeira:** `lixeira` move para `deleteditems` e `restaurar` para `inbox` (`POST /users/{conta}/messages/{id}/move`); nunca `DELETE`. Por id `ok`/`erro`, a falha de um não aborta o lote. `enviados_recentes` (Itens Enviados, To/Cc) e `respondeu_a` (filtro exato `toRecipients/any(...)`/`ccRecipients/any(...)`; apóstrofo escapado dobrando) alimentam a regra "já respondi nunca vai à lixeira".
 - **Correio:** cadastrar a conta em Cadastros › E-mail com provedor "Microsoft (ness)". `gabi/fontes/roteador.py` (`RoteadorEmail`) manda as contas `provedor='graph'` ao Graph e as demais ao Gmail; o mesmo timer `gabi-brain-correio` lê as duas. Permissão de aplicativo necessária: `Mail.ReadWrite` (o Graph não tem escopo menor que mova mensagem; a garantia é o código, igual ao `gmail.modify`).
 - **A confirmar no aceite com a caixa real:** mover para a pasta em que a mensagem já está (restaurar o que já voltou) deve responder 2xx; se o Exchange recusar, `restaurar` devolve `erro` e o painel mostra "tente de novo".
+
+## Teams (chats, só metadados)
+- **O que se lê:** `teams_chats` e `teams_mensagens` na ponte `graph_ness`. Só metadados (quem, quando, tipo de chat, se há menção); o texto das mensagens não é guardado nem vai a modelo nesta fase. O log recebe só contagens.
+- **Regra (`gabi/teams/regra.py`):** conta como "sem resposta" a mensagem de chat 1:1 ou com menção ao Ricardo que passou de 2 horas úteis sem resposta dele. Expediente: 08:00 às 19:00, segunda a sexta, horário de Brasília. Parâmetros: `teams.horas_uteis` (2), `teams.expediente` (08:00-19:00 seg-sex) e `teams.janela_inicial_horas` (24). A primeira execução olha 24 h para trás.
+- **Aviso:** `teams_sem_resposta`. API: `/api/v1/teams/fontes` (cadastrar a conta; estado `sim` por `PUT .../estado`).
+- **Permissões:** as permissões de aplicativo (`Chat.Read.All`) alcançam o tenant inteiro; a restrição está no código, que só lê os chats da conta cadastrada. Se a ionic restringir por política do administrador, a alternativa é acesso delegado (`Chat.Read`), não implementada.
+- **Timer:** `gabi-brain-teams.timer`, a cada 5 min das 07h às 20h55 (Brasília), instalado e desligado.
