@@ -154,3 +154,56 @@ def test_so_leitura_no_codigo():
     for proibido in ("PATCH", "PUT", "DELETE"):
         assert proibido not in texto
     assert texto.count('"POST"') == 1
+
+
+# ---------------- contatos ----------------
+def _contato(**kw):
+    return {"displayName": "Ana", "mobilePhone": None, "homePhones": [], "businessPhones": [], "emailAddresses": [], **kw}
+
+
+def test_contatos_um_item_por_telefone_com_emails():
+    c = _contato(mobilePhone="+55 11 99999-0000", homePhones=["1133334444"],
+                 emailAddresses=[{"address": "Ana@X.com"}, {"address": "ana@x.com"}, {"address": "lixo"}])
+    gr, _ = _graph([(200, {"value": [c]})])
+    assert gr.contatos("resper@ness.com.br") == [
+        {"nome": "Ana", "telefone": "+55 11 99999-0000", "emails": ["ana@x.com"]},
+        {"nome": "Ana", "telefone": "1133334444", "emails": ["ana@x.com"]}]
+
+
+def test_contatos_so_email_e_vazio():
+    gr, _ = _graph([(200, {"value": [_contato(emailAddresses=[{"address": "ana@x.com"}]), _contato(displayName="Sem nada")]})])
+    assert gr.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": None, "emails": ["ana@x.com"]}]
+
+
+def test_contatos_sem_email_nao_tem_chave_emails():
+    gr, _ = _graph([(200, {"value": [_contato(mobilePhone="11999990000")]})])
+    assert gr.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": "11999990000"}]
+
+
+def test_contatos_pagina_e_pede_so_campos_necessarios():
+    prox = g.BASE + "/users/resper%40ness.com.br/contacts?$skiptoken=P2"
+    gr, http = _graph([(200, {"value": [_contato(mobilePhone="1")], "@odata.nextLink": prox}), (200, {"value": [_contato(displayName="Bia", mobilePhone="2")]})])
+    r = gr.contatos("resper@ness.com.br")
+    assert [x["nome"] for x in r] == ["Ana", "Bia"]
+    u = urlsplit(http.chamadas[0][1])
+    assert u.path == "/v1.0/users/resper%40ness.com.br/contacts"
+    q = parse_qs(u.query)
+    assert q["$select"] == ["displayName,mobilePhone,homePhones,businessPhones,emailAddresses"] and q["$top"] == ["100"]
+    assert http.chamadas[1][1] == prox
+
+
+def test_contatos_paginacao_sem_fim():
+    prox = g.BASE + "/users/resper%40ness.com.br/contacts?$skiptoken=P"
+    gr, _ = _graph([(200, {"value": [], "@odata.nextLink": prox})] * 3)
+    with pytest.raises(ErroGraphNess, match="paginação sem fim"):
+        gr.contatos("resper@ness.com.br")
+    gr, _ = _graph([(200, {"value": [], "@odata.nextLink": f"{prox}{i}"}) for i in range(g.MAX_PAGINAS + 5)])
+    with pytest.raises(ErroGraphNess, match="paginação sem fim"):
+        gr.contatos("resper@ness.com.br")
+
+
+def test_contatos_conta_nao_permitida_sem_rede():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="conta não permitida"):
+        gr.contatos("outro@ness.com.br")
+    assert http.chamadas == []

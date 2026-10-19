@@ -9,6 +9,8 @@ import urllib.parse
 import urllib.request
 from typing import Callable
 
+from gabi.fontes.google_contatos import MAX_EMAILS, _EMAIL
+
 BASE = "https://graph.microsoft.com/v1.0"
 HOST = "https://graph.microsoft.com/"
 LOGIN = "https://login.microsoftonline.com"
@@ -117,6 +119,56 @@ class GraphNess:
         if not isinstance(resp, dict):
             raise ErroGraphNess("resposta inválida do Graph")
         return resp
+
+
+    def _paginas(self, url: str, extra: dict | None = None):
+        """Cada página (dict) seguindo `@odata.nextLink`; link repetido ou mais de MAX_PAGINAS páginas é erro."""
+        vistos = set()
+        for _ in range(MAX_PAGINAS):
+            resp = self._get(url, extra)
+            yield resp
+            url = resp.get("@odata.nextLink")
+            if not url:
+                return
+            if url in vistos:
+                break
+            vistos.add(url)
+        raise ErroGraphNess("paginação sem fim")
+
+    def contatos(self, conta: str) -> list[dict]:
+        """[{nome, telefone[, emails]}] como os contatos do Google: um item por telefone (celular, casa, trabalho), cada um com os e-mails do contato;
+        contato só com e-mail vira um item com `telefone: None`. Só nome, telefone e e-mail são lidos."""
+        conta = self._conta(conta)
+        campos = "displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+        url = f"{BASE}/users/{urllib.parse.quote(conta, safe='')}/contacts?$select={campos}&$top=100"
+        saida = []
+        for pagina in self._paginas(url):
+            for p in pagina.get("value") or []:
+                if not isinstance(p, dict):
+                    continue
+                nome = p.get("displayName")
+                nome = nome if isinstance(nome, str) and nome.strip() else None
+                emails = _emails(p.get("emailAddresses"))
+                telefones = [t for t in [p.get("mobilePhone"), *(p.get("homePhones") or []), *(p.get("businessPhones") or [])]
+                             if isinstance(t, str) and t.strip()]
+                for t in telefones:
+                    item = {"nome": nome, "telefone": t}
+                    if emails:
+                        item["emails"] = list(emails)
+                    saida.append(item)
+                if emails and not telefones:
+                    saida.append({"nome": nome, "telefone": None, "emails": emails})
+        return saida
+
+
+def _emails(lista) -> list[str]:
+    """Endereços válidos em minúsculas, sem repetir, no máximo MAX_EMAILS."""
+    achados = []
+    for e in lista or []:
+        v = e.get("address") if isinstance(e, dict) else None
+        if isinstance(v, str) and _EMAIL.match(v.strip()):
+            achados.append(v.strip().lower())
+    return list(dict.fromkeys(achados))[:MAX_EMAILS]
 
 
 def graph_ness_do_ambiente(env) -> GraphNess | None:
