@@ -10,6 +10,7 @@ from gabi.agenda import tempo
 from gabi.avisos import _novo
 from gabi.db import transacao
 from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 
 RECARGA_DIAS = 7
 CREDENCIAL = re.compile(r"-> 401\b|invalid_grant|não autorizada|token recusado")
@@ -106,20 +107,22 @@ def _fechar_aviso(con, conta: str, agora: str) -> None:
                 (_agora(agora).astimezone(dt.timezone.utc).isoformat(), conta))
 
 
-def sincronizar(con, listar: Callable, agora: str) -> dict:
-    """Por fonte com estado='sim': {fonte_id: resultado | {"erro": msg}}. Uma fonte que falha não derruba as outras nem muda suas linhas."""
+def sincronizar(con, listar: Callable, agora: str, *, listar_graph: Callable | None = None) -> dict:
+    """Por fonte com estado='sim': {fonte_id: resultado | {"erro": msg}}. Uma fonte que falha não derruba as outras nem muda suas linhas.
+    `listar` lê as fontes do Google; `listar_graph` (mesma assinatura) as da Microsoft (ness)."""
     saida = {}
     for f in con.execute("select id, conta, provedor, auth from agenda_fonte where estado='sim' order by id").fetchall():
-        if f["provedor"] != "google":
+        cliente = {"google": listar, "graph": listar_graph}.get(f["provedor"])
+        if cliente is None:
             saida[f["id"]] = {"erro": "provedor sem cliente ainda"}
             continue
         if f["auth"] != "oauth":  # `delegacao` ainda não tem cliente: não tenta o OAuth da conta por engano
             saida[f["id"]] = {"erro": "autenticação por delegação sem cliente ainda"}
             continue
         try:
-            saida[f["id"]] = sincronizar_fonte(con, f["id"], listar, agora)
+            saida[f["id"]] = sincronizar_fonte(con, f["id"], cliente, agora)
         except Exception as ex:  # noqa: BLE001 - uma fonte nunca derruba as outras; só texto tipado do cliente entra no erro, de resto só o nome da classe
-            msg = str(ex) if isinstance(ex, ErroGoogleOAuth) else type(ex).__name__
+            msg = str(ex) if isinstance(ex, (ErroGoogleOAuth, ErroGraphNess)) else type(ex).__name__
             anterior = con.execute("select ultimo_erro from agenda_fonte where id=?", (f["id"],)).fetchone()[0]
             saida[f["id"]] = {"erro": msg}
             con.execute("update agenda_fonte set ultimo_erro=? where id=?", (msg, f["id"]))

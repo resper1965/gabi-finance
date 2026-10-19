@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from gabi.api import criar_app
 from gabi.db import conectar
 from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 
 from tests.rotas.test_escuta import AGORA, BOSS, JSON, VIP, banco  # noqa: F401  (fixture banco)
 
@@ -93,10 +94,44 @@ def test_descobrir_calendarios_cria_fontes_a_decidir(cli, banco):
     assert len(cli.get(f"{U}/fontes", headers=BOSS).json()["dados"]["fontes"]) == 2
 
 
-def test_descobrir_em_fonte_inexistente_ou_graph(cli):
+def test_descobrir_em_fonte_inexistente(cli):
     assert _post(cli, f"{U}/fontes/999/calendarios/descobrir").status_code == 404
-    gid = _post(cli, f"{U}/fontes", {"conta": "g@x.com", "provedor": "graph"}).json()["dados"]["id"]
-    assert _post(cli, f"{U}/fontes/{gid}/calendarios/descobrir").status_code == 400
+
+
+class _Graph:
+    def __init__(self, cals=None, erro=None):
+        self.cals, self.erro, self.chamadas = cals or [], erro, []
+
+    def listar_calendarios(self, conta):
+        self.chamadas.append(conta)
+        if self.erro:
+            raise self.erro
+        return self.cals
+
+
+def _cli_graph(banco, graph=None):
+    fontes = {"graph_ness": (lambda: graph)} if graph is not None else {}
+    return TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes=fontes), client=("127.0.0.1", 50000))
+
+
+def test_descobrir_calendarios_do_graph(banco):
+    graph = _Graph([{"id": "AAA=", "nome": "Calendar", "principal": True}, {"id": "BBB=", "nome": "Feriados", "principal": False}])
+    cli = _cli_graph(banco, graph)
+    gid = _criar(cli, "resper@ness.com.br", provedor="graph")
+    r = _post(cli, f"{U}/fontes/{gid}/calendarios/descobrir")
+    assert r.status_code == 200, r.text
+    assert [(c["calendario_id"], c["nome"], c["estado"]) for c in r.json()["dados"]["calendarios"]] == [("primary", "Calendar", "a_decidir"), ("BBB=", "Feriados", "a_decidir")]
+    assert graph.chamadas == ["resper@ness.com.br"]
+
+
+def test_descobrir_graph_sem_fonte_ou_com_ponte_fora_vira_503(banco):
+    sem = _cli_graph(banco)
+    gid = _criar(sem, "resper@ness.com.br", provedor="graph")
+    r = _post(sem, f"{U}/fontes/{gid}/calendarios/descobrir")
+    assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
+    caida = _cli_graph(banco, _Graph(erro=ErroGraphNess("serviço de fontes indisponível")))
+    r = _post(caida, f"{U}/fontes/{gid}/calendarios/descobrir")
+    assert r.status_code == 503 and r.json()["erro"] == "fonte_indisponivel"
 
 
 def test_ponte_fora_vira_503(banco):

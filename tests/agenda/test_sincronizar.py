@@ -241,3 +241,38 @@ def test_auth_delegacao_sem_cliente_nao_chama_o_google(con):
     cli = Falso()
     assert sincronizar(con, cli, AGORA) == {f: {"erro": "autenticação por delegação sem cliente ainda"}}
     assert cli.chamadas == []
+
+
+# ---------------- Graph (ness) ----------------
+from gabi.fontes.graph_ness import ErroGraphNess  # noqa: E402
+
+
+def _fonte_graph(con, conta="resper@ness.com.br", cal="primary", estado="sim"):
+    return con.execute("insert into agenda_fonte(conta, provedor, calendario_id, estado) values (?,?,?,?)", (conta, "graph", cal, estado)).lastrowid
+
+
+def test_fonte_graph_usa_o_cliente_graph_e_a_google_o_do_google(con):
+    fg, fgo = _fonte_graph(con), _fonte(con)
+    google = Falso(ResultadoEventos([_ev("g1")], [], "TG", False))
+    graph = Falso(ResultadoEventos([_ev("m1"), _ev("m2")], [], "TM", False))
+    r = sincronizar(con, google, AGORA, listar_graph=graph)
+    assert r[fg]["gravados"] == 2 and r[fgo]["gravados"] == 1
+    assert [c[0] for c in graph.chamadas] == ["resper@ness.com.br"] and [c[0] for c in google.chamadas] == ["a@x.com"]
+    assert con.execute("select sync_token from agenda_fonte where id=?", (fg,)).fetchone()[0] == "TM"
+
+
+def test_graph_sem_cliente_nao_derruba_as_outras(con):
+    fg, fgo = _fonte_graph(con), _fonte(con)
+    r = sincronizar(con, Falso(ResultadoEventos([_ev("g1")], [], "T", False)), AGORA)
+    assert r[fg] == {"erro": "provedor sem cliente ainda"} and r[fgo]["gravados"] == 1
+
+
+def test_erro_do_graph_aparece_tipado_e_reconecta_no_401(con):
+    f = _fonte_graph(con)
+    r = sincronizar(con, Falso(), AGORA, listar_graph=Falso(ErroGraphNess("GET /v1.0/users/x/calendarView/delta -> 401")))
+    assert r[f] == {"erro": "GET /v1.0/users/x/calendarView/delta -> 401"}
+    assert con.execute("select ultimo_erro from agenda_fonte").fetchone()[0].endswith("-> 401")
+    assert con.execute("select count(*) from aviso where tipo='agenda_reconectar'").fetchone()[0] == 1
+    f2 = _fonte_graph(con, cal="outro")
+    r = sincronizar(con, Falso(), AGORA, listar_graph=Falso(RuntimeError("segredo"), RuntimeError("segredo")))
+    assert r[f] == {"erro": "RuntimeError"} and r[f2] == {"erro": "RuntimeError"}

@@ -10,6 +10,7 @@ from gabi.agenda import fontes as fn
 from gabi.db import transacao
 from gabi.envelope import envelope
 from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
@@ -55,20 +56,21 @@ async def criar_fonte(request: Request, ident: Identidade = Depends(exigir("boss
 
 @router.post("/fontes/{fonte_id}/calendarios/descobrir")
 async def descobrir(fonte_id: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Pergunta ao Google (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora."""
+    """Pergunta ao Google ou ao Graph (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora."""
     await _json(request)
-    fabrica = request.app.state.fontes.get("google_agenda")
-    fonte = fabrica() if fabrica else None
     con = _con(request)
     try:
         try:
             f = fn._existe(con, fonte_id)  # 404 antes de 503 e de qualquer chamada de rede
+            nome, rotulo = ("graph_ness", "Microsoft (Graph)") if f["provedor"] == "graph" else ("google_agenda", "Google")
+            fabrica = request.app.state.fontes.get(nome)
+            fonte = fabrica() if fabrica else None
             if fonte is None:
-                raise erro(503, "fonte_indisponivel", "a agenda do Google não está configurada")
-            achados = await asyncio.to_thread(fonte.listar_calendarios, f["conta"]) if f["provedor"] == "google" else []  # rede bloqueante: fora do laço da API
+                raise erro(503, "fonte_indisponivel", f"a agenda do {rotulo} não está configurada")
+            achados = await asyncio.to_thread(fonte.listar_calendarios, f["conta"])  # rede bloqueante: fora do laço da API
         except fn.ErroFonte as e:
             raise _traduzir(e) from None
-        except ErroGoogleOAuth as e:
+        except (ErroGoogleOAuth, ErroGraphNess) as e:
             raise erro(503, "fonte_indisponivel", str(e)) from None
         with transacao(con):
             try:

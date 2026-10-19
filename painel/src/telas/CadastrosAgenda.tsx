@@ -44,7 +44,7 @@ function Fontes({ leitura, acao, fuso }: { leitura: Leitura<{ fontes: Fonte[] }>
                     <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {f.estado !== "sim" && <button className="btn btn-primary" disabled={ocupado} aria-label={`Liberar ${rotulo}`} onClick={() => agir(`f${f.id}`, () => api.patch(`/api/v1/agenda/fontes/${f.id}`, { estado: "sim" }), "Agenda liberada.", leitura.recarregar)}>Liberar</button>}
                       {f.estado !== "nao" && <button className="btn btn-secondary" disabled={ocupado} aria-label={`Desligar ${rotulo}`} onClick={() => agir(`f${f.id}`, () => api.patch(`/api/v1/agenda/fontes/${f.id}`, { estado: "nao" }), "Agenda desligada.", leitura.recarregar)}>Desligar</button>}
-                      {f.provedor === "google" && f.calendario_id === "primary" && (
+                      {(f.provedor === "google" || f.provedor === "graph") && f.calendario_id === "primary" && (
                         <button className="btn btn-secondary" disabled={ocupado} aria-label={`Descobrir calendários de ${f.conta}`} onClick={() => agir(`f${f.id}`, async () => {
                           const r = await api.post<{ calendarios: { nova: boolean }[] }>(`/api/v1/agenda/fontes/${f.id}/calendarios/descobrir`);
                           const n = r.dados.calendarios.length, novos = r.dados.calendarios.filter((c) => c.nova).length;
@@ -65,7 +65,7 @@ function Fontes({ leitura, acao, fuso }: { leitura: Leitura<{ fontes: Fonte[] }>
             <label>Conta (e-mail)<br /><input aria-label="Conta da agenda" value={conta} onChange={(e) => setConta(e.target.value)} /></label>
             <label>Tipo<br />
               <select aria-label="Tipo da conta" value={provedor} onChange={(e) => setProvedor(e.target.value as "google" | "graph")}>
-                <option value="google">Google</option><option value="graph">Microsoft (ainda não lê)</option>
+                <option value="google">Google</option><option value="graph">Microsoft</option>
               </select></label>
             <button className="btn btn-primary" type="submit" disabled={ocupado}>Cadastrar conta</button>
           </form>

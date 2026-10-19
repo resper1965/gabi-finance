@@ -62,8 +62,6 @@ def definir_estado(con, fonte_id: int, estado) -> None:
 def descobrir_calendarios(con, fonte_id: int, listar_calendarios: Callable[[str], list[dict]]) -> list[dict]:
     """Uma `agenda_fonte` por calendário que a conta enxerga, `a_decidir` (o que já existe mantém o estado). O principal é o `primary` da própria conta."""
     f = _existe(con, fonte_id)
-    if f["provedor"] != "google":
-        raise ErroFonte("só contas do Google têm calendários descobertos por enquanto")
     saida = []
     for c in listar_calendarios(f["conta"]):
         cal = "primary" if c.get("principal") else c["id"]

@@ -12,24 +12,25 @@ from gabi.db import conectar, migrar
 from gabi.rodada import registrar_rodada
 
 
-def main(banco: Path | None = None, *, listar=None) -> int:
+def main(banco: Path | None = None, *, listar=None, listar_graph=None) -> int:
     banco = Path(banco or os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
-    if listar is None:
+    if listar is None and listar_graph is None:
         sock = os.environ.get("GABI_FONTES_SOCKET")
         if not sock:
             print("ERRO: GABI_FONTES_SOCKET não configurado", file=sys.stderr)
             return 2
-        from gabi.fontes.ponte import PonteAgenda
-        ponte = PonteAgenda(sock)
-        if not ponte.configurada():
-            print("ERRO: agenda do Google não configurada no serviço de fontes", file=sys.stderr)
+        from gabi.fontes.ponte import PonteAgenda, PonteGraph
+        ponte, ponte_graph = PonteAgenda(sock), PonteGraph(sock)
+        listar = ponte.listar_eventos if ponte.configurada() else None
+        listar_graph = ponte_graph.listar_eventos if ponte_graph.configurada() else None
+        if listar is None and listar_graph is None:
+            print("ERRO: nem a agenda do Google nem a do Graph estão configuradas no serviço de fontes", file=sys.stderr)
             return 2
-        listar = ponte.listar_eventos
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     try:
         with registrar_rodada(con, "agenda") as rod:  # alimenta o frescor do envelope; rodada ok sem fonte liberada
-            r = sincronizar(con, listar, dt.datetime.now(dt.timezone.utc).isoformat())
+            r = sincronizar(con, listar, dt.datetime.now(dt.timezone.utc).isoformat(), listar_graph=listar_graph)
             rod.lidos = sum(v.get("lidos", 0) for v in r.values())
             rod.novos = sum(v.get("gravados", 0) for v in r.values())
             falhas = sum(1 for v in r.values() if "erro" in v)
