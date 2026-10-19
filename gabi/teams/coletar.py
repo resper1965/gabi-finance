@@ -61,7 +61,7 @@ def _chat(con, ponte, conta: str, c: dict, agora: dt.datetime, janela: float) ->
 
 
 def _conta(con, ponte, conta: str, agora: dt.datetime, janela: float) -> dict:
-    chats = novas = puladas = 0
+    chats = novas = puladas = ok = 0
     for c in ponte.teams_chats(conta):
         try:
             lido, n = _chat(con, ponte, conta, c, agora, janela)
@@ -71,8 +71,8 @@ def _conta(con, ponte, conta: str, agora: dt.datetime, janela: float) -> dict:
                 puladas += 1  # este chat falhou (sem acesso, sumiu, 4xx/5xx): pula só ele
                 continue
             raise  # 429 ou erro sem status: encerra a conta
-        chats, novas = chats + lido, novas + n
-    if puladas and not chats:
+        chats, novas, ok = chats + lido, novas + n, ok + 1  # `ok`: chats tratados sem erro (lidos ou pulados pelo cursor)
+    if puladas and not ok:
         raise ErroGraphNess("todos os chats falharam na leitura")  # sem status: encerra a conta com falha, não é aviso suave
     return {"chats": chats, "novas": novas, **({"puladas": puladas} if puladas else {})}
 

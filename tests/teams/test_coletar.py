@@ -203,6 +203,17 @@ def test_todos_os_chats_pulados_e_falha_da_conta(con):
     assert f["ultimo_erro"] and f["coletada_em"] is None
 
 
+def test_chat_com_403_e_outro_pulado_pelo_cursor_nao_falha_a_conta(con):
+    _fonte(con)
+    con.execute("insert into teams_conversa(conta, chat_id, tipo, cursor) values ('a@ness.com.br','c2','um_a_um','2026-10-20T14:00:00+00:00')")
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2", ultima="2026-10-20T14:00:00+00:00")]},
+              erros={("a@ness.com.br", "c1"): ErroGraphNess("_ErroStatus: GET /chats/c1/messages -> 403")})
+    r = coletar(con, p, AGORA)
+    assert r["a@ness.com.br"] == {"chats": 0, "novas": 0, "puladas": 1}
+    f = con.execute("select coletada_em from teams_fonte").fetchone()
+    assert f["coletada_em"] == AGORA.isoformat()
+
+
 def test_troca_de_token_403_nao_e_chat_pulado(con):
     _fonte(con)
     p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")]}, {("a@ness.com.br", "c2"): [_msg("1", "2026-10-20T13:00:00+00:00")]},
