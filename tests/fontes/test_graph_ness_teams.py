@@ -48,7 +48,12 @@ def graph(rotas, token=None):
 
 
 def eu_rota():
-    return ("GET", r"/users/resper@ness\.com\.br$", (200, {"id": EU}))
+    """Página de chats com membros, de onde se aprende o id da conta (`/users/{conta}` dá 403 sem User.Read.All)."""
+    return ("GET", r"/users/resper@ness\.com\.br/chats$", (200, {"value": [CHAT_COM_MEMBROS]}))
+
+
+CHAT_COM_MEMBROS = {"id": CHAT, "chatType": "oneOnOne", "members": [
+    {"email": "ana@x.com", "userId": ANA, "displayName": "Ana"}, {"email": "Resper@Ness.com.br", "userId": EU.upper(), "displayName": "Ricardo"}]}
 
 
 def m(n, quando, de=ANA, nome="Ana", **kw):
@@ -74,7 +79,7 @@ def test_chats_mapeia_tipos_e_ultima():
                  {"chat_id": "c2", "tipo": "grupo", "ultima_em": None},
                  {"chat_id": "c3", "tipo": "grupo", "ultima_em": "2025-10-18T09:00:00+00:00"}]
     assert "SEGREDO" not in json.dumps(r)
-    assert http.chamadas[0][2]["$expand"] == ["lastMessagePreview"]
+    assert http.chamadas[0][2]["$expand"] == ["lastMessagePreview,members"]
 
 
 def test_mensagens_so_depois_de_desde_e_em_ordem():
@@ -108,7 +113,8 @@ def test_de_eu_e_mencoes_eu_pelo_id_da_conta():
     r = gr.teams_mensagens(CONTA, CHAT, None)
     assert [(x["de_eu"], x["mencoes_eu"]) for x in r] == [(True, False), (False, True), (False, False)]
     gr.teams_mensagens(CONTA, CHAT, None)  # o id da conta é cacheado
-    assert sum(1 for c in http.chamadas if c[1].endswith("/resper@ness.com.br")) == 1
+    assert not [c for c in http.chamadas if c[1].endswith("/resper@ness.com.br")]  # nunca /users/{conta}
+    assert sum(1 for c in http.chamadas if c[1].endswith("/chats")) == 1
 
 
 def test_conta_nao_cadastrada_levanta():
@@ -155,3 +161,26 @@ def test_erro_nao_vaza_corpo():
     with pytest.raises(ErroGraphNess, match="-> 403") as e:
         gr.teams_chats(CONTA)
     assert "TEXTO-SECRETO" not in repr(e.value)
+
+
+def test_teams_chats_aprende_o_id_da_conta_sem_vazar_membros():
+    item = {**CHAT_COM_MEMBROS, "lastMessagePreview": None}
+    gr, http = graph([("GET", r"/chats$", (200, {"value": [item]})), rota_msgs([m(1, "2025-10-19T10:00:00Z", de=EU)])])
+    r = gr.teams_chats(CONTA)
+    assert r == [{"chat_id": CHAT, "tipo": "um_a_um", "ultima_em": None}] and "Ana" not in json.dumps(r)
+    assert gr.teams_mensagens(CONTA, CHAT, None)[0]["de_eu"] is True
+    assert len([c for c in http.chamadas if c[1].endswith("/chats")]) == 1  # sem página extra: o id já estava em cache
+
+
+def test_meu_id_sem_membro_levanta_sem_status():
+    gr, _ = graph([("GET", r"/chats$", (200, {"value": [{"id": CHAT, "chatType": "group", "members": [{"email": "ana@x.com", "userId": ANA}]}]})),
+                   rota_msgs([m(1, "2025-10-19T10:00:00Z")])])
+    with pytest.raises(ErroGraphNess, match="não foi possível identificar a conta") as e:
+        gr.teams_mensagens(CONTA, CHAT, None)
+    assert "->" not in str(e.value) and not hasattr(e.value, "status")
+
+
+def test_chat_id_malformado_e_descartado_na_listagem():
+    itens = [{"id": "19:ok@thread.v2", "chatType": "group"}, {"id": "a/b", "chatType": "group"}, {"id": "a b", "chatType": "group"}, {"id": "x" * 201, "chatType": "oneOnOne"}]
+    gr, _ = graph([("GET", r"/chats$", (200, {"value": itens}))])
+    assert [c["chat_id"] for c in gr.teams_chats(CONTA)] == ["19:ok@thread.v2"]

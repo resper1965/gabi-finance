@@ -67,7 +67,7 @@ def test_grupo_sem_mencao_nao_vira_pendente(con):
     p = Falsa({"a@ness.com.br": [_chat(tipo="grupo")]}, {("a@ness.com.br", "c1"): [_msg("1", "2026-10-20T13:00:00+00:00")]})
     coletar(con, p, AGORA)
     c = _conv(con)
-    assert c["ultima_para_mim_em"] is None and c["de_nome"] is None and c["cursor"] == "2026-10-20T13:00:00+00:00"
+    assert c["ultima_para_mim_em"] is None and c["de_nome"] is None and c["cursor"] == "2026-10-20T14:00:00+00:00"
 
 
 def test_grupo_com_mencao_vira_pendente(con):
@@ -84,7 +84,7 @@ def test_minha_resposta_registra_resposta(con):
     coletar(con, p, AGORA)
     c = _conv(con)
     assert c["minha_ultima_resposta_em"] == "2026-10-20T13:30:00+00:00" and c["ultima_para_mim_em"] == "2026-10-20T13:00:00+00:00"
-    assert c["cursor"] == "2026-10-20T13:30:00+00:00"
+    assert c["cursor"] == "2026-10-20T14:00:00+00:00"  # a última atividade conhecida do chat (prévia) vale mais que a última mensagem
 
 
 def test_primeira_coleta_ignora_historico_antigo(con):
@@ -102,9 +102,10 @@ def test_cursor_evita_reler(con):
     _fonte(con)
     p = Falsa({"a@ness.com.br": [_chat()]}, {("a@ness.com.br", "c1"): [_msg("1", "2026-10-20T13:00:00+00:00")]})
     coletar(con, p, AGORA)
-    r = coletar(con, p, AGORA)  # ultima_em (14:00) > cursor (13:00): lê de novo, com cursor - 1 s
-    assert p.chamadas[1][2] == "2026-10-20T12:59:59+00:00"
-    p2 = Falsa({"a@ness.com.br": [_chat(ultima="2026-10-20T13:00:00+00:00")]})
+    p.chats["a@ness.com.br"] = [_chat(ultima="2026-10-20T14:30:00+00:00")]
+    r = coletar(con, p, AGORA)  # ultima_em (14:30) > cursor (14:00): lê de novo, com cursor - 1 s
+    assert p.chamadas[1][2] == "2026-10-20T13:59:59+00:00"
+    p2 = Falsa({"a@ness.com.br": [_chat(ultima="2026-10-20T14:00:00+00:00")]})
     r = coletar(con, p2, AGORA)
     assert p2.chamadas == [] and r["a@ness.com.br"] == {"chats": 0, "novas": 0}
 
@@ -165,6 +166,49 @@ def test_erro_sem_status_encerra_a_conta(con):
     p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")]}, erros={("a@ness.com.br", "c1"): ErroGraphNess("serviço de fontes indisponível")})
     r = coletar(con, p, AGORA)
     assert r["a@ness.com.br"] == {"erro": "serviço de fontes indisponível"} and [c for c in p.chamadas if c[1] == "c2"] == []
+
+
+def test_chat_sem_mensagem_na_janela_ganha_cursor_e_nao_e_relido(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat(ultima="2026-09-01T10:00:00+00:00")]})
+    coletar(con, p, AGORA)
+    assert len(p.chamadas) == 1 and _conv(con)["cursor"] == "2026-09-01T10:00:00+00:00"
+    coletar(con, p, AGORA)
+    assert len(p.chamadas) == 1  # pulado na rodada seguinte
+
+
+def test_chat_so_com_evento_de_sistema_nao_e_relido(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat(ultima="2026-10-20T14:00:00+00:00")]}, {("a@ness.com.br", "c1"): []})  # mensagens filtradas: lista vazia
+    coletar(con, p, AGORA)
+    coletar(con, p, AGORA)
+    assert len(p.chamadas) == 1
+
+
+def test_sem_ultima_em_cursor_vira_o_desde_lido(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat(ultima=None)]})
+    coletar(con, p, AGORA)
+    assert _conv(con)["cursor"] == (AGORA - dt.timedelta(hours=24)).isoformat()
+
+
+def test_todos_os_chats_pulados_e_falha_da_conta(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")]}, erros={
+        ("a@ness.com.br", "c1"): ErroGraphNess("_ErroStatus: GET /chats/c1/messages -> 403"),
+        ("a@ness.com.br", "c2"): ErroGraphNess("GET /chats/c2/messages -> 404")})
+    r = coletar(con, p, AGORA)
+    assert "erro" in r["a@ness.com.br"]
+    f = con.execute("select ultimo_erro, coletada_em from teams_fonte").fetchone()
+    assert f["ultimo_erro"] and f["coletada_em"] is None
+
+
+def test_troca_de_token_403_nao_e_chat_pulado(con):
+    _fonte(con)
+    p = Falsa({"a@ness.com.br": [_chat("c1"), _chat("c2")]}, {("a@ness.com.br", "c2"): [_msg("1", "2026-10-20T13:00:00+00:00")]},
+              {("a@ness.com.br", "c1"): ErroGraphNess("troca de token -> 403")})
+    r = coletar(con, p, AGORA)
+    assert r["a@ness.com.br"] == {"erro": "troca de token -> 403"} and [c for c in p.chamadas if c[1] == "c2"] == []
 
 
 SENTINELAS = ("SENT_CORPO", "SENT_ASSUNTO", "SENT_ANEXO", "SENT_TEXTO", "SENT_ERRO")

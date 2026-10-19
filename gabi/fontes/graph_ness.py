@@ -389,26 +389,41 @@ class GraphNess:
 
     # ---------------- teams (só metadado: o texto nunca é pedido) ----------------
     def teams_chats(self, conta: str) -> list[dict]:
-        """[{chat_id, tipo ("um_a_um"|"grupo"), ultima_em}] dos chats da conta; `ultima_em` vem do `lastMessagePreview` (só a data; o corpo não é lido)."""
-        url = f"{self._caixa(conta)}/chats?$expand=lastMessagePreview&$top=50"
+        """[{chat_id, tipo ("um_a_um"|"grupo"), ultima_em}] dos chats da conta; `ultima_em` vem do `lastMessagePreview` (só a data; o corpo não é lido).
+        De passagem aprende o id AAD da própria conta (membro cujo e-mail é a conta): nenhum membro/nome sai daqui."""
+        conta = self._conta(conta)
+        url = f"{self._caixa(conta)}/chats?$expand=lastMessagePreview,members&$top=50"
         saida = []
         for pagina in self._paginas(url):
             for c in pagina.get("value") or []:
-                if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not c["id"] or c.get("chatType") not in _TIPOS_CHAT:
+                if not isinstance(c, dict):
+                    continue
+                self._aprender_id(conta, c)
+                if not isinstance(c.get("id"), str) or not _CHAT_ID.match(c["id"]) or c.get("chatType") not in _TIPOS_CHAT:
                     continue
                 previa = c.get("lastMessagePreview")
                 ultima = _utc(previa.get("createdDateTime")) if isinstance(previa, dict) else None
                 saida.append({"chat_id": c["id"], "tipo": _TIPOS_CHAT[c["chatType"]], "ultima_em": ultima.isoformat() if ultima else None})
         return saida
 
+    def _aprender_id(self, conta: str, chat) -> None:
+        if conta in self._meu_ids or not isinstance(chat, dict) or not isinstance(chat.get("members"), list):
+            return
+        for m in chat["members"]:
+            if (isinstance(m, dict) and isinstance(m.get("email"), str) and m["email"].lower() == conta.lower()
+                    and isinstance(m.get("userId"), str) and m["userId"]):
+                self._meu_ids[conta] = m["userId"].lower()
+                return
+
     def _meu_id(self, conta: str) -> str:
-        cache = self._meu_ids
-        if conta not in cache:
-            resp = self._get(f"{self._caixa(conta)}?$select=id")
-            if not isinstance(resp.get("id"), str) or not resp["id"]:
-                raise ErroGraphNess("resposta inválida do Graph")
-            cache[conta] = resp["id"].lower()
-        return cache[conta]
+        """Id AAD da conta, sem `User.Read.All` (`/users/{conta}` dá 403): vem dos membros dos chats. Sem achar, erro SEM status (encerra a conta)."""
+        if conta not in self._meu_ids:
+            resp = self._get(f"{self._caixa(conta)}/chats?$top=20&$expand=members")
+            for c in resp.get("value") or []:
+                self._aprender_id(conta, c)
+        if conta not in self._meu_ids:
+            raise ErroGraphNess("não foi possível identificar a conta")
+        return self._meu_ids[conta]
 
     def teams_mensagens(self, conta: str, chat_id: str, desde: str | None) -> list[dict]:
         """[{id, quando, de_nome, de_eu, mencoes_eu}] das mensagens de pessoas do chat com `quando > desde`, em ordem crescente. Sistema, apagadas e bots

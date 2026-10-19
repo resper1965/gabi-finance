@@ -233,6 +233,9 @@ def _teams_sem_resposta(con, agora: dt.datetime, novo) -> None:
     Ao criar o aviso grava `ultimo_aviso_em`: a mesma mensagem não avisa de novo; mensagem nova (ultima_para_mim_em maior) avisa outra vez."""
     from gabi.teams import regra
     horas, expediente = regra.ler_config(con)
+    local = agora.astimezone(regra.BRT)
+    if local.weekday() >= 5 or not expediente[0] <= local.time() < expediente[1]:
+        return  # fora do expediente (noite, fim de semana): nada nasce nem é enviado de madrugada
     for c in con.execute("select c.* from teams_conversa c join teams_fonte f on f.conta=c.conta where f.estado='sim' order by c.conta, c.chat_id").fetchall():
         if not regra.pendente(c, agora, horas, expediente):
             continue

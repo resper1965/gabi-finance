@@ -2,7 +2,7 @@
 O texto da mensagem nunca chega aqui (a ponte não o devolve); o único texto livre persistido é `de_nome`.
 
 Erros pela ponte: o serviço de fontes devolve só o tipo e a mensagem; um `_ErroStatus` do Graph chega como `ErroGraphNess` com a mensagem
-`_ErroStatus: GET <caminho> -> <status>`. O status é lido desse texto (regex `-> (\\d{3})\\b`): qualquer erro COM status (403, 404, 400, 500...) pula só o chat (um chat "envenenado" não trava os
+`_ErroStatus: GET <caminho> -> <status>`. O status é lido desse texto (regex ancorada em `GET ... -> NNN`): qualquer erro COM status (403, 404, 400, 500...) pula só o chat (um chat "envenenado" não trava os
 outros) e é contado em `puladas`; 429 encerra a conta nesta rodada; erro SEM status (transporte/indisponível) encerra a conta e vai
 (curto) para `teams_fonte.ultimo_erro`. Nunca se grava o texto de um erro com status."""
 import datetime as dt
@@ -12,14 +12,14 @@ from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.teams.regra import _dt, _parametro
 
 JANELA_INICIAL_HORAS = 24
-_STATUS = re.compile(r"-> (\d{3})\b")
+_STATUS = re.compile(r"^(?:_ErroStatus: )?GET .* -> (\d{3})\b")
 
 
 def _status(e: Exception) -> int | None:
     s = getattr(e, "status", None)
     if isinstance(s, int):
         return s
-    m = _STATUS.search(str(e))
+    m = _STATUS.match(str(e))
     return int(m[1]) if m else None
 
 
@@ -39,10 +39,12 @@ def _chat(con, ponte, conta: str, c: dict, agora: dt.datetime, janela: float) ->
     desde = (cursor - dt.timedelta(seconds=1)) if cursor else agora - dt.timedelta(hours=janela)
     msgs = ponte.teams_mensagens(conta, c["chat_id"], desde.isoformat())
     para_mim, resposta, nome, novo_cursor = (atual[k] if atual else None for k in ("ultima_para_mim_em", "minha_ultima_resposta_em", "de_nome", "cursor"))
-    for m in msgs:
-        q = m["quando"]
+    # leitura bem-sucedida devolveu tudo > desde até agora: o cursor avança até a última atividade conhecida do chat (ou ao `desde` lido)
+    for q in [m["quando"] for m in msgs] + ([c["ultima_em"]] if c["ultima_em"] else []) or [desde.isoformat()]:
         if novo_cursor is None or _dt(q) > _dt(novo_cursor):
             novo_cursor = q
+    for m in msgs:
+        q = m["quando"]
         if m["de_eu"]:
             if resposta is None or _dt(q) > _dt(resposta):
                 resposta = q
@@ -70,6 +72,8 @@ def _conta(con, ponte, conta: str, agora: dt.datetime, janela: float) -> dict:
                 continue
             raise  # 429 ou erro sem status: encerra a conta
         chats, novas = chats + lido, novas + n
+    if puladas and not chats:
+        raise ErroGraphNess("todos os chats falharam na leitura")  # sem status: encerra a conta com falha, não é aviso suave
     return {"chats": chats, "novas": novas, **({"puladas": puladas} if puladas else {})}
 
 

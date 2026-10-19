@@ -75,3 +75,18 @@ def test_config_padrao_e_parametros(con):
 def test_config_invalida_cai_no_padrao(con):
     con.execute("insert into parametro(chave, valor) values ('teams.horas_uteis','-1'),('teams.expediente',?)", (json.dumps("lixo"),))
     assert ler_config(con) == (2, EXP)
+
+
+def test_inicio_as_23h_conta_so_do_proximo_dia_util():
+    assert horas_uteis_entre(b(19, 23), b(20, 10), EXP) == 2.0
+    assert horas_uteis_entre(b(16, 23), b(19, 10), EXP) == 2.0  # sexta 23:00 -> segunda 10:00
+
+
+def test_inicio_no_sabado_e_antes_das_8():
+    assert horas_uteis_entre(b(17, 10), b(19, 10), EXP) == 2.0  # sábado 17/10
+    assert horas_uteis_entre(b(19, 5), b(19, 10), EXP) == 2.0
+
+
+def test_inicio_igual_ou_depois_do_fim_da_zero():
+    assert horas_uteis_entre(b(19, 10), b(19, 10), EXP) == 0.0
+    assert horas_uteis_entre(b(19, 12), b(19, 10), EXP) == 0.0

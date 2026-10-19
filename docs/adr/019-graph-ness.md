@@ -9,7 +9,7 @@ Data: 19/10/2026 · Estado: aceito (código completo, nada ligado; passos do don
 3. **Só leitura e só a caixa da ness.** O app tem permissão no tenant inteiro; a trava é o código (conta vem de `M365_CONTAS`, `GET` apenas, teste varre o módulo) e, fora dele, a política de acesso do Exchange. Risco aceito: até a política existir, a barreira é o código.
 4. **`deltaLink` do banco só vai ao host do Graph.** Sem isso um valor adulterado em `agenda_fonte.sync_token` levaria o Bearer do app para fora.
 5. **E-mail da ness (19/10, mesmo molde do ADR-018):** provedor `graph` no correio, sobre `mailFolders/inbox/messages/delta`. Única escrita: `move` para `deleteditems`/`inbox` (destino fixo, `Prefer: IdType="ImmutableId"` para o id sobreviver à mudança de pasta). Nunca envia, responde, encaminha nem apaga de vez; corpo da mensagem nunca é lido. Risco aceito: `Mail.ReadWrite` é mais amplo que a lixeira; a garantia é a lista branca da ponte + teste de varredura (e a política do Exchange, quando existir).
-6. **Fora desta fase:** Teams (sem guardar texto), com plano próprio.
+6. **Fora desta fase:** Teams (sem guardar texto), com plano próprio (superado pelo item 7).
 
 ## Teams (20/10/2026)
 7. **Só metadados, sem texto e sem modelo na fase 1.** O Teams da ness é lido pela ponte `graph_ness` (`teams_chats`, `teams_mensagens`) apenas para saber quem escreveu, quando e se houve resposta; o conteúdo das mensagens não é guardado nem enviado a modelo. Mesma trava do restante: só leitura e só a conta cadastrada (a permissão `Chat.Read.All` alcança o tenant, a restrição é o código).

@@ -70,10 +70,21 @@ def test_teams_mensagem_nova_depois_do_aviso_gera_outro_no_dia_seguinte(con):
     _conv(con)
     gerar_avisos(con, AGORA)
     dia2 = AGORA + dt.timedelta(days=3)  # segunda 09:00 BRT
-    con.execute("update teams_conversa set ultima_para_mim_em=?", ("2026-10-17T00:00:00+00:00",))  # sábado: só conta a partir de segunda
     con.execute("update teams_conversa set ultima_para_mim_em=?", ("2026-10-16T20:00:00+00:00",))  # sexta 17:00 BRT
     assert len(gerar_avisos(con, dia2)) == 1
     assert len(con.execute("select 1 from aviso").fetchall()) == 2
+    # mensagem nova no MESMO dia, já avisada: não cria segundo aviso
+    con.execute("update teams_conversa set ultima_para_mim_em=?", ("2026-10-19T12:00:00+00:00",))  # segunda 09:00 BRT (antes do aviso, depois reavisado)
+    assert gerar_avisos(con, dia2 + dt.timedelta(hours=3)) == []
+    assert len(con.execute("select 1 from aviso").fetchall()) == 2
+
+
+def test_teams_madrugada_e_fim_de_semana_nao_criam(con):
+    _conv(con)
+    assert gerar_avisos(con, dt.datetime(2026, 10, 16, 3, 5, tzinfo=UTC)) == []  # sexta 00:05 BRT
+    assert gerar_avisos(con, dt.datetime(2026, 10, 17, 13, 0, tzinfo=UTC)) == []  # sábado 10:00 BRT
+    assert con.execute("select count(*) from aviso").fetchone()[0] == 0
+    assert len(gerar_avisos(con, AGORA)) == 1  # dia útil 09:00 BRT
 
 
 def test_teams_payload_sem_texto(con):
