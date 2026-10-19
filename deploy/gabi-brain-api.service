@@ -11,7 +11,7 @@ Group=gabibrain
 WorkingDirectory=/opt/gabi-brain
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
-Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi.tail985643.ts.net
+Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi.tail985643.ts.net,https://gabi-brain.tail985643.ts.net
 # Paperless e Nibo vivem no serviço gabi-brain-fontes (esta unidade não tem rede nem tokens).
 Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
 # Saúde (ADR-014): chave de 32 bytes em arquivo colocado pelo Ricardo (root:gabibrain 0640); sem o arquivo as rotas /familia respondem 503. O cofre fica em /var/lib/gabi-brain/saude.enc.

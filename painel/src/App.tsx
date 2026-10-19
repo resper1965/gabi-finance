@@ -39,9 +39,10 @@ import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
 import { Qualidade } from "./telas/Gabi/Qualidade";
 import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
+import { AReceber } from "./telas/Cobrar/AReceber";
 
 const TELAS: Record<string, () => ReactNode> = {
-  visao: Resumo, projecao: Projecao, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
+  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros, escuta: Escuta, agendas: CadastrosAgenda, correio: CadastrosCorreio, prioridades: Prioridades, setup: Configuracao,
   qualidade: Qualidade, hoje: Hoje, temas: Frentes, familia: Familia, reembolso: Reembolso, agenda: Agenda, emails: Mensagens, contatos: Contatos, tarefas: Tarefas, entregas: Entregas,

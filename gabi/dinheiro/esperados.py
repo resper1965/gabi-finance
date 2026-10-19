@@ -56,11 +56,12 @@ def _serie(chave: str, itens: list[tuple[str, int]], hoje: dt.date) -> dict | No
     cv = st.pstdev(valores) / media if len(valores) > 1 and media else 0
     dias = [int(d[8:10]) for d, _ in fechados]
     dia_limite = max(dias) + max(1, (max(dias) - min(dias)) // 4)
-    ocorreu = any(d[:7] == atual and abs(v - media) <= media * TOLERANCIA_VALOR for d, v in itens)
+    veio = sorted((d, v) for d, v in itens if d[:7] == atual and abs(v - media) <= media * TOLERANCIA_VALOR)
+    ocorreu = bool(veio)
     atrasada = not ocorreu and hoje.day > dia_limite
     return {"pagador": chave.title(), "valor_centavos": round(media), "dia_tipico": int(st.median(dias)), "dia_limite": dia_limite, "meses": n,
             "confianca": "alta" if n >= 4 and cv < 0.1 else ("media" if n >= 3 else "nova"),
-            "ocorreu_este_mes": ocorreu, "atrasada": atrasada, "dias_atraso": hoje.day - dia_limite if atrasada else 0}
+            "ocorreu_este_mes": ocorreu, "recebido_em": veio[-1][0] if veio else None, "recebido_centavos": sum(v for _, v in veio) if veio else None, "atrasada": atrasada, "dias_atraso": hoje.day - dia_limite if atrasada else 0}
 
 
 def entradas_esperadas(con, hoje: dt.date) -> list[dict]:

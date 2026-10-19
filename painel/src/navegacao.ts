@@ -15,7 +15,7 @@ export const GRUPOS: Grupo[] = [
   { titulo: "Dinheiro", areas: [
     { id: "caixa", rotulo: "Caixa", pergunta: "Tenho caixa? O que vence?", abas: [["visao", "Resumo", "Tenho caixa?"], ["projecao", "Previsão", "Quanto terei em caixa nos próximos dias?"], ["pedidos", "Pedidos", "O que me pediram para pagar?"], ["fluxo", "Semanas", "Como o caixa anda, semana a semana?"], ["contas", "A pagar", "O que vence, e quando?"]] },
     { id: "gastos", rotulo: "Gastos", pergunta: "Para onde vai o dinheiro?", abas: [["lanc", "Lançamentos", "De quem é cada gasto?"], ["destino", "Para onde vai", "Para onde vai o dinheiro?"], ["cartao", "Cartões", "Quanto já foi no cartão?"], ["parcelas", "Parcelas", "Quanto já está comprometido?"], ["assin", "Assinaturas", "O que é assinatura esquecida?"]] },
-    { id: "cobrar", rotulo: "Cobrar", pergunta: "Quem me deve?", abas: [["notas", "Notas a receber", "O que os contratantes me devem pelas notas?"], ["reemb", "Reembolsos", "Quem me deve?"], ["docs", "Comprovantes", "O que o Paperless já tem?"], ["email", "E-mail de cobrança", "O que vou cobrar, e de quem?"]] },
+    { id: "cobrar", rotulo: "Cobrar", pergunta: "Quem me deve?", abas: [["areceber", "A receber", "O que vou receber este mês, e o que já entrou?"], ["notas", "Notas a receber", "O que os contratantes me devem pelas notas?"], ["reemb", "Reembolsos", "Quem me deve?"], ["docs", "Comprovantes", "O que o Paperless já tem?"], ["email", "E-mail de cobrança", "O que vou cobrar, e de quem?"]] },
     { id: "regras", rotulo: "Regras", pergunta: "O que a Gabi sugere classificar?", abas: [["regras", "Regras", "O que a Gabi sugere classificar?"]] },
   ] },
   { titulo: "Casa", areas: [

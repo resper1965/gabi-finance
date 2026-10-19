@@ -379,3 +379,13 @@ def test_descrever_hermes_parado():
 def test_estado_do_servico_devolve_none_quando_nao_ha_systemd_ou_unidade():
     from gabi.avisos import estado_do_servico
     assert estado_do_servico("unidade-que-nao-existe-xyz") is None
+
+
+def test_servico_falhou_nao_empilha_enquanto_nao_lido_e_fica_mudo_depois_de_lido(con):
+    from gabi.avisos import registrar_servico_falhou
+    registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA)
+    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=1)) is None   # a unidade segue falhando: um aviso só
+    assert registrar_servico_falhou(con, "gabi-brain-saldos.service", AGORA + dt.timedelta(days=1)) is not None   # outra unidade tem o seu
+    con.execute("update aviso set entregue_em='x'")
+    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=2)) is None   # lido: silêncio por 7 dias
+    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=9)) is not None

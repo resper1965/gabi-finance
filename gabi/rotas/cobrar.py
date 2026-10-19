@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request
 
 from gabi.cobrar import cadastro, cobranca as cb, comprovantes as cp_, lote_nibo as lote, pedidos as pd, reembolso as rb
 from gabi.cobrar import recebimentos as rec
+from gabi.cobrar.a_receber import a_receber_do_mes
 from gabi.cobrar.previsao import RECENTE_DIAS, previsao as calcular_previsao
 from gabi.dinheiro import contas_pagar
 from gabi.dinheiro.valor import formatar
@@ -246,6 +247,22 @@ def notas(request: Request, aberta: int = 0):
                           "bruto": formatar(n["valor_bruto_centavos"]), "liquido": formatar(n["valor_liquido_centavos"] or 0), "situacao": sit,
                           "nibo_pago": bool(n["nibo_pago"]), "pdf": bool(n["pdf_arquivo"]), "xml": bool(n["xml_arquivo"])})
         return envelope(con, {"itens": itens, "totais": {k: formatar(v) for k, v in totais.items()}}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.get("/a-receber")
+def a_receber(request: Request):
+    """O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois)."""
+    con = _con(request)
+    try:
+        d = a_receber_do_mes(con, _agora(request).date())
+        fmt = lambda t: {k.removesuffix("_centavos"): formatar(v) for k, v in t.items()}  # noqa: E731
+        for i in d["recorrentes"] + d["notas"]:
+            i["esperado"], i["recebido"] = formatar(i.pop("esperado_centavos")), (formatar(i["recebido_centavos"]) if i["recebido_centavos"] is not None else None)
+            i.pop("recebido_centavos")
+        d["totais"] = {k: fmt(v) for k, v in d["totais"].items()}
+        return envelope(con, d, agora=_agora(request))
     finally:
         con.close()
 

@@ -231,3 +231,36 @@ def test_reembolso_abrir_respeita_a_selecao_de_itens(cli):
     rid = post(cli, "/api/v1/cobrar/reembolsos", {"empresa_id": "ness", "itens": [escolhido]}).json()["dados"]["id"]
     ness = next(e for e in get(cli, "/api/v1/cobrar/reembolsos").json()["dados"]["empresas"] if e["empresa_id"] == "ness")
     assert rid and post(cli, "/api/v1/cobrar/reembolsos", {"empresa_id": "ness", "itens": ["x"]}).status_code == 400
+
+
+def test_a_receber_do_mes_separa_recebido_atrasado_e_a_receber(banco):
+    c = conectar(banco)
+    for m in (5, 6, 7, 8, 9):      # pagador regular no C6 PJ (conta 2): vem dia 7; em outubro já veio
+        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza) values (2,?,?,1000000,'Pix recebido de CLIENTE X LTDA','caixa')", (f"r{m}", f"2026-{m:02d}-07"))
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza) values (2,'r10','2026-10-07',1000000,'Pix recebido de CLIENTE X LTDA','caixa')")
+    c.close()
+    _nota(banco, "IONIC", "2026-10-25", 2226122)       # a receber
+    _nota(banco, "BARRA", "2026-10-03", 366015)        # venceu e não foi confirmada: atrasada
+    _nota(banco, "PAGA", "2026-10-30", 50000, pago=1)  # Nibo diz pago: conferir, não é recebimento
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    r = cli.get("/api/v1/cobrar/a-receber", headers=BOSS)
+    assert r.status_code == 200
+    d = r.json()["dados"]
+    [rec] = d["recorrentes"]
+    assert rec["situacao"] == "recebido" and rec["recebido_em"] == "2026-10-07" and rec["recebido"] == "10000.00"
+    sit = {n["pagador"]: n["situacao"] for n in d["notas"]}
+    assert sit == {"IONIC": "a_receber", "BARRA": "atrasado", "PAGA": "nibo_diz_pago"}
+    assert d["totais"]["notas"]["falta"] == "26421.37" and d["totais"]["notas"]["atrasado"] == "3660.15" and d["totais"]["recorrentes"]["recebido"] == "10000.00"
+    assert rec["extrato"]["conta"] == "C6 PJ" and "CLIENTE X" in rec["extrato"]["descricao"]
+    assert cli.get("/api/v1/cobrar/a-receber", headers=VIP).status_code == 403
+
+
+def test_a_receber_nota_com_credito_proposto_vira_credito_provavel_com_o_lancamento(banco):
+    _nota(banco, "BARRA", "2026-10-03", 366015)
+    c = conectar(banco)
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (2,'x1','2026-10-05',366015,'Pix recebido BARRA DO PARA','posted')")
+    c.execute("insert into recebimento_nota(nota_id, lancamento_id, confianca, motivo, criado_em) select id, (select max(id) from lancamento), 0.9, 'valor igual', 'x' from nota_fiscal")
+    c.close()
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    [n] = cli.get("/api/v1/cobrar/a-receber", headers=BOSS).json()["dados"]["notas"]
+    assert n["situacao"] == "credito_provavel" and n["recebido_em"] == "2026-10-05" and n["extrato"]["descricao"] == "Pix recebido BARRA DO PARA"
