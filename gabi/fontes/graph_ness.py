@@ -30,6 +30,10 @@ _ID_MSG = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id imutável de mensagem (ba
 _IMUTAVEL = 'IdType="ImmutableId"'  # o id não muda quando a mensagem vai e volta dos Itens Excluídos (restaurar usa o mesmo id)
 _DESTINOS = {"trash": "deleteditems", "untrash": "inbox"}  # as únicas escritas: destino fixo, nunca vindo de fora
 _VENENO = (400, 404, 410, 413, 422)  # 4xx que é do id (401/403/429/5xx continuam parando a leitura)
+_CHAT_ID = re.compile(r"^[0-9A-Za-z:@._-]{1,200}$")  # id de chat do Teams ("19:...@thread.v2"): nunca "/" nem espaço
+_TIPOS_CHAT = {"oneOnOne": "um_a_um", "group": "grupo", "meeting": "grupo"}
+_CAMPOS_TEAMS = "id,createdDateTime,from,messageType,mentions,deletedDateTime"  # sem body, subject nem attachments
+MAX_PAGINAS_TEAMS = 5  # 5 x 50 mensagens por leitura de chat (do mais novo para o mais antigo)
 _CAMPOS_MSG = "id,conversationId,from,subject,receivedDateTime,bodyPreview,isDraft,internetMessageHeaders"
 
 
@@ -122,6 +126,7 @@ class GraphNess:
 
     def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time):
         self._token, self._contas, self._http, self._agora = token, [c.lower() for c in contas], http, agora
+        self._meu_ids: dict[str, str] = {}  # conta -> id AAD (Teams: de_eu / mencoes_eu)
 
     def __repr__(self):
         return "GraphNess(<oculto>)"
@@ -381,6 +386,85 @@ class GraphNess:
                 achou = achou or bool(resp.get("value"))
             saida[a] = achou
         return saida
+
+    # ---------------- teams (só metadado: o texto nunca é pedido) ----------------
+    def teams_chats(self, conta: str) -> list[dict]:
+        """[{chat_id, tipo ("um_a_um"|"grupo"), ultima_em}] dos chats da conta; `ultima_em` vem do `lastMessagePreview` (só a data; o corpo não é lido)."""
+        url = f"{self._caixa(conta)}/chats?$expand=lastMessagePreview&$top=50"
+        saida = []
+        for pagina in self._paginas(url):
+            for c in pagina.get("value") or []:
+                if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not c["id"] or c.get("chatType") not in _TIPOS_CHAT:
+                    continue
+                previa = c.get("lastMessagePreview")
+                ultima = _utc(previa.get("createdDateTime")) if isinstance(previa, dict) else None
+                saida.append({"chat_id": c["id"], "tipo": _TIPOS_CHAT[c["chatType"]], "ultima_em": ultima.isoformat() if ultima else None})
+        return saida
+
+    def _meu_id(self, conta: str) -> str:
+        cache = self._meu_ids
+        if conta not in cache:
+            resp = self._get(f"{self._caixa(conta)}?$select=id")
+            if not isinstance(resp.get("id"), str) or not resp["id"]:
+                raise ErroGraphNess("resposta inválida do Graph")
+            cache[conta] = resp["id"].lower()
+        return cache[conta]
+
+    def teams_mensagens(self, conta: str, chat_id: str, desde: str | None) -> list[dict]:
+        """[{id, quando, de_nome, de_eu, mencoes_eu}] das mensagens de pessoas do chat com `quando > desde`, em ordem crescente. Sistema, apagadas e bots
+        (ou sem `from.user`) ficam de fora. Só metadado: o `$select` não inclui `body`, e o texto nunca é lido nem devolvido."""
+        conta = self._conta(conta)
+        if not isinstance(chat_id, str) or not _CHAT_ID.match(chat_id):
+            raise ErroGraphNess("chat inválido")
+        limite = None
+        if desde is not None:
+            limite = _utc(desde)
+            if limite is None:
+                raise ErroGraphNess("data inválida")
+        meu = self._meu_id(conta)
+        url = (f"{self._caixa(conta)}/chats/{urllib.parse.quote(chat_id, safe='')}/messages?$select={_CAMPOS_TEAMS}"
+               "&$orderby=createdDateTime%20desc&$top=50")
+        saida = []
+        for n, pagina in enumerate(self._paginas(url), 1):
+            antigas = False
+            for item in pagina.get("value") or []:
+                msg = _mensagem_teams(item, meu)
+                if msg is None:
+                    continue
+                if limite is not None and dt.datetime.fromisoformat(msg["quando"]) <= limite:
+                    antigas = True  # a ordem é do mais novo para o mais antigo: daqui para trás já foi visto
+                    continue
+                saida.append(msg)
+            if antigas or n >= MAX_PAGINAS_TEAMS:
+                break
+        return sorted(saida, key=lambda x: x["quando"])
+
+
+def _utc(texto) -> dt.datetime | None:
+    """ISO do Graph -> datetime UTC (sem fração de segundo para comparar igual); None se não for data."""
+    try:
+        d = dt.datetime.fromisoformat(texto.replace("Z", "+00:00"))
+        return (d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)).astimezone(dt.timezone.utc).replace(microsecond=0)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _mensagem_teams(m, meu_id: str) -> dict | None:
+    """None para o que não é mensagem de pessoa: sistema (`messageType != "message"`), apagada, bot/dispositivo ou malformada. Só metadado."""
+    if not isinstance(m, dict) or m.get("messageType") != "message" or m.get("deletedDateTime") or not isinstance(m.get("id"), str):
+        return None
+    de = m.get("from")
+    usuario = de.get("user") if isinstance(de, dict) else None
+    quando = _utc(m.get("createdDateTime"))
+    if not isinstance(usuario, dict) or not isinstance(usuario.get("id"), str) or quando is None:
+        return None
+    nome = usuario.get("displayName")
+    mencoes = m.get("mentions")
+    eu = any(isinstance(x, dict) and isinstance(x.get("mentioned"), dict) and isinstance(x["mentioned"].get("user"), dict)
+             and isinstance(x["mentioned"]["user"].get("id"), str) and x["mentioned"]["user"]["id"].lower() == meu_id
+             for x in (mencoes if isinstance(mencoes, list) else []))
+    return {"id": m["id"], "quando": quando.isoformat(), "de_nome": nome if isinstance(nome, str) else "", "de_eu": usuario["id"].lower() == meu_id,
+            "mencoes_eu": eu}
 
 
 def _mensagem(m: dict) -> dict | None:
