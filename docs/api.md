@@ -147,6 +147,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |
 | GET | `/api/v1/tarefas` | Tarefas abertas e concluídas, de todas as origens. |
 | POST | `/api/v1/tarefas/{tarefa_id}/concluir` | Conclui a tarefa NA ORIGEM (Graph ou Google) e só então marca aqui. |
+| GET | `/api/v1/teams/fontes` | Contas do Teams cadastradas, com estado, última coleta, último erro e quantas conversas. |
+| POST | `/api/v1/teams/fontes` | Cadastra uma conta do Teams (e-mail). Nasce `a_decidir`: nada é lido até liberar. |
+| PUT | `/api/v1/teams/fontes/{fonte_id}/estado` | Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma conta. Só liberada é lida pelo coletor. |
 
 ## MCP (`/mcp`, Streamable HTTP, `Authorization: Bearer <token>`; leitura e PROPOSTAS: nenhuma ferramenta aprova, envia, paga ou apaga)
 

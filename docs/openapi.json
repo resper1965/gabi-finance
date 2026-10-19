@@ -4273,6 +4273,76 @@
     },
     "summary": "Concluir"
    }
+  },
+  "/api/v1/teams/fontes": {
+   "get": {
+    "description": "Contas do Teams cadastradas, com estado, última coleta, último erro e quantas conversas.\n`ultimo_erro` vem como o coletor gravou: pode ser um aviso mesmo numa coleta que deu certo (ex.: 'N chat(s) pulado(s) por erro'), então o painel mostra como aviso, não como falha.",
+    "operationId": "fontes_api_v1_teams_fontes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Fontes"
+   },
+   "post": {
+    "description": "Cadastra uma conta do Teams (e-mail). Nasce `a_decidir`: nada é lido até liberar.",
+    "operationId": "criar_fonte_api_v1_teams_fontes_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar Fonte"
+   }
+  },
+  "/api/v1/teams/fontes/{fonte_id}/estado": {
+   "put": {
+    "description": "Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma conta. Só liberada é lida pelo coletor.",
+    "operationId": "estado_fonte_api_v1_teams_fontes__fonte_id__estado_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fonte_id",
+      "required": true,
+      "schema": {
+       "title": "Fonte Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Estado Fonte"
+   }
   }
  }
 }
