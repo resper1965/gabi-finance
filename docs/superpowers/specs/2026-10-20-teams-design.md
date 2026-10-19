@@ -34,6 +34,8 @@ Avisar quando há mensagem para o Ricardo no Teams que ele não atendeu, nas dua
 ## 6. Erros e limites
 Erro do Graph vira `ErroGraph` sem corpo de resposta. 429/Retry-After respeitado; falha de uma conta não derruba a outra. Endpoints de mensagens de chat por aplicativo são sujeitos a licença/medição da Microsoft: verificar em teste real na ness antes de fechar o plano (ponto aberto de verificação, não de decisão).
 
+Achado da sonda (20/10, ness, só leitura): `GET /users/{conta}/chats?$expand=lastMessagePreview` e `GET /chats/{id}/messages?$select=id,createdDateTime,from,messageType,mentions,deletedDateTime` respondem 200 por aplicativo, sem licença/medição. `chatType`: oneOnOne, group, meeting. `lastMessagePreview` traz `createdDateTime`, `from`, `isDeleted`, `messageType` (e `body`, que a fonte descarta). `from` tem `user`, `application` ou `device`; `from.user.id` é uuid; `messageType` inclui `message` e `unknownFutureValue` (só `message` conta). A forma de `mentions[].mentioned.user.id` não pôde ser vista (a amostra não tinha menção): os testes seguem a documentação do Graph e o aceite real confere.
+
 ## 6a. Ionic pode estar mais restrita
 Não assumimos que o administrador da ionic concederá `Chat.Read.All`/`ChannelMessage.Read.All` de aplicativo (são permissões amplas, de tenant inteiro, e costumam ser negadas ou exigir política de acesso). Consequências no desenho:
 - A fonte ionic é opcional e independente: a ness entra em produção sem ela, e a ausência de credenciais ou o 403 da ionic vira estado "não configurada/negada" no painel, nunca erro que derrube o coletor.
