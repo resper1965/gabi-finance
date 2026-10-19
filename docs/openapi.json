@@ -279,7 +279,7 @@
   },
   "/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir": {
    "post": {
-    "description": "Pergunta ao Google (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora.",
+    "description": "Pergunta ao Google ou ao Graph (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora.",
     "operationId": "descobrir_api_v1_agenda_fontes__fonte_id__calendarios_descobrir_post",
     "parameters": [
      {
@@ -1111,6 +1111,23 @@
      }
     },
     "summary": "Cartoes"
+   }
+  },
+  "/api/v1/cobrar/a-receber": {
+   "get": {
+    "description": "O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois).",
+    "operationId": "a_receber_api_v1_cobrar_a_receber_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "A Receber"
    }
   },
   "/api/v1/cobrar/cobrancas": {

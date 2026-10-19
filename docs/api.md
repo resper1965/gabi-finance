@@ -14,7 +14,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/agenda/fontes` | Contas e calendários de agenda cadastrados, com estado, última sincronização, último erro e quantos eventos. |
 | POST | `/api/v1/agenda/fontes` | Cadastra uma conta de agenda (e-mail, provedor google|graph, auth oauth|delegacao). Nasce `a_decidir`: nada é lido até liberar. |
 | PATCH | `/api/v1/agenda/fontes/{fonte_id}` | Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma fonte. Só liberada é lida pelo timer. |
-| POST | `/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir` | Pergunta ao Google (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora. |
+| POST | `/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir` | Pergunta ao Google ou ao Graph (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora. |
 | GET | `/api/v1/agenda/parametros` | Parâmetros da agenda: privados (mostrar|so_painel|ocultar), fuso e janela de leitura em dias (padrões se não definidos). |
 | PUT | `/api/v1/agenda/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves. |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |
@@ -42,6 +42,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/caixas-email` | Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim). |
 | PATCH | `/api/v1/caixas-email/{caixa_id}` | Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler). |
 | GET | `/api/v1/cartoes` | Cartões: fatura aberta, % do limite, série de 12 meses e categorias. |
+| GET | `/api/v1/cobrar/a-receber` | O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois). |
 | GET | `/api/v1/cobrar/cobrancas` | Rascunhos de cobrança guardados (opcionalmente de uma empresa). |
 | POST | `/api/v1/cobrar/cobrancas` | Monta o RASCUNHO do e-mail de cobrança (não envia). Corpo: {"empresa_id", "itens"?: [lancamento_id]}. |
 | POST | `/api/v1/cobrar/cobrancas/{cid}/enviar` | Desabilitado (ADR-006): o app só guarda o rascunho. |
