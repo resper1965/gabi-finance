@@ -25,6 +25,9 @@ function Fila({ leitura, acao }: { leitura: Leitura<{ fila: Remetente[]; aprovad
   const primeiro = useRef<HTMLButtonElement>(null);
   const aprovarRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const voltar = useRef<string | null>(null);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoTel, setNovoTel] = useState("");
+  const [novoPapel, setNovoPapel] = useState("familia");
   useEffect(() => {
     if (escolhendo) primeiro.current?.focus();
     else if (voltar.current) { aprovarRefs.current[voltar.current]?.focus(); voltar.current = null; }
@@ -62,6 +65,18 @@ function Fila({ leitura, acao }: { leitura: Leitura<{ fila: Remetente[]; aprovad
                     </li>);
                 })}
               </ul>)}
+          </Bloco>
+          <Bloco titulo="Aprovar um número" nota="Para quem ainda não escreveu: informe o telefone com DDD. A Gabi só passa a ler as mensagens dessa pessoa.">
+            <form style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }} onSubmit={async (e) => {
+              e.preventDefault();
+              if (await agir("novo-numero", () => api.post(`/api/v1/escuta/remetentes/${encodeURIComponent(novoTel.trim())}/aprovar`, { papel: novoPapel, nome: novoNome.trim() || undefined }), "Número aprovado.", leitura.recarregar)) { setNovoNome(""); setNovoTel(""); }
+            }}>
+              <label>Nome<br /><input aria-label="Nome do remetente" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} /></label>
+              <label>Telefone<br /><input aria-label="Telefone do remetente" inputMode="tel" placeholder="11 91234-5678" value={novoTel} onChange={(e) => setNovoTel(e.target.value)} /></label>
+              <label>Papel<br /><select aria-label="Papel do remetente" value={novoPapel} onChange={(e) => setNovoPapel(e.target.value)}>{PAPEIS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>
+              <button className="btn btn-primary" type="submit" disabled={ocupado || novoTel.trim() === ""}>Aprovar número</button>
+            </form>
+            <Aviso erro={erros["novo-numero"]} />
           </Bloco>
           <Bloco titulo={`Aprovados · ${d.aprovados.length}`}>
             {d.aprovados.length === 0 ? <Vazio frase="Ninguém aprovado ainda." /> : (

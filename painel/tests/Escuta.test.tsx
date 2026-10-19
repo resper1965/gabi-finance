@@ -392,3 +392,25 @@ test.each([["Sincronizar agora", null], ["Apagar contatos", "Confirmar apagar co
   if (confirmar) fireEvent.click(await screen.findByRole("button", { name: confirmar }));
   await waitFor(() => expect(c.slice(antes).some((x) => /offset=0/.test(x.url))).toBe(true));
 });
+
+test("aprovar um numero que ainda nao escreveu manda telefone, papel e nome para a API", async () => {
+  const c = fake();
+  montar();
+  await assentar();
+  fireEvent.change(screen.getByLabelText("Nome do remetente"), { target: { value: "Ana Souza" } });
+  fireEvent.change(screen.getByLabelText("Telefone do remetente"), { target: { value: "11 91234-5678" } });
+  fireEvent.change(screen.getByLabelText("Papel do remetente"), { target: { value: "prestador" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar número" }));
+  await assentar();
+  const [p] = posts(c);
+  expect(p.metodo).toBe("POST");
+  expect(decodeURIComponent(p.url)).toContain("/api/v1/escuta/remetentes/11 91234-5678/aprovar");
+  expect(p.corpo).toEqual({ papel: "prestador", nome: "Ana Souza" });
+});
+
+test("o botao de aprovar numero fica desligado sem telefone", async () => {
+  fake();
+  montar();
+  await assentar();
+  expect((screen.getByRole("button", { name: "Aprovar número" }) as HTMLButtonElement).disabled).toBe(true);
+});
