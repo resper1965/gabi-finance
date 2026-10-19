@@ -34,6 +34,12 @@ Avisar quando há mensagem para o Ricardo no Teams que ele não atendeu, nas dua
 ## 6. Erros e limites
 Erro do Graph vira `ErroGraph` sem corpo de resposta. 429/Retry-After respeitado; falha de uma conta não derruba a outra. Endpoints de mensagens de chat por aplicativo são sujeitos a licença/medição da Microsoft: verificar em teste real na ness antes de fechar o plano (ponto aberto de verificação, não de decisão).
 
+## 6a. Ionic pode estar mais restrita
+Não assumimos que o administrador da ionic concederá `Chat.Read.All`/`ChannelMessage.Read.All` de aplicativo (são permissões amplas, de tenant inteiro, e costumam ser negadas ou exigir política de acesso). Consequências no desenho:
+- A fonte ionic é opcional e independente: a ness entra em produção sem ela, e a ausência de credenciais ou o 403 da ionic vira estado "não configurada/negada" no painel, nunca erro que derrube o coletor.
+- O contrato `FonteTeams` não depende do tipo de autenticação. Se o aplicativo não for liberado, a alternativa é acesso **delegado** (o próprio Ricardo consente `Chat.Read`, só dos chats dele, por fluxo de código de dispositivo, com refresh token em arquivo 0600). É mais restrito e mais adequado, mas é decisão dele e do administrador; não é implementada agora.
+- O que vale para a ionic é conferido com o administrador antes de qualquer plano para ela.
+
 ## 7. Testes
 Fixtures do Graph: 1:1 sem resposta, menção em grupo, resposta que fecha o aviso, bot/sistema ignorado, expediente e fim de semana, uma conta com erro e a outra ok, e prova de que corpo/assunto não vazam em log, exceção, aviso nem banco. Depois teste real da ness, só leitura.
 
