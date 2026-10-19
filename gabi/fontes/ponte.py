@@ -26,7 +26,7 @@ PERMITIDOS = {
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
-                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
+                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
@@ -242,6 +242,24 @@ class PonteGraph:
                 or not isinstance(r.get("recarga_completa"), bool) or not (r.get("novo_sync_token") is None or isinstance(r.get("novo_sync_token"), str))):
             raise ErroGraphNess("resposta inválida do serviço de fontes")
         return ResultadoEventos(r["eventos"], r["cancelados"], r.get("novo_sync_token"), r["recarga_completa"])
+
+    def teams_chats(self, conta: str) -> list[dict]:
+        r = self._ponte._chamar("teams_chats", (conta,))
+        if (not isinstance(r, list) or not all(
+                isinstance(x, dict) and set(x) == {"chat_id", "tipo", "ultima_em"} and isinstance(x["chat_id"], str)
+                and x["tipo"] in ("um_a_um", "grupo") and (x["ultima_em"] is None or isinstance(x["ultima_em"], str)) for x in r)):
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
+
+    def teams_mensagens(self, conta: str, chat_id: str, desde: str) -> list[dict]:
+        """Só metadados (sem texto da mensagem) atravessam a ponte."""
+        r = self._ponte._chamar("teams_mensagens", (conta, chat_id, desde))
+        if (not isinstance(r, list) or not all(
+                isinstance(x, dict) and set(x) == {"id", "quando", "de_nome", "de_eu", "mencoes_eu"} and isinstance(x["id"], str)
+                and isinstance(x["quando"], str) and isinstance(x["de_nome"], str) and isinstance(x["de_eu"], bool)
+                and isinstance(x["mencoes_eu"], bool) for x in r)):
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
 
 
 def _resultado_por_id(r, erro: type[Exception] = ErroGoogleOAuth) -> dict:
