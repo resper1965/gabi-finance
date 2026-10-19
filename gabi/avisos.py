@@ -97,6 +97,17 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     if tipo == "cobrada_apos_cancelar":
         ok = con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
         return (VALE if ok else RESOLVIDO), payload
+    if tipo == "teams_sem_resposta":
+        conta, _, chat_id = str(payload.get("chave") or "").partition("|")
+        r = con.execute("select c.ultima_para_mim_em, c.minha_ultima_resposta_em, f.estado from teams_conversa c join teams_fonte f on f.conta=c.conta "
+                        "where c.conta=? and c.chat_id=?", (conta, chat_id)).fetchone()
+        if r is None or r["estado"] != "sim":
+            return RESOLVIDO, payload
+        from gabi.teams.regra import _dt
+        para_mim, resp = _dt(r["ultima_para_mim_em"]), _dt(r["minha_ultima_resposta_em"])
+        if para_mim is None or (resp is not None and resp >= para_mim):
+            return RESOLVIDO, payload
+        return VALE, payload
     return VALE, payload
 
 
@@ -113,7 +124,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
     return estado, atual
 
 
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve")
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta")
 ABERTOS_A_VENCER = ("aberto", "previsto", "debito_automatico")
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -217,6 +228,19 @@ def _hermes_parado(con, agora: dt.datetime, novo, estado) -> None:
         novo("hermes_parado", unidade, {"unidade": unidade, "estado": st})
 
 
+def _teams_sem_resposta(con, agora: dt.datetime, novo) -> None:
+    """Conversa do Teams (conta com teams_fonte 'sim') em que me chamaram (1:1) ou me mencionaram (grupo) e não respondi há N horas úteis. Sem texto de mensagem.
+    Ao criar o aviso grava `ultimo_aviso_em`: a mesma mensagem não avisa de novo; mensagem nova (ultima_para_mim_em maior) avisa outra vez."""
+    from gabi.teams import regra
+    horas, expediente = regra.ler_config(con)
+    for c in con.execute("select c.* from teams_conversa c join teams_fonte f on f.conta=c.conta where f.estado='sim' order by c.conta, c.chat_id").fetchall():
+        if not regra.pendente(c, agora, horas, expediente):
+            continue
+        chave = f"{c['conta']}|{c['chat_id']}"
+        if novo("teams_sem_resposta", chave, {"conta": c["conta"], "chat_id": c["chat_id"], "tipo_chat": c["tipo"], "de_nome": c["de_nome"], "desde": c["ultima_para_mim_em"]}) is not None:
+            con.execute("update teams_conversa set ultimo_aviso_em=? where conta=? and chat_id=?", (agora.astimezone(dt.timezone.utc).isoformat(), c["conta"], c["chat_id"]))
+
+
 def _vence_em_breve(con, agora: dt.datetime, hoje: dt.date, novo) -> None:
     """Contas que vencem de amanhã até `avisos.antecedencia_dias` (padrão 3) à frente e ainda não foram avisadas, com o valor estimado marcado como tal.
     Cada conta entra num aviso uma única vez (as que entram na janela depois, como boleto emitido tarde, saem no aviso do dia); o do dia do vencimento é o `vence_hoje`."""
@@ -266,6 +290,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         i = _novo(con, agora, *a)
         if i is not None:
             criados.append(i)
+        return i
 
     ult = con.execute("select conferida, fim from rodada where fonte='open-finance' and fim is not null order by id desc limit 2").fetchall()
     if len(ult) == 2 and not any(r["conferida"] for r in ult):
@@ -282,6 +307,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     _escuta_parada(con, agora, novo)
     if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
         _hermes_parado(con, agora, novo, estado_servico)
+    _teams_sem_resposta(con, agora, novo)
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):
         novo("conta_atrasada", c["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"])})

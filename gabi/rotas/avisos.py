@@ -2,6 +2,7 @@
 Título e texto saem do servidor em pt-BR, para o painel e o canal (Hermes) mostrarem a mesma coisa. Consome: aviso, decisao."""
 import datetime as dt
 import json
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 
@@ -114,6 +115,17 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "vence_hoje":
         itens = p.get("itens") or []
         return "Vence hoje", "; ".join(f"{i['nome']} {_brl(i.get('valor'))}" for i in itens) or "nada"
+    if tipo == "teams_sem_resposta":
+        quem = p.get("de_nome") or "Alguém"
+        verbo = "te mencionou" if p.get("tipo_chat") == "grupo" else "te chamou"
+        try:
+            d = dt.datetime.fromisoformat(p["desde"])
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=dt.timezone.utc)
+            desde = f" desde {d.astimezone(ZoneInfo('America/Sao_Paulo')).strftime('%d/%m %H:%M')}"
+        except (KeyError, TypeError, ValueError):
+            desde = ""
+        return f"Teams: {quem} {verbo}", f"sem resposta{desde} ({p.get('conta', '?')})"
     if tipo == "hermes_parado":
         return "O Hermes (Telegram e WhatsApp) está parado", f"a unidade {p.get('unidade') or 'hermes-gateway'} está {p.get('estado') or 'fora do ar'}; reinicie com: sudo systemctl restart hermes-gateway"
     if tipo == "servico_falhou":
