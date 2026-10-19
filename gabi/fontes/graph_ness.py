@@ -35,13 +35,23 @@ class _ErroStatus(ErroGraphNess):
         self.status = status
 
 
+class _SemRedirecionamento(urllib.request.HTTPRedirectHandler):
+    """O urllib copiaria o cabeçalho Authorization para o destino de um 3xx, qualquer que fosse o host: aqui o redirecionamento nunca é seguido."""
+
+    def redirect_request(self, *a, **k):
+        return None
+
+
+_ABRIR = urllib.request.build_opener(_SemRedirecionamento).open
+
+
 def _http_real(metodo, url, corpo=None, cabecalhos=None):
     """(status, json). O corpo de um erro NUNCA é lido (pode ecoar segredo ou texto de evento). A falha só é registrada no `except`; o erro
     tipado sai depois do bloco (sem __context__)."""
     req = urllib.request.Request(url, data=corpo, method=metodo, headers=cabecalhos or {})
     falha = None
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with _ABRIR(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
         codigo = e.code
@@ -126,7 +136,7 @@ class GraphNess:
                 self._token.invalidar()
                 continue
             break
-        if status >= 400:
+        if status >= 300:  # 3xx não é seguido (ver _SemRedirecionamento) e não é resposta
             raise _ErroStatus(f"GET {caminho} -> {status}", status)
         if not isinstance(resp, dict):
             raise ErroGraphNess("resposta inválida do Graph")

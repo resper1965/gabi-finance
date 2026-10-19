@@ -356,3 +356,44 @@ def test_erro_nao_leva_titulo_do_evento():
     with pytest.raises(ErroGraphNess) as e:
         gr.listar_eventos(CONTA, "primary", None, JANELA)
     assert "secreta" not in str(e.value)
+
+
+# ---------------- redirecionamento ----------------
+def test_http_real_nao_segue_redirecionamento_e_nao_vaza_o_bearer():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    vistos = []
+
+    class Alvo(BaseHTTPRequestHandler):
+        def do_GET(self):
+            vistos.append(self.headers.get("Authorization"))
+            self.send_response(200); self.end_headers(); self.wfile.write(b"{}")
+
+        def log_message(self, *a):
+            pass
+
+    alvo = HTTPServer(("127.0.0.1", 0), Alvo)
+
+    class Redireciona(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302); self.send_header("Location", f"http://127.0.0.1:{alvo.server_port}/roubo"); self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    origem = HTTPServer(("127.0.0.1", 0), Redireciona)
+    for s in (alvo, origem):
+        threading.Thread(target=s.serve_forever, daemon=True).start()
+    try:
+        status, _ = g._http_real("GET", f"http://127.0.0.1:{origem.server_port}/x", None, {"Authorization": "Bearer TOKEN-SECRETO"})
+    finally:
+        for s in (alvo, origem):
+            s.shutdown(); s.server_close()
+    assert vistos == [] and status == 302
+
+
+def test_get_trata_3xx_como_erro():
+    gr, _ = _graph([(302, {})])
+    with pytest.raises(ErroGraphNess, match="-> 302"):
+        gr._get(g.BASE + "/users/x/y")
