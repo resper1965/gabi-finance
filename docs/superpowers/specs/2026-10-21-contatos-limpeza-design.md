@@ -16,7 +16,7 @@ Depois de aprovar as 50 propostas de criar/corrigir celular, o Ricardo achou suj
 ### 2. Três tipos novos em `contato_proposta`
 | tipo | quando propõe | o que escreve no Graph |
 |---|---|---|
-| `corrigir_nome` | o nome limpo difere do atual; nome limpo precisa ter ≥ 2 caracteres | só `displayName`; telefone igual no antes e no depois |
+| `corrigir_nome` | o nome limpo difere do atual; nome limpo precisa ter ≥ 2 caracteres | só `displayName` (via `renomear`; o telefone não é tocado) |
 | `apagar_telefone` | `contato_graph.telefone is null` (ainda inválido depois do item 1) | limpa só aquele campo de telefone, com o valor `antes` conferido |
 | `apagar_contato` | nome limpo com **1 caractere** e o contato não tem e-mail nem outro telefone além do que a proposta mostra | apaga o contato inteiro |
 
@@ -28,7 +28,10 @@ Limpeza de nome (`_limpar_nome`): remove caracteres de `Unicode categoria S* e P
 Cada tipo ganha `_aplicar_*` no padrão dos existentes: revalida contra `contato_graph` (a linha lida ainda é a mesma: nome e telefone original), conta ainda em `escuta.contas_contatos`; divergência → `contato_alterado`; falha da ponte → `graph_indisponivel`; resultado `alterado` da ponte → `contato_alterado`. Sucesso: atualiza `contato_graph` local e marca `aplicada` na mesma transação. `apagar_contato` remove a linha de `contato_graph` (e o contato local de `contato_google` por telefone, se houver só ele).
 
 ### 4. Ponte (`graph_ness_contatos.py` + `ponte.py`)
-Dois métodos novos, no mesmo arquivo da escrita de contatos: `contato_apagar_telefone(conta, graph_id, campo, antes_telefone)` e `contato_apagar(conta, graph_id, antes)`. Ambos releem o contato e só escrevem se nome e o campo conferem com o que o chamador viu; senão devolvem `{"resultado": "alterado"}`. `corrigir_nome` reaproveita `contato_corrigir` com o telefone igual no antes e no depois; **primeira tarefa do plano: confirmar no código que esse caminho aceita telefone inalterado** e, se não aceitar, acrescentar `contato_renomear`. Apagar contato usa `DELETE /users/{conta}/contacts/{id}` (a permissão `Contacts.ReadWrite` já cobre). Allowlist da ponte (`ponte.py:30`) ganha os nomes novos.
+Três métodos novos em `graph_ness_contatos.py` (mais os wrappers em `graph_ness.py` e o cliente/allowlist em `ponte.py`): `renomear(conta, graph_id, nome_antes, nome_depois)`, `apagar_telefone(conta, graph_id, campo, telefone_antes)` e `apagar(conta, graph_id, nome_antes)`. `contato_corrigir` NÃO serve para renomear: ele confere e escreve `mobilePhone` junto. Todos releem o contato (`$select`) e só escrevem se o que o chamador viu ainda confere; senão devolvem `{"resultado": "alterado"}` sem escrever.
+- `renomear`: confere `displayName`; PATCH só `displayName`.
+- `apagar_telefone`: `campo` mobile → confere `mobilePhone` e PATCH `mobilePhone: null`; home/business → confere que o número está na lista e PATCH a lista sem ele.
+- `apagar`: confere `displayName`, que não há e-mail e que o contato tem no máximo 1 telefone; `DELETE /users/{conta}/contacts/{id}` (a permissão `Contacts.ReadWrite` já cobre). Allowlist em `ponte.py` ganha `contato_renomear`, `contato_apagar_telefone`, `contato_apagar`.
 
 ### 5. Painel
 A aba Contatos lista os tipos novos com antes → depois (telefone original em `apagar_telefone`; nome e telefone em `apagar_contato`). O lote existente passa a aprovar `corrigir` **e** `corrigir_nome` mostrados na tela; **`apagar_telefone` e `apagar_contato` nunca entram em lote** (individual, com confirmação). Recusar aprovada continua valendo até a gravação.
