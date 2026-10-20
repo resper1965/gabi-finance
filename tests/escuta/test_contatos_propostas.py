@@ -237,3 +237,24 @@ def test_main_gera_propostas_e_imprime_so_contagens(tmp_path, capsys):
     code = c.main(banco, listar=lambda conta: [])
     out = capsys.readouterr().out
     assert code == 0 and "propostas: criar=1 corrigir=0" in out and "Segredo" not in out and "912345678" not in out
+
+
+def test_migracao_0073_aceita_tipos_novos_e_preserva_linhas(tmp_path):
+    import shutil
+    import sqlite3
+    antes = tmp_path / "antes"
+    antes.mkdir()
+    for f in MIGR.glob("[0-9][0-9][0-9][0-9]_*.sql"):
+        if f.name < "0073":
+            shutil.copy(f, antes / f.name)
+    k = conectar(tmp_path / "m.db")
+    migrar(k, antes)
+    k.execute("insert into contato_proposta(tipo, conta, nome_depois, telefone_depois, origem) values ('criar', ?, 'A', '+5511900000001', 'whatsapp')", (NESS,))
+    k.execute("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, origem, estado) values ('corrigir', ?, 'g', 'B', '+5511900000002', 'telefone_invalido', 'aprovada')", (NESS,))
+    k.commit()
+    migrar(k, MIGR)
+    assert [(r["tipo"], r["estado"]) for r in k.execute("select tipo, estado from contato_proposta order by id")] == [("criar", "pendente"), ("corrigir", "aprovada")]
+    k.execute("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, origem) values ('apagar_contato', ?, 'g9', 'U', '', 'nome_curto')", (NESS,))
+    with pytest.raises(sqlite3.IntegrityError):
+        k.execute("insert into contato_proposta(tipo, conta, nome_depois, telefone_depois, origem) values ('qualquer', ?, 'x', '', 'whatsapp')", (NESS,))
+    assert k.execute("select 1 from sqlite_master where name='contato_proposta_aberta'").fetchone()
