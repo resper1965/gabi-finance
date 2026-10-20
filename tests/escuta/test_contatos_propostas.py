@@ -100,7 +100,13 @@ def test_nao_corrige_telefone_fixo_ou_de_trabalho(con, campo):
     assert p.gerar(con, AGORA)["corrigir"] == 0
 
 
-@pytest.mark.parametrize("bruto", ["(11) 9999-0000 ramal 5", "11 9999-0000 x 12", "+1 415 555 0000", "123"])
+def test_estrangeiro_tem_telefone_mas_nunca_gera_corrigir(con):
+    _sync(con, _it("+1 415 555 0000"))
+    assert con.execute("select telefone from contato_graph").fetchone()[0] == "+14155550000"
+    assert p.gerar(con, AGORA)["corrigir"] == 0
+
+
+@pytest.mark.parametrize("bruto", ["(11) 9999-0000 ramal 5", "11 9999-0000 x 12", "123"])
 def test_ramal_ou_numero_que_nao_normaliza_nunca_gera(con, bruto):
     _sync(con, _it(bruto))
     assert con.execute("select telefone from contato_graph").fetchone()[0] is None
