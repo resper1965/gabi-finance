@@ -5,6 +5,7 @@ import { Vazio } from "../componentes/Estados";
 import { api } from "../lib/api";
 import { Aviso, useAcao, type Acao } from "../lib/useAcao";
 import { useApi, type Leitura } from "../lib/useApi";
+import { ContatosPropostas } from "./ContatosPropostas";
 
 interface Remetente { numero: string; nome: string | null; qtd: number }
 interface Aprovado { pessoa_id: string; nome: string; numero: string | null; papel: string | null }
@@ -241,7 +242,7 @@ function Contatos({ acao }: { acao: Acao }) {
   return (
     <Painel leitura={leitura} arquivo="escuta-contatos">
       {(d) => (
-        <Bloco titulo={`Contatos do Google · ${d.total}`} nota="Só nome e telefone, lidos das suas contas do Google. Nada é escrito nos contatos.">
+        <Bloco titulo={`Contatos do Google · ${d.total}`} nota="Só nome e telefone, lidos das suas contas do Google. Só grava o que você aprovar abaixo.">
           <Aviso erro={erros.contatos} />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button className="btn btn-primary" disabled={ocupado} onClick={() => agir("contatos", async () => {
@@ -254,6 +255,7 @@ function Contatos({ acao }: { acao: Acao }) {
             <button ref={apagar} className="btn btn-secondary" disabled={ocupado} onClick={() => setApagando(true)}>Apagar contatos</button>
           </div>
           {resumo && <p role="status" style={{ margin: 0, ...suave }}>{resumo}</p>}
+          <ContatosPropostas acao={acao} />
           {apagando && (
             <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <p style={{ margin: 0 }}>Apagar todos os contatos guardados? As pessoas já criadas a partir deles ficam.</p>
