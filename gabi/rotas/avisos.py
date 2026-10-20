@@ -135,6 +135,9 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Teams: {quem} {verbo}", f"sem resposta{desde} ({p.get('conta', '?')})"
     if tipo == "hermes_parado":
         return "O Hermes (Telegram e WhatsApp) está parado", f"a unidade {p.get('unidade') or 'hermes-gateway'} está {p.get('estado') or 'fora do ar'}; reinicie com: sudo systemctl restart hermes-gateway"
+    if tipo == "google_parado":
+        return ("Google parado: correio, agenda e contatos sem ler",
+                f"todas as fontes Google falham ({', '.join(p.get('contas') or [])}); provável token expirado: refaça com sudo /opt/gabi-brain/venv/bin/python -m tools.obter_token_google <conta> --env /etc/gabi/google.env --gravar")
     if tipo == "servico_falhou":
         return "Serviço falhou", f"{p.get('unidade', '?')} terminou com erro"
     if tipo == "lancamento_sem_conversao":

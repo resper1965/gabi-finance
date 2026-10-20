@@ -229,6 +229,31 @@ def _hermes_parado(con, agora: dt.datetime, novo, estado) -> None:
         novo("hermes_parado", unidade, {"unidade": unidade, "estado": st})
 
 
+def _google_parado(con, agora: dt.datetime, novo) -> None:
+    """Todas as fontes Google liberadas (correio e agenda) falhando E sem sincronizar há mais de `avisos.google_horas` (padrão 2): token revogado ou expirado
+    (app OAuth em modo Testing vence em 7 dias). Uma fonte funcionando basta para não avisar; recarga vazia não é falha. Um aviso por dia, só contas e contagem."""
+    if _parametro(con, "avisos.vigiar_google", True) is False:
+        return
+    horas = _parametro(con, "avisos.google_horas", 2)
+    if isinstance(horas, bool) or not isinstance(horas, (int, float)) or horas <= 0:
+        horas = 2
+    corte = (agora - dt.timedelta(hours=horas)).astimezone(dt.timezone.utc)
+    fontes = [r for t in ("email_fonte", "agenda_fonte") for r in con.execute(
+        f"select conta, sincronizada_em, ultimo_erro from {t} where provedor='google' and estado='sim'")]
+    if not fontes:
+        return
+    for f in fontes:
+        if not f["ultimo_erro"] or f["ultimo_erro"].startswith("recarga vazia"):
+            return
+        if f["sincronizada_em"]:
+            quando = dt.datetime.fromisoformat(f["sincronizada_em"])
+            if quando.tzinfo is None:
+                quando = quando.replace(tzinfo=dt.timezone.utc)
+            if quando >= corte:
+                return
+    novo("google_parado", "google", {"fontes": len(fontes), "contas": sorted({f["conta"] for f in fontes})})
+
+
 def _teams_sem_resposta(con, agora: dt.datetime, novo) -> None:
     """Conversa do Teams (conta com teams_fonte 'sim') em que me chamaram (1:1) ou me mencionaram (grupo) e não respondi há N horas úteis. Sem texto de mensagem.
     Ao criar o aviso grava `ultimo_aviso_em`: a mesma mensagem não avisa de novo; mensagem nova (ultima_para_mim_em maior) avisa outra vez."""
@@ -318,6 +343,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     _escuta_parada(con, agora, novo)
     if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
         _hermes_parado(con, agora, novo, estado_servico)
+    _google_parado(con, agora, novo)
     _teams_sem_resposta(con, agora, novo)
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):

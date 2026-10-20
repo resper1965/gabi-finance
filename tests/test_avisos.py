@@ -413,3 +413,53 @@ def test_banco_atualizado_ou_sem_registro_ou_corrompido_nao_avisa(con):
     _sync_banco(con, Itau="", Bradesco="nao-e-data", XP=5)
     gerar_avisos(con, AGORA)
     assert _tipos(con) == []
+
+
+# ---------------- google_parado: todas as fontes do Google falhando ----------------
+def _fonte_google(con, tabela, conta, erro=None, sincronizada_horas_atras=None, estado="sim", provedor="google"):
+    sinc = (AGORA - dt.timedelta(hours=sincronizada_horas_atras)).isoformat() if sincronizada_horas_atras is not None else None
+    con.execute(f"insert into {tabela}(conta, provedor, estado, sincronizada_em, ultimo_erro) values (?,?,?,?,?)", (conta, provedor, estado, sinc, erro))
+
+
+def test_google_parado_quando_todas_as_fontes_falham(con):
+    _fonte_google(con, "email_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
+    _fonte_google(con, "agenda_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
+    gerar_avisos(con, AGORA)
+    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
+    r = con.execute("select payload from aviso where tipo='google_parado'").fetchall()
+    assert len(r) == 1 and json.loads(r[0][0]) == {"chave": "google", "fontes": 2, "contas": ["a@gmail.com"]}
+
+
+def test_google_parado_nao_avisa_se_ao_menos_uma_fonte_funciona(con):
+    _fonte_google(con, "email_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
+    _fonte_google(con, "agenda_fonte", "b@esper.ws", None, 0.2)
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
+
+
+def test_google_parado_ignora_falha_recente_isolada_fonte_nao_google_e_liberada_nao(con):
+    _fonte_google(con, "email_fonte", "a@gmail.com", "troca de token -> 503", 0.25)    # falhou há 15 min, sincronizou há pouco: oscilação
+    _fonte_google(con, "email_fonte", "n@ness.com.br", "erro", 50, provedor="graph")   # não é Google
+    _fonte_google(con, "agenda_fonte", "c@gmail.com", "token recusado: c@gmail.com", 50, estado="nao")  # não liberada
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
+
+
+def test_google_parado_recarga_vazia_nao_e_falha_e_sem_fonte_nao_avisa(con):
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
+    _fonte_google(con, "agenda_fonte", "a@gmail.com", "recarga vazia: eventos mantidos", 30)
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
+
+
+def test_google_parado_fonte_nunca_sincronizada_com_erro_conta(con):
+    _fonte_google(con, "email_fonte", "a@gmail.com", "conta não autorizada: a@gmail.com", None)
+    gerar_avisos(con, AGORA)
+    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 1
+
+
+def test_descrever_google_parado():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("google_parado", {"fontes": 3, "contas": ["a@gmail.com", "b@esper.ws"]})
+    assert "Google" in t and "a@gmail.com" in x and "obter_token_google" in x
