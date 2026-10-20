@@ -480,6 +480,15 @@ class _FalsoGraph:
             return {"resultado": "talvez"}
         return {"resultado": "ok" if antes == {"nome": "A", "telefone": "1"} and depois["nome"] == "B" else "alterado"}
 
+    def contato_renomear(self, conta, graph_id, nome_antes, nome_depois):
+        return {"resultado": "talvez"} if conta == "malformada@x.com" else {"resultado": "ok" if nome_antes == "A⁹" and nome_depois == "A" else "alterado"}
+
+    def contato_apagar_telefone(self, conta, graph_id, campo, telefone_antes):
+        return {"resultado": "ok" if (campo, telefone_antes) == ("home", "1") else "alterado"}
+
+    def contato_apagar(self, conta, graph_id, nome_antes):
+        return {"resultado": "ok" if nome_antes == "U" else "alterado"}
+
     def enviar(self):
         return "nunca"
 
@@ -495,7 +504,7 @@ def sock_graph(tmp_path):
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
                                                   "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
-                                                  "contato_criar", "contato_corrigir"})
+                                                  "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -577,7 +586,7 @@ def test_teams_metodos_estao_permitidos():
 
 def test_metodo_de_escrita_do_teams_nao_existe():
     import re
-    assert not [m for m in PERMITIDOS["graph_ness"] if re.search(r"enviar|responder|apagar|reagir", m)]
+    assert not [m for m in PERMITIDOS["graph_ness"] if m.startswith("teams") and re.search(r"enviar|responder|apagar|reagir", m)]  # apagar de CONTATO é da ADR-021
 
 
 def test_ponte_graph_teams_chats_valida_forma(sock_graph):
@@ -596,3 +605,12 @@ def test_ponte_graph_teams_mensagens_valida_forma(sock_graph):
     for conta in ("malformada@x.com", "naolista@x.com"):
         with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
             p.teams_mensagens(conta, "c1", "2026-10-19T00:00:00Z")
+
+
+def test_cliente_graph_limpeza_ida_e_volta_e_resposta_invalida(sock_graph):
+    p = PonteGraph(sock_graph)
+    assert p.contato_renomear("resper@ness.com.br", "AAMkAGI2TG93AAA=", "A⁹", "A") == {"resultado": "ok"}
+    assert p.contato_apagar_telefone("resper@ness.com.br", "AAMkAGI2TG93AAA=", "home", "1") == {"resultado": "ok"}
+    assert p.contato_apagar("resper@ness.com.br", "AAMkAGI2TG93AAA=", "X") == {"resultado": "alterado"}
+    with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+        p.contato_renomear("malformada@x.com", "AAMkAGI2TG93AAA=", "A", "B")

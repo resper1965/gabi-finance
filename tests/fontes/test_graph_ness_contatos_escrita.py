@@ -96,6 +96,89 @@ def test_nome_ou_telefone_invalido_recusado(nome, tel):
 
 def test_trava_no_modulo():
     mod = Path(gc.__file__).read_text()
-    assert "DELETE" not in mod and "PUT" not in mod
+    assert "PUT" not in mod and mod.count('"DELETE"') == 1  # o único DELETE é o de apagar contato inteiro (ADR-021)
     assert "PATCH" not in Path(g.__file__).read_text()
-    assert not hasattr(GraphNess, "contato_apagar")
+    assert not hasattr(GraphNess, "contato_apagar_tudo")
+
+
+# ---------------- limpeza (ADR-021): renomear, apagar telefone, apagar contato ----------------
+URL_ID = f"{URL}/AAMkAGI2TG93AAA%3D"
+
+
+def test_renomear_so_displayname_apos_reler():
+    gr, http = _graph([(200, {"displayName": "Ana⁹"}), (200, {})])
+    assert gr.contato_renomear(CONTA, GID, "Ana⁹", "Ana") == {"resultado": "ok"}
+    leitura, escrita = http.chamadas
+    assert leitura[0] == "GET" and leitura[1] == f"{URL_ID}?$select=displayName"
+    assert escrita[0] == "PATCH" and escrita[1] == URL_ID and json.loads(escrita[2]) == {"displayName": "Ana"}
+
+
+def test_renomear_alterado_nao_escreve():
+    gr, http = _graph([(200, {"displayName": "Outro"})])
+    assert gr.contato_renomear(CONTA, GID, "Ana⁹", "Ana") == {"resultado": "alterado"}
+    assert [c[0] for c in http.chamadas] == ["GET"]
+
+
+def test_apagar_telefone_mobile_manda_null():
+    gr, http = _graph([(200, {"mobilePhone": "123", "homePhones": [], "businessPhones": []}), (200, {})])
+    assert gr.contato_apagar_telefone(CONTA, GID, "mobile", "123") == {"resultado": "ok"}
+    leitura, escrita = http.chamadas
+    assert leitura[1] == f"{URL_ID}?$select=mobilePhone,homePhones,businessPhones"
+    assert escrita[0] == "PATCH" and json.loads(escrita[2]) == {"mobilePhone": None}
+
+
+def test_apagar_telefone_home_preserva_o_outro():
+    gr, http = _graph([(200, {"mobilePhone": None, "homePhones": ["111", "222"], "businessPhones": []}), (200, {})])
+    assert gr.contato_apagar_telefone(CONTA, GID, "home", "111") == {"resultado": "ok"}
+    assert json.loads(http.chamadas[1][2]) == {"homePhones": ["222"]}
+
+
+@pytest.mark.parametrize("campo,relida", [("mobile", {"mobilePhone": "999", "homePhones": [], "businessPhones": []}),
+                                          ("home", {"mobilePhone": None, "homePhones": ["222"], "businessPhones": []}),
+                                          ("business", {"mobilePhone": None, "homePhones": [], "businessPhones": []})])
+def test_apagar_telefone_alterado_nao_escreve(campo, relida):
+    gr, http = _graph([(200, relida)])
+    assert gr.contato_apagar_telefone(CONTA, GID, campo, "111") == {"resultado": "alterado"}
+    assert [c[0] for c in http.chamadas] == ["GET"]
+
+
+def test_apagar_telefone_campo_invalido_sem_http():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="contato inválido"):
+        gr.contato_apagar_telefone(CONTA, GID, "fax", "111")
+    assert http.chamadas == []
+
+
+def test_apagar_contato_faz_delete_apos_conferir():
+    gr, http = _graph([(200, {"displayName": "U", "mobilePhone": "123", "homePhones": [], "businessPhones": [], "emailAddresses": []}), (204, None)])
+    assert gr.contato_apagar(CONTA, GID, "U") == {"resultado": "ok"}
+    leitura, escrita = http.chamadas
+    assert leitura[1] == f"{URL_ID}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+    assert escrita[0] == "DELETE" and escrita[1] == URL_ID and escrita[2] is None
+
+
+@pytest.mark.parametrize("relida", [
+    {"displayName": "Outro", "mobilePhone": "1", "homePhones": [], "businessPhones": [], "emailAddresses": []},
+    {"displayName": "U", "mobilePhone": "1", "homePhones": [], "businessPhones": [], "emailAddresses": [{"address": "a@b.com"}]},
+    {"displayName": "U", "mobilePhone": "1", "homePhones": ["2"], "businessPhones": [], "emailAddresses": []},
+])
+def test_apagar_contato_recusa_o_que_mudou(relida):
+    gr, http = _graph([(200, relida)])
+    assert gr.contato_apagar(CONTA, GID, "U") == {"resultado": "alterado"}
+    assert [c[0] for c in http.chamadas] == ["GET"]
+
+
+def test_limpeza_erro_nao_vaza_nome_nem_telefone():
+    gr, _ = _graph([(200, {"displayName": "U", "mobilePhone": "999", "homePhones": [], "businessPhones": [], "emailAddresses": []}), (500, {"x": "U 999"})])
+    with pytest.raises(ErroGraphNess) as e:
+        gr.contato_apagar(CONTA, GID, "U")
+    assert str(e.value) == "contato: HTTP 500"
+
+
+def test_limpeza_recusa_conta_e_id_invalidos_sem_http():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="conta não permitida"):
+        gr.contato_apagar("x@y.com", GID, "U")
+    with pytest.raises(ErroGraphNess, match="id de contato inválido"):
+        gr.contato_renomear(CONTA, "../x", "A", "B")
+    assert http.chamadas == []
