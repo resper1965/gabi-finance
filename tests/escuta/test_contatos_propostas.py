@@ -12,6 +12,11 @@ AGORA = "2026-10-20T10:00:00Z"
 NUM = "+5511912345678"
 
 
+
+def _antigas(r):
+    """Só criar/corrigir: os tipos de limpeza têm testes próprios."""
+    return {k: r[k] for k in ("criar", "corrigir")}
+
 @pytest.fixture
 def con(tmp_path):
     k = conectar(tmp_path / "t.db")
@@ -34,7 +39,7 @@ def _props(con):
 
 def test_criar_para_remetente_aprovado_com_nome_sem_contato(con):
     _rem(con, nome="  Fulano  ")
-    assert p.gerar(con, AGORA) == {"criar": 1, "corrigir": 0}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 1, "corrigir": 0}
     (r,) = _props(con)
     assert (r["tipo"], r["conta"], r["graph_id"], r["origem"], r["estado"]) == ("criar", NESS, None, "whatsapp", "pendente")
     assert (r["nome_depois"], r["telefone_depois"], r["criada_em"]) == ("Fulano", NUM, AGORA)
@@ -43,7 +48,7 @@ def test_criar_para_remetente_aprovado_com_nome_sem_contato(con):
 @pytest.mark.parametrize("nome", [None, "", "   "])
 def test_nao_cria_sem_nome(con, nome):
     _rem(con, nome=nome)
-    assert p.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
 
 
 def test_nao_cria_remetente_nao_aprovado_ou_numero_estranho(con):
@@ -74,7 +79,7 @@ def _it(tel, nome="Beltrano", gid="AAMk0001", campo="mobile"):
 
 def test_celular_antigo_de_8_digitos_gera_exatamente_uma_correcao(con):
     _sync(con, _it("11 9999-0000", nome="  Beltrano "))
-    assert p.gerar(con, AGORA) == {"criar": 0, "corrigir": 1}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 1}
     (r,) = _props(con)
     assert (r["tipo"], r["conta"], r["graph_id"], r["origem"], r["estado"]) == ("corrigir", NESS, "AAMk0001", "telefone_invalido", "pendente")
     assert (r["nome_antes"], r["telefone_antes"]) == ("Beltrano", "11 9999-0000")
@@ -91,7 +96,7 @@ def test_celular_antigo_com_ddi_ou_ddd_55_tambem_corrige(con, bruto):
                                    "(011) 9999-0000", "55 99999-0000"])
 def test_so_formatacao_diferente_nao_gera_proposta(con, bruto):
     _sync(con, _it(bruto))
-    assert p.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
 
 
 @pytest.mark.parametrize("campo", ["home", "business", None])
@@ -133,7 +138,7 @@ def test_recusada_nao_repete_mesmo_valor_e_repete_valor_novo(con):
     _sync(con, _it("11 9999-0000"))
     p.gerar(con, AGORA)
     p.decidir(con, _props(con)[0]["id"], "recusada", "ricardo", AGORA)
-    assert p.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
     _sync(con, _it("11 9999-0000", nome="Novo Nome"))
     assert p.gerar(con, AGORA)["corrigir"] == 1
     assert len(_props(con)) == 2
@@ -149,8 +154,8 @@ def test_aplicada_nao_repete(con):
 def test_gerar_e_idempotente(con):
     _rem(con)
     _sync(con, _it("11 9999-0000"))
-    assert p.gerar(con, AGORA) == {"criar": 1, "corrigir": 1}
-    assert p.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 1, "corrigir": 1}
+    assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
     assert len(_props(con)) == 2
 
 
@@ -242,7 +247,7 @@ def test_main_gera_propostas_e_imprime_so_contagens(tmp_path, capsys):
     k = conectar(banco); migrar(k, MIGR); _rem(k, nome="Segredo"); k.commit(); k.close()
     code = c.main(banco, listar=lambda conta: [])
     out = capsys.readouterr().out
-    assert code == 0 and "propostas: criar=1 corrigir=0" in out and "Segredo" not in out and "912345678" not in out
+    assert code == 0 and "propostas: criar=1 corrigir=0 nomes=0 apagar_telefone=0 apagar_contato=0" in out and "Segredo" not in out and "912345678" not in out
 
 
 def test_migracao_0073_aceita_tipos_novos_e_preserva_linhas(tmp_path):
@@ -264,3 +269,84 @@ def test_migracao_0073_aceita_tipos_novos_e_preserva_linhas(tmp_path):
     with pytest.raises(sqlite3.IntegrityError):
         k.execute("insert into contato_proposta(tipo, conta, nome_depois, telefone_depois, origem) values ('qualquer', ?, 'x', '', 'whatsapp')", (NESS,))
     assert k.execute("select 1 from sqlite_master where name='contato_proposta_aberta'").fetchone()
+
+
+# ---------------- limpeza (ADR-021) ----------------
+@pytest.mark.parametrize("sujo,limpo", [
+    ("José Rodrigo Carvalho⁹", "José Rodrigo Carvalho"),
+    ("Jaqueline Jurkovich |", "Jaqueline Jurkovich"),
+    ("  Ana   Lima ", "Ana Lima"),
+    ("EMR3 Segurança", "EMR3 Segurança"),
+    ("NOFARO", "NOFARO"),
+    ("LTB SAO PAULO", "LTB SAO PAULO"),
+    ("Antonio Américo (Tonico) Barbosa De Oliveira", "Antonio Américo (Tonico) Barbosa De Oliveira"),
+    ("Gabriela Andrade - HomeCred", "Gabriela Andrade - HomeCred"),
+    ("Maria D'Ávila Jr.", "Maria D'Ávila Jr."),
+])
+def test_limpar_nome(sujo, limpo):
+    assert p.limpar_nome(sujo) == limpo
+
+
+def _g(con):
+    return p.gerar(con, AGORA)
+
+
+def test_gera_corrigir_nome_uma_por_contato_mesmo_com_dois_telefones(con):
+    _sync(con, _it("+5511999990001", nome="José⁹", gid="AAMk0001"), _it("+5511999990002", nome="José⁹", gid="AAMk0001", campo="home"))
+    r = _g(con)
+    assert r["corrigir_nome"] == 1
+    (x,) = [q for q in _props(con) if q["tipo"] == "corrigir_nome"]
+    assert (x["graph_id"], x["nome_antes"], x["nome_depois"], x["telefone_antes"], x["telefone_depois"], x["origem"]) == \
+        ("AAMk0001", "José⁹", "José", None, "", "nome_sujo")
+
+
+def test_nao_gera_nome_para_caixa_alta_nem_emr3(con):
+    _sync(con, _it("+5511999990001", nome="NOFARO", gid="AAMk0001"), _it("+5511999990002", nome="EMR3 Segurança", gid="AAMk0002"))
+    r = _g(con)
+    assert (r["corrigir_nome"], r["apagar_contato"]) == (0, 0)
+
+
+def test_gera_apagar_contato_nome_de_uma_letra(con):
+    _sync(con, _it("+5511947338256", nome="U", gid="AAMk0001"))
+    assert _g(con)["apagar_contato"] == 1
+    (x,) = [q for q in _props(con) if q["tipo"] == "apagar_contato"]
+    assert (x["graph_id"], x["nome_antes"], x["telefone_antes"], x["nome_depois"], x["telefone_depois"], x["origem"]) == \
+        ("AAMk0001", "U", "+5511947338256", "U", "", "nome_curto")
+
+
+def test_nao_apaga_contato_de_uma_letra_com_email_ou_segundo_telefone(con):
+    _sync(con, {**_it("+5511947338256", nome="U", gid="AAMk0001"), "emails": ["u@x.com"]},
+          _it("+5511911111111", nome="V", gid="AAMk0002"), _it("+5511922222222", nome="V", gid="AAMk0002", campo="home"))
+    r = _g(con)
+    assert (r["apagar_contato"], r["corrigir_nome"]) == (0, 0)
+
+
+def test_gera_apagar_telefone_para_invalido(con):
+    _sync(con, _it("11 9999-0000 ramal 5", nome="Beltrano", gid="AAMk0001", campo="business"))
+    assert _g(con)["apagar_telefone"] == 1
+    (x,) = [q for q in _props(con) if q["tipo"] == "apagar_telefone"]
+    assert (x["graph_id"], x["nome_antes"], x["telefone_antes"], x["nome_depois"], x["telefone_depois"], x["origem"]) == \
+        ("AAMk0001", "Beltrano", "11 9999-0000 ramal 5", "Beltrano", "", "telefone_invalido")
+
+
+def test_estrangeiro_nao_gera_apagar_telefone(con):
+    _sync(con, _it("+1 415 555 2671", gid="AAMk0001"))
+    assert _g(con)["apagar_telefone"] == 0
+
+
+def test_limpeza_idempotente_e_recusada_nao_volta(con):
+    _sync(con, _it("+5511999990001", nome="José⁹", gid="AAMk0001"), _it("+5511947338256", nome="U", gid="AAMk0002"),
+          _it("123", nome="Ana", gid="AAMk0003", campo="home"))
+    chaves = ("corrigir_nome", "apagar_contato", "apagar_telefone")
+    r1 = _g(con)
+    assert [r1[k] for k in chaves] == [1, 1, 1]
+    r2 = _g(con)
+    assert [r2[k] for k in chaves] == [0, 0, 0]
+    con.execute("update contato_proposta set estado='recusada'")
+    r3 = _g(con)
+    assert [r3[k] for k in chaves] == [0, 0, 0]
+    assert len(_props(con)) == 3
+
+
+def test_gerar_retorna_todas_as_contagens(con):
+    assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato"}

@@ -1,6 +1,7 @@
 """Propostas de criar/corrigir contato da ness (sem modelo, depois da sincronização). Nada é escrito aqui: só se gera, lista e decide.
 `listar` devolve nome e telefone porque alimenta o painel; nada neste módulo imprime nem registra nome ou número."""
 import re
+import unicodedata
 
 from gabi.db import transacao
 from gabi.escuta import contatos
@@ -19,6 +20,16 @@ class ErroProposta(ValueError):
 
 def _nome(v) -> str | None:
     return v.strip()[:200] if isinstance(v, str) and v.strip() else None
+
+
+_LIXO = "|¦*_~^`\\<>="  # símbolos que sobram em nomes de contato; hífen, parênteses, ponto, apóstrofo e & são nome de verdade
+
+
+def limpar_nome(nome: str) -> str:
+    """Só tira lixo: sobrescrito/subscrito (`⁹`), símbolos de `_LIXO` soltos ou nas pontas e espaço sobrando. Não mexe em caixa nem em dígito comum (EMR3)."""
+    sem = "".join(c for c in nome if not unicodedata.name(c, "").startswith(("SUPERSCRIPT", "SUBSCRIPT")))
+    palavras = [w for w in sem.split() if w.strip(_LIXO)]
+    return " ".join(w.strip(_LIXO) if w[0] in _LIXO or w[-1] in _LIXO else w for w in palavras)
 
 
 def _digitos(t: str) -> str:
@@ -48,6 +59,31 @@ def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel
                        "values (?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora)).rowcount
 
 
+def _limpeza(con, agora: str) -> tuple[int, int, int]:
+    """corrigir_nome (um por contato), apagar_contato (nome limpo de 1 caractere, contato com 1 telefone válido e sem e-mail) e apagar_telefone
+    (um por telefone que não normaliza e não é estrangeiro). Dado de terceiros só vai para a fila, nunca para log."""
+    nomes = apagar_c = apagar_t = 0
+    linhas = con.execute("select conta, graph_id, nome, telefone_original, telefone from contato_graph order by conta, graph_id, telefone_original").fetchall()
+    por_contato: dict[tuple, list] = {}
+    for r in linhas:
+        por_contato.setdefault((r["conta"], r["graph_id"]), []).append(r)
+    for (conta, gid), rs in por_contato.items():
+        nome = _nome(rs[0]["nome"])
+        limpo = limpar_nome(nome) if nome else ""
+        if len(limpo) == 1:
+            r = rs[0]
+            if len(rs) == 1 and r["telefone"] is not None and not con.execute(
+                    "select 1 from contato_google_email where conta=? and telefone=?", (conta, r["telefone"])).fetchone():
+                apagar_c += _inserir(con, agora, "apagar_contato", conta, gid, nome, r["telefone"], limpo, "", "nome_curto")
+        elif nome and limpo and limpo != nome:
+            nomes += _inserir(con, agora, "corrigir_nome", conta, gid, nome, None, limpo, "", "nome_sujo")
+        if nome:
+            for r in rs:
+                if r["telefone"] is None and (r["telefone_original"] or "").strip():
+                    apagar_t += _inserir(con, agora, "apagar_telefone", conta, gid, nome, r["telefone_original"], nome, "", "telefone_invalido")
+    return nomes, apagar_c, apagar_t
+
+
 def gerar(con, agora: str) -> dict:
     criar = corrigir = 0
     conta = contatos.conta_origem(con)
@@ -69,7 +105,8 @@ def gerar(con, agora: str) -> dict:
                            (novo, r["conta"], r["graph_id"], r["telefone_original"])).fetchone():
                 continue  # outro contato (ou outro campo deste) já tem o número: corrigir criaria duplicata
             corrigir += _inserir(con, agora, "corrigir", r["conta"], r["graph_id"], r["nome"], r["telefone_original"], nome, novo, "telefone_invalido")
-    return {"criar": criar, "corrigir": corrigir}
+        nomes, apagar_c, apagar_t = _limpeza(con, agora)
+    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c}
 
 
 def listar(con, estado: str | None = None) -> list[dict]:
