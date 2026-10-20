@@ -15,6 +15,7 @@ Apagar contato, mesclar duplicados, gravar e-mail/endereço/empresa, gravar em G
 ## Gerador (sem modelo, depois da sincronização)
 - **Criar:** `escuta_remetente` com estado `aprovado` e `nome` preenchido cujo número não existe em `contato_graph` nem em `contato_google` → proposta `criar` com nome e telefone E.164.
 - **Corrigir:** contato em `contato_graph` cujo `telefone_original` hoje não vira E.164 válido, mas vira com a regra existente de normalização (`_telefone`/`normalizar_telefone`) → proposta `corrigir`. Quando a regra não produz número, o contato fica fora da fila.
+  - *Revisão final (20/10):* a regra acima era um conjunto vazio (a sincronização já aplica a mesma normalização). Vale: celular (`campo='mobile'`) com nome e E.164 cuja normalização muda os DÍGITOS em relação ao `telefone_original` (sem DDI 55) → `corrigir`; só formatação não gera proposta. Ver ADR-020.
 - Proposta `recusada` para o mesmo alvo e mesmo valor não é regerada. Se o valor muda, pode gerar de novo.
 
 ## Aplicação
