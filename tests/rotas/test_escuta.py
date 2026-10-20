@@ -502,3 +502,81 @@ def test_sincronizar_so_com_o_graph_configurado(banco):
     r = cli.post(f"{U}/sincronizar", headers={**BOSS, **JSON}, content="{}")
     assert r.status_code == 200, r.text  # a conta do Gmail cai como "não autorizada" sem derrubar a da ness
     assert r.json()["dados"]["contas"][NESS] == {"lidos": 1} and "erro" in r.json()["dados"]["contas"][GMAIL]
+
+
+# ---------------- propostas de contatos (fila de aprovação) ----------------
+P = "/api/v1/escuta/contatos/propostas"
+
+
+def _proposta(banco, tipo="criar", nome="Joana Silva", tel="+5511912345678", estado="pendente"):
+    c = conectar(banco)
+    pid = c.execute("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, origem, estado) values (?, 'resper@ness.com.br', ?, ?, ?, ?, ?)",
+                    (tipo, "g1" if tipo == "corrigir" else None, nome, tel, "telefone_invalido" if tipo == "corrigir" else "whatsapp", estado)).lastrowid
+    c.close()
+    return pid
+
+
+def test_propostas_listam_e_so_boss(cli, banco):
+    pid = _proposta(banco)
+    r = cli.get(P, headers=BOSS)
+    assert r.status_code == 200
+    item = r.json()["dados"]["itens"][0]
+    assert item["id"] == pid and item["nome_depois"] == "Joana Silva" and item["telefone_depois"] == "+5511912345678"
+    assert {"tipo", "conta", "nome_antes", "telefone_antes", "origem", "estado", "motivo", "criada_em", "decidida_em", "decidida_por", "aplicada_em"} <= set(item)
+    assert cli.get(P, headers=VIP).status_code == 403
+    assert _post(cli, f"{P}/{pid}/decisao", {"estado": "aprovada"}, VIP).status_code == 403
+    assert _post(cli, f"{P}/aprovar-correcoes", None, VIP).status_code == 403
+
+
+def test_listar_filtra_por_estado_e_estado_invalido_400(cli, banco):
+    _proposta(banco)
+    _proposta(banco, nome="Ana", tel="+5511900000001", estado="recusada")
+    assert [i["estado"] for i in cli.get(P, headers=BOSS).json()["dados"]["itens"]] == ["pendente"]
+    assert [i["estado"] for i in cli.get(P + "?estado=recusada", headers=BOSS).json()["dados"]["itens"]] == ["recusada"]
+    r = cli.get(P + "?estado=xis", headers=BOSS)
+    assert r.status_code == 400 and r.json()["erro"] == "requisicao_invalida"
+
+
+def test_listar_mostra_estado_do_interruptor(cli, banco):
+    assert cli.get(P, headers=BOSS).json()["dados"]["escrita"] == "desligado"
+    from gabi.escuta import contatos_gravar
+    assert contatos_gravar.escrita_ligada(conectar(banco)) is False
+
+
+def test_decisao_aprova_e_audita_sem_dados_pessoais(cli, banco):
+    pid = _proposta(banco)
+    r = _post(cli, f"{P}/{pid}/decisao", {"estado": "aprovada"})
+    assert r.status_code == 200 and r.json()["dados"] == {"id": pid, "estado": "aprovada"}
+    c = conectar(banco)
+    linha = c.execute("select estado, decidida_por from contato_proposta where id=?", (pid,)).fetchone()
+    assert (linha["estado"], linha["decidida_por"]) == ("aprovada", "boss@x.com")
+    audit = [o for o in _decisoes(banco) if "contato proposta" in o]
+    assert audit == [f"escuta: contato proposta {pid} → aprovada"]
+    assert "Joana" not in audit[0] and "5511912345678" not in audit[0]
+
+
+def test_decisao_em_proposta_ja_decidida_409(cli, banco):
+    pid = _proposta(banco)
+    assert _post(cli, f"{P}/{pid}/decisao", {"estado": "recusada"}).status_code == 200
+    r = _post(cli, f"{P}/{pid}/decisao", {"estado": "aprovada"})
+    assert r.status_code == 409 and r.json()["erro"] == "conflito"
+
+
+def test_decisao_estado_invalido_400_e_inexistente_404(cli, banco):
+    pid = _proposta(banco)
+    for corpo in ({"estado": "aplicada"}, {"estado": 3}, {}):
+        r = _post(cli, f"{P}/{pid}/decisao", corpo)
+        assert r.status_code == 400 and r.json()["erro"] == "requisicao_invalida"
+    r = _post(cli, f"{P}/9999/decisao", {"estado": "aprovada"})
+    assert r.status_code == 404 and r.json()["erro"] == "nao_encontrado"
+
+
+def test_aprovar_correcoes_devolve_quantidade(cli, banco):
+    _proposta(banco, "corrigir", "A", "+5511911111111")
+    _proposta(banco, "corrigir", "B", "+5511922222222")
+    criar = _proposta(banco, "criar", "C", "+5511933333333")
+    r = _post(cli, f"{P}/aprovar-correcoes")
+    assert r.status_code == 200 and r.json()["dados"] == {"aprovadas": 2}
+    assert [i["id"] for i in cli.get(P, headers=BOSS).json()["dados"]["itens"]] == [criar]
+    audit = [o for o in _decisoes(banco) if "correç" in o]
+    assert audit == ["escuta: aprovou 2 correção(ões) de contato"]

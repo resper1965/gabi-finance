@@ -10,6 +10,8 @@ from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.envelope import envelope
 from gabi.escuta import contatos as ct
+from gabi.escuta import contatos_gravar as cg
+from gabi.escuta import contatos_propostas as cp
 from gabi.escuta import remetentes as rem
 from gabi.escuta.caixa import normalizar_telefone
 from gabi.fontes.google_contatos import ErroGoogleContatos
@@ -326,6 +328,62 @@ async def trazer_contatos(request: Request, ident: Identidade = Depends(exigir("
             ignoradas = len(tels) - criadas
             _audit(con, ident.login, f"escuta: trouxe {criadas} contato(s) como pessoa ({ignoradas} ignorado(s))")
         return envelope(con, {"criadas": criadas, "ignoradas": ignoradas}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+ESTADOS_PROPOSTA = ("pendente", "aprovada", "recusada", "aplicada", "falhou")
+
+
+def _agora_utc(request: Request) -> str:
+    return _agora(request).astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@router.get("/contatos/propostas")
+def listar_propostas(request: Request, estado: str = "pendente", ident: Identidade = Depends(exigir("boss"))):
+    """Lista as propostas de criar/corrigir contato da ness (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada."""
+    if estado not in ESTADOS_PROPOSTA:
+        raise erro(400, "requisicao_invalida", f"estado deve ser um de: {', '.join(ESTADOS_PROPOSTA)}")
+    con = _con(request)
+    try:
+        itens = cp.listar(con, estado)
+        escrita = "ligado" if cg.escrita_ligada(con) else "desligado"
+        return envelope(con, {"itens": itens, "escrita": escrita}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/contatos/propostas/aprovar-correcoes")
+def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Aprova de uma vez todas as propostas pendentes do tipo corrigir (telefone inválido); devolve quantas."""
+    con = _con(request)
+    try:
+        n = cp.aprovar_correcoes(con, ident.login, _agora_utc(request))
+        with transacao(con):
+            _audit(con, ident.login, f"escuta: aprovou {n} correção(ões) de contato")
+        return envelope(con, {"aprovadas": n}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/contatos/propostas/{proposta_id}/decisao")
+async def decidir_proposta(proposta_id: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Aprova ou recusa uma proposta pendente de contato (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida."""
+    corpo = _corpo(await _json(request))
+    estado = corpo.get("estado")
+    if estado not in cp.ESTADOS_DECISAO:
+        raise erro(400, "requisicao_invalida", "estado deve ser aprovada ou recusada")
+    con = _con(request)
+    try:
+        try:
+            cp.decidir(con, proposta_id, estado, ident.login, _agora_utc(request))
+        except cp.ErroProposta as e:
+            if e.nao_encontrado:
+                raise erro(404, "nao_encontrado", str(e))
+            raise erro(409 if e.conflito else 400, "conflito" if e.conflito else "requisicao_invalida", str(e))
+        with transacao(con):
+            _audit(con, ident.login, f"escuta: contato proposta {proposta_id} → {estado}")
+        return envelope(con, {"id": proposta_id, "estado": estado}, agora=_agora(request))
     finally:
         con.close()
 
