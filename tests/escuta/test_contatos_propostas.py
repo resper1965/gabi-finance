@@ -322,11 +322,12 @@ def test_nao_apaga_contato_de_uma_letra_com_email_ou_segundo_telefone(con):
 
 
 def test_gera_apagar_telefone_para_invalido(con):
-    _sync(con, _it("11 9999-0000 ramal 5", nome="Beltrano", gid="AAMk0001", campo="business"))
+    _sync(con, _it("12345", nome="Beltrano", gid="AAMk0001", campo="business"))
     assert _g(con)["apagar_telefone"] == 1
     (x,) = [q for q in _props(con) if q["tipo"] == "apagar_telefone"]
+    # telefone_depois repete o número só para a chave de deduplicação (um contato pode ter vários inválidos)
     assert (x["graph_id"], x["nome_antes"], x["telefone_antes"], x["nome_depois"], x["telefone_depois"], x["origem"]) == \
-        ("AAMk0001", "Beltrano", "11 9999-0000 ramal 5", "Beltrano", "", "telefone_invalido")
+        ("AAMk0001", "Beltrano", "12345", "Beltrano", "12345", "telefone_invalido")
 
 
 def test_estrangeiro_nao_gera_apagar_telefone(con):
@@ -350,3 +351,18 @@ def test_limpeza_idempotente_e_recusada_nao_volta(con):
 
 def test_gerar_retorna_todas_as_contagens(con):
     assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato"}
+
+
+@pytest.mark.parametrize("bruto", ["11 3456-7890 ramal 12", "(11) 3456-7890, (11) 98765-4321", "999999999", "11912345678 x5"])
+def test_nao_propoe_apagar_o_que_parece_telefone_real(con, bruto):
+    _sync(con, _it(bruto, gid="AAMk0001", campo="home"))
+    assert con.execute("select telefone from contato_graph").fetchone()[0] is None  # segue inválido para o sincronizador
+    assert _g(con)["apagar_telefone"] == 0
+
+
+def test_contato_com_dois_invalidos_ganha_uma_proposta_para_cada(con):
+    _sync(con, _it("123", gid="AAMk0001", campo="home"), _it("456", gid="AAMk0001", campo="business"))
+    assert _g(con)["apagar_telefone"] == 2
+    con.execute("update contato_proposta set estado='aplicada' where telefone_antes='123'")
+    con.execute("update contato_proposta set estado='recusada' where telefone_antes='456'")
+    assert _g(con)["apagar_telefone"] == 0 and len(_props(con)) == 2

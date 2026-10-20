@@ -59,6 +59,12 @@ def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel
                        "values (?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora)).rowcount
 
 
+def _sem_cara_de_telefone(original) -> bool:
+    """Só o que claramente não é número (código curto, menos de 7 dígitos, sem ramal nem lista). Ramal, vários números ou número sem DDD ficam para o dono."""
+    texto = (original or "").strip()
+    return bool(texto) and len(re.sub(r"\D", "", texto)) < 7 and not contatos._RAMAL.search(texto)
+
+
 def _limpeza(con, agora: str) -> tuple[int, int, int]:
     """corrigir_nome (um por contato), apagar_contato (nome limpo de 1 caractere, contato com 1 telefone válido e sem e-mail) e apagar_telefone
     (um por telefone que não normaliza e não é estrangeiro). Dado de terceiros só vai para a fila, nunca para log."""
@@ -79,8 +85,9 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
             nomes += _inserir(con, agora, "corrigir_nome", conta, gid, nome, None, limpo, "", "nome_sujo")
         if nome:
             for r in rs:
-                if r["telefone"] is None and (r["telefone_original"] or "").strip():
-                    apagar_t += _inserir(con, agora, "apagar_telefone", conta, gid, nome, r["telefone_original"], nome, "", "telefone_invalido")
+                if r["telefone"] is None and _sem_cara_de_telefone(r["telefone_original"]):
+                    # telefone_depois repete o número só como chave de deduplicação: um contato pode ter vários inválidos
+                    apagar_t += _inserir(con, agora, "apagar_telefone", conta, gid, nome, r["telefone_original"], nome, r["telefone_original"], "telefone_invalido")
     return nomes, apagar_c, apagar_t
 
 
