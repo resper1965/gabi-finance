@@ -309,6 +309,16 @@ class GraphNess:
                 msgs.append(m)
         return asdict(ResultadoEmail(msgs, delta, recarga))
 
+    def contato_criar(self, conta: str, nome: str, telefone: str) -> dict:
+        """Cria um contato (só nome e celular). A escrita vive em `graph_ness_contatos` (import aqui evita o ciclo)."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.criar(self, conta, nome, telefone)
+
+    def contato_corrigir(self, conta: str, graph_id: str, antes: dict, depois: dict) -> dict:
+        """Corrige nome e celular se o contato ainda estiver como `antes`; senão {"resultado": "alterado"} sem escrever."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.corrigir(self, conta, graph_id, antes, depois)
+
     def _enviar_mover(self, url: str, destino: str) -> int:
         """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""
         corpo = json.dumps({"destinationId": destino}).encode()

@@ -26,7 +26,8 @@ PERMITIDOS = {
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
-                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens"}),
+                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
+                             "contato_criar", "contato_corrigir"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
@@ -221,6 +222,18 @@ class PonteGraph:
     def contas(self) -> list[str]:
         r = self._ponte._chamar("contas")
         if not isinstance(r, list) or not all(isinstance(x, str) for x in r):
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
+
+    def contato_criar(self, conta: str, nome: str, telefone: str) -> dict:
+        r = self._ponte._chamar("contato_criar", (conta, nome, telefone))
+        if not isinstance(r, dict) or not isinstance(r.get("id"), str):
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
+
+    def contato_corrigir(self, conta: str, graph_id: str, antes: dict, depois: dict) -> dict:
+        r = self._ponte._chamar("contato_corrigir", (conta, graph_id, antes, depois))
+        if not isinstance(r, dict) or r.get("resultado") not in ("ok", "alterado"):
             raise ErroGraphNess("resposta inválida do serviço de fontes")
         return r
 
