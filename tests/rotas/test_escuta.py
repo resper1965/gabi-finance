@@ -539,8 +539,42 @@ def test_listar_filtra_por_estado_e_estado_invalido_400(cli, banco):
 
 def test_listar_mostra_estado_do_interruptor(cli, banco):
     assert cli.get(P, headers=BOSS).json()["dados"]["escrita"] == "desligado"
-    from gabi.escuta import contatos_gravar
-    assert contatos_gravar.escrita_ligada(conectar(banco)) is False
+    c = conectar(banco)
+    c.execute("insert into parametro(chave, valor) values ('contatos.escrita', '\"ligado\"')")
+    c.close()
+    assert cli.get(P, headers=BOSS).json()["dados"]["escrita"] == "ligado"
+
+
+def _audit_quebrado(monkeypatch):
+    def _x(*a, **k):
+        raise RuntimeError("falha na auditoria")
+    monkeypatch.setattr("gabi.rotas.escuta._audit", _x)
+
+
+def test_falha_na_auditoria_desfaz_a_decisao(banco, monkeypatch):
+    pid = _proposta(banco)
+    _audit_quebrado(monkeypatch)
+    sem_erro_http = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000), raise_server_exceptions=False)
+    assert _post(sem_erro_http, f"{P}/{pid}/decisao", {"estado": "aprovada"}).status_code >= 500
+    c = conectar(banco)
+    assert c.execute("select estado, decidida_por from contato_proposta where id=?", (pid,)).fetchone()[:] == ("pendente", None)
+    c.close()
+
+
+def test_falha_na_auditoria_desfaz_aprovar_correcoes(banco, monkeypatch):
+    pid = _proposta(banco, "corrigir", "A", "+5511911111111")
+    _audit_quebrado(monkeypatch)
+    sem_erro_http = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000), raise_server_exceptions=False)
+    assert _post(sem_erro_http, f"{P}/aprovar-correcoes").status_code >= 500
+    c = conectar(banco)
+    assert c.execute("select estado from contato_proposta where id=?", (pid,)).fetchone()[0] == "pendente"
+    c.close()
+
+
+def test_aprovar_correcoes_sem_nenhuma_nao_audita(cli, banco):
+    _proposta(banco, "criar")
+    assert _post(cli, f"{P}/aprovar-correcoes").json()["dados"] == {"aprovadas": 0}
+    assert [o for o in _decisoes(banco) if "correç" in o] == []
 
 
 def test_decisao_aprova_e_audita_sem_dados_pessoais(cli, banco):

@@ -65,7 +65,7 @@ def listar(con, estado: str | None = None) -> list[dict]:
     return [dict(r) for r in linhas]
 
 
-def decidir(con, proposta_id: int, estado: str, login: str, agora: str) -> None:
+def decidir(con, proposta_id: int, estado: str, login: str, agora: str, auditar=None) -> None:
     if estado not in ESTADOS_DECISAO:
         raise ErroProposta("Decisão inválida.")
     with transacao(con):
@@ -76,9 +76,14 @@ def decidir(con, proposta_id: int, estado: str, login: str, agora: str) -> None:
             raise ErroProposta("A proposta já foi decidida.", conflito=True)
         con.execute("update contato_proposta set estado=?, decidida_em=?, decidida_por=? where id=? and estado='pendente'",
                     (estado, agora, login, proposta_id))
+        if auditar is not None:
+            auditar()  # dentro da transação: se falhar, a decisão não fica
 
 
-def aprovar_correcoes(con, login: str, agora: str) -> int:
+def aprovar_correcoes(con, login: str, agora: str, auditar=None) -> int:
     with transacao(con):
-        return con.execute("update contato_proposta set estado='aprovada', decidida_em=?, decidida_por=? where tipo='corrigir' and estado='pendente'",
+        n = con.execute("update contato_proposta set estado='aprovada', decidida_em=?, decidida_por=? where tipo='corrigir' and estado='pendente'",
                            (agora, login)).rowcount
+        if auditar is not None and n:
+            auditar(n)  # dentro da transação: se falhar, nada fica aprovado
+        return n

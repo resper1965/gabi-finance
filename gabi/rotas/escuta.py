@@ -358,9 +358,8 @@ def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(ex
     """Aprova de uma vez todas as propostas pendentes do tipo corrigir (telefone inválido); devolve quantas."""
     con = _con(request)
     try:
-        n = cp.aprovar_correcoes(con, ident.login, _agora_utc(request))
-        with transacao(con):
-            _audit(con, ident.login, f"escuta: aprovou {n} correção(ões) de contato")
+        n = cp.aprovar_correcoes(con, ident.login, _agora_utc(request),
+                                 auditar=lambda n: _audit(con, ident.login, f"escuta: aprovou {n} correção(ões) de contato"))
         return envelope(con, {"aprovadas": n}, agora=_agora(request))
     finally:
         con.close()
@@ -376,13 +375,12 @@ async def decidir_proposta(proposta_id: int, request: Request, ident: Identidade
     con = _con(request)
     try:
         try:
-            cp.decidir(con, proposta_id, estado, ident.login, _agora_utc(request))
+            cp.decidir(con, proposta_id, estado, ident.login, _agora_utc(request),
+                       auditar=lambda: _audit(con, ident.login, f"escuta: contato proposta {proposta_id} → {estado}"))
         except cp.ErroProposta as e:
             if e.nao_encontrado:
                 raise erro(404, "nao_encontrado", str(e))
             raise erro(409 if e.conflito else 400, "conflito" if e.conflito else "requisicao_invalida", str(e))
-        with transacao(con):
-            _audit(con, ident.login, f"escuta: contato proposta {proposta_id} → {estado}")
         return envelope(con, {"id": proposta_id, "estado": estado}, agora=_agora(request))
     finally:
         con.close()
