@@ -389,3 +389,27 @@ def test_servico_falhou_nao_empilha_enquanto_nao_lido_e_fica_mudo_depois_de_lido
     con.execute("update aviso set entregue_em='x'")
     assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=2)) is None   # lido: silêncio por 7 dias
     assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=9)) is not None
+
+
+def _sync_banco(con, **bancos):
+    con.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?) on conflict(chave) do update set valor=excluded.valor", (json.dumps(bancos),))
+
+
+def test_banco_sem_atualizar_ha_mais_de_24h_avisa_uma_vez_por_dia_e_so_ele(con):
+    antigo = (AGORA - dt.timedelta(hours=25)).astimezone(dt.timezone.utc).isoformat()
+    fresco = (AGORA - dt.timedelta(hours=23)).astimezone(dt.timezone.utc).isoformat()
+    _sync_banco(con, Itau=antigo, **{"C6 Bank Empresas": fresco})
+    gerar_avisos(con, AGORA); gerar_avisos(con, AGORA)
+    r = con.execute("select tipo, payload from aviso").fetchall()
+    assert [x["tipo"] for x in r] == ["banco_desatualizado"]
+    p = json.loads(r[0]["payload"])
+    assert p["banco"] == "Itau" and p["desde"] == antigo
+
+
+def test_banco_atualizado_ou_sem_registro_ou_corrompido_nao_avisa(con):
+    gerar_avisos(con, AGORA)
+    con.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', 'lixo')")
+    gerar_avisos(con, AGORA)
+    _sync_banco(con, Itau="", Bradesco="nao-e-data", XP=5)
+    gerar_avisos(con, AGORA)
+    assert _tipos(con) == []

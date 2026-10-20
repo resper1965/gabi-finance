@@ -104,3 +104,9 @@ def test_descrever_avisos_do_correio():
     assert "a@x.com" in titulo and "credencial" in texto
     titulo, texto = descrever("email_falhou", {"chave": "falhou", "total": 3})
     assert "3" in titulo and "tentativas" in texto
+
+
+def test_descrever_banco_desatualizado():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("banco_desatualizado", {"banco": "Itaú", "desde": "2026-10-19T18:10:00Z"})
+    assert titulo == "Itaú sem atualizar há mais de 24 h" and "19/10 15:10" in texto

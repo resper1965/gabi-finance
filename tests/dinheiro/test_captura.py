@@ -323,3 +323,13 @@ def test_rodada_presa_em_rodando_vira_interrompida(con, tmp_path):
     _rodar(con, FakeFin([BANCO], {}), tmp_path)
     r = con.execute("select status, erro from rodada where id=1").fetchone()
     assert r["status"] == "erro" and r["erro"] == "interrompida"
+
+
+def test_sincronizar_devolve_a_ultima_atualizacao_de_cada_banco_pelo_nome():
+    ini = "2026-10-08T10:00:00"
+    st = [{"id": "i1", "status": "UPDATED", "executionStatus": "SUCCESS", "lastUpdatedAt": "2026-10-08T10:01:00Z"},
+          {"id": "i2", "status": "UPDATED", "executionStatus": "SUCCESS", "lastUpdatedAt": "2026-10-07T09:00:00Z"}]
+    relogio = iter(range(0, 10000, 100))
+    ultimas = {}
+    sincronizar(FakeSync([st]), dorme=lambda s: None, agora=lambda: next(relogio), limite=250, inicio=ini, ultimas=ultimas)
+    assert ultimas == {"C6 Bank": "2026-10-08T10:01:00Z", "Itau": "2026-10-07T09:00:00Z"}

@@ -5,6 +5,7 @@ Grava o bruto ANTES de processar (spec §13.2) e nunca sobrescreve decisão do R
 Consome: db, rodada, bruto, dinheiro.caixa, dinheiro.valor.
 """
 import datetime as dt
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -49,9 +50,9 @@ def g(o, *ks):
 
 # --- sincronização forçada: o banco só aparece no Open Finance depois que sincroniza ---
 # status fica UPDATED mesmo sem atualizar: terminou = lastUpdatedAt depois do pedido.
-def sincronizar(chamar, dorme=time.sleep, agora=time.monotonic, limite=300, passo=30, inicio=None):
+def sincronizar(chamar, dorme=time.sleep, agora=time.monotonic, limite=300, passo=30, inicio=None, ultimas=None):
     """Força a sincronização de todas as conexões e espera cada uma atualizar (até `limite` s).
-    Devolve ({banco: executionStatus}, {banco: problema}). Não imprime valores."""
+    Devolve ({banco: executionStatus}, {banco: problema}). Não imprime valores. Se `ultimas` for um dict, recebe {banco: lastUpdatedAt do provedor}."""
     inicio = inicio or dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     nomes = {}
     for x in lista(chamar("openfinance_list_connections", {})):
@@ -77,6 +78,8 @@ def sincronizar(chamar, dorme=time.sleep, agora=time.monotonic, limite=300, pass
         if not pendentes or agora() + passo > fim:
             break
         dorme(passo)
+    if ultimas is not None:
+        ultimas.update({nomes[i]: lu for i, lu in ultimo.items() if lu})
     for i in pendentes:
         lu = ultimo.get(i, "")
         quando = f"{lu[8:10]}/{lu[5:7]} {lu[11:16]} UTC" if len(lu) >= 16 else "desconhecida"
@@ -277,6 +280,20 @@ def _retomar(con, hoje: dt.date, agora: dt.datetime) -> dict[str, tuple[int, int
         "select account_id, lidos, novos from captura_conta where rodada_id=? and dia=?", (ultima["id"], hoje.isoformat()))}
 
 
+def _guardar_sync_banco(con, ultimas: dict) -> None:
+    """Guarda a última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`): é a idade dos dados, não a da nossa leitura.
+    Quem não veio nesta sincronização mantém o valor anterior."""
+    if not ultimas:
+        return
+    r = con.execute("select valor from parametro where chave='dinheiro.sync_banco'").fetchone()
+    try:
+        atual = json.loads(r[0]) if r else {}
+    except (ValueError, TypeError):
+        atual = {}
+    atual = {**(atual if isinstance(atual, dict) else {}), **ultimas}
+    con.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?) on conflict(chave) do update set valor=excluded.valor", (json.dumps(atual, ensure_ascii=False),))
+
+
 def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, *, bancos_pj=frozenset(),
              sincronizar_antes: bool = False, dorme=time.sleep) -> ResumoCaptura:
     """Uma rodada de captura. Erro numa conta entra em `falhas` e as outras seguem (rodada ok, com aviso)."""
@@ -284,7 +301,9 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
     with registrar_rodada(con, "open-finance") as rodada:
         sync, problemas = None, {}
         if sincronizar_antes:
-            estados, problemas = sincronizar(cliente, dorme=dorme)
+            ultimas: dict = {}
+            estados, problemas = sincronizar(cliente, dorme=dorme, ultimas=ultimas)
+            _guardar_sync_banco(con, ultimas)
             sync = {"estados": estados, "problemas": problemas}
         ts = agora.replace(tzinfo=None).isoformat(timespec="seconds")
         contas = lista(cliente("openfinance_list_accounts", {}))

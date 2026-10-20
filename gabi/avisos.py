@@ -17,6 +17,7 @@ from gabi.dinheiro.valor import formatar
 
 BRT = ZoneInfo("America/Sao_Paulo")
 HORAS_DADOS_ANTIGOS = 72
+HORAS_BANCO_DESATUALIZADO = 24
 JANELA_ENTREGA = dt.timedelta(days=2)  # idade máxima para o Telegram enviar um aviso (telegram.py usa esta mesma constante)
 
 
@@ -284,6 +285,25 @@ def _valor_diferente(con, agora: dt.datetime, novo) -> None:
                 novo("valor_diferente", i["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "estimado": formatar(est), "real": formatar(real)})
 
 
+def _bancos_desatualizados(con, agora: dt.datetime, novo) -> None:
+    """Banco cujo PROVEDOR não atualiza há mais de 24 h (`dinheiro.sync_banco`, gravado na sincronização): a rodada pode sair `conferida` com saldo velho,
+    então o aviso olha cada banco. Um por banco por dia; sem registro, corrompido ou data inválida não avisa."""
+    r = con.execute("select valor from parametro where chave='dinheiro.sync_banco'").fetchone()
+    try:
+        bancos = json.loads(r[0]) if r else {}
+    except (ValueError, TypeError):
+        return
+    for nome, lu in sorted(bancos.items() if isinstance(bancos, dict) else []):
+        try:
+            quando = dt.datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if quando.tzinfo is None:
+            quando = quando.replace(tzinfo=dt.timezone.utc)
+        if agora - quando > dt.timedelta(hours=HORAS_BANCO_DESATUALIZADO):
+            novo("banco_desatualizado", nome, {"banco": nome, "desde": str(lu)})
+
+
 def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
@@ -307,6 +327,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     if ref and agora - dt.datetime.fromisoformat(ref) > dt.timedelta(hours=HORAS_EXPORTACAO):
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
+    _bancos_desatualizados(con, agora, novo)
     _escuta_parada(con, agora, novo)
     if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
         _hermes_parado(con, agora, novo, estado_servico)

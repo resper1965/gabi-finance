@@ -108,6 +108,13 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Valor diferente: {p.get('nome', '?')}", f"estimado {_reais(p.get('estimado'))}, veio {_reais(p.get('real'))} (vence {_ddmm(p.get('vencimento'))})"
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
+    if tipo == "banco_desatualizado":
+        try:
+            d = dt.datetime.fromisoformat(str(p["desde"]).replace("Z", "+00:00"))
+            desde = d.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m %H:%M")
+        except (KeyError, TypeError, ValueError):
+            desde = "data desconhecida"
+        return f"{p.get('banco', 'Banco')} sem atualizar há mais de 24 h", f"o saldo e os lançamentos vêm da última atualização do banco, em {desde}; confira antes de decidir por eles"
     if tipo == "conta_atrasada":
         return f"Conta atrasada: {p.get('nome', '?')}", f"venceu em {p.get('vencimento', '?')}, {_brl(p.get('valor'))}"
     if tipo == "cobrada_apos_cancelar":

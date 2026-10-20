@@ -97,7 +97,7 @@ Despesa da **Bekaa** (`empresa.relacao='pj_titular'`) paga em conta PF vira um a
 - **Aplicar donos padrão** (depois de editar `seeds/donos-padrao.json`): `sudo ~/aplicar-donos.sh`. Idempotente e auditado; não sobrescreve decisão do Ricardo (`voce`) nem regra (`regra`).
 - **Rodar a rodada à mão:** `sudo systemctl start gabi-brain-extratos` (captura, conferência, classificação, compromissos e recebimentos propostos); ler com `journalctl -u gabi-brain-extratos -n 20 --no-pager -o cat`. Saldos: `gabi-brain-saldos`.
 - **Importar notas (NFS-e da Bekaa):** `sudo ~/instalar-notas.sh` (instala e roda `gabi-brain-notas`); o timer `gabi-brain-notas.timer` repete sozinho. Os recebimentos casados aparecem em Cobrar → Notas a receber para confirmar ou rejeitar.
-- **Ler avisos:** sino do painel; por linha de comando `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.avisos`. Tipos: `rodada_parada`, `conta_atrasada`, `cobrada_apos_cancelar`, `vence_hoje`, `servico_falhou` (qualquer unit com `OnFailure`), `exportacao_parada` (sem pacote há mais de 9 dias).
+- **Ler avisos:** sino do painel; por linha de comando `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.avisos`. Tipos: `rodada_parada`, `conta_atrasada`, `cobrada_apos_cancelar`, `vence_hoje`, `servico_falhou` (qualquer unit com `OnFailure`), `exportacao_parada` (sem pacote há mais de 9 dias), `banco_desatualizado` (o provedor não atualiza um banco há mais de 24 h; vem de `dinheiro.sync_banco`, gravado a cada sincronização; um aviso por banco por dia).
 - **Restaurar backup:** ver "Backup e restauração" e "Backup fora da VPS".
 - **Comparar com o gabi-financeiro (G21):** `python -m tools.comparar_agenda --mes AAAA-MM`; saída vazia por 7 dias é o critério de corte.
 
