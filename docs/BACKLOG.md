@@ -1,5 +1,5 @@
 # gabi.brain · BACKLOG (fonte única do que falta)
-Criado: 16/10/2026. **Este arquivo manda sobre o que falta.** `STATUS.md` conta o histórico; `PLANO-DEFINITIVO.md` guarda as decisões; `TRILHA.md` e `/home/ricardo/PENDENCIAS-RICARDO.md` passam a apontar para cá.
+Criado: 16/10/2026. **Este arquivo manda sobre o que falta.** `STATUS.md` é a retomada rápida (o histórico foi para `docs/historico/`); `PLANO-DEFINITIVO.md` guarda as decisões; `TRILHA.md` e `/home/ricardo/PENDENCIAS-RICARDO.md` passam a apontar para cá.
 
 ## "Completa" quer dizer
 O núcleo que deixa **desligar o `gabi-fin` e o OpenClaw** e marcar a tag `v1.0-gabi-brain`: dinheiro, cobrar, agenda, e-mail, escuta, exames/saúde e canais (Hermes). O que não bloqueia isso está em **Depois**.
@@ -113,6 +113,16 @@ Estado real em 16/10/2026, com o motivo de cada item não ter sido feito:
 - **Obsidian por pessoa:** ⏸ o código (T4.6) existe e está testado; o uso real depende do Ricardo (criar o cofre e dizer quem entra).
 - Ideias do Vercel Eve, só como prática: evals de mensagem (resumo, fechamento, avisos), manifesto único por capacidade, retomada por passo nos jobs com modelo, aprovação explícita por ferramenta de escrita. Não reestruturar o brain nesse modelo.
 - Fase 3 (Trabalho): Entregas segue "ainda não construída". Contatos (16/10) feita; **frente por pessoa feita em 16/10** só onde há vínculo real (e-mail confirmado numa frente liga a frente ao remetente: Contatos mostra "frente: <nome>"); **tarefa por pessoa fica sem linha** (`tarefa` não tem remetente nem pessoa; inventar o vínculo seria chute). Segue de fora: reunião da agenda nova por participante (guarda só `participantes_qtd`, ADR-017), e "respondido" por conversa (o brain só sabe o endereço, `email_respondido`).
+
+## Análise de 20/10/2026 (simplificar, medir, endurecer)
+- ✅ 20/10 testes mais rápidos: `tests/conftest.py` copia um banco-modelo migrado (suíte de ~20 min de CPU para uns poucos minutos).
+- ✅ 20/10 banco parado há mais de 24 h vira aviso `banco_desatualizado` (um por banco por dia), entra no `desatualizado` do envelope (campo `bancos_antigos`) e no resumo da manhã. Antes só aparecia no log. Fonte: `dinheiro.sync_banco`, gravado a cada sincronização do provedor.
+- ✅ 20/10 timers de agenda e correio escalonados (trabalho :00, correio :05, agenda :10, a cada 15 min) para não baterem na ponte no mesmo segundo. Valem depois de `sudo ~/instalar-brain.sh`.
+- ⏸ **Podar ferramentas do Hermes (36 no include):** sem evidência hoje (o log do Hermes tem ~10 chamadas reais em 3 dias). O uso por ferramenta já está em Gabi › Qualidade (`chamada_mcp`). Reavaliar em 2 semanas: cortar do include (`~/.hermes/config.yaml`) as que tiverem 0 chamadas.
+- ⏸ **Candidatos a corte, hoje esperando decisão ou chave do Ricardo (não são código morto):** cliente do Linear e tela Entregas (falta `LINEAR_API_KEY`; `trabalho` e `tokens` ainda o usam), Obsidian por pessoa (`gabi/familia/obsidian.py`), `gabi-brain-escuta.path`. Decidir: ligar ou remover.
+- ⏸ **Varredura "só no log":** o único achado até agora foi o banco parado (resolvido). Os demais `AVISO:` das rodadas (agenda, e-mail, Teams, contatos) viram `rodada.aviso` e entram no envelope; sem pendência conhecida.
+- ⏸ **Extratos 4x por dia (em vez de 06h e 14h):** muda custo de chamadas ao mcp.ai; só com ok do Ricardo. A rodada leva ~10 min por esperar a sincronização de cada banco.
+- **Não fazer:** juntar correio, agenda e trabalho num timer só (acopla falhas e quebra o aviso `servico_falhou`).
 
 ## Obsoleto (não fazer)
 - **G16** reconectar XP Investimentos: a conexão saiu do mcp.ai em 11/10. Issue `docs/issues/0001` vale só para o C6.

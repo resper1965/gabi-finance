@@ -101,7 +101,10 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
     d = modulo_hoje.hoje(con, agora)
     linhas = []
     if env["desatualizado"]:
-        linhas += [f"⚠️ *Dados desatualizados* (conferidos até {_quando(env['dados_ate'])}). Confira antes de agir.", ""]
+        linhas += [f"⚠️ *Dados desatualizados* (conferidos até {_quando(env['dados_ate'])}). Confira antes de agir."]
+        if env.get("bancos_antigos"):
+            linhas += ["Sem atualizar há mais de 24 h: " + "; ".join(f"{b['banco']} (desde {_quando(b['desde'])})" for b in env["bancos_antigos"]) + "."]
+        linhas += [""]
     linhas += agenda_financeira.montar(con, agora, dias=3) + [""]
     linhas += _bloco_agenda(d["agenda"], consulta.dia_local(agora, consulta.fuso_da_agenda(con)).isoformat()) + [""]
     linhas += _bloco_correio(consulta_correio.importantes(con, limite=50, agora=agora), len(d["emails_importantes"]))

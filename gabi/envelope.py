@@ -1,5 +1,6 @@
 """Envelope de toda resposta de leitura: `dados_ate` vem da última rodada CONFERIDA, não da última tentativa (R4/Review 4)."""
 import datetime as dt
+import json
 import sqlite3
 
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
@@ -24,6 +25,7 @@ COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
 ESPERADAS = ("notas-nibo", "comprovantes-paperless")
 BRT = dt.timezone(dt.timedelta(hours=-3))
+LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
 
 
@@ -72,6 +74,25 @@ def _correio_em_uso(con) -> bool:
     return _em_uso(con, "email_fonte")
 
 
+def bancos_antigos(con, agora: dt.datetime) -> list[dict]:
+    """Bancos que o provedor não atualiza há mais de 24 h, do mais antigo ao mais novo: [{banco, desde}]. Parâmetro ausente, corrompido ou com data inválida não conta.
+    A rodada pode sair `conferida` com saldo velho; esta é a idade real do dado."""
+    r = con.execute("select valor from parametro where chave='dinheiro.sync_banco'").fetchone()
+    try:
+        bancos = json.loads(r[0]) if r else {}
+    except (ValueError, TypeError):
+        return []
+    saida = []
+    for nome, lu in (bancos.items() if isinstance(bancos, dict) else []):
+        try:
+            quando = _utc(str(lu).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if agora - quando > LIMITE_BANCO:
+            saida.append((quando, {"banco": nome, "desde": str(lu)}))
+    return [x for _, x in sorted(saida, key=lambda t: (t[0], t[1]["banco"]))]
+
+
 def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     agora = agora or dt.datetime.now(dt.timezone.utc)
     fontes, ultimas, falta, atrasada = [], [], False, False
@@ -116,6 +137,10 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
             atrasada = atrasada or (nome in COM_CONFERENCIA and estado == "parada")
         fontes.append({"nome": nome, "estado": estado, "ultima": _z(ultima) if ultima else None})
     dados_ate = None if (falta or not ultimas) else min(ultimas)  # a fonte mais velha manda
-    return {"dados_ate": _z(dados_ate) if dados_ate else None,
-            "desatualizado": dados_ate is None or atrasada or agora - dados_ate > LIMITE_DESATUALIZADO,
-            "proxima_rodada": proxima_rodada(agora), "fontes": fontes, "dados": dados}
+    antigos = bancos_antigos(con, agora)
+    saida = {"dados_ate": _z(dados_ate) if dados_ate else None,
+             "desatualizado": dados_ate is None or atrasada or bool(antigos) or agora - dados_ate > LIMITE_DESATUALIZADO,
+             "proxima_rodada": proxima_rodada(agora), "fontes": fontes, "dados": dados}
+    if antigos:
+        saida["bancos_antigos"] = antigos  # só aparece quando há banco parado: nomeia quem e desde quando
+    return saida

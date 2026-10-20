@@ -226,3 +226,23 @@ def test_correio_liberado_sem_nenhuma_rodada_aparece_nao_conferida(con):
     con.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
     e = envelope(con, None, AGORA)
     assert _estados(e)["correio"] == "nao_conferida" and e["desatualizado"] is True
+
+
+def _sync(con, **bancos):
+    import json
+    con.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?)", (json.dumps(bancos),))
+
+
+def test_banco_parado_ha_mais_de_24h_desatualiza_mesmo_com_rodada_conferida_e_diz_quem(con):
+    _producao(con)
+    velho, novo = (AGORA - dt.timedelta(hours=26)).isoformat(), (AGORA - dt.timedelta(hours=20)).isoformat()
+    _sync(con, Itau=velho, Bradesco=novo)
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is True and e["bancos_antigos"] == [{"banco": "Itau", "desde": velho}]
+
+
+def test_bancos_em_dia_nao_mudam_o_envelope(con):
+    _producao(con)
+    _sync(con, Itau=(AGORA - dt.timedelta(hours=23)).isoformat())
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is False and "bancos_antigos" not in e
