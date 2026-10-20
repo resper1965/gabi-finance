@@ -370,3 +370,22 @@ def test_lixeira_segue_listada_com_a_conta_desligada_e_avisa(cli, banco):
     _patch(cli, f"{U}/fontes/{f}", {"estado": "nao"})
     m = cli.get(f"{U}/lixeira", headers=BOSS).json()["dados"]["mensagens"]
     assert [(x["assunto"], x["conta_desligada"]) for x in m] == [("Promo", True)]
+
+
+def test_restaurar_e_mover_de_conta_graph_vao_pela_fonte_da_ness_e_nao_pela_do_google(banco):
+    from gabi.fontes.graph_ness import ErroGraphNess
+    google, graph = _Email(), _Email()
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"google_email": lambda: google, "graph_email": lambda: graph}),
+                     client=("127.0.0.1", 50000))
+    f = _criar(cli, "resper@ness.com.br", provedor="graph"); _patch(cli, f"{U}/fontes/{f}", {"estado": "sim", "lixeira": 1})
+    mid = _msg(banco, f, "AAMk0001=", "na_lixeira", "lixo", 0, "Promo", thread="T1")
+    assert _post(cli, f"{U}/mensagens/{mid}/restaurar").status_code == 200
+    assert graph.chamadas == [("resper@ness.com.br", ["AAMk0001="])] and google.chamadas == []
+    sugerida = _msg(banco, f, "AAMk0002=", "classificada", "lixo", 1, "Promo2", thread="T2")
+    assert _post(cli, f"{U}/mensagens/{sugerida}/lixeira").status_code == 200
+    assert graph.movidas == [("resper@ness.com.br", ["AAMk0002="])] and not hasattr(google, "movidas")
+    # erro tipado da ness vira 503 `fonte_indisponivel`, não 500
+    com_erro = _Email(erro=ErroGraphNess("POST /v1.0/users/x/messages/y/move -> 503"))
+    cli2 = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"graph_email": lambda: com_erro}), client=("127.0.0.1", 50000))
+    outra = _msg(banco, f, "AAMk0003=", "na_lixeira", "lixo", 0, "Promo3", thread="T3")
+    assert _post(cli2, f"{U}/mensagens/{outra}/restaurar").status_code == 503

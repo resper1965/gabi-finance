@@ -500,6 +500,25 @@ def test_unidades_do_correio_seguem_o_padrao_e_nao_sao_habilitadas():
     assert not any("correio" in l for l in ligadas)
 
 
+# ---------------- teams (instalado, NÃO habilitado) ----------------
+def test_unidades_do_teams_seguem_o_padrao_e_nao_sao_habilitadas():
+    srv, t = _ler("gabi-brain-teams.service"), _ler("gabi-brain-teams.timer")
+    assert "-m gabi.teams" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv
+    assert "TimeoutStartSec=300" in srv
+    assert "OnCalendar=*-*-* 07..20:00/5:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-teams.service" in t
+    assert hasattr(importlib.import_module("gabi.teams.__main__"), "main")
+    for nome in ("gabi-brain-teams.service", "gabi-brain-teams.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
+    assert not any("teams" in l for l in ligadas)
+
+
 def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
     unit = _ler("gabi-brain-fontes.service")
     assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")

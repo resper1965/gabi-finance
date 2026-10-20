@@ -13,6 +13,8 @@ from gabi.escuta import contatos as ct
 from gabi.escuta import remetentes as rem
 from gabi.escuta.caixa import normalizar_telefone
 from gabi.fontes.google_contatos import ErroGoogleContatos
+from gabi.fontes.graph_ness import ErroGraphNess
+from gabi.fontes.roteador import roteador_contatos
 from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
@@ -242,13 +244,19 @@ def _numeros_de_pessoas(con) -> set[str]:
 def sincronizar_contatos(request: Request, ident: Identidade = Depends(exigir("boss"))):
     """Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.
     200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar."""
-    fabrica = request.app.state.fontes.get("google_contatos")
-    fonte = fabrica() if fabrica else None
-    if fonte is None:
+    fontes = request.app.state.fontes
+    fabrica, fabrica_graph = fontes.get("google_contatos"), fontes.get("graph_ness")
+    google, graph = (fabrica() if fabrica else None), (fabrica_graph() if fabrica_graph else None)
+    if google is None and graph is None:
         raise erro(503, "fonte_indisponivel", "os contatos do Google não estão configurados")
+    # a conta do Graph (ness) vai ao Graph; as demais ao Google. A lista de contas do Graph vem da ponte (rede só no serviço de fontes)
+    try:
+        listar = roteador_contatos(google.listar if google else None, graph.contatos if graph else None, graph.contas() if graph else [])
+    except ErroGraphNess as e:
+        raise erro(503, "fonte_indisponivel", str(e)) from None
     con = _con(request)
     try:
-        r = ct.sincronizar(con, ct.contas_contatos(con), fonte.listar)
+        r = ct.sincronizar(con, ct.contas_contatos(con), listar)
         falhas = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
         if r["contas"] and len(falhas) == len(r["contas"]):  # nenhuma conta sincronizou (ou a ponte está fora do ar)
             raise erro(503, "fonte_indisponivel", "nenhuma conta sincronizou: " + "; ".join(f"{k}: {m}" for k, m in falhas.items()))

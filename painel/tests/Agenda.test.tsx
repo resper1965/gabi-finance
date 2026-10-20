@@ -82,6 +82,16 @@ test("descobrir calendários chama a rota e mostra o resumo", async () => {
   expect(mudancas(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/agenda/fontes/1/calendarios/descobrir" });
 });
 
+test("conta Microsoft: rótulo do tipo e botão de descobrir calendários", async () => {
+  const c = fake({ fontes: [{ ...FONTE, conta: "resper@ness.com.br", provedor: "graph" }], calendarios: [{ nova: true }] });
+  montar();
+  expect(await screen.findByRole("option", { name: "Microsoft" })).toBeTruthy();
+  expect(screen.queryByText(/ainda não lê/)).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Descobrir calendários de resper@ness.com.br" }));
+  expect(await screen.findByText(/1 calendário\(s\) encontrado\(s\), 1 novo/)).toBeTruthy();
+  expect(mudancas(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/agenda/fontes/1/calendarios/descobrir" });
+});
+
 test("erro na linha aparece na linha e mantém a tela", async () => {
   fake({ fontes: [FONTE], falha: /descobrir/ });
   montar();

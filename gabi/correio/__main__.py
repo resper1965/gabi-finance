@@ -1,6 +1,6 @@
 """Programa do correio (timer de 15 min): sincroniza as fontes liberadas, confere quem o dono já respondeu, classifica, move o obviamente inútil para a
 lixeira (só em conta com a lixeira ligada), alerta emergências, resume o dia e apaga trechos antigos e poda mensagens velhas (`email.retencao_msg_dias`). Imprime SÓ contagens, nunca remetente, assunto ou trecho.
-O Gmail e o modelo chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem segredo.
+O Gmail, o Graph da ness e o modelo chegam pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem segredo.
 Sai 0 se ao menos uma fonte sincronizou ou não há fonte liberada; 1 só se todas falham e alguma por motivo diferente de "conta não autorizada".
 Uso: python -m gabi.correio"""
 import datetime as dt
@@ -44,6 +44,16 @@ def _conferir_respondidos(con, ponte, resultados: dict, agora: str) -> None:
             continue
 
 
+def _contas_graph(banco: Path) -> list[str]:
+    """Contas cadastradas com provedor `graph`: é o cadastro (e não a entrada livre) que decide que a conta vai ao Graph."""
+    con = conectar(banco)
+    try:
+        migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
+        return [r["conta"] for r in con.execute("select conta from email_fonte where provedor='graph'")]
+    finally:
+        con.close()
+
+
 def main(banco: Path | None = None, *, listar=None, ponte=None, cliente=_AUTO, agora: dt.datetime | None = None) -> int:
     banco = Path(banco or os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
     sock = os.environ.get("GABI_FONTES_SOCKET")
@@ -51,10 +61,10 @@ def main(banco: Path | None = None, *, listar=None, ponte=None, cliente=_AUTO, a
         if not sock:
             print("ERRO: GABI_FONTES_SOCKET não configurado", file=sys.stderr)
             return 2
-        from gabi.fontes.ponte import PonteEmail
-        p = PonteEmail(sock)
-        if not p.configurada():
-            print("ERRO: o e-mail do Google não está configurado no serviço de fontes", file=sys.stderr)
+        from gabi.fontes.roteador import email_pela_ponte
+        p = email_pela_ponte(sock, _contas_graph(banco))
+        if p is None:
+            print("ERRO: nem o e-mail do Google nem o Graph da ness estão configurados no serviço de fontes", file=sys.stderr)
             return 2
         ponte = ponte or p
         listar = listar or p.listar_novos

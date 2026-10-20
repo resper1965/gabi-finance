@@ -99,3 +99,12 @@ def test_main_todas_as_fontes_falhando_grava_rodada_em_erro_mesmo_saindo_0(banco
 def test_main_sem_fonte_liberada_grava_rodada_ok(banco):
     main(banco, listar=lambda *a: pytest.fail("não deveria listar"))
     assert _rodadas(banco) == [("agenda", "ok", 0, 0)]
+
+
+def test_main_so_graph_com_cliente_injetado(banco, capsys):
+    c = conectar(banco)
+    c.execute("insert into agenda_fonte(conta, provedor, estado) values ('resper@ness.com.br', 'graph', 'sim')")
+    c.close()
+    rc = main(banco, listar_graph=lambda c, cal, t, j: ResultadoEventos([_ev("1", "SEGREDO-TITULO")], [], "T", False))
+    saida = capsys.readouterr()
+    assert rc == 0 and "gravados=1" in saida.out and "fontes=1 ok=1" in saida.out and "SEGREDO" not in saida.out + saida.err

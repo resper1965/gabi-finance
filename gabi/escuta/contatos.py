@@ -189,12 +189,11 @@ def main(banco: Path | None = None, *, listar=None) -> int:
         if not sock:
             print("ERRO: GABI_FONTES_SOCKET não configurado", file=sys.stderr)
             return 2
-        from gabi.fontes.ponte import PonteContatos
-        ponte = PonteContatos(sock)
-        if not ponte.configurada():
-            print("ERRO: contatos do Google não configurados no serviço de fontes", file=sys.stderr)
+        from gabi.fontes.roteador import contatos_pela_ponte
+        listar = contatos_pela_ponte(sock)
+        if listar is None:
+            print("ERRO: contatos (Google e Graph) não configurados no serviço de fontes", file=sys.stderr)
             return 2
-        listar = ponte.listar
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     try:

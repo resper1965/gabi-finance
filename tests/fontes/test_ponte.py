@@ -434,3 +434,146 @@ def test_ponte_email_respondeu_a_cruza_e_valida_a_forma(sock_email):
     with pytest.raises(ErroGoogleOAuth) as e:
         p.respondeu_a("ruim@x.com", ["bia@x.com"])
     assert str(e.value) == "messages.list -> 500"
+
+
+# ---- Graph da ness pela ponte ----
+from gabi.fontes.graph_ness import ErroGraphNess  # noqa: E402
+from gabi.fontes.ponte import PonteGraph  # noqa: E402
+
+
+class _FalsoGraph:
+    def contas(self):
+        return ["resper@ness.com.br"]
+
+    def contatos(self, conta):
+        return [{"nome": "Ana", "telefone": "1"}]
+
+    def listar_calendarios(self, conta):
+        return [{"id": "A=", "nome": "Calendar", "principal": True}]
+
+    def listar_eventos(self, conta, calendario_id, sync_token, janela):
+        if conta == "malformada@x.com":
+            return {"eventos": []}
+        if conta == "boom@x.com":
+            raise ErroGraphNess("GET /v1.0/users/x/calendarView/delta -> 401")
+        return {"eventos": [{"externo_id": "a"}], "cancelados": ["b"], "novo_sync_token": "S", "recarga_completa": False}
+
+    def teams_chats(self, conta):
+        if conta == "malformada@x.com":
+            return [{"chat_id": "c1", "tipo": "um_a_um"}]
+        if conta == "texto@x.com":
+            return [{"chat_id": "c1", "tipo": "grupo", "ultima_em": None, "corpo": "oi"}]
+        return [{"chat_id": "c1", "tipo": "um_a_um", "ultima_em": "2026-10-20T10:00:00Z"}, {"chat_id": "c2", "tipo": "grupo", "ultima_em": None}]
+
+    def teams_mensagens(self, conta, chat_id, desde):
+        if conta == "malformada@x.com":
+            return [{"id": "m1", "quando": "2026-10-20T10:00:00Z", "de_nome": "Ana", "de_eu": "sim", "mencoes_eu": False}]
+        if conta == "naolista@x.com":
+            return {"id": "m1"}
+        return [{"id": "m1", "quando": "2026-10-20T10:00:00Z", "de_nome": "Ana", "de_eu": False, "mencoes_eu": True}]
+
+    def enviar(self):
+        return "nunca"
+
+
+@pytest.fixture
+def sock_graph(tmp_path):
+    srv = Servidor(tmp_path / "gr.sock", {"graph_ness": _FalsoGraph(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield tmp_path / "gr.sock"
+    srv.shutdown(); srv.server_close()
+
+
+def test_graph_ness_metodos_permitidos(sock_graph):
+    assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
+                                                  "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens"})
+    assert ERROS["graph_ness"] is ErroGraphNess
+    with pytest.raises(ErroGraphNess, match="metodo_proibido"):
+        Ponte(sock_graph, "graph_ness")._chamar("enviar")
+
+
+def test_ponte_graph_cruza_resultados(sock_graph):
+    p = PonteGraph(sock_graph)
+    assert p.configurada() and p.contas() == ["resper@ness.com.br"]
+    assert p.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": "1"}]
+    assert p.listar_calendarios("resper@ness.com.br")[0]["principal"] is True
+    r = p.listar_eventos("resper@ness.com.br", "primary", None, JANELA_AG)
+    assert isinstance(r, ResultadoEventos) and r.cancelados == ["b"] and r.novo_sync_token == "S"
+
+
+def test_ponte_graph_valida_forma(sock_graph):
+    with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+        PonteGraph(sock_graph).listar_eventos("malformada@x.com", "primary", None, JANELA_AG)
+    with pytest.raises(ErroGraphNess, match="-> 401"):
+        PonteGraph(sock_graph).listar_eventos("boom@x.com", "primary", None, JANELA_AG)
+
+
+def test_ponte_graph_nao_configurada(tmp_path):
+    srv = Servidor(tmp_path / "n.sock", {"graph_ness": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        assert PonteGraph(tmp_path / "n.sock").configurada() is False
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ambiente_com_socket_expoe_graph_ness(tmp_path, monkeypatch):
+    srv = Servidor(tmp_path / "e.sock", {"graph_ness": _FalsoGraph()})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("GABI_FONTES_SOCKET", str(tmp_path / "e.sock"))
+        assert isinstance(fontes_do_ambiente()["graph_ness"](), PonteGraph)
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_ponte_do_graph_aceita_o_correio_e_valida_a_forma_com_o_erro_da_ness(tmp_path):
+    from gabi.fontes.graph_ness import ErroGraphNess
+    assert {"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"} <= PERMITIDOS["graph_ness"]
+    for proibido in ("enviar", "apagar", "send", "delete", "responder"):
+        assert proibido not in PERMITIDOS["graph_ness"]
+
+    class Falsa(_FalsaEmail):
+        pass
+    srv = Servidor(tmp_path / "gm.sock", {"graph_ness": Falsa(), "paperless": None})
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        p = PonteEmail(tmp_path / "gm.sock", "graph_ness", ErroGraphNess)
+        assert p.configurada()
+        assert p.listar_novos("a@x.com", None, 14).novo_history_id == "H"
+        assert p.lixeira("a@x.com", ["a1"]) == {"a1": "ok"}
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.listar_novos("malformada@x.com", None, 14)
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.lixeira("malformada@x.com", ["a1"])
+        with pytest.raises(ErroGraphNess, match="resposta inválida"):
+            p.enviados_recentes("malformada@x.com", 365)
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_teams_metodos_estao_permitidos():
+    assert {"teams_chats", "teams_mensagens"} <= PERMITIDOS["graph_ness"]
+
+
+def test_metodo_de_escrita_do_teams_nao_existe():
+    import re
+    assert not [m for m in PERMITIDOS["graph_ness"] if re.search(r"enviar|responder|apagar|reagir", m)]
+
+
+def test_ponte_graph_teams_chats_valida_forma(sock_graph):
+    p = PonteGraph(sock_graph)
+    r = p.teams_chats("resper@ness.com.br")
+    assert [c["chat_id"] for c in r] == ["c1", "c2"] and r[1]["ultima_em"] is None
+    for conta in ("malformada@x.com", "texto@x.com"):
+        with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+            p.teams_chats(conta)
+
+
+def test_ponte_graph_teams_mensagens_valida_forma(sock_graph):
+    p = PonteGraph(sock_graph)
+    r = p.teams_mensagens("resper@ness.com.br", "c1", "2026-10-19T00:00:00Z")
+    assert r == [{"id": "m1", "quando": "2026-10-20T10:00:00Z", "de_nome": "Ana", "de_eu": False, "mencoes_eu": True}]
+    for conta in ("malformada@x.com", "naolista@x.com"):
+        with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+            p.teams_mensagens(conta, "c1", "2026-10-19T00:00:00Z")
