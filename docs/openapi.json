@@ -2512,7 +2512,7 @@
   },
   "/api/v1/escuta/contatos/propostas": {
    "get": {
-    "description": "Lista as propostas de criar/corrigir contato da ness (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada.",
+    "description": "Lista as propostas de contato da ness (criar, corrigir, corrigir nome, apagar telefone, apagar contato) (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada.",
     "operationId": "listar_propostas_api_v1_escuta_contatos_propostas_get",
     "parameters": [
      {
@@ -2551,7 +2551,7 @@
   },
   "/api/v1/escuta/contatos/propostas/aprovar-correcoes": {
    "post": {
-    "description": "Aprova as correções pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar e não pendentes ficam; devolve quantas.",
+    "description": "Aprova as correções (telefone e nome) pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam; devolve quantas.",
     "operationId": "aprovar_correcoes_propostas_api_v1_escuta_contatos_propostas_aprovar_correcoes_post",
     "responses": {
      "200": {
