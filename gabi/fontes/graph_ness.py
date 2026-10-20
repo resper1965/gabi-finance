@@ -30,6 +30,7 @@ _ID_MSG = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id imutável de mensagem (ba
 _IMUTAVEL = 'IdType="ImmutableId"'  # o id não muda quando a mensagem vai e volta dos Itens Excluídos (restaurar usa o mesmo id)
 _DESTINOS = {"trash": "deleteditems", "untrash": "inbox"}  # as únicas escritas: destino fixo, nunca vindo de fora
 _VENENO = (400, 404, 410, 413, 422)  # 4xx que é do id (401/403/429/5xx continuam parando a leitura)
+_ID_CONTATO = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id de contato do Graph (base64url): nunca "/" nem espaço
 _CHAT_ID = re.compile(r"^[0-9A-Za-z:@._-]{1,200}$")  # id de chat do Teams ("19:...@thread.v2"): nunca "/" nem espaço
 _TIPOS_CHAT = {"oneOnOne": "um_a_um", "group": "grupo", "meeting": "grupo"}
 _CAMPOS_TEAMS = "id,createdDateTime,from,messageType,mentions,deletedDateTime"  # sem body, subject nem attachments
@@ -226,10 +227,10 @@ class GraphNess:
         raise ErroGraphNess("paginação sem fim")
 
     def contatos(self, conta: str) -> list[dict]:
-        """[{nome, telefone[, emails]}] como os contatos do Google: um item por telefone (celular, casa, trabalho), cada um com os e-mails do contato;
+        """[{nome, telefone, campo[, graph_id][, emails]}] como os contatos do Google: um item por telefone (celular, casa, trabalho), cada um com os e-mails do contato;
         contato só com e-mail vira um item com `telefone: None`. Só nome, telefone e e-mail são lidos."""
         conta = self._conta(conta)
-        campos = "displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+        campos = "id,displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
         url = f"{BASE}/users/{urllib.parse.quote(conta, safe='')}/contacts?$select={campos}&$top=100"
         saida = []
         for pagina in self._paginas(url):
@@ -239,10 +240,15 @@ class GraphNess:
                 nome = p.get("displayName")
                 nome = nome if isinstance(nome, str) and nome.strip() else None
                 emails = _emails(p.get("emailAddresses"))
-                telefones = [t for t in [p.get("mobilePhone"), *(p.get("homePhones") or []), *(p.get("businessPhones") or [])]
-                             if isinstance(t, str) and t.strip()]
-                for t in telefones:
-                    item = {"nome": nome, "telefone": t}
+                gid = p.get("id")
+                gid = gid if isinstance(gid, str) and _ID_CONTATO.match(gid) else None
+                telefones = [(t, campo) for campo, lista in (("mobile", [p.get("mobilePhone")]), ("home", p.get("homePhones") or []),
+                                                             ("business", p.get("businessPhones") or []))
+                             for t in lista if isinstance(t, str) and t.strip()]
+                for t, campo in telefones:
+                    item = {"nome": nome, "telefone": t, "campo": campo}
+                    if gid:
+                        item["graph_id"] = gid
                     if emails:
                         item["emails"] = list(emails)
                     saida.append(item)

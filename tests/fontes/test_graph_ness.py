@@ -166,8 +166,21 @@ def test_contatos_um_item_por_telefone_com_emails():
                  emailAddresses=[{"address": "Ana@X.com"}, {"address": "ana@x.com"}, {"address": "lixo"}])
     gr, _ = _graph([(200, {"value": [c]})])
     assert gr.contatos("resper@ness.com.br") == [
-        {"nome": "Ana", "telefone": "+55 11 99999-0000", "emails": ["ana@x.com"]},
-        {"nome": "Ana", "telefone": "1133334444", "emails": ["ana@x.com"]}]
+        {"nome": "Ana", "telefone": "+55 11 99999-0000", "campo": "mobile", "emails": ["ana@x.com"]},
+        {"nome": "Ana", "telefone": "1133334444", "campo": "home", "emails": ["ana@x.com"]}]
+
+
+def test_contatos_trazem_graph_id_e_campo():
+    c = _contato(id="AAMk1234", mobilePhone="1", homePhones=["2"], businessPhones=["3"])
+    gr, _ = _graph([(200, {"value": [c]})])
+    itens = gr.contatos("resper@ness.com.br")
+    assert [(i["graph_id"], i["campo"], i["telefone"]) for i in itens] == [("AAMk1234", "mobile", "1"), ("AAMk1234", "home", "2"), ("AAMk1234", "business", "3")]
+
+
+def test_contatos_id_invalido_nao_vira_graph_id():
+    for ruim in ("a/b", "curto", 5, None):
+        gr, _ = _graph([(200, {"value": [_contato(id=ruim, mobilePhone="1")]})])
+        assert "graph_id" not in gr.contatos("resper@ness.com.br")[0]
 
 
 def test_contatos_so_email_e_vazio():
@@ -177,7 +190,7 @@ def test_contatos_so_email_e_vazio():
 
 def test_contatos_sem_email_nao_tem_chave_emails():
     gr, _ = _graph([(200, {"value": [_contato(mobilePhone="11999990000")]})])
-    assert gr.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": "11999990000"}]
+    assert gr.contatos("resper@ness.com.br") == [{"nome": "Ana", "telefone": "11999990000", "campo": "mobile"}]
 
 
 def test_contatos_pagina_e_pede_so_campos_necessarios():
@@ -188,7 +201,7 @@ def test_contatos_pagina_e_pede_so_campos_necessarios():
     u = urlsplit(http.chamadas[0][1])
     assert u.path == "/v1.0/users/resper%40ness.com.br/contacts"
     q = parse_qs(u.query)
-    assert q["$select"] == ["displayName,mobilePhone,homePhones,businessPhones,emailAddresses"] and q["$top"] == ["100"]
+    assert q["$select"] == ["id,displayName,mobilePhone,homePhones,businessPhones,emailAddresses"] and q["$top"] == ["100"]
     assert http.chamadas[1][1] == prox
 
 
