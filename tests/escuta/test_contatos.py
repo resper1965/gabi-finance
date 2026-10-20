@@ -116,9 +116,13 @@ def test_todas_as_contas_falhando_nao_mexe_na_tabela_mas_conta_removida_e_purgad
 
 
 @pytest.mark.parametrize("item,esperado", [
-    ({"telefone": "+1 (415) 555-2671"}, None),
-    ({"telefone": "+44 20 7946 0958"}, None),
-    ({"telefone": "001 415 555 2671"}, None),
+    ({"telefone": "+1 (415) 555-2671"}, "+14155552671"),
+    ({"telefone": "+44 20 7946 0958"}, "+442079460958"),
+    ({"telefone": "0044 20 7946 0958"}, "+442079460958"),
+    ({"telefone": "001 415 555 2671"}, "+14155552671"),
+    ({"telefone": "+1 415"}, None),
+    ({"telefone": "+1 415 555 2671 ramal 12"}, None),
+    ({"telefone": "+1 415 555 2671 8888 9999"}, None),
     ({"telefone": "(11) 3456-7890 r.1"}, None),
     ({"telefone": "11 3456-7890 ramal 12"}, None),
     ({"telefone": "11912345678 x5"}, None),
@@ -290,3 +294,11 @@ def test_sincronizar_substitui_so_a_conta(con):
         raise RuntimeError("x")
     c.sincronizar(con, [NESS], falha)
     assert [r[1] for r in _graph_linhas(con)] == ["AAMk3333"]
+
+
+def test_estrangeiro_nao_conta_como_invalido_e_entra_na_tabela(con):
+    dados = {NESS: [{"nome": "Bob", "telefone": "+1 (415) 555-2671", "graph_id": "AAMk1", "campo": "mobile"}]}
+    r = c.sincronizar(con, [NESS], _listar(dados))
+    assert r["invalidos"] == 0
+    assert _linhas(con) == [(NESS, "+14155552671", "Bob")]
+    assert [x[4] for x in _graph_linhas(con)] == ["+14155552671"]

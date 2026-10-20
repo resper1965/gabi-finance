@@ -81,8 +81,8 @@ test.each([["Aprovar", "aprovada"], ["Recusar", "recusada"]])("%s envia a decis�
 test("botão em lote envia só os ids das correções na tela e avisa que não inclui contatos novos", async () => {
   const c = fake([prop({ id: 1 }), CRIAR, prop({ id: 3, telefone_antes: "+551193334444" })]);
   montar();
-  expect(await screen.findByText(/Não inclui contatos novos\./)).toBeTruthy();
-  fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções de telefone" }));
+  expect(await screen.findByText(/Não inclui contatos novos nem apagar\./)).toBeTruthy();
+  fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/propostas/aprovar-correcoes", corpo: { ids: [1, 3] } });
   expect(await screen.findByText("2 correção(ões) aprovada(s).")).toBeTruthy();
@@ -91,7 +91,7 @@ test("botão em lote envia só os ids das correções na tela e avisa que não i
 test("o resumo do lote some quando outra ação roda", async () => {
   fake([prop({ id: 1 }), CRIAR]);
   montar();
-  fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções de telefone" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções" }));
   expect(await screen.findByText("2 correção(ões) aprovada(s).")).toBeTruthy();
   const recusar = screen.getByRole("button", { name: "Recusar proposta 2 (criar)" }) as HTMLButtonElement;
   await waitFor(() => expect(recusar.disabled).toBe(false)); // espera a releitura do lote terminar
@@ -176,4 +176,60 @@ test("sem aprovadas, a segunda lista não aparece", async () => {
   montar();
   await screen.findByText(/\+5511988887777/);
   expect(screen.queryByText(/Aprovadas aguardando gravação/)).toBeNull();
+});
+
+const NOME = prop({ id: 11, tipo: "corrigir_nome", nome_antes: "José⁹", telefone_antes: null, nome_depois: "José", telefone_depois: "", origem: "nome_sujo" });
+const APAGAR_TEL = prop({ id: 12, tipo: "apagar_telefone", nome_antes: "Ana", telefone_antes: "12345", nome_depois: "Ana", telefone_depois: "", origem: "telefone_invalido" });
+const APAGAR_CONTATO = prop({ id: 13, tipo: "apagar_contato", nome_antes: "U", telefone_antes: "+5511947338256", nome_depois: "U", telefone_depois: "", origem: "nome_curto" });
+
+test("mostra rótulo e antes → depois dos tipos de limpeza", async () => {
+  fake([NOME, APAGAR_TEL, APAGAR_CONTATO]);
+  montar();
+  expect(await screen.findByText("Corrigir nome")).toBeTruthy();
+  expect(screen.getByText("Apagar telefone")).toBeTruthy();
+  expect(screen.getByText("Apagar contato")).toBeTruthy();
+  expect(screen.getByText(/José⁹/)).toBeTruthy();
+  expect(screen.getByText(/\(telefone removido\)/)).toBeTruthy();
+  expect(screen.getByText(/\(contato apagado\)/)).toBeTruthy();
+});
+
+test("lote envia corrigir e corrigir_nome e nunca apagar", async () => {
+  const c = fake([prop({ id: 1 }), NOME, APAGAR_TEL, APAGAR_CONTATO]);
+  montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].corpo).toEqual({ ids: [1, 11] });
+});
+
+test("só apagar na fila não mostra o botão em lote", async () => {
+  fake([APAGAR_TEL, APAGAR_CONTATO]);
+  montar();
+  await screen.findByText("Apagar telefone");
+  expect(screen.queryByRole("button", { name: /Aprovar todas/ })).toBeNull();
+});
+
+test("apagar contato só aprova depois de confirmar", async () => {
+  const c = fake([APAGAR_CONTATO]);
+  const confirma = vi.spyOn(window, "confirm");
+  montar();
+  const botao = await screen.findByRole("button", { name: "Aprovar proposta 13 (apagar_contato)" });
+  confirma.mockReturnValueOnce(false);
+  fireEvent.click(botao);
+  expect(posts(c)).toHaveLength(0);
+  confirma.mockReturnValueOnce(true);
+  fireEvent.click(botao);
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0]).toMatchObject({ url: "/api/v1/escuta/contatos/propostas/13/decisao", corpo: { estado: "aprovada" } });
+  expect(confirma.mock.calls[0][0]).not.toMatch(/U|5511947338256/);
+  confirma.mockRestore();
+});
+
+test("aprovar apagar telefone também pede confirmação", async () => {
+  const c = fake([APAGAR_TEL]);
+  const confirma = vi.spyOn(window, "confirm").mockReturnValue(false);
+  montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Aprovar proposta 12 (apagar_telefone)" }));
+  expect(confirma).toHaveBeenCalledTimes(1);
+  expect(posts(c)).toHaveLength(0);
+  confirma.mockRestore();
 });

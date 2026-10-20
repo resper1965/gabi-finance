@@ -56,7 +56,7 @@ def conta_origem(con) -> str:
 
 def _telefone(item) -> str | None:
     """E.164 de um contato. Prefere o `canonico` (canonicalForm do Google); sem ele, recusa o que normalizar_telefone (que só entende
-    Brasil e antepõe 55) transformaria em número brasileiro errado: DDI diferente de 55 e ramal."""
+    Brasil e antepõe 55) transformaria em número brasileiro errado: ramal, e DDI diferente de 55 só vale se vier com `+`/`00` e 8 a 15 dígitos."""
     if not isinstance(item, dict):
         return None
     canon = item.get("canonico")
@@ -72,7 +72,8 @@ def _telefone(item) -> str | None:
     if t.startswith("00"):
         t = "+" + t[2:]
     if t.startswith("+") and not re.sub(r"\D", "", t).startswith("55"):
-        return None
+        digitos = re.sub(r"\D", "", t)
+        return "+" + digitos if 8 <= len(digitos) <= 15 else None  # estrangeiro: vale como está, nunca vira +55
     return normalizar_telefone(t)
 
 
@@ -215,7 +216,8 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     ok = {k: v for k, v in r["contas"].items() if "lidos" in v}
     erros = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
     print(f"contatos: total={r['total']} invalidos={r['invalidos']} contas_ok={len(ok)} lidos={sum(v['lidos'] for v in ok.values())}")
-    print(f"propostas: criar={g['criar']} corrigir={g['corrigir']}")
+    print(f"propostas: criar={g['criar']} corrigir={g['corrigir']} nomes={g['corrigir_nome']} "
+          f"apagar_telefone={g['apagar_telefone']} apagar_contato={g['apagar_contato']}")
     for conta, msg in erros.items():
         print(f"AVISO: conta {conta} falhou: {msg}", file=sys.stderr)
     todas = bool(contas) and not ok

@@ -22,7 +22,7 @@ Depois de aprovar as 50 propostas de criar/corrigir celular, o Ricardo achou suj
 
 `apagar_telefone` apaga só o campo; o contato continua existindo, mesmo que fique sem telefone (apagá-lo é decisão do Ricardo, no Outlook). `apagar_contato` só nasce da regra do nome de 1 caractere.
 
-Limpeza de nome (`_limpar_nome`): remove caracteres de `Unicode categoria S* e P*` que estejam soltos nas pontas ou isolados por espaço (`|`), troca sobrescritos/subscritos coladas à palavra (`⁹`) quando o contato **não** é uma sigla com dígito comum (`EMR3` não muda porque o `3` é ASCII), colapsa espaços e corta as pontas. Parênteses, hífen, ponto e apóstrofo **dentro** de nomes são preservados (`Antonio Américo (Tonico) ...`, `Gabriela Andrade - HomeCred`).
+Limpeza de nome (`_limpar_nome`): remove sobrescritos/subscritos Unicode (`⁹`) e os símbolos da lista explícita `|¦*_~^`\<>=` soltos ou nas pontas (lista, não categoria Unicode: o hífen solto de "Gabriela Andrade - HomeCred" é nome), não toca em dígito ASCII (`EMR3`), colapsa espaços e corta as pontas. Parênteses, hífen, ponto e apóstrofo **dentro** de nomes são preservados (`Antonio Américo (Tonico) ...`, `Gabriela Andrade - HomeCred`).
 
 ### 3. Aplicar (`contatos_gravar.py`)
 Cada tipo ganha `_aplicar_*` no padrão dos existentes: revalida contra `contato_graph` (a linha lida ainda é a mesma: nome e telefone original), conta ainda em `escuta.contas_contatos`; divergência → `contato_alterado`; falha da ponte → `graph_indisponivel`; resultado `alterado` da ponte → `contato_alterado`. Sucesso: atualiza `contato_graph` local e marca `aplicada` na mesma transação. `apagar_contato` remove a linha de `contato_graph` (e o contato local de `contato_google` por telefone, se houver só ele).

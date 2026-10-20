@@ -319,6 +319,21 @@ class GraphNess:
         from gabi.fontes import graph_ness_contatos
         return graph_ness_contatos.corrigir(self, conta, graph_id, antes, depois)
 
+    def contato_renomear(self, conta: str, graph_id: str, nome_antes: str, nome_depois: str) -> dict:
+        """Troca só o nome se o contato ainda estiver como `nome_antes`; senão {"resultado": "alterado"} sem escrever."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.renomear(self, conta, graph_id, nome_antes, nome_depois)
+
+    def contato_apagar_telefone(self, conta: str, graph_id: str, campo: str, telefone_antes: str) -> dict:
+        """Limpa um telefone do contato se ele ainda for `telefone_antes`; os outros números ficam."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.apagar_telefone(self, conta, graph_id, campo, telefone_antes)
+
+    def contato_apagar(self, conta: str, graph_id: str, nome_antes: str, telefone_antes: str) -> dict:
+        """Remove o contato se ainda estiver como `nome_antes`, sem e-mail e com um único telefone, `telefone_antes`."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.apagar(self, conta, graph_id, nome_antes, telefone_antes)
+
     def _enviar_mover(self, url: str, destino: str) -> int:
         """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""
         corpo = json.dumps({"destinationId": destino}).encode()

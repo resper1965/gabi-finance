@@ -1,5 +1,5 @@
 # ADR-020 · Escrita de contatos da ness no Graph (criar e corrigir, só com aprovação)
-Data: 20/10/2026 · Estado: aceito (código pronto na branch `feat/contatos-escrita`, nada ligado; passos do dono no runbook `#contatos-escrita`) · Spec: `docs/superpowers/specs/2026-10-20-contatos-escrita-graph-design.md` · Plano: `docs/superpowers/plans/2026-10-20-contatos-escrita-graph.md`
+Estendida pela ADR-021 (limpeza: renomear, apagar telefone e apagar contato) · Data: 20/10/2026 · Estado: aceito (código pronto na branch `feat/contatos-escrita`, nada ligado; passos do dono no runbook `#contatos-escrita`) · Spec: `docs/superpowers/specs/2026-10-20-contatos-escrita-graph-design.md` · Plano: `docs/superpowers/plans/2026-10-20-contatos-escrita-graph.md`
 
 **Contexto.** O ADR-019 deixou os contatos da ness só de leitura. Em 20/10 o Ricardo pediu que a Gabi crie contatos que ainda não existem (quem escreveu pelo WhatsApp) e corrija celulares cujo número muda ao normalizar (tipicamente o celular antigo de 8 dígitos sem o 9) nos contatos da `resper@ness.com.br`. Isso é exceção explícita ao "só leitura" do ADR-019 e só vale para contatos; e-mail, agenda e Teams seguem como estavam.
 

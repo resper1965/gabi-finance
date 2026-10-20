@@ -87,7 +87,7 @@ def test_nenhuma_rota_de_exclusao_no_codigo():
     """Chamadas de SAÍDA (urllib/requests). `@router.delete` é a exclusão lógica de cadastros da própria API, não conta."""
     achados = []
     for arq in RAIZ.rglob("*.py"):
-        if "painel" in arq.parts:
+        if "painel" in arq.parts or arq.name == "graph_ness_contatos.py":  # o único DELETE do código: apagar contato da ness, aprovado um a um (ADR-021; travado em test_graph_ness_contatos_escrita)
             continue
         for i, linha in enumerate(arq.read_text(encoding="utf-8").splitlines(), 1):
             if re.search(r"(?<!router)\.delete\(|requests\.delete|[\"']DELETE[\"']|method\s*=\s*[\"']DELETE", linha) and "re.search" not in linha:

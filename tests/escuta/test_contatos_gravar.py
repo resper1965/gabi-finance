@@ -32,6 +32,11 @@ class FakeGraph:
         return {"resultado": self._corrigir}
 
 
+def _antigas(r):
+    """Só criar/corrigir: os tipos de limpeza têm testes próprios."""
+    return {k: r[k] for k in ("criar", "corrigir")}
+
+
 @pytest.fixture
 def con(tmp_path):
     k = conectar(tmp_path / "t.db")
@@ -376,7 +381,7 @@ def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
     from gabi.escuta import contatos_propostas as cp
     itens = [{"nome": "Beltrano", "telefone": "11 9999-0000", "graph_id": "AAMk0001", "campo": "mobile"}]
     c.sincronizar(con, c.contas_contatos(con), lambda conta: list(itens) if conta == NESS else [])
-    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 1}
+    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 1}
     (pid,) = [r["id"] for r in cp.listar(con, "pendente")]
     assert cp.aprovar_correcoes(con, "ricardo", AGORA, [pid]) == 1
     _ligar(con)
@@ -386,7 +391,139 @@ def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
                                {"nome": "Beltrano", "telefone": "+5511999990000"})]
     linha = con.execute("select telefone_original, telefone from contato_graph where graph_id='AAMk0001'").fetchone()
     assert tuple(linha) == ("+5511999990000", "+5511999990000")
-    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
     # e a próxima sincronização, com o Graph já corrigido, também não gera nada
     c.sincronizar(con, c.contas_contatos(con), lambda conta: [{**itens[0], "telefone": "+5511999990000"}] if conta == NESS else [])
-    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
+
+
+# ---------------- limpeza (ADR-021) ----------------
+class FakeLimpeza(FakeGraph):
+    def __init__(self, resultado="ok", erro=False):
+        super().__init__()
+        self._resultado, self._erro = resultado, erro
+
+    def _responde(self, *chamada):
+        self.chamadas.append(chamada)
+        if self._erro:
+            raise ErroGraphNess("graph fora")
+        return self._resultado if isinstance(self._resultado, dict) else {"resultado": self._resultado}
+
+    def contato_renomear(self, conta, graph_id, nome_antes, nome_depois):
+        return self._responde("renomear", conta, graph_id, nome_antes, nome_depois)
+
+    def contato_apagar_telefone(self, conta, graph_id, campo, telefone_antes):
+        return self._responde("apagar_telefone", conta, graph_id, campo, telefone_antes)
+
+    def contato_apagar(self, conta, graph_id, nome_antes, telefone_antes):
+        return self._responde("apagar", conta, graph_id, nome_antes, telefone_antes)
+
+
+def _limpa(con, tipo, nome_antes, nome_depois, tel_antes, gid="g-1", estado="aprovada"):
+    cur = con.execute("insert into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, estado) "
+                      "values (?,?,?,?,?,?,'',?,?)", (tipo, NESS, gid, nome_antes, tel_antes, nome_depois, "nome_sujo", estado))
+    con.commit()
+    return cur.lastrowid
+
+
+def _linhas_graph(con):
+    return [tuple(r) for r in con.execute("select graph_id, nome, telefone_original, telefone from contato_graph order by graph_id, telefone_original")]
+
+
+def _preparar(con, tipo):
+    """Contato local + proposta aprovada de cada tipo de limpeza. Devolve (id da proposta, chamada esperada ao Graph)."""
+    _ligar(con)
+    if tipo == "corrigir_nome":
+        _graph_linha(con, nome="José⁹", original="+55 11 91234-5678", telefone="+5511912345678")
+        return _limpa(con, tipo, "José⁹", "José", None), ("renomear", NESS, "g-1", "José⁹", "José")
+    if tipo == "apagar_telefone":
+        _graph_linha(con, nome="Ana", original="12345", telefone=None, campo="home")
+        return _limpa(con, tipo, "Ana", "Ana", "12345"), ("apagar_telefone", NESS, "g-1", "home", "12345")
+    _graph_linha(con, nome="U", original="+55 11 94733-8256", telefone="+5511947338256")
+    return _limpa(con, tipo, "U", "U", "+5511947338256"), ("apagar", NESS, "g-1", "U", "+55 11 94733-8256")
+
+
+TIPOS_LIMPEZA = ["corrigir_nome", "apagar_telefone", "apagar_contato"]
+
+
+@pytest.mark.parametrize("tipo", TIPOS_LIMPEZA)
+def test_limpeza_ok_grava_local_e_marca_aplicada(con, tipo):
+    pid, chamada = _preparar(con, tipo)
+    graph = FakeLimpeza()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [chamada] and r["aplicadas"] == 1 and _estado(con, pid)[0] == "aplicada"
+    esperado = {"corrigir_nome": [("g-1", "José", "+55 11 91234-5678", "+5511912345678")], "apagar_telefone": [], "apagar_contato": []}[tipo]
+    assert _linhas_graph(con) == esperado
+
+
+@pytest.mark.parametrize("tipo", TIPOS_LIMPEZA)
+def test_limpeza_contato_mudou_localmente_nao_chama_o_graph(con, tipo):
+    pid, _ = _preparar(con, tipo)
+    con.execute("update contato_graph set nome='Mudou'" if tipo != "apagar_telefone" else "update contato_graph set telefone_original='999'")
+    con.commit()
+    graph = FakeLimpeza()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and r["falhas"] == 1 and r["descartadas"] == 1 and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
+
+
+@pytest.mark.parametrize("tipo", TIPOS_LIMPEZA)
+def test_limpeza_graph_devolve_alterado(con, tipo):
+    pid, _ = _preparar(con, tipo)
+    before = _linhas_graph(con)
+    r = g.aplicar(con, FakeLimpeza("alterado"), AGORA)
+    assert _estado(con, pid)[:2] == ("falhou", "contato_alterado") and r["descartadas"] == 1 and _linhas_graph(con) == before
+
+
+@pytest.mark.parametrize("tipo", TIPOS_LIMPEZA)
+@pytest.mark.parametrize("falha", ["erro", {"resultado": "talvez"}])
+def test_limpeza_graph_indisponivel(con, tipo, falha):
+    pid, _ = _preparar(con, tipo)
+    graph = FakeLimpeza(falha if isinstance(falha, dict) else "ok", erro=falha == "erro")
+    r = g.aplicar(con, graph, AGORA)
+    assert _estado(con, pid)[:2] == ("falhou", "graph_indisponivel") and r["falhas"] == 1 and r["descartadas"] == 0
+
+
+@pytest.mark.parametrize("tipo", TIPOS_LIMPEZA)
+def test_limpeza_desligado_so_simula(con, tipo):
+    pid, _ = _preparar(con, tipo)
+    _ligar(con, "desligado")
+    graph = FakeLimpeza()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and r["simuladas"] == 1 and _estado(con, pid)[0] == "aprovada"
+
+
+def test_apagar_telefone_sem_campo_e_alterado(con):
+    _ligar(con)
+    _graph_linha(con, nome="Ana", original="12345", telefone=None, campo=None)
+    pid = _limpa(con, "apagar_telefone", "Ana", "Ana", "12345")
+    graph = FakeLimpeza()
+    g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
+
+
+def test_apagar_telefone_preserva_o_outro_telefone_do_contato(con):
+    _ligar(con)
+    _graph_linha(con, nome="Ana", original="12345", telefone=None, campo="home")
+    _graph_linha(con, nome="Ana", original="+5511999990000", telefone="+5511999990000", campo="mobile")
+    pid = _limpa(con, "apagar_telefone", "Ana", "Ana", "12345")
+    g.aplicar(con, FakeLimpeza(), AGORA)
+    assert _estado(con, pid)[0] == "aplicada" and _linhas_graph(con) == [("g-1", "Ana", "+5511999990000", "+5511999990000")]
+
+
+def test_apagar_contato_tira_tambem_do_contato_google(con):
+    pid, _ = _preparar(con, "apagar_contato")
+    con.execute("insert into contato_google(conta, telefone, nome) values (?,?,?)", (NESS, "+5511947338256", "U"))
+    con.commit()
+    g.aplicar(con, FakeLimpeza(), AGORA)
+    assert con.execute("select count(*) from contato_google").fetchone()[0] == 0
+
+
+def test_tipo_desconhecido_vira_contato_alterado(con):
+    _ligar(con)
+    pid, _ = _preparar(con, "corrigir_nome")
+    con.execute("pragma ignore_check_constraints=1")
+    con.execute("update contato_proposta set tipo='inventado' where id=?", (pid,))
+    con.commit()
+    graph = FakeLimpeza()
+    g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
