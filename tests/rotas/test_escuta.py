@@ -508,10 +508,13 @@ def test_sincronizar_so_com_o_graph_configurado(banco):
 P = "/api/v1/escuta/contatos/propostas"
 
 
+_ORIGEM = {"criar": "whatsapp", "corrigir": "telefone_invalido", "corrigir_nome": "nome_sujo", "apagar_telefone": "telefone_invalido", "apagar_contato": "nome_curto"}
+
+
 def _proposta(banco, tipo="criar", nome="Joana Silva", tel="+5511912345678", estado="pendente"):
     c = conectar(banco)
     pid = c.execute("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, origem, estado) values (?, 'resper@ness.com.br', ?, ?, ?, ?, ?)",
-                    (tipo, "g1" if tipo == "corrigir" else None, nome, tel, "telefone_invalido" if tipo == "corrigir" else "whatsapp", estado)).lastrowid
+                    (tipo, None if tipo == "criar" else "g1", nome, tel, _ORIGEM[tipo], estado)).lastrowid
     c.close()
     return pid
 
@@ -617,6 +620,23 @@ def test_aprovar_correcoes_so_dos_ids_enviados(cli, banco):
     assert [i["id"] for i in cli.get(P + "?estado=recusada", headers=BOSS).json()["dados"]["itens"]] == [ja]
     audit = [o for o in _decisoes(banco) if "correç" in o]
     assert audit == ["escuta: aprovou 2 correção(ões) de contato"]
+
+
+def test_aprovar_correcoes_inclui_corrigir_nome_e_nunca_apagar(cli, banco):
+    nome = _proposta(banco, "corrigir_nome", "Ana", "")
+    apagar_tel = _proposta(banco, "apagar_telefone", "Bia", "")
+    apagar_contato = _proposta(banco, "apagar_contato", "U", "")
+    r = _post(cli, f"{P}/aprovar-correcoes", {"ids": [nome, apagar_tel, apagar_contato]})
+    assert r.status_code == 200 and r.json()["dados"] == {"aprovadas": 1}
+    pendentes = [i["id"] for i in cli.get(P, headers=BOSS).json()["dados"]["itens"]]
+    assert pendentes == [apagar_tel, apagar_contato]
+    assert [i["id"] for i in cli.get(P + "?estado=aprovada", headers=BOSS).json()["dados"]["itens"]] == [nome]
+
+
+def test_listar_devolve_os_tipos_novos(cli, banco):
+    ids = [_proposta(banco, t, "X", "") for t in ("corrigir_nome", "apagar_telefone", "apagar_contato")]
+    itens = cli.get(P, headers=BOSS).json()["dados"]["itens"]
+    assert [(i["id"], i["tipo"]) for i in itens] == list(zip(ids, ("corrigir_nome", "apagar_telefone", "apagar_contato")))
 
 
 @pytest.mark.parametrize("corpo", [{}, {"ids": []}, {"ids": None}, {"ids": "1"}, {"ids": [1, "2"]}, {"ids": [True]}, {"ids": [1.5]}])

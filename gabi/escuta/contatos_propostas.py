@@ -147,11 +147,12 @@ def decidir(con, proposta_id: int, estado: str, login: str, agora: str, auditar=
 
 
 def aprovar_correcoes(con, login: str, agora: str, ids, auditar=None) -> int:
-    """Aprova só as correções pendentes cujos ids o painel mostrou (nunca o que o dono não viu); criar e não pendentes ficam como estão."""
+    """Aprova só as correções (de telefone e de nome) pendentes cujos ids o painel mostrou (nunca o que o dono não viu); criar, apagar_telefone,
+    apagar_contato e não pendentes ficam como estão: apagar só se aprova um a um."""
     ids = ids_validos(ids)
     with transacao(con):
         n = con.execute(f"update contato_proposta set estado='aprovada', decidida_em=?, decidida_por=? "
-                        f"where id in ({','.join('?' * len(ids))}) and tipo='corrigir' and estado='pendente'", (agora, login, *ids)).rowcount
+                        f"where id in ({','.join('?' * len(ids))}) and tipo in ('corrigir','corrigir_nome') and estado='pendente'", (agora, login, *ids)).rowcount
         if auditar is not None and n:
             auditar(n)  # dentro da transação: se falhar, nada fica aprovado
         return n

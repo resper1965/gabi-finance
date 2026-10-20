@@ -341,7 +341,7 @@ def _agora_utc(request: Request) -> str:
 
 @router.get("/contatos/propostas")
 def listar_propostas(request: Request, estado: str = "pendente", ident: Identidade = Depends(exigir("boss"))):
-    """Lista as propostas de criar/corrigir contato da ness (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada."""
+    """Lista as propostas de contato da ness (criar, corrigir, corrigir nome, apagar telefone, apagar contato) (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada."""
     if estado not in ESTADOS_PROPOSTA:
         raise erro(400, "requisicao_invalida", f"estado deve ser um de: {', '.join(ESTADOS_PROPOSTA)}")
     con = _con(request)
@@ -355,7 +355,7 @@ def listar_propostas(request: Request, estado: str = "pendente", ident: Identida
 
 @router.post("/contatos/propostas/aprovar-correcoes")
 async def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Aprova as correções pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar e não pendentes ficam; devolve quantas."""
+    """Aprova as correções (telefone e nome) pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam; devolve quantas."""
     corpo = _corpo(await _json(request))
     try:
         ids = cp.ids_validos(corpo.get("ids"))
