@@ -108,6 +108,69 @@ def _aplicar_corrigir(con, graph, p, agora: str) -> str | None:
     return None if _registrar(con, gravar) else GRAPH_INDISPONIVEL
 
 
+def _gravar_aplicada(con, p, agora: str, local) -> str | None:
+    """Depois do Graph: `local()` ajusta o espelho (contato_graph/contato_google) e a proposta vira aplicada, na mesma transação."""
+    def gravar():
+        local()
+        con.execute("update contato_proposta set estado='aplicada', motivo=null, aplicada_em=? where id=? and estado='aprovada'", (agora, p["id"]))
+    return None if _registrar(con, gravar) else GRAPH_INDISPONIVEL
+
+
+def _resultado_graph(chamada) -> str | None:
+    """None = o Graph escreveu; senão o motivo fixo (`alterado` do Graph = contato mudou; qualquer outra coisa = indisponível)."""
+    try:
+        r = chamada()
+        resultado = r.get("resultado") if isinstance(r, dict) else None
+    except Exception:  # noqa: BLE001 - ErroGraphNess ou falha da ponte: motivo fixo, sem o texto
+        return GRAPH_INDISPONIVEL
+    if resultado == "alterado":
+        return CONTATO_ALTERADO
+    return None if resultado == "ok" else GRAPH_INDISPONIVEL
+
+
+def _aplicar_corrigir_nome(con, graph, p, agora: str) -> str | None:
+    if p["graph_id"] is None or _conta_fora(con, p) or con.execute(
+            "select 1 from contato_graph where conta=? and graph_id=? and nome is ?", (p["conta"], p["graph_id"], p["nome_antes"])).fetchone() is None:
+        return CONTATO_ALTERADO
+    motivo = _resultado_graph(lambda: graph.contato_renomear(p["conta"], p["graph_id"], p["nome_antes"], p["nome_depois"]))
+    if motivo:
+        return motivo
+    return _gravar_aplicada(con, p, agora, lambda: con.execute(
+        "update contato_graph set nome=?, atualizado_em=? where conta=? and graph_id=?", (p["nome_depois"], agora, p["conta"], p["graph_id"])))
+
+
+def _aplicar_apagar_telefone(con, graph, p, agora: str) -> str | None:
+    linha = None if p["graph_id"] is None or p["telefone_antes"] is None or _conta_fora(con, p) else con.execute(
+        "select campo from contato_graph where conta=? and graph_id=? and telefone_original=? and telefone is null and nome is ?",
+        (p["conta"], p["graph_id"], p["telefone_antes"], p["nome_antes"])).fetchone()
+    if linha is None or linha["campo"] is None:
+        return CONTATO_ALTERADO
+    motivo = _resultado_graph(lambda: graph.contato_apagar_telefone(p["conta"], p["graph_id"], linha["campo"], p["telefone_antes"]))
+    if motivo:
+        return motivo
+    return _gravar_aplicada(con, p, agora, lambda: con.execute(
+        "delete from contato_graph where conta=? and graph_id=? and telefone_original=?", (p["conta"], p["graph_id"], p["telefone_antes"])))
+
+
+def _aplicar_apagar_contato(con, graph, p, agora: str) -> str | None:
+    linhas = [] if p["graph_id"] is None or p["telefone_antes"] is None or _conta_fora(con, p) else con.execute(
+        "select nome, telefone from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"])).fetchall()
+    if len(linhas) != 1 or linhas[0]["nome"] != p["nome_antes"] or linhas[0]["telefone"] != p["telefone_antes"]:
+        return CONTATO_ALTERADO
+    motivo = _resultado_graph(lambda: graph.contato_apagar(p["conta"], p["graph_id"], p["nome_antes"]))
+    if motivo:
+        return motivo
+
+    def local():
+        con.execute("delete from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"]))
+        con.execute("delete from contato_google where conta=? and telefone=?", (p["conta"], p["telefone_antes"]))
+    return _gravar_aplicada(con, p, agora, local)
+
+
+APLICADORES = {"criar": _aplicar_criar, "corrigir": _aplicar_corrigir, "corrigir_nome": _aplicar_corrigir_nome,
+               "apagar_telefone": _aplicar_apagar_telefone, "apagar_contato": _aplicar_apagar_contato}
+
+
 def aplicar(con, graph, agora: str) -> dict:
     return _aplicar(con, graph, agora)[0]
 
@@ -127,7 +190,8 @@ def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
             atual = con.execute("select estado from contato_proposta where id=?", (p["id"],)).fetchone()
             if atual is None or atual["estado"] != "aprovada":
                 continue
-            motivo = (_aplicar_criar if p["tipo"] == "criar" else _aplicar_corrigir)(con, graph, p, agora)
+            aplicador = APLICADORES.get(p["tipo"])
+            motivo = CONTATO_ALTERADO if aplicador is None else aplicador(con, graph, p, agora)
         except Exception:  # noqa: BLE001 - erro local inesperado também não deixa a proposta presa em 'aprovada'
             motivo = GRAPH_INDISPONIVEL
         if motivo is None:
