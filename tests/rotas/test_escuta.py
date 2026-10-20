@@ -565,15 +565,15 @@ def test_falha_na_auditoria_desfaz_aprovar_correcoes(banco, monkeypatch):
     pid = _proposta(banco, "corrigir", "A", "+5511911111111")
     _audit_quebrado(monkeypatch)
     sem_erro_http = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000), raise_server_exceptions=False)
-    assert _post(sem_erro_http, f"{P}/aprovar-correcoes").status_code >= 500
+    assert _post(sem_erro_http, f"{P}/aprovar-correcoes", {"ids": [pid]}).status_code >= 500
     c = conectar(banco)
     assert c.execute("select estado from contato_proposta where id=?", (pid,)).fetchone()[0] == "pendente"
     c.close()
 
 
 def test_aprovar_correcoes_sem_nenhuma_nao_audita(cli, banco):
-    _proposta(banco, "criar")
-    assert _post(cli, f"{P}/aprovar-correcoes").json()["dados"] == {"aprovadas": 0}
+    pid = _proposta(banco, "criar")
+    assert _post(cli, f"{P}/aprovar-correcoes", {"ids": [pid]}).json()["dados"] == {"aprovadas": 0}
     assert [o for o in _decisoes(banco) if "correç" in o] == []
 
 
@@ -605,12 +605,47 @@ def test_decisao_estado_invalido_400_e_inexistente_404(cli, banco):
     assert r.status_code == 404 and r.json()["erro"] == "nao_encontrado"
 
 
-def test_aprovar_correcoes_devolve_quantidade(cli, banco):
-    _proposta(banco, "corrigir", "A", "+5511911111111")
-    _proposta(banco, "corrigir", "B", "+5511922222222")
+def test_aprovar_correcoes_so_dos_ids_enviados(cli, banco):
+    a = _proposta(banco, "corrigir", "A", "+5511911111111")
+    b = _proposta(banco, "corrigir", "B", "+5511922222222")
+    fora = _proposta(banco, "corrigir", "D", "+5511944444444")
     criar = _proposta(banco, "criar", "C", "+5511933333333")
-    r = _post(cli, f"{P}/aprovar-correcoes")
+    ja = _proposta(banco, "corrigir", "E", "+5511955555555", estado="recusada")
+    r = _post(cli, f"{P}/aprovar-correcoes", {"ids": [a, b, criar, ja, 99999]})
     assert r.status_code == 200 and r.json()["dados"] == {"aprovadas": 2}
-    assert [i["id"] for i in cli.get(P, headers=BOSS).json()["dados"]["itens"]] == [criar]
+    assert [i["id"] for i in cli.get(P, headers=BOSS).json()["dados"]["itens"]] == [fora, criar]
+    assert [i["id"] for i in cli.get(P + "?estado=recusada", headers=BOSS).json()["dados"]["itens"]] == [ja]
     audit = [o for o in _decisoes(banco) if "correç" in o]
     assert audit == ["escuta: aprovou 2 correção(ões) de contato"]
+
+
+@pytest.mark.parametrize("corpo", [{}, {"ids": []}, {"ids": None}, {"ids": "1"}, {"ids": [1, "2"]}, {"ids": [True]}, {"ids": [1.5]}])
+def test_aprovar_correcoes_sem_ids_validos_400(cli, banco, corpo):
+    pid = _proposta(banco, "corrigir", "A", "+5511911111111")
+    r = _post(cli, f"{P}/aprovar-correcoes", corpo)
+    assert r.status_code == 400 and r.json()["erro"] == "requisicao_invalida"
+    c = conectar(banco)
+    assert c.execute("select estado from contato_proposta where id=?", (pid,)).fetchone()[0] == "pendente"
+    c.close()
+
+
+def test_recusar_proposta_ja_aprovada_e_auditada(cli, banco):
+    pid = _proposta(banco)
+    assert _post(cli, f"{P}/{pid}/decisao", {"estado": "aprovada"}).status_code == 200
+    r = _post(cli, f"{P}/{pid}/decisao", {"estado": "recusada"})
+    assert r.status_code == 200 and r.json()["dados"] == {"id": pid, "estado": "recusada"}
+    assert [o for o in _decisoes(banco) if "contato proposta" in o] == [f"escuta: contato proposta {pid} → aprovada", f"escuta: contato proposta {pid} → recusada"]
+    assert [i["id"] for i in cli.get(P + "?estado=recusada", headers=BOSS).json()["dados"]["itens"]] == [pid]
+
+
+@pytest.mark.parametrize("estado", ["aplicada", "falhou"])
+def test_aplicada_ou_falhou_nao_volta_409(cli, banco, estado):
+    pid = _proposta(banco, estado=estado)
+    for e in ("aprovada", "recusada"):
+        r = _post(cli, f"{P}/{pid}/decisao", {"estado": e})
+        assert r.status_code == 409 and r.json()["erro"] == "conflito"
+
+
+def test_aprovada_nao_aprova_de_novo_409(cli, banco):
+    pid = _proposta(banco, estado="aprovada")
+    assert _post(cli, f"{P}/{pid}/decisao", {"estado": "aprovada"}).status_code == 409

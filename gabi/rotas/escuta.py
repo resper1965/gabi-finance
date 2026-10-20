@@ -354,11 +354,16 @@ def listar_propostas(request: Request, estado: str = "pendente", ident: Identida
 
 
 @router.post("/contatos/propostas/aprovar-correcoes")
-def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Aprova de uma vez todas as propostas pendentes do tipo corrigir (telefone inválido); devolve quantas."""
+async def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Aprova as correções pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar e não pendentes ficam; devolve quantas."""
+    corpo = _corpo(await _json(request))
+    try:
+        ids = cp.ids_validos(corpo.get("ids"))
+    except cp.ErroProposta as e:
+        raise erro(400, "requisicao_invalida", str(e))
     con = _con(request)
     try:
-        n = cp.aprovar_correcoes(con, ident.login, _agora_utc(request),
+        n = cp.aprovar_correcoes(con, ident.login, _agora_utc(request), ids,
                                  auditar=lambda n: _audit(con, ident.login, f"escuta: aprovou {n} correção(ões) de contato"))
         return envelope(con, {"aprovadas": n}, agora=_agora(request))
     finally:
@@ -367,7 +372,7 @@ def aprovar_correcoes_propostas(request: Request, ident: Identidade = Depends(ex
 
 @router.post("/contatos/propostas/{proposta_id}/decisao")
 async def decidir_proposta(proposta_id: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Aprova ou recusa uma proposta pendente de contato (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida."""
+    """Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida."""
     corpo = _corpo(await _json(request))
     estado = corpo.get("estado")
     if estado not in cp.ESTADOS_DECISAO:

@@ -2551,7 +2551,7 @@
   },
   "/api/v1/escuta/contatos/propostas/aprovar-correcoes": {
    "post": {
-    "description": "Aprova de uma vez todas as propostas pendentes do tipo corrigir (telefone inválido); devolve quantas.",
+    "description": "Aprova as correções pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar e não pendentes ficam; devolve quantas.",
     "operationId": "aprovar_correcoes_propostas_api_v1_escuta_contatos_propostas_aprovar_correcoes_post",
     "responses": {
      "200": {
@@ -2568,7 +2568,7 @@
   },
   "/api/v1/escuta/contatos/propostas/{proposta_id}/decisao": {
    "post": {
-    "description": "Aprova ou recusa uma proposta pendente de contato (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
+    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
     "operationId": "decidir_proposta_api_v1_escuta_contatos_propostas__proposta_id__decisao_post",
     "parameters": [
      {

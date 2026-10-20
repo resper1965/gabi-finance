@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gabi.db import conectar, migrar, transacao
-from gabi.escuta.contatos import _parametro
+from gabi.escuta.contatos import _parametro, contas_contatos
 
 CONTATO_ALTERADO, JA_EXISTE, GRAPH_INDISPONIVEL = "contato_alterado", "ja_existe", "graph_indisponivel"
 
@@ -52,8 +52,20 @@ def _registrar(con, gravar) -> bool:
         return False
 
 
+def _conta_fora(con, p) -> bool:
+    """A conta saiu de escuta.contas_contatos: a sincronização apagou o contato_graph dela, então a revalidação local não enxerga mais nada."""
+    return p["conta"] not in contas_contatos(con)
+
+
+def _remetente_mudou(con, p) -> bool:
+    r = con.execute("select nome, estado from escuta_remetente where numero=?", (p["telefone_depois"],)).fetchone()
+    return r is None or r["estado"] != "aprovado" or not isinstance(r["nome"], str) or r["nome"].strip() != p["nome_depois"]
+
+
 def _aplicar_criar(con, graph, p, agora: str) -> str | None:
     tel = p["telefone_depois"]
+    if _conta_fora(con, p) or _remetente_mudou(con, p):
+        return CONTATO_ALTERADO
     if con.execute("select 1 from contato_graph where telefone=?", (tel,)).fetchone() or \
             con.execute("select 1 from contato_google where telefone=?", (tel,)).fetchone():
         return JA_EXISTE
@@ -76,7 +88,7 @@ def _aplicar_corrigir(con, graph, p, agora: str) -> str | None:
     chave = (p["conta"], p["graph_id"], p["telefone_antes"])
     atual = con.execute("select nome from contato_graph where conta=? and graph_id=? and telefone_original=? and campo='mobile' and nome is ?",
                         (*chave, p["nome_antes"])).fetchone()
-    if p["graph_id"] is None or p["telefone_antes"] is None or atual is None:
+    if p["graph_id"] is None or p["telefone_antes"] is None or atual is None or _conta_fora(con, p):
         return CONTATO_ALTERADO
     try:
         r = graph.contato_corrigir(p["conta"], p["graph_id"], {"nome": p["nome_antes"], "telefone": p["telefone_antes"]},
@@ -102,7 +114,8 @@ def aplicar(con, graph, agora: str) -> dict:
 
 def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
     """Só `aprovada`. Desligado: nenhuma chamada ao `graph`, estado intacto, tudo conta como simulada. Ligado: revalida contra o banco antes de
-    escrever (criar: número já existe em contato_graph/contato_google -> ja_existe; corrigir: a linha lida não é mais a mesma -> contato_alterado)."""
+    escrever: conta fora de escuta.contas_contatos -> contato_alterado; criar: remetente não está mais aprovado com o mesmo nome -> contato_alterado,
+    número já existe em contato_graph/contato_google (qualquer conta) -> ja_existe; corrigir: a linha lida não é mais a mesma -> contato_alterado."""
     r = {"aplicadas": 0, "falhas": 0, "descartadas": 0, "simuladas": 0}
     indisponivel = 0
     aprovadas = con.execute("select * from contato_proposta where estado='aprovada' order by id").fetchall()

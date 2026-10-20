@@ -48,6 +48,8 @@ def _proposta(con, tipo="criar", estado="aprovada", nome="Fulana Silva", tel="+5
     cur = con.execute("insert into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, estado) "
                       "values (?,?,?,?,?,?,?,?,?)",
                       (tipo, NESS, graph_id, nome_antes, tel_antes, nome, tel, "whatsapp" if tipo == "criar" else "telefone_invalido", estado))
+    if tipo == "criar":  # o remetente aprovado que originou a proposta (a aplicação revalida)
+        con.execute("insert or ignore into escuta_remetente(numero, nome, estado) values (?,?,'aprovado')", (tel, nome))
     con.commit()
     return cur.lastrowid
 
@@ -316,3 +318,75 @@ def test_corrigir_ok_atualiza_tambem_o_nome(con):
     _proposta(con, tipo="corrigir", nome="Novo Nome", tel="+5511912345678", graph_id="g-1", nome_antes="Antigo", tel_antes="11 91234-5678 ")
     g.aplicar(con, FakeGraph(), AGORA)
     assert con.execute("select nome from contato_graph where graph_id='g-1'").fetchone()[0] == "Novo Nome"
+
+
+# ---------------- revisão final: revalidação do criar e conta fora da lista ----------------
+def _contas(con, contas):
+    con.execute("insert or replace into parametro(chave, valor) values ('escuta.contas_contatos', ?)", (json.dumps(contas),))
+    con.commit()
+
+
+@pytest.mark.parametrize("estado", ["bloqueado", "ignorado", "pendente"])
+def test_criar_remetente_que_deixou_de_ser_aprovado_vira_contato_alterado(con, estado):
+    _ligar(con)
+    a = _proposta(con)
+    con.execute("update escuta_remetente set estado=?", (estado,))
+    con.commit()
+    graph = FakeGraph()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and _estado(con, a)[:2] == ("falhou", "contato_alterado")
+    assert r == {"aplicadas": 0, "falhas": 1, "descartadas": 1, "simuladas": 0}
+
+
+def test_criar_remetente_sumiu_vira_contato_alterado(con):
+    _ligar(con)
+    a = _proposta(con)
+    con.execute("delete from escuta_remetente")
+    con.commit()
+    graph = FakeGraph()
+    g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and _estado(con, a)[:2] == ("falhou", "contato_alterado")
+
+
+def test_criar_remetente_renomeado_vira_contato_alterado_e_espacos_nao_contam(con):
+    _ligar(con)
+    a = _proposta(con, nome="A", tel="+5511911111111")
+    b = _proposta(con, nome="B", tel="+5511922222222")
+    con.execute("update escuta_remetente set nome='Outro' where numero='+5511911111111'")
+    con.execute("update escuta_remetente set nome='  B  ' where numero='+5511922222222'")
+    con.commit()
+    graph = FakeGraph()
+    g.aplicar(con, graph, AGORA)
+    assert [c[2] for c in graph.chamadas] == ["B"]
+    assert _estado(con, a)[:2] == ("falhou", "contato_alterado") and _estado(con, b)[0] == "aplicada"
+
+
+@pytest.mark.parametrize("tipo", ["criar", "corrigir"])
+def test_conta_fora_da_lista_de_contas_vira_contato_alterado_sem_chamar_o_graph(con, tipo):
+    _ligar(con)
+    pid = _proposta(con) if tipo == "criar" else _correcao(con)
+    _contas(con, ["resper@gmail.com"])
+    graph = FakeGraph()
+    g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
+
+
+def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
+    from gabi.escuta import contatos as c
+    from gabi.escuta import contatos_propostas as cp
+    itens = [{"nome": "Beltrano", "telefone": "11 9999-0000", "graph_id": "AAMk0001", "campo": "mobile"}]
+    c.sincronizar(con, c.contas_contatos(con), lambda conta: list(itens) if conta == NESS else [])
+    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 1}
+    (pid,) = [r["id"] for r in cp.listar(con, "pendente")]
+    assert cp.aprovar_correcoes(con, "ricardo", AGORA, [pid]) == 1
+    _ligar(con)
+    graph = FakeGraph()
+    assert g.aplicar(con, graph, AGORA)["aplicadas"] == 1
+    assert graph.chamadas == [("corrigir", NESS, "AAMk0001", {"nome": "Beltrano", "telefone": "11 9999-0000"},
+                               {"nome": "Beltrano", "telefone": "+5511999990000"})]
+    linha = con.execute("select telefone_original, telefone from contato_graph where graph_id='AAMk0001'").fetchone()
+    assert tuple(linha) == ("+5511999990000", "+5511999990000")
+    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
+    # e a próxima sincronização, com o Graph já corrigido, também não gera nada
+    c.sincronizar(con, c.contas_contatos(con), lambda conta: [{**itens[0], "telefone": "+5511999990000"}] if conta == NESS else [])
+    assert cp.gerar(con, AGORA) == {"criar": 0, "corrigir": 0}
