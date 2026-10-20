@@ -249,8 +249,8 @@ class PonteGraph:
     def contato_apagar_telefone(self, conta: str, graph_id: str, campo: str, telefone_antes: str) -> dict:
         return self._resultado("contato_apagar_telefone", conta, graph_id, campo, telefone_antes)
 
-    def contato_apagar(self, conta: str, graph_id: str, nome_antes: str) -> dict:
-        return self._resultado("contato_apagar", conta, graph_id, nome_antes)
+    def contato_apagar(self, conta: str, graph_id: str, nome_antes: str, telefone_antes: str) -> dict:
+        return self._resultado("contato_apagar", conta, graph_id, nome_antes, telefone_antes)
 
     def contatos(self, conta: str) -> list[dict]:
         r = self._ponte._chamar("contatos", (conta,))

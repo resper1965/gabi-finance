@@ -107,13 +107,14 @@ def apagar_telefone(gr, conta, graph_id, campo, telefone_antes) -> dict:
     return {"resultado": "ok"}
 
 
-def apagar(gr, conta, graph_id, nome_antes) -> dict:
-    """Apaga o contato inteiro, só se ainda tiver `nome_antes`, nenhum e-mail e no máximo um telefone (nunca apaga o que ganhou dado depois)."""
+def apagar(gr, conta, graph_id, nome_antes, telefone_antes) -> dict:
+    """Apaga o contato inteiro, só se ainda tiver `nome_antes`, nenhum e-mail e UM telefone, exatamente `telefone_antes` (o texto original que o
+    dono viu): nunca apaga o que ganhou dado, trocou ou perdeu o número depois da proposta."""
     url = _url_contato(gr, conta, graph_id)
-    nome_antes = _texto(nome_antes, MAX_NOME)
+    nome_antes, telefone_antes = _texto(nome_antes, MAX_NOME), _texto(telefone_antes, MAX_TELEFONE)
     atual = gr._get(f"{url}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses")
     telefones = ([atual.get("mobilePhone")] if atual.get("mobilePhone") else []) + list(atual.get("homePhones") or []) + list(atual.get("businessPhones") or [])
-    if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or len(telefones) > 1:
+    if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or telefones != [telefone_antes]:
         return {"resultado": "alterado"}
     _escrever(gr, "DELETE", url, None)
     return {"resultado": "ok"}

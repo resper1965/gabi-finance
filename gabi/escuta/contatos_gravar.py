@@ -154,10 +154,10 @@ def _aplicar_apagar_telefone(con, graph, p, agora: str) -> str | None:
 
 def _aplicar_apagar_contato(con, graph, p, agora: str) -> str | None:
     linhas = [] if p["graph_id"] is None or p["telefone_antes"] is None or _conta_fora(con, p) else con.execute(
-        "select nome, telefone from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"])).fetchall()
+        "select nome, telefone, telefone_original from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"])).fetchall()
     if len(linhas) != 1 or linhas[0]["nome"] != p["nome_antes"] or linhas[0]["telefone"] != p["telefone_antes"]:
         return CONTATO_ALTERADO
-    motivo = _resultado_graph(lambda: graph.contato_apagar(p["conta"], p["graph_id"], p["nome_antes"]))
+    motivo = _resultado_graph(lambda: graph.contato_apagar(p["conta"], p["graph_id"], p["nome_antes"], linhas[0]["telefone_original"]))
     if motivo:
         return motivo
 

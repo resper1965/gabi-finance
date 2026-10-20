@@ -486,7 +486,7 @@ class _FalsoGraph:
     def contato_apagar_telefone(self, conta, graph_id, campo, telefone_antes):
         return {"resultado": "ok" if (campo, telefone_antes) == ("home", "1") else "alterado"}
 
-    def contato_apagar(self, conta, graph_id, nome_antes):
+    def contato_apagar(self, conta, graph_id, nome_antes, telefone_antes):
         return {"resultado": "ok" if nome_antes == "U" else "alterado"}
 
     def enviar(self):
@@ -611,6 +611,6 @@ def test_cliente_graph_limpeza_ida_e_volta_e_resposta_invalida(sock_graph):
     p = PonteGraph(sock_graph)
     assert p.contato_renomear("resper@ness.com.br", "AAMkAGI2TG93AAA=", "A⁹", "A") == {"resultado": "ok"}
     assert p.contato_apagar_telefone("resper@ness.com.br", "AAMkAGI2TG93AAA=", "home", "1") == {"resultado": "ok"}
-    assert p.contato_apagar("resper@ness.com.br", "AAMkAGI2TG93AAA=", "X") == {"resultado": "alterado"}
+    assert p.contato_apagar("resper@ness.com.br", "AAMkAGI2TG93AAA=", "X", "1") == {"resultado": "alterado"}
     with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
         p.contato_renomear("malformada@x.com", "AAMkAGI2TG93AAA=", "A", "B")

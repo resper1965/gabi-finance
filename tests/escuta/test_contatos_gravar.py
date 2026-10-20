@@ -415,8 +415,8 @@ class FakeLimpeza(FakeGraph):
     def contato_apagar_telefone(self, conta, graph_id, campo, telefone_antes):
         return self._responde("apagar_telefone", conta, graph_id, campo, telefone_antes)
 
-    def contato_apagar(self, conta, graph_id, nome_antes):
-        return self._responde("apagar", conta, graph_id, nome_antes)
+    def contato_apagar(self, conta, graph_id, nome_antes, telefone_antes):
+        return self._responde("apagar", conta, graph_id, nome_antes, telefone_antes)
 
 
 def _limpa(con, tipo, nome_antes, nome_depois, tel_antes, gid="g-1", estado="aprovada"):
@@ -440,7 +440,7 @@ def _preparar(con, tipo):
         _graph_linha(con, nome="Ana", original="12345", telefone=None, campo="home")
         return _limpa(con, tipo, "Ana", "Ana", "12345"), ("apagar_telefone", NESS, "g-1", "home", "12345")
     _graph_linha(con, nome="U", original="+55 11 94733-8256", telefone="+5511947338256")
-    return _limpa(con, tipo, "U", "U", "+5511947338256"), ("apagar", NESS, "g-1", "U")
+    return _limpa(con, tipo, "U", "U", "+5511947338256"), ("apagar", NESS, "g-1", "U", "+55 11 94733-8256")
 
 
 TIPOS_LIMPEZA = ["corrigir_nome", "apagar_telefone", "apagar_contato"]
