@@ -3,8 +3,10 @@ rodado logo após a sincronização de contatos (ExecStartPost da mesma unit). I
 valor ou ausência = desligado: nada é enviado e as aprovadas só são contadas como simuladas. Sem rede: a escrita passa pela ponte do serviço de fontes.
 Cada proposta roda no seu try (uma falha não aborta as outras) e termina `aplicada` ou `falhou` com motivo FIXO (nunca texto de exceção, nome ou número).
 Saída e logs só com contagens."""
+import fcntl
 import os
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,8 +20,36 @@ def escrita_ligada(con) -> bool:
     return _parametro(con, "contatos.escrita", "desligado") == "ligado"
 
 
+@contextmanager
+def trava(banco: Path):
+    """Uma aplicação por vez (flock não bloqueante em <pasta do banco>/locks/contatos_gravar.lock): rodadas sobrepostas nunca enviam o mesmo POST
+    duas vezes. Rende True com a trava, False se outra rodada a tem."""
+    pasta = Path(banco).parent / "locks"
+    pasta.mkdir(parents=True, exist_ok=True)
+    f = open(pasta / "contatos_gravar.lock", "w")
+    try:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        yield True
+    finally:
+        f.close()  # fechar libera a trava, mesmo em erro
+
+
 def _falhou(con, pid: int, motivo: str) -> None:
     con.execute("update contato_proposta set estado='falhou', motivo=? where id=? and estado='aprovada'", (motivo, pid))
+
+
+def _registrar(con, gravar) -> bool:
+    """Grava o resultado local depois do Graph. Erro do banco não sobe (o laço segue); devolve False para a proposta virar falha."""
+    try:
+        with transacao(con):
+            gravar()
+        return True
+    except Exception:  # noqa: BLE001 - nunca reenvia; quem chama tenta ao menos marcar 'falhou'
+        return False
 
 
 def _aplicar_criar(con, graph, p, agora: str) -> str | None:
@@ -34,11 +64,12 @@ def _aplicar_criar(con, graph, p, agora: str) -> str | None:
             return GRAPH_INDISPONIVEL
     except Exception:  # noqa: BLE001 - ErroGraphNess ou falha da ponte: motivo fixo, sem o texto
         return GRAPH_INDISPONIVEL
-    with transacao(con):
+
+    def gravar():
         con.execute("insert or replace into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values (?,?,?,?,?,'mobile',?)",
                     (p["conta"], gid, p["nome_depois"], tel, tel, agora))
         con.execute("update contato_proposta set estado='aplicada', motivo=null, aplicada_em=? where id=? and estado='aprovada'", (agora, p["id"]))
-    return None
+    return None if _registrar(con, gravar) else GRAPH_INDISPONIVEL
 
 
 def _aplicar_corrigir(con, graph, p, agora: str) -> str | None:
@@ -57,11 +88,12 @@ def _aplicar_corrigir(con, graph, p, agora: str) -> str | None:
         return CONTATO_ALTERADO
     if resultado != "ok":
         return GRAPH_INDISPONIVEL
-    with transacao(con):
-        con.execute("update contato_graph set telefone_original=?, telefone=?, atualizado_em=? where conta=? and graph_id=? and telefone_original=?",
-                    (p["telefone_depois"], p["telefone_depois"], agora, *chave))
+
+    def gravar():
+        con.execute("update contato_graph set nome=?, telefone_original=?, telefone=?, atualizado_em=? where conta=? and graph_id=? and telefone_original=?",
+                    (p["nome_depois"], p["telefone_depois"], p["telefone_depois"], agora, *chave))
         con.execute("update contato_proposta set estado='aplicada', motivo=null, aplicada_em=? where id=? and estado='aprovada'", (agora, p["id"]))
-    return None
+    return None if _registrar(con, gravar) else GRAPH_INDISPONIVEL
 
 
 def aplicar(con, graph, agora: str) -> dict:
@@ -78,14 +110,20 @@ def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
         r["simuladas"] = len(aprovadas)
         return r, 0
     for p in aprovadas:
-        try:
+        try:  # segunda guarda (a primeira é a trava do main): outra rodada pode já ter tratado esta proposta
+            atual = con.execute("select estado from contato_proposta where id=?", (p["id"],)).fetchone()
+            if atual is None or atual["estado"] != "aprovada":
+                continue
             motivo = (_aplicar_criar if p["tipo"] == "criar" else _aplicar_corrigir)(con, graph, p, agora)
         except Exception:  # noqa: BLE001 - erro local inesperado também não deixa a proposta presa em 'aprovada'
             motivo = GRAPH_INDISPONIVEL
         if motivo is None:
             r["aplicadas"] += 1
             continue
-        _falhou(con, p["id"], motivo)
+        try:
+            _falhou(con, p["id"], motivo)
+        except Exception:  # noqa: BLE001 - banco indisponível ao registrar: conta como falha e segue com as outras
+            motivo = GRAPH_INDISPONIVEL
         r["falhas"] += 1
         if motivo == CONTATO_ALTERADO:
             r["descartadas"] += 1
@@ -104,14 +142,18 @@ def main(banco: Path | None = None, *, graph=None) -> int:
             return 2
         from gabi.fontes.ponte import PonteGraph
         graph = PonteGraph(sock)
-    con = conectar(banco)
-    migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
-    try:
-        ligada = escrita_ligada(con)
-        aprovadas = con.execute("select count(*) from contato_proposta where estado='aprovada'").fetchone()[0]
-        r, indisponivel = _aplicar(con, graph, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
-    finally:
-        con.close()
+    with trava(banco) as minha:
+        if not minha:
+            print("contatos-gravar: ja_em_execucao=1")
+            return 0
+        con = conectar(banco)
+        migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
+        try:
+            ligada = escrita_ligada(con)
+            aprovadas = con.execute("select count(*) from contato_proposta where estado='aprovada'").fetchone()[0]
+            r, indisponivel = _aplicar(con, graph, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        finally:
+            con.close()
     print(f"contatos-gravar: escrita={'ligada' if ligada else 'desligada'} aprovadas={aprovadas} simuladas={r['simuladas']} "
           f"aplicadas={r['aplicadas']} falhas={r['falhas']} descartadas={r['descartadas']}")
     return 1 if indisponivel else 0

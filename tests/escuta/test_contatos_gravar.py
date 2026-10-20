@@ -230,3 +230,89 @@ def test_main_sai_1_com_graph_indisponivel_e_0_com_descartada(tmp_path, capsys):
     banco2 = tmp_path / "n.db"
     k = conectar(banco2); migrar(k, MIGR); _ligar(k); _correcao(k); k.close()
     assert g.main(banco2, graph=FakeGraph(corrigir="alterado")) == 0
+
+
+# ---------------- fix 1: rodadas sobrepostas ----------------
+def test_main_com_a_trava_ocupada_nao_chama_o_graph(tmp_path, capsys):
+    import fcntl
+    banco = _banco(tmp_path)
+    k = conectar(banco); _ligar(k); a = _proposta(k); k.close()
+    (tmp_path / "locks").mkdir(exist_ok=True)
+    with open(tmp_path / "locks" / "contatos_gravar.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        graph = FakeGraph()
+        assert g.main(banco, graph=graph) == 0
+        assert graph.chamadas == []
+    assert capsys.readouterr().out.strip() == "contatos-gravar: ja_em_execucao=1"
+    k = conectar(banco)
+    assert _estado(k, a)[0] == "aprovada"
+    graph = FakeGraph()
+    assert g.main(banco, graph=graph) == 0  # trava solta: a próxima rodada aplica
+    assert len(graph.chamadas) == 1 and _estado(k, a)[0] == "aplicada"
+
+
+class _ConProxy:
+    """Conexão que delega ao sqlite real, mas levanta OperationalError nos updates cujo SQL contém `gatilho` (até `vezes` vezes)."""
+
+    def __init__(self, real, gatilho, vezes=1, so_id=None):
+        self._real, self._gatilho, self._vezes, self._so_id = real, gatilho, vezes, so_id
+
+    def execute(self, sql, params=()):
+        import sqlite3
+        if self._gatilho in sql and self._vezes > 0 and (self._so_id is None or self._so_id in params):
+            self._vezes -= 1
+            raise sqlite3.OperationalError("database is locked")
+        return self._real.execute(sql, params)
+
+    def __getattr__(self, nome):
+        return getattr(self._real, nome)
+
+
+def test_aplicar_concorrente_pula_a_que_ja_nao_esta_aprovada(con):
+    _ligar(con)
+    a = _proposta(con, nome="A", tel="+5511911111111")
+    b = _proposta(con, nome="B", tel="+5511922222222")
+
+    class GraphQueMudaB(FakeGraph):
+        def contato_criar(self, conta, nome, telefone):
+            con.execute("update contato_proposta set estado='aplicada' where id=?", (b,))  # outra rodada tratou B
+            return super().contato_criar(conta, nome, telefone)
+
+    graph = GraphQueMudaB()
+    r = g.aplicar(con, graph, AGORA)
+    assert [c[2] for c in graph.chamadas] == ["A"]
+    assert r["aplicadas"] == 1 and _estado(con, a)[0] == "aplicada"
+
+
+# ---------------- fix 2: erro do banco ao registrar ----------------
+def test_erro_do_banco_ao_marcar_aplicada_vira_falhou_e_o_laco_segue(con):
+    _ligar(con)
+    a = _proposta(con, nome="A", tel="+5511911111111")
+    b = _proposta(con, nome="B", tel="+5511922222222")
+    graph = FakeGraph(ids=["id-a", "id-b"])
+    r = g.aplicar(_ConProxy(con, "set estado='aplicada'", vezes=1), graph, AGORA)
+    assert r == {"aplicadas": 1, "falhas": 1, "descartadas": 0, "simuladas": 0}
+    assert [c[2] for c in graph.chamadas] == ["A", "B"]  # A não é reenviada
+    assert _estado(con, a)[:2] == ("falhou", "graph_indisponivel")
+    assert _estado(con, b)[0] == "aplicada"
+    # a transação de A foi desfeita por inteiro: nada de A em contato_graph
+    assert [x["graph_id"] for x in con.execute("select graph_id from contato_graph")] == ["id-b"]
+
+
+def test_erro_do_banco_tambem_ao_marcar_falhou_nao_derruba_o_laco(con):
+    _ligar(con)
+    a = _proposta(con, nome="A", tel="+5511911111111")
+    b = _proposta(con, nome="B", tel="+5511922222222")
+    graph = FakeGraph(ids=["id-a", "id-b"])
+    r = g.aplicar(_ConProxy(con, "update contato_proposta", vezes=2, so_id=a), graph, AGORA)
+    assert r["falhas"] == 1 and r["aplicadas"] == 1
+    assert [c[2] for c in graph.chamadas] == ["A", "B"]
+    assert _estado(con, b)[0] == "aplicada"
+
+
+def test_corrigir_ok_atualiza_tambem_o_nome(con):
+    _ligar(con)
+    _graph_linha(con, nome="Antigo")
+    _proposta(con, tipo="corrigir", nome="Novo Nome", tel="+5511912345678", graph_id="g-1", nome_antes="Antigo", tel_antes="11 91234-5678 ")
+    g.aplicar(con, FakeGraph(), AGORA)
+    assert con.execute("select nome from contato_graph where graph_id='g-1'").fetchone()[0] == "Novo Nome"
