@@ -1,6 +1,6 @@
-"""Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; a única escrita é MOVER mensagem de e-mail entre a Caixa de
-Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
-escrever em agenda ou contatos: o POST é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
+"""Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; as únicas escritas são MOVER mensagem de e-mail entre a Caixa de
+Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho) e criar/corrigir contato, delegado a `graph_ness_contatos` (ADR-020). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
+escrever em agenda: o POST aqui é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
 o resto do brain chega aqui pela ponte (`PonteGraph`). Autenticação do app por client credentials com secret (M365_TENANT_ID, M365_CLIENT_ID,
 M365_CLIENT_SECRET no ambiente do serviço). O app tem permissão no tenant inteiro: a conta lida vem sempre de `M365_CONTAS` (padrão só
 resper@ness.com.br), nunca de entrada livre. Segredo, token e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/graph-ness.md."""
@@ -123,7 +123,7 @@ class TokenApp:
 
 
 class GraphNess:
-    """Objeto da ponte (JSON puro, só GET). Sem o token provider nada sai."""
+    """Objeto da ponte (JSON puro). Lê por GET; só escreve o move de e-mail e, delegado a `graph_ness_contatos`, criar/corrigir contato (ADR-020). Sem o token provider nada sai."""
 
     def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time):
         self._token, self._contas, self._http, self._agora = token, [c.lower() for c in contas], http, agora

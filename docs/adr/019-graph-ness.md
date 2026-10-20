@@ -1,6 +1,8 @@
 # ADR-019 · Graph da ness no gabi.brain: contatos e agenda só de leitura
 Data: 19/10/2026 · Estado: aceito (código completo, nada ligado; passos do dono no runbook `#graph-ness`) · Spec: `docs/superpowers/specs/2026-10-19-graph-ness-design.md` · Plano: `docs/superpowers/plans/2026-10-19-graph-ness-base-e-agenda.md`
 
+**Exceção (20/10/2026):** criar e corrigir contatos, só com aprovação no painel, está no ADR-020; é a única exceção ao "só leitura" dos contatos.
+
 **Contexto.** A ness migrou para o Microsoft 365 em 19/10 e o Ricardo pediu agenda, e-mail, contatos e Teams da `resper@ness.com.br`. O cliente Graph antigo (`graph.py`, IONIC) usa certificado e nunca foi validado; o app `ness-automacao` já existia com secret.
 
 **Decisões e razões.**
