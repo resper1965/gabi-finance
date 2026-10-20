@@ -1,5 +1,5 @@
 [Unit]
-Description=gabi.brain contatos do Google (só nome e telefone, só leitura): sincroniza pela ponte e grava contato_google (só contagens no log)
+Description=gabi.brain contatos (só nome e telefone): sincroniza pela ponte e grava contato_google; escreve no Graph da ness só propostas aprovadas pelo dono e com contatos.escrita ligado (só contagens no log)
 After=gabi-brain-fontes.service
 OnFailure=gabi-brain-falha@%n.service
 Wants=gabi-brain-fontes.service
@@ -13,6 +13,8 @@ Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Os contatos chegam pela ponte do serviço de fontes (único com rede e segredos, R5): aqui não há token nem rede.
 Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos
+# Depois da sincronização: aplica só as propostas APROVADAS no painel; com contatos.escrita desligado (padrão) só conta o que aplicaria.
+ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos_gravar
 TimeoutStartSec=300
 UMask=0077
 NoNewPrivileges=yes
