@@ -207,11 +207,15 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     try:
         contas = contas_contatos(con)
         r = sincronizar(con, contas, listar)
+        from datetime import datetime, timezone
+        from gabi.escuta import contatos_propostas
+        g = contatos_propostas.gerar(con, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     finally:
         con.close()
     ok = {k: v for k, v in r["contas"].items() if "lidos" in v}
     erros = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
     print(f"contatos: total={r['total']} invalidos={r['invalidos']} contas_ok={len(ok)} lidos={sum(v['lidos'] for v in ok.values())}")
+    print(f"propostas: criar={g['criar']} corrigir={g['corrigir']}")
     for conta, msg in erros.items():
         print(f"AVISO: conta {conta} falhou: {msg}", file=sys.stderr)
     todas = bool(contas) and not ok
