@@ -33,6 +33,35 @@ def _vips(con) -> set[str]:
     return {a for x in lista if isinstance(lista, list) and (a := endereco(x))}
 
 
+def regra_valida(texto) -> str | None:
+    """Regra "sempre lixo" normalizada: endereço puro (`a@x.com`) ou domínio exato (`@x.com`); None se não for nenhum dos dois."""
+    if not isinstance(texto, str):
+        return None
+    t = texto.strip().lower()
+    if t.startswith("@"):
+        return t if _ENDERECO.match("x" + t) else None
+    return endereco(t)
+
+
+def regra_lixo(con, remetente) -> str | None:
+    """A regra do dono ("sempre lixo", parâmetro `email.regras_lixo`) que casa com este remetente, ou None. Endereço exato ou domínio exato (sem subdomínio)."""
+    a = endereco(remetente)
+    if a is None:
+        return None
+    r = con.execute("select valor from parametro where chave='email.regras_lixo'").fetchone()
+    try:
+        lista = json.loads(r[0]) if r else []
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(lista, list):
+        return None
+    regras = {x for t in lista if (x := regra_valida(t))}
+    for candidata in (a, "@" + a.split("@", 1)[1]):
+        if candidata in regras:
+            return candidata
+    return None
+
+
 def _pessoa_conhecida(con, a: str) -> bool:
     """Pessoa ativa com o canal `email:<endereço>` ou o endereço em `emails` (o dono cadastrou esse e-mail deliberadamente)."""
     for p in con.execute("select dados from pessoa where excluido_em is null"):

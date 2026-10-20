@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from gabi.avisos import _inicio_do_dia_utc, _novo
 from gabi.correio.classificar import Classe, classificar, decidir_lixeira
-from gabi.correio.regras import endereco, protegido, texto_protegido
+from gabi.correio.regras import endereco, protegido, regra_lixo, texto_protegido
 from gabi.correio.sincronizar import JANELA_PADRAO, respondidos_prontos
 from gabi.escuta.classificar import Falha
 
@@ -167,6 +167,19 @@ def processar(con, cliente, orcamento, ponte, agora: str, limites: Limites | Non
         if relogio() - inicio > limites.tempo_max_s:
             c["tempo"] = True
             break
+        regra = (m["classe"] is None or m["motivo"] == "regra do dono") and m["conta_lixeira"] and regra_lixo(con, m["remetente"])
+        if regra and not (protegido(con, m["fonte_id"], m["remetente"]) or texto_protegido(con, m["remetente"], m["assunto"], m["trecho"])):
+            # o dono já decidiu que este remetente é lixo: sem modelo, sem exigir sinal de lista; as travas (VIP, pessoa, respondido, palavra) seguem valendo
+            classe = Classe("lixo", 0, "regra do dono", 1.0)
+            con.execute("update email_msg set classe=?, prioridade=?, motivo=?, confianca=?, atualizado_em=? where id=?",
+                        (classe.classe, classe.prioridade, classe.motivo, classe.confianca, agora, m["id"]))
+            if m["fonte_id"] not in prontas:
+                prontas[m["fonte_id"]] = respondidos_prontos(con, m["fonte_id"])
+            if prontas[m["fonte_id"]]:
+                a_mover.setdefault(m["fonte_id"], (m["conta"], []))[1].append(m)
+            else:
+                con.execute("update email_msg set estado='classificada', atualizado_em=? where id=?", (agora, m["id"]))
+            continue
         if m["classe"] is not None:  # retomada de uma lixeira que falhou: a classificação já paga é reaproveitada
             classe = Classe(m["classe"], m["prioridade"] or 0, m["motivo"] or "", m["confianca"] or 0.0)
         else:

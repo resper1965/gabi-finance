@@ -445,3 +445,64 @@ def test_limiar_da_lixeira_tem_piso_07_no_banco_editado_a_mao(con, bruto, vai):
     _msg(con, f, "m1")
     pr.processar(con, Modelo(padrao=_json("lixo", 0, "promoção", 0.75)), _orc(), Ponte(), AGORA)
     assert (_estado(con, "m1")[0] == "na_lixeira") is vai
+
+
+def _regras(con, lista):
+    con.execute("insert into parametro(chave, valor) values ('email.regras_lixo', ?)", (json.dumps(lista),))
+
+
+def test_regra_do_dono_move_sem_chamar_o_modelo_mesmo_sem_sinal_de_lista(con):
+    f = _fonte(con); _msg(con, f, "a1", de="Loja <promo@loja.com>", lista=0)
+    _regras(con, ["promo@loja.com"])
+    m, p = Modelo(), Ponte()
+    r = pr.processar(con, m, _orc(), p, AGORA)
+    assert m.n == 0 and p.chamadas == [("a@x.com", ["a1"])] and r["lixeira"] == 1
+    x = con.execute("select estado, classe, motivo, confianca from email_msg").fetchone()
+    assert tuple(x) == ("na_lixeira", "lixo", "regra do dono", 1.0)
+
+
+def test_regra_por_dominio(con):
+    f = _fonte(con); _msg(con, f, "a1", de="x@spam.com", lista=0)
+    _regras(con, ["@spam.com"])
+    p = Ponte()
+    pr.processar(con, Modelo(), _orc(), p, AGORA)
+    assert p.chamadas == [("a@x.com", ["a1"])]
+
+
+def test_regra_nao_vence_as_travas(con):
+    f = _fonte(con)
+    _msg(con, f, "vip", de="chefe@x.com", lista=0)
+    _msg(con, f, "pal", de="promo@x.com", assunto="Fatura de outubro", lista=0)
+    con.execute("insert into parametro(chave, valor) values ('email.vips', ?)", (json.dumps(["chefe@x.com"]),))
+    _regras(con, ["chefe@x.com", "promo@x.com"])
+    p = Ponte()
+    pr.processar(con, Modelo(padrao=_json("normal", 1, "info", 0.7)), _orc(), p, AGORA)
+    assert p.chamadas == []
+    assert _estado(con, "vip")[:2] == ("classificada", "normal") and _estado(con, "pal")[:2] == ("classificada", "normal")
+
+
+def test_regra_com_lixeira_desligada_nao_move(con):
+    f = _fonte(con, lixeira=0); _msg(con, f, "a1", de="promo@loja.com", lista=0)
+    _regras(con, ["promo@loja.com"])
+    p = Ponte()
+    pr.processar(con, Modelo(padrao=_json("normal", 1, "info", 0.7)), _orc(), p, AGORA)
+    assert p.chamadas == [] and _estado(con, "a1")[0] == "classificada"
+
+
+def test_regra_ainda_confere_ao_vivo_se_o_dono_ja_respondeu(con):
+    f = _fonte(con); _msg(con, f, "a1", de="promo@loja.com", lista=0)
+    _regras(con, ["promo@loja.com"])
+    p = Ponte(respondeu={"promo@loja.com"})
+    pr.processar(con, Modelo(), _orc(), p, AGORA)
+    assert p.chamadas == [] and _estado(con, "a1")[0] == "classificada"
+
+
+def test_regra_do_dono_tenta_de_novo_depois_de_falha_da_ponte(con):
+    f = _fonte(con); _msg(con, f, "a1", de="promo@loja.com", lista=0)
+    _regras(con, ["promo@loja.com"])
+    pr.processar(con, Modelo(), _orc(), Ponte(erro_ids={"a1"}), AGORA)
+    assert _estado(con, "a1")[0] == "nova"
+    depois = "2026-10-12T13:00:00+00:00"
+    p = Ponte(); m = Modelo()
+    pr.processar(con, m, _orc(), p, depois)
+    assert m.n == 0 and p.chamadas == [("a@x.com", ["a1"])] and _estado(con, "a1")[0] == "na_lixeira"

@@ -18,7 +18,7 @@ function fake(o: Opcoes = {}) {
   let sugerido = o.sugerido ?? [];
   let dispensadas = o.dispensadas ?? [];
   let prioridades = o.prioridades ?? [];
-  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, retencao_msg_dias: 180, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], ...o.parametros };
+  const parametros = { criterios_emergencia: "", vips: [], lixeira_confianca: 0.9, janela_dias: 14, retencao_dias: 30, retencao_msg_dias: 180, dias_em_aberto: 7, max_alertas_dia: 5, palavras_protegidas: ["fatura", "boleto"], regras_lixo: [], ...o.parametros };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
     chamadas.push({ metodo, url, corpo: init?.body ? JSON.parse(String(init.body)) : undefined });
@@ -275,4 +275,30 @@ test("retenção das mensagens no brain: mostra 180, recusa abaixo do piso de 90
   fireEvent.change(campo, { target: { value: "365" } });
   fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
   await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "PUT", url: "/api/v1/correio/parametros", corpo: { retencao_msg_dias: 365 } }]));
+});
+
+test("ajustes mostram as regras de lixo e salvam só elas", async () => {
+  const c = fake({ parametros: { regras_lixo: ["promo@loja.com", "@spam.com"] } });
+  montar();
+  const regras = (await screen.findByLabelText("Regras de lixo")) as HTMLTextAreaElement;
+  expect(regras.value).toBe("promo@loja.com\n@spam.com");
+  fireEvent.change(regras, { target: { value: "promo@loja.com\n\n@spam.com \n@novo.com" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar ajustes" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "PUT", url: "/api/v1/correio/parametros", corpo: { regras_lixo: ["promo@loja.com", "@spam.com", "@novo.com"] } }]));
+});
+
+test("lixo sugerido: Sempre lixo cria a regra e move para a lixeira", async () => {
+  const c = fake({ sugerido: [LIXO] });
+  montar(<Prioridades />);
+  fireEvent.click(await screen.findByRole("button", { name: "Sempre lixo Oferta imperdível" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([
+    { metodo: "POST", url: "/api/v1/correio/mensagens/11/regra-lixo", corpo: { tipo: "remetente" } },
+    { metodo: "POST", url: "/api/v1/correio/mensagens/11/lixeira", corpo: {} }]));
+});
+
+test("lixo sugerido: Sempre lixo numa conta sem lixeira só cria a regra", async () => {
+  const c = fake({ sugerido: [{ ...LIXO, conta_lixeira: 0 }] });
+  montar(<Prioridades />);
+  fireEvent.click(await screen.findByRole("button", { name: "Sempre lixo Oferta imperdível" }));
+  await waitFor(() => expect(mudancas(c)).toEqual([{ metodo: "POST", url: "/api/v1/correio/mensagens/11/regra-lixo", corpo: { tipo: "remetente" } }]));
 });

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 
 from gabi.correio import consulta
 from gabi.correio import fontes as fn
+from gabi.correio.regras import endereco
 from gabi.correio.processar import fechar_alerta
 from gabi.db import transacao
 from gabi.envelope import envelope
@@ -183,6 +184,37 @@ async def mover_para_lixeira(mensagem_id: int, request: Request, ident: Identida
             con.execute("update email_msg set estado='na_lixeira', atualizado_em=? where id=? and estado='classificada'", (agora, mensagem_id))
             _audit(con, ident.login, f"correio: moveu mensagem {mensagem_id} para a lixeira")
         return envelope(con, {"id": mensagem_id, "estado": "na_lixeira"}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/mensagens/{mensagem_id}/regra-lixo")
+async def regra_de_lixo(mensagem_id: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """O dono diz "sempre que vier deste remetente (`tipo`: remetente) ou deste domínio (`tipo`: dominio), é lixo": acrescenta a regra em `email.regras_lixo`.
+    Só grava a regra: as mensagens novas vão para a lixeira (nunca apaga de vez) nas rodadas seguintes, e as travas (VIP, pessoa, respondido, palavra protegida)
+    continuam valendo. Idempotente. A auditoria leva só o id da mensagem e o tipo, nunca o endereço."""
+    corpo = _corpo(await _json(request))
+    tipo = corpo.get("tipo")
+    if tipo not in ("remetente", "dominio"):
+        raise erro(400, "requisicao_invalida", "tipo deve ser remetente ou dominio")
+    con = _con(request)
+    try:
+        m = con.execute("select remetente from email_msg where id=?", (mensagem_id,)).fetchone()
+        if m is None:
+            raise erro(404, "nao_encontrado", "mensagem não existe")
+        a = endereco(m["remetente"])
+        if a is None:
+            raise erro(409, "conflito", "a mensagem não tem um remetente válido para virar regra")
+        regra = a if tipo == "remetente" else "@" + a.split("@", 1)[1]
+        with transacao(con):
+            atuais = fn.parametros(con)["regras_lixo"]
+            if regra not in atuais:
+                try:
+                    fn.gravar_parametros(con, fn.validar_parametros({"regras_lixo": atuais + [regra]}))
+                except fn.ErroFonte as e:
+                    raise _traduzir(e) from None
+                _audit(con, ident.login, f"correio: regra de lixo ({tipo}) a partir da mensagem {mensagem_id}")
+        return envelope(con, {"id": mensagem_id, "regra": regra}, agora=_agora(request))
     finally:
         con.close()
 

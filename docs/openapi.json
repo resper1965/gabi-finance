@@ -2129,6 +2129,44 @@
     "summary": "Nao E Lixo"
    }
   },
+  "/api/v1/correio/mensagens/{mensagem_id}/regra-lixo": {
+   "post": {
+    "description": "O dono diz \"sempre que vier deste remetente (`tipo`: remetente) ou deste domínio (`tipo`: dominio), é lixo\": acrescenta a regra em `email.regras_lixo`.\nSó grava a regra: as mensagens novas vão para a lixeira (nunca apaga de vez) nas rodadas seguintes, e as travas (VIP, pessoa, respondido, palavra protegida)\ncontinuam valendo. Idempotente. A auditoria leva só o id da mensagem e o tipo, nunca o endereço.",
+    "operationId": "regra_de_lixo_api_v1_correio_mensagens__mensagem_id__regra_lixo_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "mensagem_id",
+      "required": true,
+      "schema": {
+       "title": "Mensagem Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Regra De Lixo"
+   }
+  },
   "/api/v1/correio/mensagens/{mensagem_id}/restaurar": {
    "post": {
     "description": "Tira da lixeira (pela ponte) e marca `restaurada`: a Gabi nunca a move de novo. Idempotente. 503 `fonte_indisponivel` se a ponte ou o Gmail não confirmar.",

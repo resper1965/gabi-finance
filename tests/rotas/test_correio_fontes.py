@@ -76,7 +76,7 @@ def test_so_boss_acessa(cli):
     for m, url in (("get", f"{U}/fontes"), ("post", f"{U}/fontes"), ("patch", f"{U}/fontes/1"), ("get", f"{U}/parametros"), ("put", f"{U}/parametros"),
                    ("get", f"{U}/prioridades"), ("get", f"{U}/lixeira"), ("post", f"{U}/mensagens/1/restaurar"),
                    ("get", f"{U}/lixo-sugerido"), ("get", f"{U}/dispensadas"), ("post", f"{U}/mensagens/1/lixeira"), ("post", f"{U}/mensagens/1/nao-e-lixo"),
-                   ("post", f"{U}/mensagens/1/dispensar"), ("post", f"{U}/mensagens/1/desfazer-dispensa")):
+                   ("post", f"{U}/mensagens/1/dispensar"), ("post", f"{U}/mensagens/1/desfazer-dispensa"), ("post", f"{U}/mensagens/1/regra-lixo")):
         assert getattr(cli, m)(url, headers=VIP).status_code == 403, (m, url)
         assert getattr(cli, m)(url).status_code == 401, (m, url)
 
@@ -113,7 +113,7 @@ def test_liberar_leitura_e_lixeira_sao_chaves_separadas_e_a_lixeira_exige_leitur
 def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
     padrao = cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]
     assert {k: v for k, v in padrao.items() if k != "palavras_protegidas"} == {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
-                                                                                "retencao_msg_dias": 180, "dias_em_aberto": 7, "max_alertas_dia": 5}
+                                                                                "retencao_msg_dias": 180, "dias_em_aberto": 7, "max_alertas_dia": 5, "regras_lixo": []}
     assert "fatura" in padrao["palavras_protegidas"] and "boleto" in padrao["palavras_protegidas"]  # a lista padrão aparece para o dono editar
     r = _put(cli, {"vips": ["Chefe@Ionic.com", "chefe@ionic.com", " bia@x.com "], "criterios_emergencia": "banco ou cobrança com prazo", "lixeira_confianca": 0.95})
     assert r.status_code == 200
@@ -126,6 +126,7 @@ def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
                                    {"lixeira_confianca": "0.9"}, {"lixeira_confianca": True}, {"janela_dias": 0}, {"janela_dias": 61}, {"janela_dias": 1.5},
                                    {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_msg_dias": 89}, {"retencao_msg_dias": 3651}, {"retencao_msg_dias": True}, {"retencao_dias": True},
                                    {"dias_em_aberto": 0}, {"dias_em_aberto": 31}, {"dias_em_aberto": True}, {"max_alertas_dia": 0}, {"max_alertas_dia": 51}, {"max_alertas_dia": 2.5},
+                                   {"regras_lixo": "a@x.com"}, {"regras_lixo": ["nao-e-email"]}, {"regras_lixo": ["@"]}, {"regras_lixo": [3]}, {"regras_lixo": [f"u{i}@x.com" for i in range(501)]},
                                    {"palavras_protegidas": "fatura"}, {"palavras_protegidas": [3]}, {"palavras_protegidas": ["x" * 61]}, {"palavras_protegidas": ["a"] * 0 + [f"p{i}" for i in range(201)]}])
 def test_parametros_validam_faixas(cli, corpo):
     assert _put(cli, corpo).status_code == 400
@@ -389,3 +390,28 @@ def test_restaurar_e_mover_de_conta_graph_vao_pela_fonte_da_ness_e_nao_pela_do_g
     cli2 = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"graph_email": lambda: com_erro}), client=("127.0.0.1", 50000))
     outra = _msg(banco, f, "AAMk0003=", "na_lixeira", "lixo", 0, "Promo3", thread="T3")
     assert _post(cli2, f"{U}/mensagens/{outra}/restaurar").status_code == 503
+
+
+def test_regras_lixo_normalizadas_pelo_parametro(cli):
+    r = _put(cli, {"regras_lixo": ["Promo@Loja.com", "promo@loja.com", " @Spam.COM ", "@spam.com"]})
+    assert r.status_code == 200 and r.json()["dados"]["regras_lixo"] == ["promo@loja.com", "@spam.com"]
+
+
+def test_regra_lixo_da_mensagem_por_remetente_ou_dominio_idempotente_e_auditada(cli, banco):
+    f = _liberada(cli, lixeira=True)
+    mid = _msg(banco, f, "a1", "classificada", "lixo", 0)  # remetente ana@x.com
+    r = _post(cli, f"{U}/mensagens/{mid}/regra-lixo", {"tipo": "remetente"})
+    assert r.status_code == 200 and r.json()["dados"]["regra"] == "ana@x.com"
+    assert _post(cli, f"{U}/mensagens/{mid}/regra-lixo", {"tipo": "remetente"}).status_code == 200  # idempotente
+    assert _post(cli, f"{U}/mensagens/{mid}/regra-lixo", {"tipo": "dominio"}).json()["dados"]["regra"] == "@x.com"
+    assert cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]["regras_lixo"] == ["ana@x.com", "@x.com"]
+    d = " | ".join(_decisoes(banco))
+    assert "regra de lixo" in d and "ana@x.com" not in d  # a auditoria leva o id, nunca o endereço
+
+
+def test_regra_lixo_pedidos_invalidos(cli, banco):
+    f = _liberada(cli)
+    mid = _msg(banco, f, "a1")
+    assert _post(cli, f"{U}/mensagens/{mid}/regra-lixo", {"tipo": "tudo"}).status_code == 400
+    assert _post(cli, f"{U}/mensagens/{mid}/regra-lixo", {}).status_code == 400
+    assert _post(cli, f"{U}/mensagens/999/regra-lixo", {"tipo": "remetente"}).status_code == 404

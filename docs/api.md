@@ -76,6 +76,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/correio/mensagens/{mensagem_id}/dispensar` | Marca um e-mail emergencial, importante ou normal como tratado: sai das listas e do resumo da manhã e fecha o alerta da conversa. Não vai para a lixeira nem |
 | POST | `/api/v1/correio/mensagens/{mensagem_id}/lixeira` | Decisão do dono sobre um "lixo sugerido": manda para a lixeira do Gmail (só trash, recuperável) e marca `na_lixeira`. Exige a conta liberada e a lixeira |
 | POST | `/api/v1/correio/mensagens/{mensagem_id}/nao-e-lixo` | O dono diz que o "lixo sugerido" não é lixo: marca `restaurada` (a Gabi nunca a move). Não toca no Gmail. Idempotente. |
+| POST | `/api/v1/correio/mensagens/{mensagem_id}/regra-lixo` | O dono diz "sempre que vier deste remetente (`tipo`: remetente) ou deste domínio (`tipo`: dominio), é lixo": acrescenta a regra em `email.regras_lixo`. |
 | POST | `/api/v1/correio/mensagens/{mensagem_id}/restaurar` | Tira da lixeira (pela ponte) e marca `restaurada`: a Gabi nunca a move de novo. Idempotente. 503 `fonte_indisponivel` se a ponte ou o Gmail não confirmar. |
 | GET | `/api/v1/correio/parametros` | Critérios de emergência, VIPs, limiar da lixeira, janela de leitura e retenção do trecho (padrões se não definidos). |
 | PUT | `/api/v1/correio/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves (nunca critérios nem VIPs). |

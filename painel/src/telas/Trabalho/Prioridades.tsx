@@ -24,6 +24,10 @@ export function Prioridades() {
   const dispensar = (m: Msg) => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/dispensar`), "Mensagem dispensada.", recarregar);
   const desfazer = (m: Msg) => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/desfazer-dispensa`), "Dispensa desfeita.", recarregar);
   const mover = (m: Msg) => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/lixeira`), "Mensagem movida para a lixeira.", recarregar);
+  const sempreLixo = (m: Msg, mover: boolean) => agir(`m${m.id}`, async () => {
+    await api.post(`/api/v1/correio/mensagens/${m.id}/regra-lixo`, { tipo: "remetente" });
+    if (mover) await api.post(`/api/v1/correio/mensagens/${m.id}/lixeira`);
+  }, "Regra criada: o que vier deste remetente vai para a lixeira.", recarregar);
   const naoELixo = (m: Msg) => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/nao-e-lixo`), "Marcada como não é lixo.", recarregar);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -45,6 +49,8 @@ export function Prioridades() {
               <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="btn btn-secondary" disabled={ocupado || !m.conta_lixeira} title={m.conta_lixeira ? undefined : "Ligue a lixeira desta conta em Cadastros › E-mail"} aria-label={`Mover para a lixeira ${m.assunto || "mensagem sem assunto"}`}
                   onClick={() => mover(m)}>Mover para a lixeira</button>
+                <button className="btn btn-secondary" disabled={ocupado} title="Cria a regra: tudo que vier deste remetente vai para a lixeira (desfaça em Cadastros › E-mail)" aria-label={`Sempre lixo ${m.assunto || "mensagem sem assunto"}`}
+                  onClick={() => sempreLixo(m, !!m.conta_lixeira)}>Sempre lixo deste remetente</button>
                 <button className="btn btn-secondary" disabled={ocupado} aria-label={`Não é lixo ${m.assunto || "mensagem sem assunto"}`} onClick={() => naoELixo(m)}>Não é lixo</button>
               </span>
               <Aviso erro={erros[`m${m.id}`]} />
@@ -56,8 +62,11 @@ export function Prioridades() {
           <Bloco titulo={`Na lixeira · últimos 30 dias · ${d.mensagens.length}`}>{d.mensagens.length === 0 ? <li style={{ listStyle: "none" }}>Nada foi para a lixeira.</li> : d.mensagens.map((m) => (
             <li key={m.id} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <span>{quem(m)} <small style={suave}>· {m.motivo || "sem motivo"} · {m.conta}{m.conta_desligada ? " · conta desligada (ainda dá para restaurar)" : ""}</small></span>
-              <button className="btn btn-secondary" disabled={ocupado} aria-label={`Restaurar ${m.assunto || "mensagem sem assunto"}`}
-                onClick={() => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/restaurar`), "Mensagem restaurada.", recarregar)}>Restaurar</button>
+              <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn btn-secondary" disabled={ocupado} aria-label={`Sempre lixo ${m.assunto || "mensagem sem assunto"}`} onClick={() => sempreLixo(m, false)}>Sempre lixo deste remetente</button>
+                <button className="btn btn-secondary" disabled={ocupado} aria-label={`Restaurar ${m.assunto || "mensagem sem assunto"}`}
+                  onClick={() => agir(`m${m.id}`, () => api.post(`/api/v1/correio/mensagens/${m.id}/restaurar`), "Mensagem restaurada.", recarregar)}>Restaurar</button>
+              </span>
               <Aviso erro={erros[`m${m.id}`]} />
             </li>))}</Bloco>
         )}

@@ -4,17 +4,18 @@ Nenhum segredo aqui: o refresh token vive só no serviço de fontes. Critérios 
 import json
 import sqlite3
 
-from gabi.correio.regras import PALAVRA_MAX, PALAVRAS_PADRAO, endereco
+from gabi.correio.regras import PALAVRA_MAX, PALAVRAS_PADRAO, endereco, regra_valida
 from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida
 
 PROVEDORES = ("google", "graph")
 ESTADOS = ("sim", "nao", "a_decidir")
 PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30, "retencao_msg_dias": 180,
-           "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO)}
+           "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO), "regras_lixo": []}
 CHAVES = {k: f"email.{k}" for k in PADROES}
 CRITERIOS_MAX = 2000
 VIPS_MAX = 200
 PALAVRAS_MAX = 200
+REGRAS_MAX = 500
 
 
 class ErroFonte(ValueError):
@@ -99,6 +100,13 @@ def validar_parametros(corpo) -> dict:
             normal = [endereco(x) for x in v]
             if not all(normal):
                 raise ErroFonte("vips tem um endereço de e-mail inválido")
+            v = list(dict.fromkeys(normal))
+        elif k == "regras_lixo":
+            if not isinstance(v, list) or len(v) > REGRAS_MAX or not all(isinstance(x, str) for x in v):
+                raise ErroFonte(f"regras_lixo deve ser uma lista de até {REGRAS_MAX} endereços (a@x.com) ou domínios (@x.com)")
+            normal = [regra_valida(x) for x in v]
+            if not all(normal):
+                raise ErroFonte("regras_lixo tem um endereço ou domínio inválido")
             v = list(dict.fromkeys(normal))
         elif k == "lixeira_confianca":
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0.7 <= v <= 1.0:

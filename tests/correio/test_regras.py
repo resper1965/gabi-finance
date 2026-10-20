@@ -98,3 +98,22 @@ def test_palavras_protegidas_vem_do_parametro_e_o_dono_pode_trocar_a_lista(con):
 def test_parametro_de_palavras_corrompido_cai_na_lista_padrao(con):
     con.execute("insert into parametro(chave, valor) values ('email.palavras_protegidas', 'nao-e-json')")
     assert regras.texto_protegido(con, "x@y.com", "Sua fatura", "") == "palavra"
+
+
+def _regras(con, lista):
+    con.execute("insert into parametro(chave, valor) values ('email.regras_lixo', ?)", (json.dumps(lista),))
+
+
+def test_regra_lixo_casa_por_endereco_e_por_dominio(con):
+    _regras(con, ["promo@loja.com", "@spam.com", "invalida", 3])
+    assert regras.regra_lixo(con, "Loja <PROMO@loja.com>") == "promo@loja.com"
+    assert regras.regra_lixo(con, "x@spam.com") == "@spam.com"
+    assert regras.regra_lixo(con, "outro@loja.com") is None
+    assert regras.regra_lixo(con, "x@sub.spam.com") is None  # domínio exato, sem subdomínio
+    assert regras.regra_lixo(con, "sem endereco") is None
+
+
+def test_regras_lixo_corrompido_ou_ausente_nao_derruba(con):
+    assert regras.regra_lixo(con, "a@b.com") is None
+    con.execute("insert into parametro(chave, valor) values ('email.regras_lixo', 'nao-e-json')")
+    assert regras.regra_lixo(con, "a@b.com") is None

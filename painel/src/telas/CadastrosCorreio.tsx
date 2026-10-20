@@ -7,7 +7,7 @@ import { Aviso, useAcao, type Acao } from "../lib/useAcao";
 import { useApi, type Leitura } from "../lib/useApi";
 
 interface Fonte { id: number; conta: string; provedor: "google" | "graph"; estado: "sim" | "nao" | "a_decidir"; lixeira: 0 | 1; sincronizada_em: string | null; ultimo_erro: string | null; mensagens: number; na_lixeira: number }
-interface Parametros { criterios_emergencia: string; vips: string[]; lixeira_confianca: number; janela_dias: number; retencao_dias: number; retencao_msg_dias: number; dias_em_aberto: number; max_alertas_dia: number; palavras_protegidas: string[] }
+interface Parametros { criterios_emergencia: string; vips: string[]; lixeira_confianca: number; janela_dias: number; retencao_dias: number; retencao_msg_dias: number; dias_em_aberto: number; max_alertas_dia: number; palavras_protegidas: string[]; regras_lixo: string[] }
 
 const ESTADO = { sim: "Lendo", nao: "Desligada", a_decidir: "A decidir" } as const;
 const suave = { color: "var(--ink2)" } as const;
@@ -75,6 +75,7 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
   const [retencao, setRetencao] = useState<string | null>(null);
   const [retMsg, setRetMsg] = useState<string | null>(null);
   const [palavras, setPalavras] = useState<string | null>(null);
+  const [regras, setRegras] = useState<string | null>(null);
   const [emAberto, setEmAberto] = useState<string | null>(null);
   const [alertas, setAlertas] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -94,11 +95,12 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
             if (retencao !== null) { const v = inteiro(retencao, 1, 365); if (v === null) { setMsg("Retenção do trecho: informe um inteiro de 1 a 365 dias."); return; } corpo.retencao_dias = v; }
             if (retMsg !== null) { const v = inteiro(retMsg, 90, 3650); if (v === null) { setMsg("Guardar as mensagens: informe um inteiro de 90 a 3650 dias."); return; } corpo.retencao_msg_dias = v; }
             if (palavras !== null) corpo.palavras_protegidas = palavras.split("\n").map((x) => x.trim()).filter(Boolean);
+            if (regras !== null) corpo.regras_lixo = regras.split("\n").map((x) => x.trim()).filter(Boolean);
             if (emAberto !== null) { const v = inteiro(emAberto, 1, 30); if (v === null) { setMsg("Dias em aberto: informe um inteiro de 1 a 30."); return; } corpo.dias_em_aberto = v; }
             if (alertas !== null) { const v = inteiro(alertas, 1, 50); if (v === null) { setMsg("Alertas por dia: informe um inteiro de 1 a 50."); return; } corpo.max_alertas_dia = v; }
             setMsg(null);
             if (Object.keys(corpo).length === 0) return;
-            if (await agir("ajustes", () => api.put("/api/v1/correio/parametros", corpo), "Ajustes salvos.", leitura.recarregar)) { setCriterios(null); setVips(null); setLimiar(null); setJanela(null); setRetencao(null); setRetMsg(null); setPalavras(null); setEmAberto(null); setAlertas(null); }
+            if (await agir("ajustes", () => api.put("/api/v1/correio/parametros", corpo), "Ajustes salvos.", leitura.recarregar)) { setCriterios(null); setVips(null); setLimiar(null); setJanela(null); setRetencao(null); setRetMsg(null); setPalavras(null); setRegras(null); setEmAberto(null); setAlertas(null); }
           }}>
             <label>O que é emergencial para você<br />
               <textarea aria-label="Critérios de emergência" rows={4} style={{ width: "100%" }} value={criterios ?? p.criterios_emergencia} onChange={(e) => { setCriterios(e.target.value); setMsg(null); }} /></label>
@@ -106,6 +108,8 @@ function Ajustes({ leitura, acao }: { leitura: Leitura<Parametros>; acao: Acao }
               <textarea aria-label="VIPs" rows={4} style={{ width: "100%" }} value={vips ?? p.vips.join("\n")} onChange={(e) => { setVips(e.target.value); setMsg(null); }} /></label>
             <label>Palavras que protegem da lixeira (uma por linha; fatura, boleto, cobrança... nunca vão)<br />
               <textarea aria-label="Palavras protegidas" rows={5} style={{ width: "100%" }} value={palavras ?? p.palavras_protegidas.join("\n")} onChange={(e) => { setPalavras(e.target.value); setMsg(null); }} /></label>
+            <label>Sempre lixo (uma regra por linha: um e-mail, ou @dominio.com para o domínio todo; vai para a lixeira, nunca é apagado de vez; VIP, quem você já respondeu e palavras protegidas continuam valendo)<br />
+              <textarea aria-label="Regras de lixo" rows={5} style={{ width: "100%" }} value={regras ?? p.regras_lixo.join("\n")} onChange={(e) => { setRegras(e.target.value); setMsg(null); }} /></label>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
               <label>Dias em aberto na fila<br /><input inputMode="numeric" value={emAberto ?? String(p.dias_em_aberto)} onChange={(e) => { setEmAberto(e.target.value); setMsg(null); }} /></label>
               <label>Alertas por dia (máximo)<br /><input inputMode="numeric" value={alertas ?? String(p.max_alertas_dia)} onChange={(e) => { setAlertas(e.target.value); setMsg(null); }} /></label>
