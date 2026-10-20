@@ -385,6 +385,10 @@ def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
     assert "EnvironmentFile" not in srv
     assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-contatos.service" in t
     assert hasattr(importlib.import_module("gabi.escuta.contatos"), "main")
+    # escrita aprovada no Graph da ness roda depois da sincronização, na mesma unit e no mesmo sandbox (só AF_UNIX)
+    assert "ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos_gravar" in srv
+    assert srv.index("ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos\n") < srv.index("ExecStartPost=")
+    assert hasattr(importlib.import_module("gabi.escuta.contatos_gravar"), "main")
     for nome in ("gabi-brain-contatos.service", "gabi-brain-contatos.timer"):
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]

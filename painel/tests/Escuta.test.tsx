@@ -24,6 +24,7 @@ function fake(o: Opcoes = {}) {
       if (/contatos\/sincronizar/.test(url)) return ok(env({ contas: { "a@x.com": { lidos: 7 }, ...(o.contasFalhas ?? {}) }, total: 7, invalidos: 1 }));
       return ok(env({}));
     }
+    if (/contatos\/propostas/.test(url)) return ok(env({ itens: [], escrita: "ligado" }));
     if (/contatos/.test(url)) return ok(env({ itens: o.contatos ?? [], total: o.total ?? (o.contatos ?? []).length, limite: 50, offset: 0 }));
     if (/remetentes/.test(url)) return ok(env({ fila: o.fila ?? [], aprovados: o.aprovados ?? [] }));
     if (/grupos/.test(url)) return ok(env({ grupos: o.grupos ?? [] }));

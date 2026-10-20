@@ -258,3 +258,35 @@ def test_email_invalido_ou_estranho_nao_entra_e_resincronizar_substitui_so_a_con
 def test_sincronizar_nao_imprime_nem_devolve_email(con, capsys):
     r = c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "Ana", "telefone": "11912345678", "emails": ["segredo@x.com"]}]}))
     assert "segredo@x.com" not in json.dumps(r) and "segredo@x.com" not in capsys.readouterr().out
+
+
+def _graph_linhas(con):
+    return sorted(tuple(r) for r in con.execute("select conta, graph_id, nome, telefone_original, telefone, campo from contato_graph"))
+
+
+def test_sincronizar_guarda_graph_id_e_telefone_original(con):
+    dados = {NESS: [{"nome": "Ana", "telefone": "11 9999-0000", "graph_id": "AAMk1234", "campo": "mobile"}]}
+    c.sincronizar(con, [NESS], _listar(dados))
+    assert _graph_linhas(con) == [(NESS, "AAMk1234", "Ana", "11 9999-0000", c._telefone({"telefone": "11 9999-0000"}), "mobile")]
+    assert c._telefone({"telefone": "11 9999-0000"}).startswith("+55")
+
+
+def test_telefone_invalido_fica_com_telefone_nulo(con):
+    dados = {NESS: [{"nome": "Ana", "telefone": "11 3333-4444 ramal 12", "graph_id": "AAMk1234", "campo": "business"}]}
+    c.sincronizar(con, [NESS], _listar(dados))
+    assert [r[4] for r in _graph_linhas(con)] == [None]
+
+
+def test_sincronizar_substitui_so_a_conta(con):
+    d1 = {NESS: [{"nome": "Ana", "telefone": "11912345678", "graph_id": "AAMk1111", "campo": "mobile"},
+                 {"nome": "So email", "telefone": None, "graph_id": "AAMk2222", "emails": ["a@x.com"]}],
+          GMAIL: [{"nome": "Gi", "telefone": "11988887777"}]}
+    c.sincronizar(con, [GMAIL, NESS], _listar(d1))
+    assert [r[1] for r in _graph_linhas(con)] == ["AAMk1111"]
+    d2 = {NESS: [{"nome": "Bia", "telefone": "11955554444", "graph_id": "AAMk3333", "campo": "home"}], GMAIL: []}
+    c.sincronizar(con, [GMAIL, NESS], _listar(d2))
+    assert [r[1] for r in _graph_linhas(con)] == ["AAMk3333"]
+    def falha(conta):
+        raise RuntimeError("x")
+    c.sincronizar(con, [NESS], falha)
+    assert [r[1] for r in _graph_linhas(con)] == ["AAMk3333"]

@@ -472,6 +472,14 @@ class _FalsoGraph:
             return {"id": "m1"}
         return [{"id": "m1", "quando": "2026-10-20T10:00:00Z", "de_nome": "Ana", "de_eu": False, "mencoes_eu": True}]
 
+    def contato_criar(self, conta, nome, telefone):
+        return {"id": "AAMkAGI2TG93AAA="} if conta != "malformada@x.com" else {"id": 7}
+
+    def contato_corrigir(self, conta, graph_id, antes, depois):
+        if conta == "malformada@x.com":
+            return {"resultado": "talvez"}
+        return {"resultado": "ok" if antes == {"nome": "A", "telefone": "1"} and depois["nome"] == "B" else "alterado"}
+
     def enviar(self):
         return "nunca"
 
@@ -486,7 +494,8 @@ def sock_graph(tmp_path):
 
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
-                                                  "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens"})
+                                                  "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
+                                                  "contato_criar", "contato_corrigir"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -506,6 +515,16 @@ def test_ponte_graph_valida_forma(sock_graph):
         PonteGraph(sock_graph).listar_eventos("malformada@x.com", "primary", None, JANELA_AG)
     with pytest.raises(ErroGraphNess, match="-> 401"):
         PonteGraph(sock_graph).listar_eventos("boom@x.com", "primary", None, JANELA_AG)
+
+
+def test_ponte_graph_contato_escrita_cruza_dicts_e_valida_forma(sock_graph):
+    p = PonteGraph(sock_graph)
+    assert p.contato_criar("resper@ness.com.br", "A", "1") == {"id": "AAMkAGI2TG93AAA="}
+    assert p.contato_corrigir("resper@ness.com.br", "AAMkAGI2TG93AAA=", {"nome": "A", "telefone": "1"}, {"nome": "B", "telefone": "2"}) == {"resultado": "ok"}
+    with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+        p.contato_criar("malformada@x.com", "A", "1")
+    with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+        p.contato_corrigir("malformada@x.com", "AAMkAGI2TG93AAA=", {}, {})
 
 
 def test_ponte_graph_nao_configurada(tmp_path):

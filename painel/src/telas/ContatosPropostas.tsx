@@ -1,0 +1,97 @@
+import { useState, type ReactNode } from "react";
+import { Bloco } from "../componentes/Bloco";
+import { Painel } from "../componentes/Painel";
+import { Vazio } from "../componentes/Estados";
+import { api } from "../lib/api";
+import { Aviso, type Acao } from "../lib/useAcao";
+import { useApi } from "../lib/useApi";
+
+interface Proposta {
+  id: number; tipo: "criar" | "corrigir"; conta: string;
+  nome_antes: string | null; telefone_antes: string | null; nome_depois: string | null; telefone_depois: string | null;
+  origem: "whatsapp" | "telefone_invalido"; estado: string;
+}
+interface Fila { itens: Proposta[]; escrita: "ligado" | "desligado" }
+
+const suave = { color: "var(--ink2)" } as const;
+const linha = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", padding: "8px 0" } as const;
+const lista = { listStyle: "none", margin: 0, padding: 0 } as const;
+const AVISO_DESLIGADO = "A gravação está desligada: aprovar não grava ainda. Ligue em contatos.escrita quando quiser.";
+const ROTA = "/api/v1/escuta/contatos/propostas";
+const texto = (nome: string | null, tel: string | null) => [nome, tel].filter(Boolean).join(" ") || "—";
+
+const rotulo = (acao: string, p: Proposta) => `${acao} proposta ${p.id} (${p.tipo})`; // sem nome nem telefone
+
+function Linha({ p, children }: { p: Proposta; children: ReactNode }) {
+  return (
+    <li style={linha}>
+      <span>
+        <strong>{p.tipo === "criar" ? "Criar" : "Corrigir"}</strong> <span style={suave}>· {p.conta}</span><br />
+        <span style={suave}>{p.tipo === "criar" ? "— (novo)" : texto(p.nome_antes, p.telefone_antes)}</span>
+        {" → "}
+        <span>{texto(p.nome_depois, p.telefone_depois)}</span>
+      </span>
+      {children}
+    </li>);
+}
+
+/** Escuta › Contatos: fila de propostas de criar/corrigir contato. Só grava o que o dono aprovar; uma aprovada ainda pode ser recusada antes da gravação. */
+export function ContatosPropostas({ acao }: { acao: Acao }) {
+  const { ocupado, erros, agir } = acao;
+  const [resumo, setResumo] = useState<string | null>(null);
+  const leitura = useApi<Fila>(`${ROTA}?estado=pendente`);
+  const aprovadas = useApi<Fila>(`${ROTA}?estado=aprovada`);
+  const recarregar = async () => { await Promise.all([leitura.recarregar(), aprovadas.recarregar()]); };
+  const executar = async (chave: string, fn: () => Promise<unknown>, ok: string) => {
+    if (!(await agir(chave, fn, ok, recarregar))) await recarregar(); // falhou (ex.: 409 já decidida): relê para não mostrar fila velha
+  };
+  const decidir = (p: Proposta, estado: "aprovada" | "recusada", ok: string) => {
+    setResumo(null);
+    return executar(`proposta${p.id}`, () => api.post(`${ROTA}/${p.id}/decisao`, { estado }), ok);
+  };
+  const aguardando = aprovadas.env?.dados.itens ?? [];
+  return (
+    <Painel leitura={leitura} arquivo="escuta-contatos-propostas">
+      {(d) => {
+        const correcoes = d.itens.filter((p) => p.tipo === "corrigir").map((p) => p.id);
+        return (
+          <Bloco titulo={`Propostas de contatos · ${d.itens.length}`} nota="Contatos novos do WhatsApp e telefones a corrigir. Nada muda na Microsoft (conta ness) até você aprovar.">
+            {d.escrita === "desligado" && <p role="status" style={{ margin: 0, ...suave }}>{AVISO_DESLIGADO}</p>}
+            <Aviso erro={erros.propostas} />
+            {resumo && <p role="status" style={{ margin: 0, ...suave }}>{resumo}</p>}
+            {correcoes.length > 0 && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="btn btn-primary" disabled={ocupado} onClick={() => { setResumo(null); return executar("propostas", async () => {
+                  const r = await api.post<{ aprovadas: number }>(`${ROTA}/aprovar-correcoes`, { ids: correcoes });
+                  setResumo(`${r.dados.aprovadas} correção(ões) aprovada(s).`);
+                }, "Correções aprovadas."); }}>Aprovar todas as correções de telefone</button>
+                <span style={suave}>Só as correções listadas aqui. Não inclui contatos novos.</span>
+              </div>)}
+            {d.itens.length === 0 ? <Vazio frase="Nenhuma proposta pendente." /> : (
+              <ul style={lista}>
+                {d.itens.map((p) => (
+                  <Linha key={p.id} p={p}>
+                    <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button className="btn btn-primary" disabled={ocupado} aria-label={rotulo("Aprovar", p)} onClick={() => decidir(p, "aprovada", "Proposta aprovada.")}>Aprovar</button>
+                      <button className="btn btn-secondary" disabled={ocupado} aria-label={rotulo("Recusar", p)} onClick={() => decidir(p, "recusada", "Proposta recusada.")}>Recusar</button>
+                    </span>
+                    <Aviso erro={erros[`proposta${p.id}`]} />
+                  </Linha>))}
+              </ul>)}
+            {aguardando.length > 0 && (
+              <>
+                <h4 style={{ margin: "8px 0 0" }}>Aprovadas aguardando gravação · {aguardando.length}</h4>
+                <ul style={lista}>
+                  {aguardando.map((p) => (
+                    <Linha key={p.id} p={p}>
+                      <button className="btn btn-secondary" disabled={ocupado} aria-label={rotulo("Recusar", p)} onClick={() => decidir(p, "recusada", "Aprovação desfeita.")}>Recusar</button>
+                      <Aviso erro={erros[`proposta${p.id}`]} />
+                    </Linha>))}
+                </ul>
+              </>)}
+          </Bloco>
+        );
+      }}
+    </Painel>
+  );
+}

@@ -1,6 +1,6 @@
-"""Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; a única escrita é MOVER mensagem de e-mail entre a Caixa de
-Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
-escrever em agenda ou contatos: o POST é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
+"""Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; as únicas escritas são MOVER mensagem de e-mail entre a Caixa de
+Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho) e criar/corrigir contato, delegado a `graph_ness_contatos` (ADR-020). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
+escrever em agenda: o POST aqui é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
 o resto do brain chega aqui pela ponte (`PonteGraph`). Autenticação do app por client credentials com secret (M365_TENANT_ID, M365_CLIENT_ID,
 M365_CLIENT_SECRET no ambiente do serviço). O app tem permissão no tenant inteiro: a conta lida vem sempre de `M365_CONTAS` (padrão só
 resper@ness.com.br), nunca de entrada livre. Segredo, token e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/graph-ness.md."""
@@ -30,6 +30,7 @@ _ID_MSG = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id imutável de mensagem (ba
 _IMUTAVEL = 'IdType="ImmutableId"'  # o id não muda quando a mensagem vai e volta dos Itens Excluídos (restaurar usa o mesmo id)
 _DESTINOS = {"trash": "deleteditems", "untrash": "inbox"}  # as únicas escritas: destino fixo, nunca vindo de fora
 _VENENO = (400, 404, 410, 413, 422)  # 4xx que é do id (401/403/429/5xx continuam parando a leitura)
+_ID_CONTATO = re.compile(r"^[A-Za-z0-9_=-]{8,400}$")  # id de contato do Graph (base64url): nunca "/" nem espaço
 _CHAT_ID = re.compile(r"^[0-9A-Za-z:@._-]{1,200}$")  # id de chat do Teams ("19:...@thread.v2"): nunca "/" nem espaço
 _TIPOS_CHAT = {"oneOnOne": "um_a_um", "group": "grupo", "meeting": "grupo"}
 _CAMPOS_TEAMS = "id,createdDateTime,from,messageType,mentions,deletedDateTime"  # sem body, subject nem attachments
@@ -122,7 +123,7 @@ class TokenApp:
 
 
 class GraphNess:
-    """Objeto da ponte (JSON puro, só GET). Sem o token provider nada sai."""
+    """Objeto da ponte (JSON puro). Lê por GET; só escreve o move de e-mail e, delegado a `graph_ness_contatos`, criar/corrigir contato (ADR-020). Sem o token provider nada sai."""
 
     def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time):
         self._token, self._contas, self._http, self._agora = token, [c.lower() for c in contas], http, agora
@@ -226,10 +227,10 @@ class GraphNess:
         raise ErroGraphNess("paginação sem fim")
 
     def contatos(self, conta: str) -> list[dict]:
-        """[{nome, telefone[, emails]}] como os contatos do Google: um item por telefone (celular, casa, trabalho), cada um com os e-mails do contato;
+        """[{nome, telefone, campo[, graph_id][, emails]}] como os contatos do Google: um item por telefone (celular, casa, trabalho), cada um com os e-mails do contato;
         contato só com e-mail vira um item com `telefone: None`. Só nome, telefone e e-mail são lidos."""
         conta = self._conta(conta)
-        campos = "displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+        campos = "id,displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
         url = f"{BASE}/users/{urllib.parse.quote(conta, safe='')}/contacts?$select={campos}&$top=100"
         saida = []
         for pagina in self._paginas(url):
@@ -239,10 +240,15 @@ class GraphNess:
                 nome = p.get("displayName")
                 nome = nome if isinstance(nome, str) and nome.strip() else None
                 emails = _emails(p.get("emailAddresses"))
-                telefones = [t for t in [p.get("mobilePhone"), *(p.get("homePhones") or []), *(p.get("businessPhones") or [])]
-                             if isinstance(t, str) and t.strip()]
-                for t in telefones:
-                    item = {"nome": nome, "telefone": t}
+                gid = p.get("id")
+                gid = gid if isinstance(gid, str) and _ID_CONTATO.match(gid) else None
+                telefones = [(t, campo) for campo, lista in (("mobile", [p.get("mobilePhone")]), ("home", p.get("homePhones") or []),
+                                                             ("business", p.get("businessPhones") or []))
+                             for t in lista if isinstance(t, str) and t.strip()]
+                for t, campo in telefones:
+                    item = {"nome": nome, "telefone": t, "campo": campo}
+                    if gid:
+                        item["graph_id"] = gid
                     if emails:
                         item["emails"] = list(emails)
                     saida.append(item)
@@ -302,6 +308,16 @@ class GraphNess:
             if m:
                 msgs.append(m)
         return asdict(ResultadoEmail(msgs, delta, recarga))
+
+    def contato_criar(self, conta: str, nome: str, telefone: str) -> dict:
+        """Cria um contato (só nome e celular). A escrita vive em `graph_ness_contatos` (import aqui evita o ciclo)."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.criar(self, conta, nome, telefone)
+
+    def contato_corrigir(self, conta: str, graph_id: str, antes: dict, depois: dict) -> dict:
+        """Corrige nome e celular se o contato ainda estiver como `antes`; senão {"resultado": "alterado"} sem escrever."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.corrigir(self, conta, graph_id, antes, depois)
 
     def _enviar_mover(self, url: str, destino: str) -> int:
         """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""

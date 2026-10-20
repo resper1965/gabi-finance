@@ -103,11 +103,15 @@ def sincronizar(con, contas: list[str], listar: Callable[[str], list[dict]]) -> 
             continue
         linhas: dict[str, str | None] = {}
         mails: dict[tuple[str, str], str | None] = {}  # (e-mail, telefone ou '') -> nome
+        graph: dict[tuple[str, str], tuple] = {}  # (graph_id, telefone original) -> (nome, E.164 ou None, campo)
         for it in itens:
             tel = _telefone(it)
             nome = it.get("nome")
             nome = nome.strip()[:200] if isinstance(nome, str) and nome.strip() else None
             enderecos = _enderecos(it)
+            gid, bruto, campo = it.get("graph_id"), it.get("telefone"), it.get("campo")
+            if isinstance(gid, str) and gid and isinstance(bruto, str) and bruto.strip():
+                graph.setdefault((gid, bruto), (nome, tel, campo if campo in ("mobile", "home", "business") else None))
             if tel is None:
                 if it.get("telefone") or it.get("canonico") or not enderecos:  # telefone inválido (ramal, DDI estranho) ou item vazio; contato só com e-mail não é inválido
                     invalidos += 1
@@ -116,17 +120,21 @@ def sincronizar(con, contas: list[str], listar: Callable[[str], list[dict]]) -> 
             for a in enderecos:
                 if (a, tel or "") not in mails or (mails[(a, tel or "")] is None and nome):
                     mails[(a, tel or "")] = nome
-        lidas[conta] = (linhas, mails)
+        lidas[conta] = (linhas, mails, graph)
         resultado[conta] = {"lidos": len(itens)}
     with transacao(con):
         marcas = ",".join("?" * len(contas))
         con.execute(f"delete from contato_google where conta not in ({marcas})" if contas else "delete from contato_google", contas)
         con.execute(f"delete from contato_google_email where conta not in ({marcas})" if contas else "delete from contato_google_email", contas)
-        for conta, (linhas, mails) in lidas.items():
+        con.execute(f"delete from contato_graph where conta not in ({marcas})" if contas else "delete from contato_graph", contas)
+        for conta, (linhas, mails, graph) in lidas.items():
             con.execute("delete from contato_google where conta=?", (conta,))
             con.executemany("insert into contato_google(conta, telefone, nome) values (?,?,?)", [(conta, t, n) for t, n in linhas.items()])
             con.execute("delete from contato_google_email where conta=?", (conta,))
             con.executemany("insert into contato_google_email(conta, email, telefone, nome) values (?,?,?,?)", [(conta, a, t, n) for (a, t), n in mails.items()])
+            con.execute("delete from contato_graph where conta=?", (conta,))
+            con.executemany("insert or ignore into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo) values (?,?,?,?,?,?)",
+                            [(conta, gid, n, orig, t, campo) for (gid, orig), (n, t, campo) in graph.items()])
     total = con.execute("select count(distinct telefone) from contato_google").fetchone()[0]
     return {"contas": resultado, "total": total, "invalidos": invalidos}
 
@@ -199,11 +207,15 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     try:
         contas = contas_contatos(con)
         r = sincronizar(con, contas, listar)
+        from datetime import datetime, timezone
+        from gabi.escuta import contatos_propostas
+        g = contatos_propostas.gerar(con, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     finally:
         con.close()
     ok = {k: v for k, v in r["contas"].items() if "lidos" in v}
     erros = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
     print(f"contatos: total={r['total']} invalidos={r['invalidos']} contas_ok={len(ok)} lidos={sum(v['lidos'] for v in ok.values())}")
+    print(f"propostas: criar={g['criar']} corrigir={g['corrigir']}")
     for conta, msg in erros.items():
         print(f"AVISO: conta {conta} falhou: {msg}", file=sys.stderr)
     todas = bool(contas) and not ok

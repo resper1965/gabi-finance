@@ -2510,6 +2510,100 @@
     "summary": "Listar Contatos"
    }
   },
+  "/api/v1/escuta/contatos/propostas": {
+   "get": {
+    "description": "Lista as propostas de criar/corrigir contato da ness (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada.",
+    "operationId": "listar_propostas_api_v1_escuta_contatos_propostas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Propostas"
+   }
+  },
+  "/api/v1/escuta/contatos/propostas/aprovar-correcoes": {
+   "post": {
+    "description": "Aprova as correções pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar e não pendentes ficam; devolve quantas.",
+    "operationId": "aprovar_correcoes_propostas_api_v1_escuta_contatos_propostas_aprovar_correcoes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Aprovar Correcoes Propostas"
+   }
+  },
+  "/api/v1/escuta/contatos/propostas/{proposta_id}/decisao": {
+   "post": {
+    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
+    "operationId": "decidir_proposta_api_v1_escuta_contatos_propostas__proposta_id__decisao_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposta_id",
+      "required": true,
+      "schema": {
+       "title": "Proposta Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Proposta"
+   }
+  },
   "/api/v1/escuta/contatos/sincronizar": {
    "post": {
     "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
