@@ -22,7 +22,7 @@ Google (contatos G12), Graph da ionic e Nibo (A7/C2/C3) aguardam chave ou consen
 | D5 | 145 lançamentos sem dono (Cadastros), depois `sudo ~/aplicar-donos.sh` | R | ⏸ | classificação ≥ 90 % |
 | D6 | ~~D6~~ dispensado em 21/10 por ordem do dono (sem esperar as 7 rodadas). | C | ✅ | — |
 | D7 | ~~D7~~ dispensado em 21/10 por ordem do dono; o `gabi-fin` já estava parado e arquivado desde 19/10 e `tools.congelar` nunca foi escrito. | C | ✅ | — |
-| D8 | ✅ 16/10 no código (spec e plano `2026-10-16-reembolso-saude`; `gabi/reembolso_saude/`, migração 0040, `gabi-brain-reembolso-saude.timer` instalado e DESLIGADO, 5 ferramentas MCP `reembolso_saude_*`, rota `GET /api/v1/reembolso-saude/dossies`). **Porte do reembolso de saúde** (`reembolso_fila.py` e `reembolso_segunda`): pistas passam a vir do anexo de saúde que a escuta nova grava no Paperless (`gabi:saude-reembolso`), classificado pelo texto; estado e nomes no cofre cifrado; lista de segunda vira aviso do brain. **Falta (R):** chave do cofre e modelo na ponte, escuta em `ativo`, ligar o timer, 5 ferramentas no include do Hermes, alguns dias em paralelo e então `systemctl disable --now gabi-reembolso.path gabi-reembolso.timer gabi-reembolso-segunda.timer` (runbook `#reembolso-saude`). **Tela ✅ 16/10** (aba Reembolso de saúde; rotas `semana`, `pedi`, `recebi`; mensagens de saúde sem anexo na tela Família). **Depois:** trava do cofre compartilhada com exames e API, leitura de PDF sem texto, campos antigos do Paperless | C | ✅ código; ⏸ passos do dono | `gabi-reembolso*` aposentados sem perder função |
+| D8 | ⏹ DESCARTADO 21/10 (saúde). Antes: ✅ 16/10 no código (spec e plano `2026-10-16-reembolso-saude`; `gabi/reembolso_saude/`, migração 0040, `gabi-brain-reembolso-saude.timer` instalado e DESLIGADO, 5 ferramentas MCP `reembolso_saude_*`, rota `GET /api/v1/reembolso-saude/dossies`). **Porte do reembolso de saúde** (`reembolso_fila.py` e `reembolso_segunda`): pistas passam a vir do anexo de saúde que a escuta nova grava no Paperless (`gabi:saude-reembolso`), classificado pelo texto; estado e nomes no cofre cifrado; lista de segunda vira aviso do brain. **Falta (R):** chave do cofre e modelo na ponte, escuta em `ativo`, ligar o timer, 5 ferramentas no include do Hermes, alguns dias em paralelo e então `systemctl disable --now gabi-reembolso.path gabi-reembolso.timer gabi-reembolso-segunda.timer` (runbook `#reembolso-saude`). **Tela ✅ 16/10** (aba Reembolso de saúde; rotas `semana`, `pedi`, `recebi`; mensagens de saúde sem anexo na tela Família). **Depois:** trava do cofre compartilhada com exames e API, leitura de PDF sem texto, campos antigos do Paperless | C | ✅ código; ⏸ passos do dono | `gabi-reembolso*` aposentados sem perder função |
 | D9 | Cancelar BrandYourself (renovou em 16/09) | R | ⏸ | cancelado |
 
 ### 1b. Agenda financeira, "a receber" e perfil de normalidade (novo em 16/10)
@@ -80,14 +80,15 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 | E1 | ~~Parear o ouvinte~~ feito em 19/10 (`escuta-ouvinte` ativo). Resta G12 `contacts.readonly` (contatos Google) | R | ⏸ |
 | E2 | Chave do modelo com limite; aprovar remetentes e grupos na tela | R | ⏸ |
 | E3 | Ligar em `registro` e comparar por N dias (`tools.comparar_escuta`, divergência 0) | R+C | ⏸ |
-| E4 | Aceitar que saúde só de texto não vai ao cofre (desvio ADR-016), depois modo `ativo`; teste de crise (`--teste-crise`) recebido | R | ⏸ |
+| E4 | (saúde descartada em 21/10: só o modo `ativo` e o teste de crise seguem) Aceitar que saúde só de texto não vai ao cofre (desvio ADR-016), depois modo `ativo`; teste de crise (`--teste-crise`) recebido | R | ⏸ |
 
-### 5. Exames e saúde
+### 5. Exames e saúde — DESCARTADO em 21/10 (o dono desistiu dos dados de saúde)
+Timers `gabi-brain-exames` e `gabi-brain-reembolso-saude` desligados em 21/10 (religar: `sudo systemctl enable --now <timer>`). Código, cofre `saude.enc` e `/etc/gabi/saude.key` ficam como estão, sem uso; nada de saúde entra em alerta ou pendência. S1-S3, D8 e a parte de saúde do E4 deixam de ser pendência. Apagar dados ou remover código só por pedido novo.
 | # | Item | Dono | Status |
 |---|---|---|---|
 | S1 | ~~Plano de exames~~ executado em 16/10 (tarefas 1-10, instalado; timer ligado em 16/10 21:20). Ver `PROGRESSO-GOAL.md` | C | ✅ |
-| S2 | ✅ 16/10: chave gerada pelo Claude (`/etc/gabi/saude.key`); **leve a cópia `~/saude.key.COPIE-E-APAGUE` para fora da VPS e apague**. `/etc/gabi/saude.key` (sem ela a tela Família responde 503) e a lista de PDFs de exames como aceite | R | ⏸ |
-| S3 | Leitura por imagem de PDF digitalizado (exames e reembolso): código pronto em 16/10, **desligada**. Ricardo liga `saude.visao_pdf` (ver `runbook#visao-pdf`: privacidade, custo) e a rota de reprocessar exames passa `visao=` (`gabi/rotas/familia.py`) | R/C | ⏸ |
+| S2 | ⏹ DESCARTADO 21/10. Antes: ✅ 16/10: chave gerada pelo Claude (`/etc/gabi/saude.key`); **leve a cópia `~/saude.key.COPIE-E-APAGUE` para fora da VPS e apague**. `/etc/gabi/saude.key` (sem ela a tela Família responde 503) e a lista de PDFs de exames como aceite | R | ⏸ |
+| S3 | ⏹ DESCARTADO 21/10. Leitura por imagem de PDF digitalizado (exames e reembolso): código pronto em 16/10, **desligada**. Ricardo liga `saude.visao_pdf` (ver `runbook#visao-pdf`: privacidade, custo) e a rota de reprocessar exames passa `visao=` (`gabi/rotas/familia.py`) | R/C | ⏸ |
 
 ### 6. Canal (Hermes) e corte do OpenClaw
 | # | Item | Dono | Status | Pronto quando |
