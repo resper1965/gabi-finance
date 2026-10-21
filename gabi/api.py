@@ -181,8 +181,6 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_correio)
     from gabi.rotas.dia import router as rotas_dia
     app.include_router(rotas_dia)
-    from gabi.rotas.trabalho import router as rotas_trabalho
-    app.include_router(rotas_trabalho)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")

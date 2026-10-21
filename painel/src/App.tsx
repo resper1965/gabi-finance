@@ -27,22 +27,18 @@ import { CadastrosTeams } from "./telas/CadastrosTeams";
 import { CadastrosCorreio } from "./telas/CadastrosCorreio";
 import { Prioridades } from "./telas/Trabalho/Prioridades";
 import { Hoje } from "./telas/Trabalho/Hoje";
-import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
-import { Mensagens } from "./telas/Trabalho/Mensagens";
-import { Tarefas } from "./telas/Trabalho/Tarefas";
-import { Entregas } from "./telas/Trabalho/Entregas";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
 import { Qualidade } from "./telas/Gabi/Qualidade";
 import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
 import { AReceber } from "./telas/Cobrar/AReceber";
 
-const TELAS: Record<string, () => ReactNode> = {
+export const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
-  qualidade: Qualidade, hoje: Hoje, temas: Frentes, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
+  qualidade: Qualidade, hoje: Hoje, agenda: Agenda,
 };
 
 function tela(area: Area, aba: string) {

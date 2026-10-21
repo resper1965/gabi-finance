@@ -53,7 +53,6 @@ def _producao(con):
     _r(con, "open-finance", 2, conferida=1)
     _r(con, "notas-nibo", 3)
     _r(con, "comprovantes-paperless", 3)
-    _r(con, "trabalho", 1)  # ninguém liberado: não conta
 
 
 def test_producao_fontes_sem_conferencia_nao_geram_falso_alarme(con):
@@ -97,16 +96,6 @@ def test_open_finance_sem_conferencia_continua_nao_conferida(con):
     assert e["desatualizado"] is True
 
 
-def test_trabalho_conta_quando_ha_caixa_liberada(con):
-    _producao(con)
-    con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")
-    assert _estados(envelope(con, None, AGORA))["trabalho"] == "ok"
-    con.execute("delete from rodada where fonte='trabalho'")
-    _r(con, "trabalho", 30, status="ok")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["trabalho"] == "parada" and e["desatualizado"] is True
-
-
 def test_saldos_e_exportacao_nao_entram(con):
     _producao(con)
     _r(con, "open-finance-saldos", 99)
@@ -124,14 +113,6 @@ def test_banco_novo_so_com_open_finance_lista_as_esperadas_como_nao_conferidas(c
     _r(con, "comprovantes-paperless", 1)
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False and set(_estados(e).values()) == {"ok"}
-
-
-def test_trabalho_em_uso_sem_nenhuma_rodada_aparece_nao_conferida(con):
-    _producao(con)
-    con.execute("delete from rodada where fonte='trabalho'")
-    con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["trabalho"] == "nao_conferida" and e["desatualizado"] is True
 
 
 def test_fonte_nao_declarada_aparece_mas_nunca_desatualiza(con):
@@ -156,19 +137,14 @@ def test_toda_fonte_registrada_no_codigo_esta_declarada_em_FONTES():
     assert achadas and achadas <= set(FONTES), achadas - set(FONTES)
 
 
-def test_trabalho_fora_com_tabelas_vazias_ou_agenda_fonte_ausente(con):
-    _producao(con)
-    assert "trabalho" not in _estados(envelope(con, None, AGORA))  # caixa_email vazia, agenda_fonte inexistente
-
-
 def test_erro_de_banco_que_nao_e_tabela_ausente_nao_e_engolido(con):
-    from gabi.envelope import _trabalho_em_uso
+    from gabi.envelope import _agenda_em_uso
 
     class Trava:
         def execute(self, *a):
             raise sqlite3.OperationalError("database is locked")
     with pytest.raises(sqlite3.OperationalError):
-        _trabalho_em_uso(Trava())
+        _agenda_em_uso(Trava())
 
 
 def test_limite_diario_e_30h(con):

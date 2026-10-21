@@ -36,9 +36,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/caixa/projecao` | Saldo projetado dia a dia (hoje até 90 dias): saldo atual, saídas de compromissos e faturas, entradas de NFS-e a vencer e recorrentes. |
 | GET | `/api/v1/caixa/resumo` | KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção. |
 | GET | `/api/v1/caixa/semanas` | Semanas (passado real e projeção): entradas e saídas por categoria e saldo. |
-| GET | `/api/v1/caixas-email` | Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe. |
-| POST | `/api/v1/caixas-email` | Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim). |
-| PATCH | `/api/v1/caixas-email/{caixa_id}` | Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler). |
 | GET | `/api/v1/cartoes` | Cartões: fatura aberta, % do limite, série de 12 meses e categorias. |
 | GET | `/api/v1/cobrar/a-receber` | O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois). |
 | GET | `/api/v1/cobrar/cobrancas` | Rascunhos de cobrança guardados (opcionalmente de uma empresa). |
@@ -91,18 +88,12 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/decisoes/perguntas` | Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem). |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
-| GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
-| GET | `/api/v1/frentes` | Frentes de trabalho com a contagem de itens confirmados. |
-| POST | `/api/v1/frentes` | Abre uma frente (nome, tipo, empresa e regra vêm do Ricardo). |
-| GET | `/api/v1/frentes/{frente_id}` | Uma frente: e-mails confirmados e os sugeridos que aguardam confirmação. |
-| POST | `/api/v1/frentes/{frente_id}/itens/{item_id}/confirmar` | Confirma que um e-mail entra na frente (só o Ricardo decide). |
 | GET | `/api/v1/gabi/qualidade` | A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias). |
 | GET | `/api/v1/hoje` | O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro. |
 | GET | `/api/v1/lancamentos` | Lançamentos paginados, com filtros e a origem de cada classificação. |
 | POST | `/api/v1/lancamentos/lote` | Muda vários lançamentos de uma vez; criar_regra cria uma regra por estabelecimento. |
 | PATCH | `/api/v1/lancamentos/{lid}` | Muda categoria, para quem, empresa ou frente de um lançamento (a origem vira 'voce'). |
-| GET | `/api/v1/mensagens` | E-mails recentes (cabeçalho e trecho) e os ids que o expurgo sugere (nada é apagado aqui). |
 | GET | `/api/v1/parcelas` | Parcelas: comprometido por mês e andamento de cada compra parcelada. |
 | GET | `/api/v1/regras` | Regras de classificação. |
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
@@ -111,8 +102,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/sugestoes` | Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra. |
 | POST | `/api/v1/sugestoes/{sid}/aprovar` | Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado. |
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |
-| GET | `/api/v1/tarefas` | Tarefas abertas e concluídas, de todas as origens. |
-| POST | `/api/v1/tarefas/{tarefa_id}/concluir` | Conclui a tarefa NA ORIGEM (Graph ou Google) e só então marca aqui. |
 | GET | `/api/v1/teams/fontes` | Contas do Teams cadastradas, com estado, última coleta, último erro e quantas conversas. |
 | POST | `/api/v1/teams/fontes` | Cadastra uma conta do Teams (e-mail). Nasce `a_decidir`: nada é lido até liberar. |
 | PUT | `/api/v1/teams/fontes/{fonte_id}/estado` | Libera (`sim`), desliga (`nao`) ou devolve para decisão (`a_decidir`) uma conta. Só liberada é lida pelo coletor. |

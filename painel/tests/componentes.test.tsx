@@ -77,8 +77,8 @@ test("Shell vira barra inferior abaixo de 760px", () => {
 test("textos da navegacao iguais ao prototipo", () => {
   const nav = Object.fromEntries(GRUPOS.map((g) => [g.titulo, g.areas.map((a) => a.rotulo)]));
   expect(nav).toEqual({
-    Dia: ["Hoje", "Frentes"],
-    Trabalho: ["Agenda", "Mensagens", "Tarefas"],
+    Dia: ["Hoje"],
+    Trabalho: ["Agenda", "Mensagens"],
     Dinheiro: ["Caixa", "Gastos", "Cobrar", "Regras"],
     Casa: ["Cadastros", "Gabi"],
   });

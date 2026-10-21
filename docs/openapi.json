@@ -994,76 +994,6 @@
     "summary": "Semanas"
    }
   },
-  "/api/v1/caixas-email": {
-   "get": {
-    "description": "Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe.",
-    "operationId": "listar_caixas_api_v1_caixas_email_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar Caixas"
-   },
-   "post": {
-    "description": "Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim).",
-    "operationId": "criar_caixa_api_v1_caixas_email_post",
-    "responses": {
-     "201": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Criar Caixa"
-   }
-  },
-  "/api/v1/caixas-email/{caixa_id}": {
-   "patch": {
-    "description": "Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler).",
-    "operationId": "atualizar_caixa_api_v1_caixas_email__caixa_id__patch",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "caixa_id",
-      "required": true,
-      "schema": {
-       "title": "Caixa Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Atualizar Caixa"
-   }
-  },
   "/api/v1/cartoes": {
    "get": {
     "description": "Cartões: fatura aberta, % do limite, série de 12 meses e categorias.",
@@ -2591,23 +2521,6 @@
     "summary": "Destino Agrupado"
    }
   },
-  "/api/v1/entregas": {
-   "get": {
-    "description": "Entregas abertas da Linear (somente leitura), as com prazo primeiro.",
-    "operationId": "entregas_api_v1_entregas_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Entregas"
-   }
-  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",
@@ -2623,123 +2536,6 @@
      }
     },
     "summary": "Fontes"
-   }
-  },
-  "/api/v1/frentes": {
-   "get": {
-    "description": "Frentes de trabalho com a contagem de itens confirmados.",
-    "operationId": "listar_frentes_api_v1_frentes_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar Frentes"
-   },
-   "post": {
-    "description": "Abre uma frente (nome, tipo, empresa e regra vêm do Ricardo).",
-    "operationId": "criar_frente_api_v1_frentes_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Criar Frente"
-   }
-  },
-  "/api/v1/frentes/{frente_id}": {
-   "get": {
-    "description": "Uma frente: e-mails confirmados e os sugeridos que aguardam confirmação.",
-    "operationId": "detalhe_frente_api_v1_frentes__frente_id__get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "frente_id",
-      "required": true,
-      "schema": {
-       "title": "Frente Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Detalhe Frente"
-   }
-  },
-  "/api/v1/frentes/{frente_id}/itens/{item_id}/confirmar": {
-   "post": {
-    "description": "Confirma que um e-mail entra na frente (só o Ricardo decide).",
-    "operationId": "confirmar_item_api_v1_frentes__frente_id__itens__item_id__confirmar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "frente_id",
-      "required": true,
-      "schema": {
-       "title": "Frente Id",
-       "type": "integer"
-      }
-     },
-     {
-      "in": "path",
-      "name": "item_id",
-      "required": true,
-      "schema": {
-       "title": "Item Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Confirmar Item"
    }
   },
   "/api/v1/gabi/qualidade": {
@@ -3006,45 +2802,6 @@
      }
     },
     "summary": "Lancamento Patch"
-   }
-  },
-  "/api/v1/mensagens": {
-   "get": {
-    "description": "E-mails recentes (cabeçalho e trecho) e os ids que o expurgo sugere (nada é apagado aqui).",
-    "operationId": "mensagens_api_v1_mensagens_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "limite",
-      "required": false,
-      "schema": {
-       "default": 50,
-       "title": "Limite",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Mensagens"
    }
   },
   "/api/v1/parcelas": {
@@ -3316,61 +3073,6 @@
      }
     },
     "summary": "Sugestao Rejeitar"
-   }
-  },
-  "/api/v1/tarefas": {
-   "get": {
-    "description": "Tarefas abertas e concluídas, de todas as origens.",
-    "operationId": "tarefas_api_v1_tarefas_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Tarefas"
-   }
-  },
-  "/api/v1/tarefas/{tarefa_id}/concluir": {
-   "post": {
-    "description": "Conclui a tarefa NA ORIGEM (Graph ou Google) e só então marca aqui.",
-    "operationId": "concluir_api_v1_tarefas__tarefa_id__concluir_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "tarefa_id",
-      "required": true,
-      "schema": {
-       "title": "Tarefa Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Concluir"
    }
   },
   "/api/v1/teams/fontes": {

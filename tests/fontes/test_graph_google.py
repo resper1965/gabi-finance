@@ -116,20 +116,6 @@ def test_google_servico_assina_jwt_com_delegacao():
     assert c["iss"] == "sa@p.iam" and c["sub"] == "ricardo@bekaa.eu"
 
 
-def test_dedupe_por_message_id_entre_google_e_graph(tmp_path):
-    from pathlib import Path
-    from gabi.db import conectar, migrar
-    from gabi.trabalho import email
-    con = conectar(tmp_path / "g.db")
-    migrar(con, Path(__file__).parent.parent.parent / "migrations")
-    con.execute("insert into caixa_email(id, endereco, provedor, estado) values (1,'n@ness','google','sim')")
-    con.execute("insert into caixa_email(id, endereco, provedor, estado) values (2,'n@ness','graph','sim')".replace("n@ness", "n@ness.com"))
-    msg = {"message_id": "<mesmo>", "remetente": "a@x.com", "assunto": "Oi", "recebido_em": "2026-10-09T10:00:00Z", "trecho": "oi"}
-    email.ingerir_email(con, 1, lambda c, cur: ([msg], "h"))
-    email.ingerir_email(con, 2, lambda c, cur: ([msg], "d"))
-    assert con.execute("select count(*) from item_email").fetchone()[0] == 1
-
-
 def test_concluir_tarefa_so_faz_patch_de_status():
     srv = Servidor({"/tasks/t1": {}})
     Graph(token=lambda: "tk", http=srv).concluir_tarefa("a@x.com", "L1/t1")

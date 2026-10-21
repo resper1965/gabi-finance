@@ -5,12 +5,10 @@ export interface Grupo { titulo: string | null; areas: Area[] }
 export const GRUPOS: Grupo[] = [
   { titulo: "Dia", areas: [
     { id: "hoje", rotulo: "Hoje", pergunta: "O que precisa de mim hoje?", abas: [["hoje", "Hoje", "O que precisa de mim hoje?"]] },
-    { id: "temas", rotulo: "Frentes", pergunta: "O que está andando em cada frente?", abas: [["temas", "Frentes", "O que está andando em cada frente?"]] },
   ] },
   { titulo: "Trabalho", areas: [
     { id: "agenda", rotulo: "Agenda", pergunta: "Onde preciso estar?", abas: [["agenda", "Agenda", "Onde preciso estar?"]] },
-    { id: "msgs", rotulo: "Mensagens", pergunta: "O que pede resposta?", abas: [["prioridades", "Prioridades", "O que exige ação primeiro?"], ["emails", "E-mails", "O que pede resposta?"]] },
-    { id: "tarefas", rotulo: "Tarefas", pergunta: "O que eu prometi?", abas: [["tarefas", "Tarefas · Microsoft 365", "O que eu prometi?"], ["entregas", "Entregas · Linear", "O que vence nos projetos?"]] },
+    { id: "msgs", rotulo: "Mensagens", pergunta: "O que pede resposta?", abas: [["prioridades", "Prioridades", "O que exige ação primeiro?"]] },
   ] },
   { titulo: "Dinheiro", areas: [
     { id: "caixa", rotulo: "Caixa", pergunta: "Tenho caixa? O que vence?", abas: [["visao", "Resumo", "Tenho caixa?"], ["projecao", "Previsão", "Quanto terei em caixa nos próximos dias?"], ["pedidos", "Pedidos", "O que me pediram para pagar?"], ["fluxo", "Semanas", "Como o caixa anda, semana a semana?"], ["contas", "A pagar", "O que vence, e quando?"]] },
@@ -20,7 +18,7 @@ export const GRUPOS: Grupo[] = [
   ] },
   { titulo: "Casa", areas: [
     { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["listacontatos", "Contatos", "Quem está nos meus contatos?"], ["agendas", "Agenda", "Quais agendas a Gabi lê?"], ["correio", "E-mail", "Quais caixas a Gabi lê?"], ["teams", "Teams", "Quais conversas do Teams a Gabi lê?"]] },
-    { id: "gabi", rotulo: "Gabi", pergunta: "A Gabi está saudável e barata?", abas: [["saude", "Saúde e custo", "A Gabi está saudável e barata?"], ["ingestao", "Ingestão", "Os dados chegaram certos?"], ["conectores", "Integrações", "De onde a Gabi lê?"], ["seguranca", "Segurança", "Quem entra, por onde, e com quê?"], ["mcp", "Servidor MCP", "O que agentes externos podem fazer?"], ["receitas", "Receitas", "Como conecto meu agente?"], ["llm", "Modelos", "Quem classifica, e quanto custa?"], ["qualidade", "Qualidade", "A Gabi acerta e responde rápido?"]] },
+    { id: "gabi", rotulo: "Gabi", pergunta: "A Gabi acerta e responde rápido?", abas: [["qualidade", "Qualidade", "A Gabi acerta e responde rápido?"]] },
   ] },
 ];
 export const AREAS = GRUPOS.flatMap((g) => g.areas);

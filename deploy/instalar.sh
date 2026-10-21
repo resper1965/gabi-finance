@@ -30,14 +30,13 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer "$AQUI"/deploy/gabi-brain-notas.service \
   "$AQUI"/deploy/gabi-brain-notas.timer "$AQUI"/deploy/gabi-brain-avisos.service "$AQUI"/deploy/gabi-brain-avisos.timer "$AQUI"/deploy/gabi-brain-falha@.service "$AQUI"/deploy/gabi-brain-exportacao.service "$AQUI"/deploy/gabi-brain-exportacao.timer \
   "$AQUI"/deploy/gabi-brain-comprovantes.service "$AQUI"/deploy/gabi-brain-comprovantes.timer \
-  "$AQUI"/deploy/gabi-brain-trabalho.service "$AQUI"/deploy/gabi-brain-trabalho.timer \
   "$AQUI"/deploy/gabi-brain-contatos.service "$AQUI"/deploy/gabi-brain-contatos.timer \
   "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
   "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer gabi-brain-trabalho.timer gabi-brain-telegram.timer
+systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer gabi-brain-telegram.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).

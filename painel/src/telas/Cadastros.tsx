@@ -5,7 +5,6 @@ import { api } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
 import { CadastrosCobranca } from "./CadastrosCobranca";
-import { CadastrosCaixas } from "./CadastrosCaixas";
 import { CadastrosEquivalencias } from "./CadastrosEquivalencias";
 
 interface Conta { id: number; apelido: string; instituicao: string; tipo: string; estado: string; limite: string | null; usuarios?: string[] }
@@ -52,7 +51,6 @@ export function Cadastros() {
         </Bloco>
         <CadastrosEquivalencias />
         <CadastrosCobranca />
-        <CadastrosCaixas />
         </div>
       )}
     </Painel>

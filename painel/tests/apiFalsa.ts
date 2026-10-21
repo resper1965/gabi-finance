@@ -13,7 +13,7 @@ const ROTAS: [RegExp, string][] = [
   [/\/cartoes/, "cartoes"], [/\/parcelas/, "parcelas"], [/\/assinaturas/, "assinaturas"], [/\/sugestoes/, "sugestoes"], [/\/regras/, "regras"],
   [/\/gabi\/qualidade/, "qualidade"], [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/rodadas/, "rodadas"], [/\/cobrar\/reembolsos/, "cobrar-reembolsos"], [/\/cobrar\/comprovantes/, "cobrar-comprovantes"],
   [/\/cobrar\/pedidos/, "cobrar-pedidos"], [/\/cobrar\/cobrancas/, "cobrar-cobrancas"], [/\/cadastros\/nibo/, "cadastros-nibo"], [/\/cadastros\/liberacoes/, "cadastros-liberacoes"], [/\/cadastros\/contas/, "cadastros-contas"], [/\/cadastros\/pessoas/, "cadastros-pessoas"],
-  [/\/hoje/, "hoje"], [/\/frentes\/1/, "frente-1"], [/\/frentes/, "frentes"], [/\/agenda/, "agenda"], [/\/mensagens/, "mensagens"], [/\/tarefas/, "tarefas"], [/\/entregas/, "entregas"], [/\/caixas-email/, "caixas-email"],
+  [/\/hoje/, "hoje"], [/\/agenda/, "agenda"],
   [/\/cadastros\/categorias/, "cadastros-categorias"], [/\/cadastros\/empresas/, "cadastros-empresas"],
 ];
 

@@ -297,17 +297,6 @@ def test_ingestao_de_comprovantes_tem_timer_diario_usa_a_ponte_e_avisa_quando_fa
     assert ligadas and "gabi-brain-comprovantes.timer" in ligadas[0]
 
 
-def test_job_do_trabalho_roda_de_15_em_15_min_com_credenciais_so_do_ambiente_e_avisa_quando_falha():
-    srv, t = _ler("gabi-brain-trabalho.service"), _ler("gabi-brain-trabalho.timer")
-    assert "-m gabi.trabalho" in srv and "EnvironmentFile=-/etc/gabi/trabalho.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "User=gabibrain" in srv and "NoNewPrivileges=yes" in srv and "ProtectSystem=strict" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    assert "Unit=gabi-brain-trabalho.service" in t
-    for nome in ("gabi-brain-trabalho.service", "gabi-brain-trabalho.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-trabalho.timer" in ligadas[0]
-
-
 def test_api_le_a_chave_da_saude_so_de_arquivo_e_grava_o_cofre_na_pasta_do_banco():
     api = _ler("gabi-brain-api.service")
     assert "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in api and "ReadWritePaths=/var/lib/gabi-brain" in api
@@ -442,5 +431,3 @@ def test_unidades_do_teams_seguem_o_padrao_e_nao_sao_habilitadas():
 def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
     unit = _ler("gabi-brain-fontes.service")
     assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
-
-
