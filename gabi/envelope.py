@@ -22,6 +22,8 @@ FONTES = {
 COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
 ESPERADAS = ("notas-nibo",)
+# Fontes cortadas pela ADR-023: as rodadas antigas ficam no banco (histórico), mas nunca entram na lista nem no dados_ate.
+CORTADAS = frozenset({"trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta"})
 BRT = dt.timezone(dt.timedelta(hours=-3))
 LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
@@ -93,7 +95,7 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     nomes |= set(ESPERADAS)
     nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
     nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
-    nomes = sorted(n for n in nomes if not (n in FONTES and FONTES[n] is None))
+    nomes = sorted(n for n in nomes if n not in CORTADAS and not (n in FONTES and FONTES[n] is None))
     for nome in nomes:
         conta = FONTES.get(nome) is not None
         tent = con.execute("select status, conferida from rodada where fonte=? order by id desc limit 1", (nome,)).fetchone()

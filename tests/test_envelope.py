@@ -232,3 +232,13 @@ def test_fontes_cortadas_nao_sao_esperadas_nem_desatualizam(con):
     con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")  # caixa legada liberada não liga fonte nenhuma
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False and not cortadas & set(_estados(e))
+
+
+def test_rodadas_antigas_de_fontes_cortadas_nao_aparecem_na_lista(con):
+    """O banco de produção guarda rodadas antigas de trabalho, comprovantes, exames, escuta: elas não podem virar 'a fonte que parou' na faixa."""
+    _r(con, "open-finance", 1, conferida=1)
+    _r(con, "notas-nibo", 1)
+    for f in ("trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta"):
+        _r(con, f, 200, status="erro")
+    nomes = set(_estados(envelope(con, None, AGORA)))
+    assert nomes == {"open-finance", "notas-nibo"}
