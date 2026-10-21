@@ -9,14 +9,14 @@ from starlette.testclient import TestClient
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro.valor import formatar
-from gabi.mcp.servidor import criar_mcp
+from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, criar_mcp
 from gabi.mcp.tokens import emitir, revogar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
-                 "financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo", "despesas_por_empresa", "fechamento_dia"}
+                 "financeiro_recorrentes", "financeiro_previsao", "despesas_por_empresa", "fechamento_dia"}
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "classificar_lancamento", "regras_sugerir"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
@@ -108,6 +108,13 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
+def test_sobram_exatamente_as_18_ferramentas_da_simplificacao():
+    assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "classificar_lancamento", "decisao_responder", "decisoes_abertas",
+                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "email_listar", "fechamento_dia",
+                                           "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
+                                           "financeiro_recorrentes", "financeiro_saldo", "regras_sugerir", "resumo_manha"]
+
+
 def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     nomes = {t["name"] for t in rpc(cli, tokens["fin"], "tools/list").json()["result"]["tools"]}
     assert nomes == PERMITIDAS
@@ -272,7 +279,7 @@ def test_smoke_cliente_oficial_streamable_http(banco, tokens):
 
 
 # ---------------- MC1: análises somente leitura ----------------
-ANALISE = ("financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo")
+ANALISE = ("financeiro_recorrentes", "financeiro_previsao")
 
 
 def _academia(banco):
@@ -303,33 +310,10 @@ def test_previsao_e_dias_invalido(cli, tokens):
     assert chamar(cli, tokens["fin"], "financeiro_previsao", dias=9999)["erro"] == "requisicao_invalida"
 
 
-def test_vazamentos_traz_chaves_e_meses_invalido(cli, tokens):
-    d = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=3)["dados"]
-    assert {"assinaturas", "aumentos"} <= set(d)
-    assert chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=0)["erro"] == "requisicao_invalida"
-
-
-def test_rumo_formata_valores(cli, tokens):
-    d = chamar(cli, tokens["fin"], "financeiro_rumo", ano=2026)["dados"]
-    out = next(l for l in d["meses"] if l["mes"] == "2026-10")
-    assert out["entradas"] == formatar(800000)
-    assert chamar(cli, tokens["fin"], "financeiro_rumo", ano=1900)["erro"] == "requisicao_invalida"
-
-
 def test_previsao_parte_do_caixa_unico_e_sem_float(cli, tokens):
     saldo = chamar(cli, tokens["fin"], "financeiro_saldo")["dados"]["caixa_unico"]
     p = chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
     assert p["saldo_inicial"] == saldo == "12345.60" and isinstance(p["menor_saldo"], str)
-
-
-def test_vazamentos_sem_float_em_dinheiro(cli, banco, tokens):
-    c = conectar(banco)
-    for i, m in enumerate(["2026-06", "2026-07", "2026-08", "2026-09"], start=20):
-        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
-                  "values (1,?,?,-5990,'STREAMING','caixa+custo','posted')", (f"v{i}", f"{m}-05"))
-    c.close()
-    ass = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=4)["dados"]["assinaturas"]
-    assert [a["mensal"] for a in ass if a["item"].startswith("STREAMING")] == ["59.90"]
 
 
 def test_previsao_sem_saldo_avisa_em_vez_de_zero(cli, banco, tokens):

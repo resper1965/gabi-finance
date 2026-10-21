@@ -111,9 +111,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `financeiro_para_onde_vai` | `fin` | periodo, por | Para onde foi o dinheiro: periodo = mes | semana | 12m; por = categoria | pessoa | fornecedor. Traz % do total e variação contra o período anterior. |
 | `financeiro_previsao` | `fin` | dias | Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura. |
 | `financeiro_recorrentes` | `fin` | sentido | Entradas e saídas recorrentes aprendidas dos últimos 6 meses (valor médio, dia típico, fixo ou variável). `sentido`: entrada ou saida. Só leitura. |
-| `financeiro_rumo` | `fin` | ano | Rumo mês a mês do `ano` (padrão: o atual): entradas, saídas, poupança, gasto e patrimônio. Só leitura. |
 | `financeiro_saldo` | `fin` | conta | Saldo do caixa único (só as contas que o Ricardo liberou) e faturas de cartão em aberto. `conta` filtra pelo apelido. |
-| `financeiro_vazamentos` | `fin` | meses | Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura. |
 | `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |
 | `resumo_manha` | `trabalho` | — | Resumo da manhã já formatado para o celular, em blocos Financeiro, Agenda e E-mail (começa por 'dados desatualizados' se for o caso). Entregar exatamente como vem. |
 

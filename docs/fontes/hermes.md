@@ -28,9 +28,7 @@ mcp_servers:
       - financeiro_para_onde_vai
       - financeiro_previsao
       - financeiro_recorrentes
-      - financeiro_rumo
       - financeiro_saldo
-      - financeiro_vazamentos
       - regras_sugerir
       - resumo_manha
 ```

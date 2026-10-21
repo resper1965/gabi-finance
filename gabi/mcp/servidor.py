@@ -17,7 +17,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_empresa, fechamento, consultas, contas_pagar as cp, rumo
+from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_empresa, fechamento, consultas, contas_pagar as cp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -30,7 +30,7 @@ _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "fechamento_dia": "fin",
-                       "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
+                       "financeiro_recorrentes": "fin", "financeiro_previsao": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS}
 
 
@@ -186,24 +186,6 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
                 r = {**r, "saldo_indisponivel": True, "aviso": "sem saldo lido das contas liberadas; os saldos abaixo partem de zero e não valem"}
             return _reais(r)
         return executar("financeiro_previsao", f)
-
-    @srv.tool()
-    def financeiro_vazamentos(meses: int = 3) -> dict:
-        """Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura."""
-        def f(con, agora):
-            return _reais(analise.vazamentos(FonteAnalise(con, so_liberadas=True), ferramentas_dia._inteiro(meses, 1, 12, "meses"), agora.date()))
-        return executar("financeiro_vazamentos", f)
-
-    @srv.tool()
-    def financeiro_rumo(ano: int | None = None) -> dict:
-        """Rumo mês a mês do `ano` (padrão: o atual): entradas, saídas, poupança, gasto e patrimônio. Só leitura."""
-        def f(con, agora):
-            a = ferramentas_dia._inteiro(ano if ano is not None else agora.year, 2000, 2100, "ano")
-            meses = [{"mes": l.mes, "entradas": formatar(l.entradas), "saidas": formatar(l.saidas), "poupanca": formatar(l.poupanca),
-                      "gasto": formatar(l.gasto), "patrimonio": None if l.patrimonio is None else formatar(l.patrimonio)}
-                     for l in rumo.rumo_mensal(con, a)]
-            return {"ano": a, "meses": meses}
-        return executar("financeiro_rumo", f)
 
     @srv.tool()
     def financeiro_lancamentos(de: str | None = None, ate: str | None = None, conta: str | None = None, categoria: int | None = None,
