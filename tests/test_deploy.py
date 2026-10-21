@@ -430,6 +430,21 @@ def test_todo_modulo_que_uma_unit_executa_existe():
         assert importlib.util.find_spec(nome) is not None, nome
 
 
-def test_units_cortadas_nao_voltam_ao_instalador():
-    for nome in ("gabi-brain-escuta", "escuta-ouvinte", "gabi-brain-trabalho", "gabi-brain-comprovantes", "gabi-brain-exames", "gabi-brain-reembolso-saude"):
-        assert nome not in INSTALAR and not list(DEPLOY.glob(f"{nome}.*")), nome
+CORTADAS = ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path", "escuta-ouvinte.service", "gabi-brain-trabalho.service",
+            "gabi-brain-trabalho.timer", "gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer", "gabi-brain-exames.service",
+            "gabi-brain-exames.timer", "gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer")
+
+
+def test_units_cortadas_nao_voltam_ao_repositorio():
+    for nome in CORTADAS:
+        assert not (DEPLOY / nome).exists(), nome
+
+
+def test_instalador_desliga_e_remove_as_units_cortadas_antes_do_reload():
+    """Na VPS elas seguem ligadas desde o instalador antigo: sem desligar, `python -m gabi.trabalho` falharia a cada 15 min (ADR-023)."""
+    linhas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith("#")]
+    texto = "\n".join(linhas)
+    reload = texto.index("systemctl daemon-reload")
+    for nome in CORTADAS:
+        assert f"/etc/systemd/system/{nome}" in texto[:reload] or nome in texto[:reload], nome
+    assert "disable --now" in texto[:reload] and "rm -f" in texto[:reload]

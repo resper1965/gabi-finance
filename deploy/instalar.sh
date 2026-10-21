@@ -34,6 +34,13 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
   "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
+# Units cortadas pela ADR-023 (22/10/2026): desliga e remove as que o instalador antigo deixou em /etc/systemd/system (idempotente; não apaga dado).
+for u in gabi-brain-escuta.service gabi-brain-escuta.timer gabi-brain-escuta.path escuta-ouvinte.service gabi-brain-trabalho.service gabi-brain-trabalho.timer \
+         gabi-brain-comprovantes.service gabi-brain-comprovantes.timer gabi-brain-exames.service gabi-brain-exames.timer \
+         gabi-brain-reembolso-saude.service gabi-brain-reembolso-saude.timer; do
+  systemctl disable --now "$u" 2>/dev/null || true
+  rm -f "/etc/systemd/system/$u"
+done
 systemctl daemon-reload
 systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-telegram.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
