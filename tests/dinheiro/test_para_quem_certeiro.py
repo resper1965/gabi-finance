@@ -93,3 +93,29 @@ def test_fila_nao_aplica_se_o_lancamento_ja_tem_dono(con):
     con.execute("insert into sugestao(tipo, lancamento_id, payload, motivo, criado_em) values ('para_quem',?,?, 'x', '2026-10-21')",
                 (lid, json.dumps({"para_quem_id": "p1"})))
     assert aplicar_fila_para_quem(con, AGORA) == 0 and _l(con, lid)["para_quem_id"] == "p2"
+
+
+def test_certeiro_fecha_a_sugestao_pendente_do_lancamento_na_rodada_real(con):
+    """classificar_pendentes roda antes da fila: aplicar o certeiro precisa fechar a sugestão antiga, senão ela fica pendente para sempre."""
+    from gabi.dinheiro.classificar import classificar_pendentes
+    _decidido(con, 1, "SEGURO", "p1")
+    lid = _lanc(con, 2, desc="SEGURO X", estab="SEGURO")
+    classificar(con, lid)
+    assert _pendentes(con, lid) == 1                     # 1 decisão: só sugere
+    _decidido(con, 3, "SEGURO", "p1")                    # a 2ª decisão chega
+    classificar_pendentes(con)
+    aplicar_fila_para_quem(con, AGORA)
+    assert (_l(con, lid)["para_quem_id"], _l(con, lid)["para_quem_origem"]) == ("p1", "gabi")
+    assert _pendentes(con, lid) == 0
+    s = con.execute("select estado, motivo from sugestao where lancamento_id=? and tipo='para_quem'", (lid,)).fetchone()
+    assert s["estado"] == "aprovada" and s["motivo"].endswith("aplicada sozinha")
+
+
+def test_fila_fecha_pendente_de_lancamento_que_ja_tem_dono_gabi(con):
+    _decidido(con, 1, "SEGURO", "p1")
+    _decidido(con, 2, "SEGURO", "p1")
+    lid = _lanc(con, 3, desc="SEGURO X", estab="SEGURO", para_quem_id="p1", para_quem_origem="gabi")
+    con.execute("insert into sugestao(tipo, lancamento_id, payload, motivo, criado_em) values ('para_quem',?,?, 'x', '2026-10-21')",
+                (lid, json.dumps({"para_quem_id": "p1"})))
+    aplicar_fila_para_quem(con, AGORA)
+    assert _pendentes(con, lid) == 0

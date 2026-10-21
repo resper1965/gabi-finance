@@ -4,6 +4,7 @@ R1: só as camadas que o Ricardo aprovou GRAVAM (regra ativa, equivalência de c
 modelo só criam SUGESTÃO pendente. Preenche apenas campos vazios; nunca sobrescreve origem `voce`.
 Consome: db (lancamento, regra, equivalencia_categoria, sugestao).
 """
+import datetime as dt
 import json
 import re
 import unicodedata
@@ -61,11 +62,15 @@ def para_quem_certeiro(con, lid: int, estab: str | None) -> str | None:
     return r["p"] if r["n"] >= MIN_DECISOES_CERTEIRO and r["d"] == 1 else None
 
 
-def aplicar_certeiro(con, lid: int, estab: str, pessoa: str) -> None:
-    """Preenche com origem 'gabi' e registra em `decisao` (o Ricardo desfaz trocando a pessoa no painel: vira 'voce')."""
+def aplicar_certeiro(con, lid: int, estab: str, pessoa: str, agora_iso: str | None = None) -> None:
+    """Preenche com origem 'gabi', registra em `decisao` e fecha a sugestão de "para quem" que estava pendente para o lançamento
+    (senão ela ficaria na fila, e recusá-la não desfaria nada). O Ricardo desfaz trocando a pessoa no painel: vira 'voce'."""
+    agora = agora_iso or dt.datetime.now(dt.timezone.utc).isoformat()
     _preencher(con, lid, "para_quem", "para_quem_id", pessoa, "gabi")
-    con.execute("insert into decisao(quando, quem, o_que, origem) values (datetime('now'), ?, ?, 'classificacao')",
-                (QUEM_CERTEIRO, f"lançamento {lid}: para quem = {pessoa} ({estab}: todas as suas decisões foram iguais)"))
+    con.execute("update sugestao set estado='aprovada', decidida_em=?, motivo=coalesce(motivo,'') || '; aplicada sozinha' "
+                "where lancamento_id=? and tipo='para_quem' and estado='pendente'", (agora, lid))
+    con.execute("insert into decisao(quando, quem, o_que, origem) values (?, ?, ?, 'classificacao')",
+                (agora, QUEM_CERTEIRO, f"lançamento {lid}: para quem = {pessoa} ({estab}: todas as suas decisões foram iguais)"))
 
 
 def _sugerir_por_cache(con, lid: int, estab: str, campo: str, col: str) -> bool:
