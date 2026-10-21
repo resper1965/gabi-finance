@@ -7,6 +7,9 @@ O núcleo que deixa **desligar o `gabi-fin` e o OpenClaw** e marcar a tag `v1.0-
 Legenda: dono **R** = Ricardo · **C** = Claude · **R+C** = juntos. Status: ✅ pronto · 🔧 em curso · ⛔ bloqueado · ⏸ em espera · ❓ a verificar.
 Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático · segredos só o Ricardo coloca · dados nunca chumbados · nada no claude.ai · esquema novo = migração 0027+ (confirmar o próximo número em `migrations/`).
 
+## Em espera por chave de terceiros (ordem do dono, 21/10)
+Google (contatos G12), Graph da ionic e Nibo (A7/C2/C3) aguardam chave ou consentimento. **Não alertar, não cobrar e não propor ações sobre eles até o Ricardo dizer que estamos liberados.** Feito em 21/10: `gabi-brain-notas.timer` desligado (religar: `sudo systemctl enable --now gabi-brain-notas.timer`); fontes Google de agenda e e-mail (esper.ws, gmail.com) já estavam em `nao`; a ionic não tem fonte criada.
+
 ## Núcleo
 
 ### 1. Dinheiro
