@@ -391,3 +391,35 @@ def test_dia_sem_lancamento_mas_saldo_mudou_continua_reprovando_o_volume(con):
     _saldo(con, "2026-10-06T22:00:00", 50000)
     _saldo(con, "2026-10-07T22:00:00", 70000)
     assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["volume_proximo"].ok is False
+
+
+def test_saldo_final_explicado_por_parte_dos_pendentes_passa(con):
+    # Itaú 21/10/2026: o banco abateu Claro e Seguro do saldo; Eletropaulo e Vivo seguem pendentes e ainda não abatidos
+    _saldo(con, "2026-10-07T23:00:00", 124017)
+    for i, v in enumerate((-87714, -33043, -60646, -6400)):
+        _lanc(con, i + 1, "2026-10-08", v, status="pending")
+    _saldo(con, "2026-10-08T15:00:00", 124017 - 120757)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"]
+    assert r.ok is True and "pendente" in r.detalhe
+
+
+def test_saldo_final_que_nenhuma_parte_dos_pendentes_explica_reprova(con):
+    _saldo(con, "2026-10-07T23:00:00", 124017)
+    for i, v in enumerate((-87714, -33043, -60646, -6400)):
+        _lanc(con, i + 1, "2026-10-08", v, status="pending")
+    _saldo(con, "2026-10-08T15:00:00", 124017 - 50000)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False
+
+
+def test_saldo_final_diferenca_de_1_centavo_e_arredondamento(con):
+    # Bradesco 21/10/2026: rendimento do investimento automático moveu o saldo em 1 centavo sem lançamento
+    _saldo(con, "2026-10-07T23:00:00", 18875)
+    _saldo(con, "2026-10-08T15:00:00", 18876)
+    r = _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"]
+    assert r.ok is True and "arredondamento" in r.detalhe
+
+
+def test_saldo_final_diferenca_de_2_centavos_ainda_reprova(con):
+    _saldo(con, "2026-10-07T23:00:00", 18875)
+    _saldo(con, "2026-10-08T15:00:00", 18877)
+    assert _por_tipo(conferir(con, _rodada(con), 1, HOJE))["saldo_final"].ok is False

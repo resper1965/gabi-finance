@@ -17,6 +17,8 @@ FRACAO_ESPERADO = 0.5   # dia da semana com movimento em >= 50% das semanas é d
 VOLUME_MINIMO = 0.5     # ontem >= 50% da mediana dos dias úteis anteriores
 MEDIANA_MINIMA = 2
 MIN_SEGUIDOS = 2        # buraco só reprova com >= 2 dias úteis SEGUIDOS sem movimento (calibrado com dado real, 09/10/2026; ADR-009)
+TOLERANCIA_SALDO = 1        # centavos: rendimento/arredondamento do banco move o saldo sem lançamento (Bradesco, 21/10/2026)
+MAX_PENDENTES = 20          # acima disso não se tenta explicar a diferença por parte dos pendentes
 DENSIDADE_REGULAR = 0.75   # fração dos dias úteis do histórico com movimento; abaixo disso a conta é "de movimento irregular"
 MIN_SEGUIDOS_IRREGULAR = 4  # conta irregular: 2 e até 3 dias úteis vazios seguidos são rotina (C6 PJ e Itaú, dado real 09/10/2026; ADR-009)
 
@@ -35,6 +37,15 @@ def _d(s: str) -> dt.date:
 
 def _util(d: dt.date) -> bool:
     return d.weekday() < 5 and d not in previstas.feriados(d.year)
+
+
+def _soma_de_algum_subconjunto(valores: list[int], alvo: int) -> bool:
+    if not valores or len(valores) > MAX_PENDENTES:
+        return False
+    somas = {0}
+    for v in valores:
+        somas |= {x + v for x in somas}
+    return alvo in somas
 
 
 def _saldo_final(con, conta_id: int, tipo: str) -> tuple[bool, str]:
@@ -56,10 +67,12 @@ def _saldo_final(con, conta_id: int, tipo: str) -> tuple[bool, str]:
     dif = variacao - esperado
     if dif == 0:
         return True, f"variação do saldo {variacao} = lançamentos {esperado} (centavos)"
-    pendentes = con.execute(
-        "select coalesce(sum(valor_centavos),0) from lancamento where conta_id=? and status='pending' and data>? and data<=?",
-        (conta_id, base["em"][:10], dia)).fetchone()[0]
-    if pendentes and dif == pendentes:  # o banco já abateu o pendente do saldo, mas ele ainda não é lançamento postado
+    if abs(dif) <= TOLERANCIA_SALDO:  # rendimento ou arredondamento do banco, sem lançamento
+        return True, f"diferença de {dif} centavo(s) tratada como arredondamento"
+    valores_pendentes = [r[0] for r in con.execute(
+        "select valor_centavos from lancamento where conta_id=? and status='pending' and data>? and data<=?",
+        (conta_id, base["em"][:10], dia))]
+    if _soma_de_algum_subconjunto(valores_pendentes, dif):  # o banco já abateu parte (ou todos) os pendentes do saldo, mas eles ainda não são lançamento postado (Itaú, 21/10/2026)
         return True, f"diferença de {dif} centavos explicada por lançamento(s) pendente(s)"
     do_dia_base = con.execute(
         "select coalesce(sum(valor_centavos),0) from lancamento where conta_id=? and status='posted' and data=?",
