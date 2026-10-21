@@ -61,8 +61,7 @@ def test_testar_restauracao_ok_contagens_iguais_as_da_origem(banco, tmp_path):
 def test_arquivo_corrompido_falha_na_restauracao(banco, tmp_path):
     destino = backup_db(conectar(banco), tmp_path / "bk", HOJE)
     dados = bytearray(destino.read_bytes())
-    meio = len(dados) // 2
-    dados[meio:meio + 4096] = b"\xff" * 4096
+    dados[4096:] = b"\xff" * (len(dados) - 4096)  # tudo depois da 1ª página: corrompe com certeza, qualquer que seja o tamanho do banco
     destino.write_bytes(bytes(dados))
     r = testar_restauracao(destino, ["pessoa"])
     assert r["ok"] is False

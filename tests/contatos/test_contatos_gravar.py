@@ -34,7 +34,7 @@ class FakeGraph:
 
 def _antigas(r):
     """Só criar/corrigir: os tipos de limpeza têm testes próprios."""
-    return {k: r[k] for k in ("criar", "corrigir")}
+    return {k: r[k] for k in ("corrigir",)}
 
 
 @pytest.fixture
@@ -381,7 +381,7 @@ def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
     from gabi.contatos import contatos_propostas as cp
     itens = [{"nome": "Beltrano", "telefone": "11 9999-0000", "graph_id": "AAMk0001", "campo": "mobile"}]
     c.sincronizar(con, c.contas_contatos(con), lambda conta: list(itens) if conta == NESS else [])
-    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 1}
+    assert _antigas(cp.gerar(con, AGORA)) == {"corrigir": 1}
     (pid,) = [r["id"] for r in cp.listar(con, "pendente")]
     assert cp.aprovar_correcoes(con, "ricardo", AGORA, [pid]) == 1
     _ligar(con)
@@ -391,10 +391,10 @@ def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
                                {"nome": "Beltrano", "telefone": "+5511999990000"})]
     linha = con.execute("select telefone_original, telefone from contato_graph where graph_id='AAMk0001'").fetchone()
     assert tuple(linha) == ("+5511999990000", "+5511999990000")
-    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
+    assert _antigas(cp.gerar(con, AGORA)) == {"corrigir": 0}
     # e a próxima sincronização, com o Graph já corrigido, também não gera nada
     c.sincronizar(con, c.contas_contatos(con), lambda conta: [{**itens[0], "telefone": "+5511999990000"}] if conta == NESS else [])
-    assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
+    assert _antigas(cp.gerar(con, AGORA)) == {"corrigir": 0}
 
 
 # ---------------- limpeza (ADR-021) ----------------

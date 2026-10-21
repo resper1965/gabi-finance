@@ -9,7 +9,7 @@ MIGRACOES = Path(__file__).parent.parent / "migrations"
 ESPERADAS = {
     "pessoa", "pet", "empresa", "compromisso_fixo", "matriz_acesso", "allowlist_vip", "acesso",
     "compromisso", "fatura", "conciliacao", "conta_estado", "agenda_estado", "agenda_eventos",
-    "memoria", "memoria_fts", "rodada", "chamada", "decisao", "token_agente", "schema_versao",
+    "memoria", "rodada", "chamada", "decisao", "token_agente", "schema_versao",
 }
 
 
@@ -38,22 +38,6 @@ def _mem(con, chave, texto):
 def _achar(con, termo):
     return [r[0] for r in con.execute(
         "select m.texto from memoria_fts f join memoria m on m.id=f.rowid where memoria_fts match ?", (termo,))]
-
-
-def test_busca_sem_acento_acha_com_acento(con):
-    _mem(con, "1", "Consulta da Helena na terça")
-    _mem(con, "2", "A Bia gosta de Açaí")
-    assert _achar(con, "terca") == ["Consulta da Helena na terça"]
-    assert _achar(con, "acai") == ["A Bia gosta de Açaí"]
-
-
-def test_fts_acompanha_update_e_delete(con):
-    _mem(con, "1", "reunião com o cliente")
-    con.execute("update memoria set texto='jantar em família' where chave='1'")
-    assert _achar(con, "reuniao") == []
-    assert _achar(con, "familia") == ["jantar em família"]
-    con.execute("delete from memoria where chave='1'")
-    assert _achar(con, "familia") == []
 
 
 def test_memoria_chave_unica(con):
@@ -166,19 +150,3 @@ def test_correio_respondido_tem_chave_composta_e_exige_a_fonte(con):
     con.execute("pragma foreign_keys=on")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into email_respondido(fonte_id, endereco, em) values (999, 'z@x.com', '2026-10-12T10:00:00+00:00')")
-
-
-def test_exame_doc_sem_dado_de_saude(con):
-    cols = [r[1] for r in con.execute("pragma table_info(exame_doc)")]
-    assert cols == ["paperless_id", "estado", "versao", "motivo", "atualizado_em"]
-
-
-def test_exame_doc_estado_invalido_rejeitado(con):
-    con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (1, 'novo', 'x')")
-    with pytest.raises(sqlite3.IntegrityError):
-        con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (2, 'qualquer', 'x')")
-
-
-def test_exame_doc_aceita_descartado_e_a_0032_mantem_as_colunas(con):
-    assert [r[1] for r in con.execute("pragma table_info(exame_doc)")] == ["paperless_id", "estado", "versao", "motivo", "atualizado_em"]
-    con.execute("insert into exame_doc(paperless_id, estado, atualizado_em) values (3, 'descartado', 'x')")

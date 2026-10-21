@@ -5,7 +5,6 @@ import unicodedata
 
 from gabi.db import transacao
 from gabi.contatos import contatos
-from gabi.contatos.interacao import interacao, passa_piso
 
 _E164 = re.compile(r"^\+\d{10,15}$")
 ESTADOS_DECISAO = ("aprovada", "recusada")
@@ -158,22 +157,10 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
 
 
 def gerar(con, agora: str) -> dict:
-    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros,
-    abaixo_do_piso = remetentes aprovados que não viram `criar` por falta de interação (1 resposta ou 5 mensagens nos últimos 12 meses)."""
-    criar = corrigir = abaixo = 0
-    conta = contatos.conta_origem(con)
+    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros.
+    `criar` (contato novo vindo do WhatsApp) não é mais gerado: dependia da escuta, que saiu (ADR-023); as linhas antigas seguem decidíveis."""
+    corrigir = 0
     with transacao(con):
-        for r in con.execute("select numero, nome from escuta_remetente where estado='aprovado' and nome is not null and trim(nome)<>'' order by numero").fetchall():
-            nome, numero = _nome(r["nome"]), r["numero"]
-            if nome is None or not _E164.match(numero or ""):
-                continue
-            if con.execute("select 1 from contato_graph where telefone=?", (numero,)).fetchone() or \
-                    con.execute("select 1 from contato_google where telefone=?", (numero,)).fetchone():
-                continue
-            if not passa_piso(interacao(con, agora, telefone=numero)):
-                abaixo += 1
-                continue
-            criar += _inserir(con, agora, "criar", conta, None, None, None, nome, numero, "whatsapp")
         for r in con.execute("select conta, graph_id, nome, telefone_original, telefone from contato_graph where campo='mobile' and telefone is not null "
                              "order by conta, graph_id, telefone_original").fetchall():
             nome, novo = _nome(r["nome"]), r["telefone"]
@@ -185,8 +172,8 @@ def gerar(con, agora: str) -> dict:
             corrigir += _inserir(con, agora, "corrigir", r["conta"], r["graph_id"], r["nome"], r["telefone_original"], nome, novo, "telefone_invalido")
         nomes, apagar_c, apagar_t = _limpeza(con, agora)
         add_email, revisar = _emails(con, agora)
-    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c,
-            "adicionar_email": add_email, "revisar": revisar, "abaixo_do_piso": abaixo}
+    return {"corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c,
+            "adicionar_email": add_email, "revisar": revisar}
 
 
 def listar(con, estado: str | None = None) -> list[dict]:

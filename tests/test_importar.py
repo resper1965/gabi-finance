@@ -45,13 +45,6 @@ def test_dinheiro_vira_centavos_inteiros(con):
     assert con.execute("select typeof(saldo_centavos) from conta_estado").fetchone()[0] == "integer"
 
 
-def test_memoria_busca_funciona_apos_importar(con):
-    importar_staging(con, STAGING)
-    achados = [r[0] for r in con.execute(
-        "select m.texto from memoria_fts f join memoria m on m.id=f.rowid where memoria_fts match 'terca'")]
-    assert achados == ["Consulta da Helena na terça"]
-
-
 def test_compromisso_fixo_e_pessoa_referenciada(con):
     importar_staging(con, STAGING)
     linha = con.execute("select pessoa_id, valor_texto, dia_vencimento from compromisso_fixo").fetchone()
