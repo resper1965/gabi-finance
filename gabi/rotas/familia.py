@@ -225,7 +225,7 @@ async def reprocessar(request: Request, ident: Identidade = SO_BOSS):
     cliente = fabrica_modelo() if fabrica_modelo else None
     banco = request.app.state.banco
     if cliente is not None:
-        from gabi.escuta.__main__ import ModeloComCusto
+        from gabi.correio.modelo import ModeloComCusto
         cliente = ModeloComCusto(cliente, banco, tarefa="exames")
     con = _con(request)
     try:

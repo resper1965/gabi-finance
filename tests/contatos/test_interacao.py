@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.escuta import interacao as i
+from gabi.contatos import interacao as i
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
 AGORA = "2026-10-21T12:00:00Z"

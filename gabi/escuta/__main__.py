@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
 from gabi.escuta.caixa import ingerir_spool, limpar_orfaos, purgar_antigas
-from gabi.escuta.classificar import recusa_sem_envio
+from gabi.correio.modelo import ModeloComCusto, cliente_da_ponte  # noqa: F401
 from gabi.escuta.crise import escrever_palavras_risco
 from gabi.escuta.destinos import DestinosReais
 from gabi.escuta.processar import processar
@@ -44,111 +44,6 @@ def _anexo_max_bytes(con) -> int:
     if isinstance(mb, bool) or not isinstance(mb, (int, float)) or mb <= 0:
         mb = 25
     return int(mb * 1024 * 1024)
-
-
-CUSTO_RESERVA_USD = 0.05  # custo inválido (NaN, infinito, negativo) nunca subnotifica o gasto: grava este valor fixo
-
-
-def custo_padrao_usd() -> float:
-    """Custo conservador de uma chamada que falhou depois do envio: OPENROUTER_CUSTO_PADRAO_USD (o mesmo do serviço de fontes), padrão 0,05."""
-    try:
-        v = float(os.environ.get("OPENROUTER_CUSTO_PADRAO_USD", CUSTO_RESERVA_USD))
-    except ValueError:
-        return CUSTO_RESERVA_USD
-    return v if math.isfinite(v) and v > 0 else CUSTO_RESERVA_USD
-
-
-PISO_RESERVA_USD = 0.001    # a reserva de falha nunca fica abaixo disto
-FATOR_RESERVA = 5           # reserva = 5 x a mediana do custo real da própria tarefa
-MIN_AMOSTRAS_RESERVA = 10   # com menos chamadas completadas que isto, vale o padrão conservador
-JANELA_RESERVA = dt.timedelta(days=14)
-
-
-def reserva_falha_usd(con, tarefa: str, agora: dt.datetime) -> float:
-    """Custo a gravar quando uma chamada falha DEPOIS do envio. Seguir o custo real da tarefa (A6): a reserva fixa de US$ 0,05 contra
-    chamadas de US$ 0,0001 fazia 20 timeouts por dia (US$ 1) estourarem o teto diário e bloquearem o modelo. Sem histórico suficiente, o padrão
-    conservador (`custo_padrao_usd`) continua valendo, e ele também é o teto da reserva."""
-    padrao = custo_padrao_usd()
-    try:
-        desde = (agora - JANELA_RESERVA).astimezone(BRT).isoformat()
-        custos = sorted(r[0] for r in con.execute("select custo_usd from custo_modelo where tarefa=? and em>=?", (tarefa, desde)) if r[0] is not None)
-    except sqlite3.Error:
-        return padrao
-    if len(custos) < MIN_AMOSTRAS_RESERVA:
-        return padrao
-    mediana = custos[len(custos) // 2]
-    return min(padrao, max(PISO_RESERVA_USD, FATOR_RESERVA * mediana))
-
-
-class ModeloComCusto:
-    """Cada chamada COMPLETADA vira, NA HORA, uma linha em `custo_modelo` (tarefa `tarefa`, padrão 'escuta'; chamada que falhou depois do envio: tarefa
-    '<tarefa>-falha' com custo conservador, `em` = instante da chamada em BRT), numa
-    SEGUNDA conexão em autocommit (WAL + busy_timeout). O serviço de fontes já cobrou a chamada: se o insert falhar (lock), a
-    classificação paga NÃO se perde; a linha fica pendente e é regravada na próxima chamada completada e em `fechar()`.
-    Erro do cliente propaga (recusa antes do envio não grava)."""
-
-    def __init__(self, cliente, banco: Path, relogio=None, tarefa: str = "escuta", tarefa_visao: str | None = None):
-        self._cliente, self._relogio, self._tarefa = cliente, relogio or (lambda: dt.datetime.now(dt.timezone.utc)), tarefa
-        self._tarefa_visao = tarefa_visao or f"{tarefa}-visao"  # leitura de PDF por imagem tem custo próprio (exames-visao, reembolso-visao)
-        self._con = conectar(banco)
-        self.pendentes: list[tuple[str, float]] = []
-
-    def _gravar_pendentes(self) -> None:
-        while self.pendentes:
-            try:
-                self._con.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,?)", self.pendentes[0])
-            except sqlite3.Error:
-                return
-            self.pendentes.pop(0)
-
-    def _registrar(self, tarefa: str, chamada) -> tuple[str, float]:
-        try:
-            texto, custo = chamada()
-        except Exception as e:
-            # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
-            # Recusa antes do envio (não configurado, teto, limite, prompt grande, PDF inválido ou grande) não cobra nada.
-            if recusa_sem_envio(e) is None:
-                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), reserva_falha_usd(self._con, tarefa, self._relogio()), f"{tarefa}-falha"))
-                self._gravar_pendentes()
-            raise
-        try:
-            ok = isinstance(custo, (int, float)) and not isinstance(custo, bool) and math.isfinite(custo) and custo >= 0
-        except TypeError:
-            ok = False
-        custo = float(custo) if ok else CUSTO_RESERVA_USD
-        self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, tarefa))
-        self._gravar_pendentes()
-        return texto, custo
-
-    def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
-        return self._registrar(self._tarefa, lambda: self._cliente.completar(prompt, forte=forte))
-
-    @property
-    def completar_pdf(self):
-        """Só existe se o cliente de baixo sabe ler PDF (quem chama testa com getattr: sem o método, o PDF sem texto continua `falhou`)."""
-        interno = getattr(self._cliente, "completar_pdf", None)
-        if not callable(interno):
-            raise AttributeError("completar_pdf")
-
-        def completar_pdf(pdf: bytes, prompt: str, *, forte: bool = False, **tetos) -> tuple[str, float]:
-            return self._registrar(self._tarefa_visao, lambda: interno(pdf, prompt, forte=forte, **tetos))
-        return completar_pdf
-
-    def fechar(self) -> None:
-        self._gravar_pendentes()
-        if self.pendentes:  # só a contagem, nunca valores
-            print(f"AVISO: {len(self.pendentes)} linha(s) de custo_modelo não gravada(s)", file=sys.stderr)
-        self._con.close()
-
-
-def cliente_da_ponte(socket_path: str | None):
-    """Sem socket ou com o modelo não configurado na ponte: None (mensagens ficam `nova`; crise por palavra continua)."""
-    if not socket_path:
-        return None
-    try:
-        return PonteModelo(socket_path) if Ponte(socket_path, "openrouter").configurada() else None
-    except Exception:  # noqa: BLE001 - ponte fora do ar nunca aborta a rodada
-        return None
 
 
 def _tempo_max_s(con) -> float:

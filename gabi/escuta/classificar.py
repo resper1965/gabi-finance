@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 
 from gabi.dinheiro.modelo import LIMIAR, ModeloCliente, Orcamento
+from gabi.correio.modelo import Falha, _chamar, recusa_sem_envio  # noqa: F401 (reexporta até a escuta sair)
 from gabi.mascara import mascarar_texto
 
 TIPOS = ("pedido", "saude", "crise", "nada")
@@ -35,46 +36,8 @@ class Classificacao:
     invalida: bool = field(default=False, compare=False)  # resposta do modelo fora do formato: vira 'nada' e conta falha (spec §3.3)
 
 
-@dataclass(frozen=True)
-class Falha:
-    """Não classificou. `temporaria`: vale tentar de novo com espera (exceção/timeout/resposta vazia, possivelmente cobrada).
-    Não temporária: sem modelo, teto ou limite (o aviso `escuta_sem_modelo` cobre; não conta tentativa). `motivo` é curto e fixo,
-    nunca texto de mensagem nem do erro."""
-    motivo: str
-    temporaria: bool
-
-
 _NADA = Classificacao("nada", 0.0, {})
 _INVALIDA = Classificacao("nada", 0.0, {}, invalida=True)
-
-# Recusas que acontecem ANTES do envio ao modelo (nada foi cobrado; não são falha temporária). Trecho da mensagem -> motivo curto.
-RECUSAS_SEM_ENVIO = {"não está configurado": "modelo não configurado", "chave ausente": "modelo não configurado",
-                     "teto diário": "teto diário do serviço de modelo", "muitas chamadas": "limite de chamadas por minuto",
-                     "prompt grande demais": "mensagem grande demais para o modelo",
-                     "pdf inválido": "PDF inválido", "pdf grande demais": "PDF grande demais", "pdf com páginas demais": "PDF com páginas demais"}
-
-
-def recusa_sem_envio(e: BaseException) -> str | None:
-    from gabi.fontes.openrouter import ErroOpenRouter
-    if not isinstance(e, ErroOpenRouter):
-        return None
-    msg = str(e)
-    return next((motivo for trecho, motivo in RECUSAS_SEM_ENVIO.items() if trecho in msg), None)
-
-
-def _chamar(cliente, prompt: str, forte: bool, orcamento: Orcamento) -> "str | Falha":
-    if not orcamento.permite():
-        return Falha("teto de custo do modelo", False)
-    try:
-        texto, custo = cliente.completar(prompt, forte=forte)
-    except Exception as e:  # noqa: BLE001 - nunca derruba a rodada; a mensagem do erro não sai daqui
-        motivo = recusa_sem_envio(e)
-        return Falha(motivo, False) if motivo else Falha("falha temporária do modelo", True)
-    orcamento.registrar(custo)
-    if not isinstance(texto, str) or not texto.strip():
-        return Falha("resposta vazia do modelo", True)  # cobrada e sem conteúdo: tenta de novo, nunca 'nada'
-    return texto
-
 
 def _prompt(texto: str) -> str:
     dados = json.dumps({"texto": mascarar_texto(texto)}, ensure_ascii=False).replace("<", "\\u003c")

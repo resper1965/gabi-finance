@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from gabi.escuta.caixa import normalizar_telefone
+from gabi.contatos.telefone import normalizar_telefone
 
 BRT = ZoneInfo("America/Sao_Paulo")
 TIPOS = ("pedido", "saude", "crise")

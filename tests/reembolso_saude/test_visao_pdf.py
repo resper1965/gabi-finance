@@ -1,7 +1,7 @@
 """Reembolso de saúde: PDF sem texto lido por visão só com `saude.visao_pdf` ligado; teto, custo por tarefa e falha fechada. Tudo FALSO (sem rede)."""
 import json
 
-from gabi.escuta.__main__ import ModeloComCusto
+from gabi.correio.modelo import ModeloComCusto
 from gabi.dinheiro.modelo import Orcamento
 from gabi.fontes.openrouter import ErroOpenRouter
 from tests.reembolso_saude.conftest import Modelo, con, arq, doc, pista, rodar, sistema, cofre_docs  # noqa: F401

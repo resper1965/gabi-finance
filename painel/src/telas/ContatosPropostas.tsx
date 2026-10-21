@@ -23,7 +23,7 @@ const suave = { color: "var(--ink2)" } as const;
 const linha = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between", borderTop: "1px solid var(--color-divider)", padding: "8px 0" } as const;
 const lista = { listStyle: "none", margin: 0, padding: 0 } as const;
 const AVISO_DESLIGADO = "A gravação está desligada: aprovar não grava ainda. Ligue em contatos.escrita quando quiser.";
-const ROTA = "/api/v1/escuta/contatos/propostas";
+const ROTA = "/api/v1/contatos/propostas";
 const texto = (nome: string | null, tel: string | null) => [nome, tel].filter(Boolean).join(" ") || "—";
 
 const emails = (e: string | null) => (e ? e.split(";").filter(Boolean).join(", ") : "—");  // o banco guarda separado por ;

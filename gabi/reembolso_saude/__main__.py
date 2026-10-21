@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from gabi.avisos import _novo, registrar_servico_falhou
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
-from gabi.escuta.__main__ import ModeloComCusto, cliente_da_ponte
+from gabi.correio.modelo import ModeloComCusto, cliente_da_ponte
 from gabi.familia.ambiente import saude_do_ambiente
 from gabi.familia.saude import abrir_saude
 from gabi.fontes.ponte import Ponte

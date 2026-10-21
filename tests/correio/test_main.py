@@ -6,7 +6,7 @@ import pytest
 
 from gabi.correio.__main__ import main
 from gabi.db import conectar, migrar
-from gabi.escuta import __main__ as escuta_prog
+from gabi.correio import modelo as modelo_prog
 from gabi.fontes.google_email import ResultadoEmail
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 
@@ -199,10 +199,10 @@ def _linhas_custo(banco):
 
 
 def test_modelo_com_custo_grava_a_tarefa_pedida_e_o_padrao_segue_escuta(banco):
-    w = escuta_prog.ModeloComCusto(Modelo(), banco)
+    w = modelo_prog.ModeloComCusto(Modelo(), banco)
     w.completar("p", forte=False)
     w.fechar()
-    w2 = escuta_prog.ModeloComCusto(Modelo(), banco, tarefa="email")
+    w2 = modelo_prog.ModeloComCusto(Modelo(), banco, tarefa="email")
     w2.completar("p", forte=False)
     w2.fechar()
     assert _linhas_custo(banco) == [("escuta", 0.001), ("email", 0.001)]
@@ -212,7 +212,7 @@ def test_modelo_com_custo_falha_depois_do_envio_grava_tarefa_falha(banco):
     class Quebra:
         def completar(self, prompt, *, forte):
             raise RuntimeError("timeout")
-    w = escuta_prog.ModeloComCusto(Quebra(), banco, tarefa="email")
+    w = modelo_prog.ModeloComCusto(Quebra(), banco, tarefa="email")
     with pytest.raises(RuntimeError):
         w.completar("p", forte=False)
     w.fechar()
@@ -223,7 +223,7 @@ def _historico_de_custo(banco, tarefa, n, custo):
     c = conectar(banco)
     for i in range(n):
         c.execute("insert into custo_modelo(em, custo_usd, tarefa) values (?,?,?)",
-                  ((dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=i)).astimezone(escuta_prog.BRT).isoformat(), custo, tarefa))
+                  ((dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=i)).astimezone(modelo_prog.BRT).isoformat(), custo, tarefa))
     c.close()
 
 
@@ -234,7 +234,7 @@ class _Quebra:
 
 def test_reserva_de_falha_segue_o_custo_real_da_tarefa(banco):
     _historico_de_custo(banco, "email", 12, 0.0001)
-    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    w = modelo_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
     with pytest.raises(RuntimeError):
         w.completar("p", forte=False)
     w.fechar()
@@ -243,7 +243,7 @@ def test_reserva_de_falha_segue_o_custo_real_da_tarefa(banco):
 
 def test_reserva_de_falha_sem_historico_suficiente_usa_o_padrao_conservador(banco):
     _historico_de_custo(banco, "email", 3, 0.0001)
-    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    w = modelo_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
     with pytest.raises(RuntimeError):
         w.completar("p", forte=False)
     w.fechar()
@@ -252,7 +252,7 @@ def test_reserva_de_falha_sem_historico_suficiente_usa_o_padrao_conservador(banc
 
 def test_reserva_de_falha_nunca_passa_do_padrao(banco):
     _historico_de_custo(banco, "email", 12, 0.5)  # chamadas caras: 5 x 0,5 > 0,05
-    w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+    w = modelo_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
     with pytest.raises(RuntimeError):
         w.completar("p", forte=False)
     w.fechar()
@@ -262,7 +262,7 @@ def test_reserva_de_falha_nunca_passa_do_padrao(banco):
 def test_vinte_timeouts_do_email_nao_estouram_o_teto_diario(banco):
     _historico_de_custo(banco, "email", 30, 0.0001)
     for _ in range(20):
-        w = escuta_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
+        w = modelo_prog.ModeloComCusto(_Quebra(), banco, tarefa="email")
         with pytest.raises(RuntimeError):
             w.completar("p", forte=False)
         w.fechar()

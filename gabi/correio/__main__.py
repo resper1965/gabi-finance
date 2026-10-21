@@ -14,7 +14,7 @@ from gabi.correio.processar import processar, purgar_mensagens, purgar_trechos, 
 from gabi.correio.sincronizar import atualizar_respondidos, respondidos_prontos, sincronizar
 from gabi.db import conectar, migrar
 from gabi.dinheiro.modelo import orcamento_do_banco
-from gabi.escuta.__main__ import ModeloComCusto, cliente_da_ponte
+from gabi.correio.modelo import ModeloComCusto, cliente_da_ponte
 from gabi.rodada import registrar_rodada
 
 BRT = ZoneInfo("America/Sao_Paulo")

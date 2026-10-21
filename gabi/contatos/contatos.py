@@ -1,6 +1,6 @@
 """Contatos do Google (nome, telefone e e-mail, só leitura) para dar nome aos remetentes e trazer gente para a escuta.
 Sem rede: a leitura vem pela ponte do serviço de fontes (`listar` injetável). Só nome, telefone e e-mail são lidos e gravados (o e-mail vai para `contato_google_email`, migração 0070); saídas e logs só
-levam contagens, nunca nome, número nem endereço. Contas e contas de origem/destino são DADO em `parametro` (JSON). Programa do timer: python -m gabi.escuta.contatos."""
+levam contagens, nunca nome, número nem endereço. Contas e contas de origem/destino são DADO em `parametro` (JSON). Programa do timer: python -m gabi.contatos.contatos."""
 import csv
 import io
 import json
@@ -12,7 +12,7 @@ from typing import Callable
 
 from gabi.db import conectar, migrar, transacao
 from gabi.correio.regras import endereco
-from gabi.escuta.caixa import normalizar_telefone
+from gabi.contatos.telefone import normalizar_telefone
 from gabi.fontes.google_contatos import ErroGoogleContatos
 
 CONTAS_PADRAO = ["resper@gmail.com", "resper@ness.com.br"]
@@ -211,7 +211,7 @@ def main(banco: Path | None = None, *, listar=None) -> int:
         contas = contas_contatos(con)
         r = sincronizar(con, contas, listar)
         from datetime import datetime, timezone
-        from gabi.escuta import contatos_propostas
+        from gabi.contatos import contatos_propostas
         g = contatos_propostas.gerar(con, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     finally:
         con.close()

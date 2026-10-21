@@ -65,7 +65,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/contagens` | Itens que pedem decisão por área do menu (caixa, gastos, regras) e o total do sino. |
 | GET | `/api/v1/contas-pagar` | Contas agrupadas: atrasadas, hoje, próximas, adiante, débito automático, a conferir e pagas. |
 | POST | `/api/v1/contas-pagar/{id_compromisso}/paga` | Baixa manual de um compromisso (vale só se não houver lançamento no extrato). |
-| GET | `/api/v1/contatos` | Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura. |
+| DELETE | `/api/v1/contatos` | Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam). |
+| GET | `/api/v1/contatos` | Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado. |
+| GET | `/api/v1/contatos/propostas` | Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada. |
+| POST | `/api/v1/contatos/propostas/aprovar-correcoes` | Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas. |
+| POST | `/api/v1/contatos/propostas/{proposta_id}/decisao` | Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida. |
+| POST | `/api/v1/contatos/sincronizar` | Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou. |
+| GET | `/api/v1/contatos/so-na-ness.csv` | CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino. |
+| POST | `/api/v1/contatos/trazer` | Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir. |
 | GET | `/api/v1/correio/dispensadas` | O que o dono dispensou nos últimos 30 dias, para desfazer. |
 | GET | `/api/v1/correio/fontes` | Contas de e-mail cadastradas: leitura (estado) e lixeira separadas, última sincronização, último erro e contagens. |
 | POST | `/api/v1/correio/fontes` | Cadastra uma conta (e-mail e provedor google|graph). Nasce `a_decidir` e sem lixeira: nada é lido nem movido até liberar. |
@@ -87,14 +94,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
-| DELETE | `/api/v1/escuta/contatos` | Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam). |
-| GET | `/api/v1/escuta/contatos` | Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado. |
-| GET | `/api/v1/escuta/contatos/propostas` | Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada. |
-| POST | `/api/v1/escuta/contatos/propostas/aprovar-correcoes` | Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas. |
-| POST | `/api/v1/escuta/contatos/propostas/{proposta_id}/decisao` | Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida. |
-| POST | `/api/v1/escuta/contatos/sincronizar` | Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou. |
-| GET | `/api/v1/escuta/contatos/so-na-ness.csv` | CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino. |
-| POST | `/api/v1/escuta/contatos/trazer` | Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir. |
 | GET | `/api/v1/escuta/grupos` | Grupos de WhatsApp vistos pela escuta e se já foram aprovados. |
 | POST | `/api/v1/escuta/grupos/{id_grupo}/aprovar` | Aprova um grupo de WhatsApp para a escuta (404 se o grupo nunca foi visto). |
 | POST | `/api/v1/escuta/grupos/{id_grupo}/comprovantes` | Define a caixa de comprovantes (CP1 B): só anexos encaminhados a este grupo vão ao Paperless. Um grupo por vez; troca a anterior. |

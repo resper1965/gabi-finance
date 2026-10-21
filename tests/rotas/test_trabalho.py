@@ -135,20 +135,3 @@ def test_rota_agenda_novo_formato(cli, banco):
     assert len(d["conflitos"]) == 1 and d["conflitos"][0]["sugestao_inicio"] == "2026-10-08T15:30:00-03:00"
 
 
-def test_contatos_exige_boss_e_devolve_envelope(cli, banco):
-    url = "/api/v1/contatos"
-    assert get(cli, url, VIP).status_code == 403 and cli.get(url).status_code == 401
-    j = get(cli, url).json()
-    assert j["dados"] == {"total": 0, "itens": []} and {"dados_ate", "dados"} <= set(j)
-
-
-def test_contatos_na_rota_email_whatsapp_sem_texto_e_caixa_liberada(cli, banco):
-    c = conectar(banco)
-    c.execute("insert into email_fonte(id, conta, provedor, estado) values (1,'eu@x.com','google','sim'), (2,'off@x.com','google','a_decidir')")
-    for f, rem in ((1, "ana@y.com"), (2, "fora@y.com")):
-        c.execute("insert into email_msg(fonte_id, externo_id, remetente, assunto, recebida_em, classe, estado) values (?,?,?,?, '2026-10-05T12:00:00+00:00','emergencial','classificada')", (f, f"x{f}", rem, "Assunto"))
-    c.execute("insert into escuta_msg(id_externo, de, recebida_em, texto, estado, tipo) values ('w','+5511987654321','2026-10-07T12:00:00+00:00','TEXTO-PRIVADO','retida','pedido')")
-    c.close()
-    j = get(cli, "/api/v1/contatos").json()
-    assert [i["nome"] for i in j["dados"]["itens"]] == ["ana@y.com", "+55 *******4321"]
-    assert "TEXTO-PRIVADO" not in json.dumps(j) and "fora@y.com" not in json.dumps(j) and "987654321" not in json.dumps(j)

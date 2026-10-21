@@ -11,7 +11,7 @@ from gabi.cobrar import cadastro
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
 from gabi.cobrar.util import agora as _agora
-from gabi.escuta.caixa import normalizar_telefone
+from gabi.contatos.telefone import normalizar_telefone
 from gabi.hoje import hoje_brt
 
 CANAL_ESCUTA = "escuta"  # pedido lido pela escuta do WhatsApp: a Gabi nunca responde ao terceiro (R2)

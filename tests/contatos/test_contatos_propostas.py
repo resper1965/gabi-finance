@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.escuta import contatos as c
-from gabi.escuta import contatos_propostas as p
+from gabi.contatos import contatos as c
+from gabi.contatos import contatos_propostas as p
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
 NESS = "resper@ness.com.br"

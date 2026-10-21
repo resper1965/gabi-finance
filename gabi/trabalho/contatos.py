@@ -12,8 +12,8 @@ from gabi.agenda import consulta as agenda
 from gabi.cobrar.cadastro import dados
 from gabi.correio.consulta import dias_em_aberto
 from gabi.correio.regras import endereco
-from gabi.escuta.caixa import normalizar_telefone
-from gabi.escuta.contatos import nome_do_numero
+from gabi.contatos.telefone import normalizar_telefone
+from gabi.contatos.contatos import nome_do_numero
 
 JANELA_AGENDA_DIAS = 7
 RETIDA_DIAS_PADRAO = 14

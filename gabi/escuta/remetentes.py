@@ -9,31 +9,13 @@ from gabi.cobrar.cadastro import dados
 from gabi.db import transacao
 from gabi.escuta import spool_seguro
 from gabi.escuta.caixa import normalizar_telefone
-from gabi.escuta.contatos import emails_do_numero, nome_do_numero
+from gabi.contatos.contatos import emails_do_numero, nome_do_numero
+from gabi.contatos.pessoas import PAPEIS, _aprovada, _casa, _pessoas_do_numero, garantir_pessoa  # noqa: F401
 
-PAPEIS = ("familia", "prestador", "cobranca")
 
 
 def _agora() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def _aprovada(d: dict) -> bool:
-    return d.get("escuta_aprovada") is True and d.get("papel_escuta") in PAPEIS
-
-
-def _casa(d: dict, numero: str) -> bool:
-    canais = d.get("canais")
-    if not isinstance(canais, list):
-        return False
-    return any(isinstance(c, str) and c.startswith("whatsapp:") and (c == f"whatsapp:{numero}" or normalizar_telefone(c[len("whatsapp:"):]) == numero)
-               for c in canais)  # id cru (LID) casa pelo canal exato
-
-
-def _pessoas_do_numero(con, numero: str) -> list:
-    """Pessoas ativas com esse número em canais (qualquer formato), a já aprovada primeiro, depois por id."""
-    achadas = [p for p in con.execute("select id, nome, dados from pessoa where excluido_em is null order by id") if _casa(dados(p), numero)]
-    return sorted(achadas, key=lambda p: not _aprovada(dados(p)))
 
 
 def _pessoa_aprovada(con, numero: str):
@@ -69,27 +51,6 @@ def fila(con) -> list[dict]:
 
 def _auditar(con, por: str, o_que: str) -> None:
     con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'escuta')", (_agora(), por, o_que))
-
-
-def garantir_pessoa(con, numero: str, nome: str | None) -> tuple[str, dict, str]:
-    """Única regra de qual `pessoa` tem este número (aprovar e trazer-dos-contatos caem na MESMA linha). Dentro de uma transação do chamador.
-    Reaproveita a que já tem o número (a aprovada primeiro); senão usa o id `wa-`+sha1[:10], reativando a excluída ou criando.
-    Devolve (id, dados, estado) com estado 'existente' | 'reativada' | 'criada'; nunca mexe em escuta_aprovada/papel_escuta."""
-    achadas = _pessoas_do_numero(con, numero)
-    if achadas:
-        return achadas[0]["id"], dados(achadas[0]), "existente"
-    pid = "wa-" + hashlib.sha1(numero.encode()).hexdigest()[:10]
-    antiga = con.execute("select dados from pessoa where id=?", (pid,)).fetchone()
-    if antiga is not None:  # a pessoa deste número foi excluída: reativa em vez de colidir na chave
-        d, estado = dados(antiga), "reativada"
-        con.execute("update pessoa set excluido_em=null where id=?", (pid,))
-    else:
-        d, estado = {}, "criada"
-        con.execute("insert into pessoa(id, nome, dados, origem) values (?,?,?, 'escuta')", (pid, nome or _nome_contato(con, numero) or numero, "{}"))
-    canais = d.get("canais") if isinstance(d.get("canais"), list) else []
-    if not _casa({"canais": canais}, numero):
-        d["canais"] = canais + [f"whatsapp:{numero}"]
-    return pid, d, estado
 
 
 def _canal_email(con, pid: str, d: dict, numero: str) -> list[str]:

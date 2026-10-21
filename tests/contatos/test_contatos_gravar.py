@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.escuta import contatos_gravar as g
+from gabi.contatos import contatos_gravar as g
 from gabi.fontes.graph_ness import ErroGraphNess
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
@@ -377,8 +377,8 @@ def test_conta_fora_da_lista_de_contas_vira_contato_alterado_sem_chamar_o_graph(
 
 
 def test_ponta_a_ponta_sync_gerar_aprovar_aplicar_corrige_celular_antigo(con):
-    from gabi.escuta import contatos as c
-    from gabi.escuta import contatos_propostas as cp
+    from gabi.contatos import contatos as c
+    from gabi.contatos import contatos_propostas as cp
     itens = [{"nome": "Beltrano", "telefone": "11 9999-0000", "graph_id": "AAMk0001", "campo": "mobile"}]
     c.sincronizar(con, c.contas_contatos(con), lambda conta: list(itens) if conta == NESS else [])
     assert _antigas(cp.gerar(con, AGORA)) == {"criar": 0, "corrigir": 1}
@@ -627,7 +627,7 @@ def test_apagar_contato_preserva_contato_google_de_outro_contato_com_o_mesmo_tel
 
 
 def test_recusar_durante_a_gravacao_nao_desfaz_o_apagar(con):
-    from gabi.escuta import contatos_propostas as cp
+    from gabi.contatos import contatos_propostas as cp
     pid, _ = _preparar(con, "apagar_contato")
     resultado = {}
 

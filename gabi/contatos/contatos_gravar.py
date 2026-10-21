@@ -1,4 +1,4 @@
-"""Aplica no Graph da ness as propostas de contato APROVADAS pelo dono (contato_proposta, migração 0072). Programa: python -m gabi.escuta.contatos_gravar,
+"""Aplica no Graph da ness as propostas de contato APROVADAS pelo dono (contato_proposta, migração 0072). Programa: python -m gabi.contatos.contatos_gravar,
 rodado logo após a sincronização de contatos (ExecStartPost da mesma unit). Interruptor `contatos.escrita` em `parametro` (JSON "ligado"); qualquer outro
 valor ou ausência = desligado: nada é enviado e as aprovadas só são contadas como simuladas. Tipos: criar, corrigir, corrigir_nome, apagar_telefone, apagar_contato, adicionar_email. Sem rede: a escrita passa pela ponte do serviço de fontes.
 Cada proposta roda no seu try (uma falha não aborta as outras) e termina `aplicada` ou `falhou` com motivo FIXO (nunca texto de exceção, nome ou número).
@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gabi.db import conectar, migrar, transacao
-from gabi.escuta.contatos import _parametro, contas_contatos
+from gabi.contatos.contatos import _parametro, contas_contatos
 
 CONTATO_ALTERADO, JA_EXISTE, GRAPH_INDISPONIVEL = "contato_alterado", "ja_existe", "graph_indisponivel"
 

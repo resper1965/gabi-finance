@@ -72,7 +72,7 @@ def _canal_email_validar(con, p: dict) -> None:
     """Só o e-mail de um contato do Google cujo telefone é um canal whatsapp DESTA pessoa (nada de endereço livre), já normalizado."""
     from gabi.cobrar.cadastro import dados
     from gabi.correio.regras import endereco
-    from gabi.escuta.caixa import normalizar_telefone
+    from gabi.contatos.telefone import normalizar_telefone
     if not isinstance(p, dict) or set(p) != {"pessoa_id", "email"} or not isinstance(p.get("pessoa_id"), str) or not isinstance(p.get("email"), str):
         raise ErroDecisao("opcoes_invalidas", "adicionar_canal_email exige pessoa_id e email, só esses dois")
     if endereco(p["email"]) != p["email"]:

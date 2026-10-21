@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.escuta import contatos as c
+from gabi.contatos import contatos as c
 from gabi.escuta import remetentes
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"

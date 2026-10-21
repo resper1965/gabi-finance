@@ -312,7 +312,7 @@ test('botao "Trazer dos contatos" so envia os selecionados e fica desabilitado s
   expect((trazer as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(trazer);
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/trazer", corpo: { telefones: ["+5511912345678"] } });
+  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/contatos/trazer", corpo: { telefones: ["+5511912345678"] } });
   expect(await screen.findByText(/Criadas 2 pessoas, 1 ignoradas/)).toBeTruthy();
   expect((screen.getByRole("checkbox", { name: "Selecionar Ana +5511912345678" }) as HTMLInputElement).checked).toBe(false);
 });
@@ -322,14 +322,14 @@ test("quem ja e pessoa nao pode ser selecionado e o link do CSV aponta para a ex
   montar();
   expect((await screen.findByRole("checkbox", { name: "Selecionar +5511900000000" }) as HTMLInputElement).disabled).toBe(true);
   const a = screen.getByRole("link", { name: "Baixar contatos só na ness (CSV)" });
-  expect(a.getAttribute("href")).toBe("/api/v1/escuta/contatos/so-na-ness.csv");
+  expect(a.getAttribute("href")).toBe("/api/v1/contatos/so-na-ness.csv");
 });
 
 test("Sincronizar agora chama a rota e mostra so contagens", async () => {
   const c = fake({ contatos: CONTATOS });
   montar();
   fireEvent.click(await screen.findByRole("button", { name: "Sincronizar agora" }));
-  await waitFor(() => expect(posts(c).map((x) => x.url)).toEqual(["/api/v1/escuta/contatos/sincronizar"]));
+  await waitFor(() => expect(posts(c).map((x) => x.url)).toEqual(["/api/v1/contatos/sincronizar"]));
   expect(await screen.findByText(/Sincronizado: 7 contatos, 1 números inválidos/)).toBeTruthy();
 });
 
@@ -356,7 +356,7 @@ test("Apagar contatos pede confirmacao, foca o Confirmar e cancelar nao envia na
   fireEvent.click(screen.getByRole("button", { name: "Apagar contatos" }));
   fireEvent.click(await screen.findByRole("button", { name: "Confirmar apagar contatos" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ metodo: "DELETE", url: "/api/v1/escuta/contatos" });
+  expect(posts(c)[0]).toMatchObject({ metodo: "DELETE", url: "/api/v1/contatos" });
 });
 
 test("erro ao sincronizar aparece na secao e a lista continua", async () => {

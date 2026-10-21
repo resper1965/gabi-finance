@@ -4,8 +4,8 @@ import re
 import unicodedata
 
 from gabi.db import transacao
-from gabi.escuta import contatos
-from gabi.escuta.interacao import interacao, passa_piso
+from gabi.contatos import contatos
+from gabi.contatos.interacao import interacao, passa_piso
 
 _E164 = re.compile(r"^\+\d{10,15}$")
 ESTADOS_DECISAO = ("aprovada", "recusada")

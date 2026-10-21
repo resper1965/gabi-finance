@@ -1840,9 +1840,9 @@
    }
   },
   "/api/v1/contatos": {
-   "get": {
-    "description": "Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura.",
-    "operationId": "contatos_api_v1_contatos_get",
+   "delete": {
+    "description": "Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam).",
+    "operationId": "apagar_contatos_api_v1_contatos_delete",
     "responses": {
      "200": {
       "content": {
@@ -1853,7 +1853,211 @@
       "description": "Successful Response"
      }
     },
-    "summary": "Contatos"
+    "summary": "Apagar Contatos"
+   },
+   "get": {
+    "description": "Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado.",
+    "operationId": "listar_contatos_api_v1_contatos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "busca",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Busca",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limite",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "title": "Limite",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Contatos"
+   }
+  },
+  "/api/v1/contatos/propostas": {
+   "get": {
+    "description": "Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada.",
+    "operationId": "listar_propostas_api_v1_contatos_propostas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Propostas"
+   }
+  },
+  "/api/v1/contatos/propostas/aprovar-correcoes": {
+   "post": {
+    "description": "Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas.",
+    "operationId": "aprovar_correcoes_propostas_api_v1_contatos_propostas_aprovar_correcoes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Aprovar Correcoes Propostas"
+   }
+  },
+  "/api/v1/contatos/propostas/{proposta_id}/decisao": {
+   "post": {
+    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
+    "operationId": "decidir_proposta_api_v1_contatos_propostas__proposta_id__decisao_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposta_id",
+      "required": true,
+      "schema": {
+       "title": "Proposta Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Proposta"
+   }
+  },
+  "/api/v1/contatos/sincronizar": {
+   "post": {
+    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
+    "operationId": "sincronizar_contatos_api_v1_contatos_sincronizar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Sincronizar Contatos"
+   }
+  },
+  "/api/v1/contatos/so-na-ness.csv": {
+   "get": {
+    "description": "CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino.",
+    "operationId": "contatos_so_na_ness_api_v1_contatos_so_na_ness_csv_get",
+    "responses": {
+     "200": {
+      "content": {
+       "text/csv": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "CSV do importador do Google (Name, Phone 1 - Value)"
+     }
+    },
+    "summary": "Contatos So Na Ness"
+   }
+  },
+  "/api/v1/contatos/trazer": {
+   "post": {
+    "description": "Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir.",
+    "operationId": "trazer_contatos_api_v1_contatos_trazer_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Trazer Contatos"
    }
   },
   "/api/v1/correio/dispensadas": {
@@ -2434,227 +2638,6 @@
      }
     },
     "summary": "Entregas"
-   }
-  },
-  "/api/v1/escuta/contatos": {
-   "delete": {
-    "description": "Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam).",
-    "operationId": "apagar_contatos_api_v1_escuta_contatos_delete",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Apagar Contatos"
-   },
-   "get": {
-    "description": "Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado.",
-    "operationId": "listar_contatos_api_v1_escuta_contatos_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "busca",
-      "required": false,
-      "schema": {
-       "default": "",
-       "title": "Busca",
-       "type": "string"
-      }
-     },
-     {
-      "in": "query",
-      "name": "limite",
-      "required": false,
-      "schema": {
-       "default": 50,
-       "title": "Limite",
-       "type": "integer"
-      }
-     },
-     {
-      "in": "query",
-      "name": "offset",
-      "required": false,
-      "schema": {
-       "default": 0,
-       "title": "Offset",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Listar Contatos"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas": {
-   "get": {
-    "description": "Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada.",
-    "operationId": "listar_propostas_api_v1_escuta_contatos_propostas_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "estado",
-      "required": false,
-      "schema": {
-       "default": "pendente",
-       "title": "Estado",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Listar Propostas"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas/aprovar-correcoes": {
-   "post": {
-    "description": "Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas.",
-    "operationId": "aprovar_correcoes_propostas_api_v1_escuta_contatos_propostas_aprovar_correcoes_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Aprovar Correcoes Propostas"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas/{proposta_id}/decisao": {
-   "post": {
-    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
-    "operationId": "decidir_proposta_api_v1_escuta_contatos_propostas__proposta_id__decisao_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "proposta_id",
-      "required": true,
-      "schema": {
-       "title": "Proposta Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Decidir Proposta"
-   }
-  },
-  "/api/v1/escuta/contatos/sincronizar": {
-   "post": {
-    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
-    "operationId": "sincronizar_contatos_api_v1_escuta_contatos_sincronizar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Sincronizar Contatos"
-   }
-  },
-  "/api/v1/escuta/contatos/so-na-ness.csv": {
-   "get": {
-    "description": "CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino.",
-    "operationId": "contatos_so_na_ness_api_v1_escuta_contatos_so_na_ness_csv_get",
-    "responses": {
-     "200": {
-      "content": {
-       "text/csv": {
-        "schema": {
-         "type": "string"
-        }
-       }
-      },
-      "description": "CSV do importador do Google (Name, Phone 1 - Value)"
-     }
-    },
-    "summary": "Contatos So Na Ness"
-   }
-  },
-  "/api/v1/escuta/contatos/trazer": {
-   "post": {
-    "description": "Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir.",
-    "operationId": "trazer_contatos_api_v1_escuta_contatos_trazer_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Trazer Contatos"
    }
   },
   "/api/v1/escuta/grupos": {
