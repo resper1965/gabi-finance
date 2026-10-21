@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { ToastProvider } from "../src/lib/toast";
 import { FiltrosProvider } from "../src/lib/filtros";
 import { CadastrosCobranca } from "../src/telas/CadastrosCobranca";
-import { Reembolsos } from "../src/telas/Cobrar/Reembolsos";
 import { amostra, apiFalsa } from "./apiFalsa";
 
 const montar = (ui: React.ReactElement) => render(<ToastProvider><FiltrosProvider>{ui}</FiltrosProvider></ToastProvider>);
@@ -26,15 +25,14 @@ test("Cadastros da cobranca: salvar a empresa envia relacao e e-mail sem perder 
   expect(chamadas.find((c) => c.metodo === "PATCH")!.corpo).toEqual({ dados: { relacao: "contratante", obs: "x", email_cobranca: "fin@ness.com.br" } });
 });
 
-test("Cadastros da cobranca: marcar quem pode pedir envia canais e permissao", async () => {
+test("Cadastros da cobranca: salvar os canais de uma pessoa", async () => {
   const chamadas = apiFalsa({ "cadastros-empresas": empresas(), "cadastros-pessoas": pessoas(), "cadastros-categorias": categorias() });
   montar(<CadastrosCobranca />);
-  const bloco = await screen.findByRole("region", { name: "Quem pode fazer pedidos" });
-  fireEvent.click(within(bloco).getByLabelText("Ana pode fazer pedidos"));
+  const bloco = await screen.findByRole("region", { name: "Canais de cada pessoa" });
   fireEvent.change(within(bloco).getByLabelText("Canais de Ana"), { target: { value: "whatsapp:+5511911110000, telegram:@ana" } });
   fireEvent.click(within(bloco).getByRole("button", { name: "Salvar Ana" }));
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "PATCH" && /cadastros\/pessoas\/ana$/.test(c.url))).toBe(true));
-  expect(chamadas.find((c) => c.metodo === "PATCH")!.corpo).toEqual({ dados: { canais: ["whatsapp:+5511911110000", "telegram:@ana"], pode_pedir: true } });
+  expect((chamadas.find((c) => c.metodo === "PATCH")!.corpo as { dados: { canais: string[] } }).dados.canais).toEqual(["whatsapp:+5511911110000", "telegram:@ana"]);
 });
 
 test("Cadastros da cobranca: categoria recebe o id equivalente no Nibo", async () => {
@@ -55,16 +53,4 @@ test("Cadastros da cobranca: define o socio do Nibo", async () => {
   fireEvent.change(within(nibo).getByLabelText("Id do sócio no Nibo"), { target: { value: "socio-1" } });
   fireEvent.click(within(nibo).getByRole("button", { name: "Salvar sócio" }));
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "PUT" || (c.metodo === "POST" && /cadastros\/nibo$/.test(c.url)))).toBe(true));
-});
-
-test("Reembolsos: crédito recebido na PJ pode ser baixado nos itens cobrados", async () => {
-  const dados = { empresas: [{ empresa_id: "ness", nome: "Ness", em_aberto: "100.00", reembolsos: [{ id: 1, estado: "cobrado", cobrado_em: "2026-10-09" }],
-    itens: [{ lancamento_id: 1, data: "2026-10-01", descricao: "HOTEL", valor: "100.00", em_aberto: "100.00", comprovante: "faltando" }],
-    creditos: [{ lancamento_id: 9, data: "2026-10-10", descricao: "PIX NESS", valor: "60.00", a_aplicar: "60.00" }] }],
-    lote: { id: null, texto_confirmacao: "Lançar no Nibo da Bekaa: 0 despesas, R$ 0,00.", itens: [] } };
-  const chamadas = apiFalsa({ "cobrar-reembolsos": env("cobrar-reembolsos", dados) });
-  montar(<Reembolsos />);
-  fireEvent.click(await screen.findByRole("button", { name: /Baixar nos itens cobrados/ }));
-  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /reembolsos\/conciliar$/.test(c.url))).toBe(true));
-  expect(chamadas.find((c) => c.metodo === "POST" && /conciliar$/.test(c.url))!.corpo).toEqual({ empresa_id: "ness", credito_id: 9 });
 });

@@ -19,7 +19,7 @@ def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel
 
 def test_hermes_nao_tem_ferramenta_de_enviar_pagar_apagar_aprovar_ou_ligar_regra():
     assert not [n for n in ferramentas_do_token(ESCOPOS_HERMES) if PROIBIDAS.search(n)]
-    assert {"avisos_pendentes", "avisos_confirmar_entrega", "resumo_manha", "financeiro_saldo"} <= set(ferramentas_do_token(ESCOPOS_HERMES))
+    assert {"resumo_manha", "financeiro_saldo", "despesas_por_empresa"} <= set(ferramentas_do_token(ESCOPOS_HERMES))
 
 
 def test_toda_ferramenta_tem_escopo_conhecido():

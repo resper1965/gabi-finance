@@ -44,7 +44,7 @@ def banco(tmp_path):
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'padrao', 'boleto', ?, '{}')", (cid, cid.split(':')[0], nome, vu, vu, v, est))
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
-    for f in ('notas-nibo', 'comprovantes-paperless'):  # fontes esperadas do envelope
+    for f in ('notas-nibo',):  # fontes esperadas do envelope
         c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.close()
     return p
@@ -257,7 +257,7 @@ def test_regras_lista_e_liga_desliga(cli, banco):
 def test_fontes_e_rodadas(cli):
     f = get(cli, "/api/v1/fontes").json()["dados"]
     est = {x["nome"]: x["estado"] for x in f["fontes"]}
-    assert est == {"open-finance": "ok", "notas-nibo": "ok", "comprovantes-paperless": "ok"}
+    assert est == {"open-finance": "ok", "notas-nibo": "ok"}
     r = get(cli, "/api/v1/rodadas").json()["dados"]["itens"]
     of = [x for x in r if x["fonte"] == "open-finance"][0]
     assert of["status"] == "ok" and of["conferida"] is True

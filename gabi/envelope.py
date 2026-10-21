@@ -14,7 +14,6 @@ LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 FONTES = {
     "open-finance": LIMITE_DESATUALIZADO,
     "notas-nibo": dt.timedelta(hours=30),               # diária 06:40
-    "comprovantes-paperless": dt.timedelta(hours=30),   # diária 07:00
     "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
     "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
@@ -22,7 +21,7 @@ FONTES = {
 }
 COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
-ESPERADAS = ("notas-nibo", "comprovantes-paperless")
+ESPERADAS = ("notas-nibo",)
 BRT = dt.timezone(dt.timedelta(hours=-3))
 LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)

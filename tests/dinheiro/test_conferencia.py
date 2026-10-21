@@ -227,7 +227,7 @@ def _conferida(con, fonte, fim):
 
 def _esperadas(con, fim="2026-10-08T13:00:00+00:00"):
     """Fontes esperadas (notas-nibo, comprovantes) com rodada ok recente: sem elas o envelope as lista como nao_conferida (por desenho)."""
-    for f in ("notas-nibo", "comprovantes-paperless"):
+    for f in ("notas-nibo",):
         _rodada(con, fonte=f, fim=fim)
 
 
@@ -251,23 +251,22 @@ def test_envelope_tentativa_ok_mas_nao_conferida_aparece_como_nao_conferida(con)
 def test_envelope_desatualizado_apos_3_dias_aponta_a_fonte_parada(con):
     _conferida(con, "open-finance", "2026-10-08T12:00:00+00:00")
     _conferida(con, "notas-nibo", "2026-10-03T12:00:00+00:00")
-    _rodada(con, fonte="comprovantes-paperless", fim="2026-10-08T13:00:00+00:00")
     e = envelope(con, {}, agora=AGORA)
     assert e["desatualizado"] is True and e["dados_ate"] == "2026-10-03T12:00:00Z"  # a mais velha manda
     est = {f["nome"]: f["estado"] for f in e["fontes"]}
-    assert est == {"open-finance": "ok", "notas-nibo": "parada", "comprovantes-paperless": "ok"}
+    assert est == {"open-finance": "ok", "notas-nibo": "parada"}
 
 
 def test_envelope_sem_nenhuma_rodada_conferida_e_desatualizado(con):
     e = envelope(con, {"a": 1}, agora=AGORA)
     assert e["dados_ate"] is None and e["desatualizado"] is True and e["dados"] == {"a": 1}
-    assert {f["nome"] for f in e["fontes"]} == {"notas-nibo", "comprovantes-paperless"}  # só as esperadas, sem rodada
+    assert {f["nome"] for f in e["fontes"]} == {"notas-nibo"}  # só as esperadas, sem rodada
 
 
 def test_envelope_ignora_backup_e_importacao(con):
     _conferida(con, "backup", "2026-10-08T12:00:00+00:00")
     _conferida(con, "importacao-staging", "2026-10-08T12:00:00+00:00")
-    assert {f["nome"] for f in envelope(con, {}, agora=AGORA)["fontes"]} == {"notas-nibo", "comprovantes-paperless"}  # backup/staging ficam de fora
+    assert {f["nome"] for f in envelope(con, {}, agora=AGORA)["fontes"]} == {"notas-nibo"}  # backup/staging ficam de fora
 
 
 def test_envelope_exatamente_3_dias_ainda_e_atual(con):

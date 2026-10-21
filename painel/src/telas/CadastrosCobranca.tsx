@@ -30,9 +30,8 @@ export function CadastrosCobranca() {
     try { await api.patch(`/api/v1/cadastros/empresas/${e.id}`, { dados }); avisar(`${e.nome} salva.`); empresas.recarregar(); } catch (x) { avisar((x as Error).message); }
   };
   const salvarPessoa = async (p: Pessoa) => {
-    const pode = edit[`pode:${p.id}`] !== undefined ? edit[`pode:${p.id}`] === "1" : p.dados.pode_pedir === true;
     const canais = v(`canais:${p.id}`, ((p.dados.canais as string[] | undefined) ?? []).join(", ")).split(",").map((c) => c.trim()).filter(Boolean);
-    try { await api.patch(`/api/v1/cadastros/pessoas/${p.id}`, { dados: { ...p.dados, canais, pode_pedir: pode } }); avisar(`${p.nome} salva.`); pessoas.recarregar(); } catch (x) { avisar((x as Error).message); }
+    try { await api.patch(`/api/v1/cadastros/pessoas/${p.id}`, { dados: { ...p.dados, canais } }); avisar(`${p.nome} salva.`); pessoas.recarregar(); } catch (x) { avisar((x as Error).message); }
   };
   const salvarCategoria = async (c: Categoria) => {
     try { await api.patch(`/api/v1/cadastros/categorias/${c.id}`, { nibo_category_id: v(`nibo:${c.id}`, c.nibo_category_id ?? "") || null }); avisar(`${c.nome} salva.`); categorias.recarregar(); }
@@ -59,14 +58,11 @@ export function CadastrosCobranca() {
           ))}
         </section>
       </Bloco>
-      <Bloco titulo="Quem pode fazer pedidos" nota="canal:identificador, separados por vírgula">
-        <section role="region" aria-label="Quem pode fazer pedidos">
+      <Bloco titulo="Canais de cada pessoa" nota="canal:identificador, separados por vírgula">
+        <section role="region" aria-label="Canais de cada pessoa">
           {(pessoas.env?.dados.itens ?? []).map((p) => (
             <div key={p.id} style={linha}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 140px" }}>
-                <input type="checkbox" aria-label={`${p.nome} pode fazer pedidos`} checked={edit[`pode:${p.id}`] !== undefined ? edit[`pode:${p.id}`] === "1" : p.dados.pode_pedir === true}
-                  onChange={(x) => set(`pode:${p.id}`, x.target.checked ? "1" : "0")} />{p.nome}
-              </label>
+              <span style={{ flex: "1 1 140px" }}>{p.nome}</span>
               <input aria-label={`Canais de ${p.nome}`} placeholder="whatsapp:+55..., telegram:@..." value={v(`canais:${p.id}`, ((p.dados.canais as string[] | undefined) ?? []).join(", "))} onChange={(x) => set(`canais:${p.id}`, x.target.value)} style={{ ...caixa, flex: "2 1 220px" }} />
               <button className="btn btn-secondary" aria-label={`Salvar ${p.nome}`} onClick={() => salvarPessoa(p)}>Salvar</button>
             </div>

@@ -16,9 +16,8 @@ MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
-                 "financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo", "cobranca_rascunho", "fechamento_dia"}
-NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "pedidos_estado", "avisos_pendentes", "avisos_confirmar_entrega",
-               "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar"}
+                 "financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo", "despesas_por_empresa", "fechamento_dia"}
+NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "classificar_lancamento", "regras_sugerir"}
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
 PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
@@ -46,7 +45,7 @@ def banco(tmp_path):
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'padrao', 'boleto', ?, '{}')", (cid, cid.split(':')[0], nome, vu, vu, v, est))
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
-    for f in ('notas-nibo', 'comprovantes-paperless'):  # fontes esperadas do envelope
+    for f in ('notas-nibo',):  # fontes esperadas do envelope
         c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.close()
     return p
@@ -135,6 +134,18 @@ def test_saldo_so_das_contas_liberadas_e_com_dados_ate(cli, tokens):
     assert r["dados_ate"] == "2026-10-08T17:00:30Z" and "desatualizado" in r
     d = r["dados"]
     assert d["caixa_unico"] == "12345.60" and [c["apelido"] for c in d["contas"]] == ["C6 PJ"] and d["faturas_abertas"] == "0.00"
+
+
+def test_despesas_por_empresa_usa_o_mes_corrente_e_formata_em_reais(cli, banco, tokens):
+    c = conectar(banco)
+    c.execute("insert into empresa(id, nome) values ('ness','NESS')")
+    pf = c.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado, pj) values ('pf-mcp','Itau','BANK','PF','sim',0)").lastrowid
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, natureza, empresa_id, descricao_original) values (?,'mcp1','2026-10-02',-12345,'custo','ness','HOTEL')", (pf,))
+    c.close()
+    d = chamar(cli, tokens["fin"], "despesas_por_empresa")["dados"]
+    assert d["mes"] == "2026-10" and d["empresas"] == [{"empresa_id": "ness", "empresa": "NESS", "total": "123.45",
+                                                        "itens": [{"lancamento_id": d["empresas"][0]["itens"][0]["lancamento_id"], "data": "2026-10-02", "descricao": "HOTEL", "valor": "123.45"}]}]
+    assert chamar(cli, tokens["docs"], "despesas_por_empresa")["erro"] == "sem_escopo"
 
 
 def test_saldo_filtra_por_conta(cli, tokens):

@@ -10,10 +10,6 @@ import { AREAS_DINHEIRO, type Area } from "./navegacao";
 import { Resumo } from "./telas/Caixa/Resumo";
 import { Semanas } from "./telas/Caixa/Semanas";
 import { APagar } from "./telas/Caixa/APagar";
-import { Pedidos } from "./telas/Caixa/Pedidos";
-import { Reembolsos } from "./telas/Cobrar/Reembolsos";
-import { Comprovantes } from "./telas/Cobrar/Comprovantes";
-import { EmailCobranca } from "./telas/Cobrar/EmailCobranca";
 import { Lancamentos } from "./telas/Gastos/Lancamentos";
 import { ParaOndeVai } from "./telas/Gastos/ParaOndeVai";
 import { Cartoes } from "./telas/Gastos/Cartoes";
@@ -35,7 +31,7 @@ import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
 import { AReceber } from "./telas/Cobrar/AReceber";
 
 export const TELAS: Record<string, () => ReactNode> = {
-  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
+  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
   qualidade: Qualidade, hoje: Hoje, agenda: Agenda,

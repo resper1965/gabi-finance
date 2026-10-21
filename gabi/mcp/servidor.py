@@ -17,7 +17,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro import agenda_financeira as agenda_fin, analise, cobranca_atraso, fechamento, consultas, contas_pagar as cp, rumo
+from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_empresa, fechamento, consultas, contas_pagar as cp, rumo
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -29,7 +29,7 @@ log = logging.getLogger("gabi.mcp")
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
-ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "cobranca_rascunho": "fin", "fechamento_dia": "fin",
+ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS}
 
@@ -140,6 +140,17 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
         return executar("financeiro_saldo", f)
 
     @srv.tool()
+    def despesas_por_empresa(mes: str | None = None) -> dict:
+        """Despesas de empresa (ness, IONIC...) pagas no PF no mês (AAAA-MM; padrão: o mês corrente), por empresa: o que o Ricardo pode cobrar ou lançar na PJ. Só leitura: nada é enviado."""
+        def f(con, agora):
+            alvo = mes or agora.date().isoformat()[:7]
+            empresas = [{"empresa_id": e["empresa_id"], "empresa": e["empresa"], "total": formatar(e["total_centavos"]),
+                         "itens": [{"lancamento_id": i["lancamento_id"], "data": i["data"], "descricao": i["descricao"], "valor": formatar(i["valor_centavos"])} for i in e["itens"]]}
+                        for e in despesas_empresa.despesas_por_empresa(con, alvo)]
+            return {"mes": alvo, "empresas": empresas}
+        return executar("despesas_por_empresa", f)
+
+    @srv.tool()
     def agenda_financeira(dias: int = 3, semanal: bool = False) -> dict:
         """Agenda financeira pronta para o celular, entregar exatamente como vem: atrasadas, o que vence hoje, os próximos `dias` (1 a 45) e a previsão do saldo; com semanal=true, 30 dias agrupados por semana e o primeiro aperto de caixa. Só leitura."""
         def f(con, agora):
@@ -155,14 +166,6 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
             linhas = fechamento.montar(con, agora.date())
             return {"linhas": linhas, "texto": "\n".join(linhas)}
         return executar("fechamento_dia", f)
-
-    @srv.tool()
-    def cobranca_rascunho(pagador: str | None = None) -> dict:
-        """Rascunho de mensagem para cobrar uma entrada atrasada (o que costuma cair no mês e não caiu). `pagador` filtra pelo nome. Só devolve texto: nada é enviado; quem envia é o Ricardo."""
-        def f(con, agora):
-            itens = cobranca_atraso.rascunhos(con, agora.date(), pagador)
-            return {"itens": itens, "nenhum_atrasado": not itens}
-        return executar("cobranca_rascunho", f)
 
     @srv.tool()
     def financeiro_recorrentes(sentido: str | None = None) -> dict:

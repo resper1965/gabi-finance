@@ -52,7 +52,6 @@ def _estados(env):
 def _producao(con):
     _r(con, "open-finance", 2, conferida=1)
     _r(con, "notas-nibo", 3)
-    _r(con, "comprovantes-paperless", 3)
 
 
 def test_producao_fontes_sem_conferencia_nao_geram_falso_alarme(con):
@@ -60,7 +59,7 @@ def test_producao_fontes_sem_conferencia_nao_geram_falso_alarme(con):
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False
     assert e["dados_ate"] is not None
-    assert _estados(e) == {"comprovantes-paperless": "ok", "notas-nibo": "ok", "open-finance": "ok"}
+    assert _estados(e) == {"notas-nibo": "ok", "open-finance": "ok"}
 
 
 def test_nibo_com_50h_esta_parada_e_desatualiza(con):
@@ -82,10 +81,10 @@ def test_nibo_ultima_tentativa_com_erro(con):
 
 def test_fonte_que_nunca_rodou_ok_fica_nao_conferida_e_desatualiza(con):
     _producao(con)
-    con.execute("delete from rodada where fonte='comprovantes-paperless'")
-    _r(con, "comprovantes-paperless", 1, status="rodando")
+    con.execute("delete from rodada where fonte='notas-nibo'")
+    _r(con, "notas-nibo", 1, status="rodando")
     e = envelope(con, None, AGORA)
-    assert _estados(e)["comprovantes-paperless"] == "nao_conferida"
+    assert _estados(e)["notas-nibo"] == "nao_conferida"
     assert e["desatualizado"] is True and e["dados_ate"] is None
 
 
@@ -108,9 +107,8 @@ def test_banco_novo_so_com_open_finance_lista_as_esperadas_como_nao_conferidas(c
     _r(con, "open-finance", 1, conferida=1)
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is True
-    assert _estados(e) == {"comprovantes-paperless": "nao_conferida", "notas-nibo": "nao_conferida", "open-finance": "ok"}
+    assert _estados(e) == {"notas-nibo": "nao_conferida", "open-finance": "ok"}
     _r(con, "notas-nibo", 1)
-    _r(con, "comprovantes-paperless", 1)
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False and set(_estados(e).values()) == {"ok"}
 

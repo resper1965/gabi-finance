@@ -286,23 +286,6 @@ def test_timer_de_exportacao_semanal_instalado():
     assert "gabi-brain-exportacao.timer" in ligadas[0]
 
 
-def test_ingestao_de_comprovantes_tem_timer_diario_usa_a_ponte_e_avisa_quando_falha():
-    srv, t = _ler("gabi-brain-comprovantes.service"), _ler("gabi-brain-comprovantes.timer")
-    assert "gabi.cobrar.ingestao" in srv and "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv and "User=gabibrain" in srv
-    assert "OnCalendar=*-*-* 07:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-comprovantes.service" in t
-    for nome in ("gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-comprovantes.timer" in ligadas[0]
-
-
-def test_api_le_a_chave_da_saude_so_de_arquivo_e_grava_o_cofre_na_pasta_do_banco():
-    api = _ler("gabi-brain-api.service")
-    assert "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in api and "ReadWritePaths=/var/lib/gabi-brain" in api
-    assert "saude.key" not in INSTALAR or "chmod" in INSTALAR  # a chave nunca é criada pelo instalador
-
-
 def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_no_repositorio():
     srv, t = _ler("gabi-brain-telegram.service"), _ler("gabi-brain-telegram.timer")
     assert "-m gabi.telegram" in srv and "EnvironmentFile=-/etc/gabi/telegram.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv

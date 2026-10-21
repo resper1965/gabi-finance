@@ -59,27 +59,10 @@ def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
     assert "• 14:00 Reunião IONIC" in txt and "📅 *Agenda* (1)" in txt and "📧 *E-mail* (1 importante)" in txt and "Saldo: sem leitura" in txt
 
 
-def test_aviso_so_e_marcado_entregue_apos_confirmacao_do_canal(tmp_path):
-    from gabi.cobrar import pedidos
-    c = _banco(tmp_path)
-    c.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada','{}','2026-10-10T05:00:00+00:00')")
-    assert len(pedidos.avisos_pendentes(c, None)) == 1 and len(pedidos.avisos_pendentes(c, None)) == 1  # ler não tira da fila
-    pedidos.marcar_entregue(c, 1)
-    assert pedidos.avisos_pendentes(c, None) == []
-
-
-def test_aviso_ja_enviado_pelo_telegram_direto_nao_volta_para_o_canal(tmp_path):
-    from gabi.cobrar import pedidos
-    c = _banco(tmp_path)
-    c.execute("insert into aviso(tipo, payload, criado_em, telegram_em) values ('rodada_parada','{}','2026-10-10T05:00:00+00:00','2026-10-10T05:01:00+00:00')")
-    assert pedidos.avisos_pendentes(c, None) == []
-
-
 def test_resumo_desatualizado_nomeia_a_fonte_que_causa(tmp_path):
     c = _banco(tmp_path)
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     c.execute("insert into rodada(fonte, inicio, fim, status) values ('notas-nibo','2026-10-01T05:00:00+00:00','2026-10-01T05:00:30+00:00','ok')")
-    c.execute("insert into rodada(fonte, inicio, fim, status) values ('comprovantes-paperless','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
     primeira = resumo_da_manha(c, AGORA)["linhas"][0]
     assert primeira.startswith("⚠️") and "desatualizados" in primeira and "notas-nibo" not in primeira
 
@@ -89,7 +72,6 @@ def test_resumo_nomeia_o_banco_parado_ha_mais_de_24h(tmp_path):
     c = _banco(tmp_path)
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     c.execute("insert into rodada(fonte, inicio, fim, status) values ('notas-nibo','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
-    c.execute("insert into rodada(fonte, inicio, fim, status) values ('comprovantes-paperless','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok')")
     c.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?)", (json.dumps({"Itau": "2026-10-08T18:10:00Z"}),))
     linhas = resumo_da_manha(c, AGORA)["linhas"]
     assert linhas[0].startswith("⚠️") and linhas[1] == "Sem atualizar há mais de 24 h: Itau (desde 08/10 15:10)." and linhas[2] == ""
