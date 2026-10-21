@@ -96,7 +96,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 | H5 | WhatsApp do Hermes: **número dedicado** (hoje a conversa usa o seu) | R | ⏸ | número pareado |
 | H6 | Backup fora da VPS (G17): `backup.pub` e primeiro pacote | R | ⏸ | pacote baixado e hash conferido |
 | H7 | 7 dias de Hermes estável + backup exportado → `--dry-run` | R+C | ⛔ depende de E4 e H5 | sem queda em 7 dias |
-| H8 | Desligar o OpenClaw (Task 15; o gateway já está parado e desabilitado desde 16/10 00:12) e arquivar o `gabi-fin`. | R+C | ⛔ | units removidas, restauração testada |
+| H8 | ~~Desligar o OpenClaw~~ feito em 20/10 (sem gate). Resta arquivar o `gabi-fin`, amarrado ao corte G21/D7. | C | ⏳ | `gabi-fin` arquivado |
 
 ### 7. Fechamento
 | # | Item | Dono | Status |
