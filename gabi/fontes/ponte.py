@@ -27,7 +27,7 @@ PERMITIDOS = {
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
                              "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
-                             "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar"}),
+                             "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
                        "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
@@ -251,6 +251,9 @@ class PonteGraph:
 
     def contato_apagar(self, conta: str, graph_id: str, nome_antes: str, telefone_antes: str) -> dict:
         return self._resultado("contato_apagar", conta, graph_id, nome_antes, telefone_antes)
+
+    def contato_adicionar_email(self, conta: str, graph_id: str, nome_antes: str, telefone_antes: str, emails: list) -> dict:
+        return self._resultado("contato_adicionar_email", conta, graph_id, nome_antes, telefone_antes, emails)
 
     def contatos(self, conta: str) -> list[dict]:
         r = self._ponte._chamar("contatos", (conta,))

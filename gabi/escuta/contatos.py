@@ -217,7 +217,8 @@ def main(banco: Path | None = None, *, listar=None) -> int:
     erros = {k: v["erro"] for k, v in r["contas"].items() if "erro" in v}
     print(f"contatos: total={r['total']} invalidos={r['invalidos']} contas_ok={len(ok)} lidos={sum(v['lidos'] for v in ok.values())}")
     print(f"propostas: criar={g['criar']} corrigir={g['corrigir']} nomes={g['corrigir_nome']} "
-          f"apagar_telefone={g['apagar_telefone']} apagar_contato={g['apagar_contato']}")
+          f"apagar_telefone={g['apagar_telefone']} apagar_contato={g['apagar_contato']} "
+          f"adicionar_email={g['adicionar_email']} revisar={g['revisar']} abaixo_do_piso={g['abaixo_do_piso']}")
     for conta, msg in erros.items():
         print(f"AVISO: conta {conta} falhou: {msg}", file=sys.stderr)
     todas = bool(contas) and not ok

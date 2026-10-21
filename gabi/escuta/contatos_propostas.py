@@ -5,6 +5,7 @@ import unicodedata
 
 from gabi.db import transacao
 from gabi.escuta import contatos
+from gabi.escuta.interacao import interacao, passa_piso
 
 _E164 = re.compile(r"^\+\d{10,15}$")
 ESTADOS_DECISAO = ("aprovada", "recusada")
@@ -52,11 +53,70 @@ def _ja_decidida(con, conta, tipo, graph_id, telefone, nome) -> bool:
                        "and estado in ('recusada','aplicada')", (conta, tipo, graph_id, telefone, nome)).fetchone() is not None
 
 
-def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem) -> int:
+def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, email=None) -> int:
     if _ja_decidida(con, conta, tipo, graph_id, tel, nome):
         return 0
-    return con.execute("insert or ignore into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, criada_em) "
-                       "values (?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora)).rowcount
+    return con.execute("insert or ignore into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, criada_em, email_depois) "
+                       "values (?,?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora, email)).rowcount
+
+
+_STOP = {"dos", "das", "del"}  # "de/da/do" já caem fora por ter menos de 3 letras
+
+
+def _partes(nome: str | None) -> set[str]:
+    sem = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode().lower()
+    return set(re.findall(r"[a-z]{3,}", sem)) - _STOP
+
+
+def nome_compativel(a: str | None, b: str | None) -> bool:
+    """Os nomes dividem ao menos uma parte (sem acento nem caixa, só partes de 3+ letras, sem preposição)."""
+    return bool(_partes(a) & _partes(b))
+
+
+MAX_EMAILS = 3  # o Outlook guarda poucos e-mails por contato (não verificado; limite seguro) e a ponte recusa mais de 5
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+$")
+
+
+def _email_valido(e) -> str | None:
+    e = (e or "").strip().lower()
+    return e if _EMAIL.match(e) else None
+
+
+def _emails(con, agora: str) -> tuple[int, int]:
+    """adicionar_email: só para contato da ness com UMA linha em contato_graph (a ponte recusa contato cujos telefones atuais difiram do enviado),
+    telefone que não aparece em outro contato. Só entram e-mails de linhas do Google cujo próprio nome é compatível com o do contato; linha de nome
+    incompatível ou nulo no mesmo telefone, mais de MAX_EMAILS e-mails distintos ou conta do contato que já tem e-mail para o telefone: nada se propõe
+    (a última nem conta em revisar). Devolve (propostas novas, contatos com e-mail barrados)."""
+    por_contato: dict[tuple, list] = {}
+    donos: dict[str, set] = {}
+    for r in con.execute("select conta, graph_id, nome, telefone from contato_graph order by conta, graph_id, telefone_original").fetchall():
+        por_contato.setdefault((r["conta"], r["graph_id"]), []).append(r)
+        if r["telefone"] is not None:
+            donos.setdefault(r["telefone"], set()).add((r["conta"], r["graph_id"]))
+    novas = revisar = 0
+    for (conta, gid), rs in por_contato.items():
+        telefones = {r["telefone"] for r in rs if r["telefone"] is not None}
+        nome, tel = _nome(rs[0]["nome"]), rs[0]["telefone"]
+        emails: set[str] = set()
+        duvida = ja_tem = False
+        for t in telefones:
+            for g in con.execute("select email, nome, conta from contato_google_email where telefone=?", (t,)).fetchall():
+                e = _email_valido(g["email"])
+                if not e:
+                    continue
+                if g["conta"] == conta:
+                    ja_tem = True  # e-mail que o próprio contato da ness já tem (o sincronizar o espelha aqui): nada a propor
+                elif nome_compativel(nome, g["nome"]):
+                    emails.add(e)
+                else:
+                    duvida = True  # e-mail de outra pessoa (ou de linha sem nome) no mesmo telefone: em dúvida, não
+        if ja_tem or not (emails or duvida):
+            continue
+        if duvida or len(emails) > MAX_EMAILS or len(rs) != 1 or tel is None or len(donos[tel]) != 1:
+            revisar += 1
+            continue
+        novas += _inserir(con, agora, "adicionar_email", conta, gid, nome, tel, nome, tel, "google_email", ";".join(sorted(emails)))
+    return novas, revisar
 
 
 def _sem_cara_de_telefone(original) -> bool:
@@ -92,7 +152,9 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
 
 
 def gerar(con, agora: str) -> dict:
-    criar = corrigir = 0
+    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros,
+    abaixo_do_piso = remetentes aprovados que não viram `criar` por falta de interação (1 resposta ou 5 mensagens nos últimos 12 meses)."""
+    criar = corrigir = abaixo = 0
     conta = contatos.conta_origem(con)
     with transacao(con):
         for r in con.execute("select numero, nome from escuta_remetente where estado='aprovado' and nome is not null and trim(nome)<>'' order by numero").fetchall():
@@ -101,6 +163,9 @@ def gerar(con, agora: str) -> dict:
                 continue
             if con.execute("select 1 from contato_graph where telefone=?", (numero,)).fetchone() or \
                     con.execute("select 1 from contato_google where telefone=?", (numero,)).fetchone():
+                continue
+            if not passa_piso(interacao(con, agora, telefone=numero)):
+                abaixo += 1
                 continue
             criar += _inserir(con, agora, "criar", conta, None, None, None, nome, numero, "whatsapp")
         for r in con.execute("select conta, graph_id, nome, telefone_original, telefone from contato_graph where campo='mobile' and telefone is not null "
@@ -113,7 +178,9 @@ def gerar(con, agora: str) -> dict:
                 continue  # outro contato (ou outro campo deste) já tem o número: corrigir criaria duplicata
             corrigir += _inserir(con, agora, "corrigir", r["conta"], r["graph_id"], r["nome"], r["telefone_original"], nome, novo, "telefone_invalido")
         nomes, apagar_c, apagar_t = _limpeza(con, agora)
-    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c}
+        add_email, revisar = _emails(con, agora)
+    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c,
+            "adicionar_email": add_email, "revisar": revisar, "abaixo_do_piso": abaixo}
 
 
 def listar(con, estado: str | None = None) -> list[dict]:
@@ -154,12 +221,12 @@ def decidir(con, proposta_id: int, estado: str, login: str, agora: str, auditar=
 
 
 def aprovar_correcoes(con, login: str, agora: str, ids, auditar=None) -> int:
-    """Aprova só as correções (de telefone e de nome) pendentes cujos ids o painel mostrou (nunca o que o dono não viu); criar, apagar_telefone,
-    apagar_contato e não pendentes ficam como estão: apagar só se aprova um a um."""
+    """Aprova só as correções (de telefone e de nome) e os adicionar_email pendentes cujos ids o painel mostrou (nunca o que o dono não viu);
+    criar, apagar_telefone, apagar_contato e não pendentes ficam como estão: apagar e criar só se aprovam um a um."""
     ids = ids_validos(ids)
     with transacao(con):
         n = con.execute(f"update contato_proposta set estado='aprovada', decidida_em=?, decidida_por=? "
-                        f"where id in ({','.join('?' * len(ids))}) and tipo in ('corrigir','corrigir_nome') and estado='pendente'", (agora, login, *ids)).rowcount
+                        f"where id in ({','.join('?' * len(ids))}) and tipo in ('corrigir','corrigir_nome','adicionar_email') and estado='pendente'", (agora, login, *ids)).rowcount
         if auditar is not None and n:
             auditar(n)  # dentro da transação: se falhar, nada fica aprovado
         return n

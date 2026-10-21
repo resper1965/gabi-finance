@@ -334,6 +334,11 @@ class GraphNess:
         from gabi.fontes import graph_ness_contatos
         return graph_ness_contatos.apagar(self, conta, graph_id, nome_antes, telefone_antes)
 
+    def contato_adicionar_email(self, conta: str, graph_id: str, nome_antes: str, telefone_antes: str, emails: list) -> dict:
+        """Acrescenta e-mails se o contato ainda estiver como `nome_antes`/`telefone_antes` e sem e-mail; senão {"resultado": "alterado"}."""
+        from gabi.fontes import graph_ness_contatos
+        return graph_ness_contatos.adicionar_email(self, conta, graph_id, nome_antes, telefone_antes, emails)
+
     def _enviar_mover(self, url: str, destino: str) -> int:
         """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""
         corpo = json.dumps({"destinationId": destino}).encode()

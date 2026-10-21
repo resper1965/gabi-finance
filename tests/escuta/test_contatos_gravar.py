@@ -527,3 +527,90 @@ def test_tipo_desconhecido_vira_contato_alterado(con):
     graph = FakeLimpeza()
     g.aplicar(con, graph, AGORA)
     assert graph.chamadas == [] and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
+
+
+# ---------------- adicionar_email ----------------
+class FakeEmail(FakeLimpeza):
+    def contato_adicionar_email(self, conta, graph_id, nome_antes, telefone_antes, emails):
+        return self._responde("adicionar_email", conta, graph_id, nome_antes, telefone_antes, emails)
+
+
+E164 = "+5511912345678"
+
+
+def _email(con, estado="aprovada", nome="Beltrano", emails="a@x.com;b@x.com", gid="g-1"):
+    cur = con.execute("insert into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, email_depois, origem, estado) "
+                      "values ('adicionar_email',?,?,?,?,?,?,?,'google_email',?)", (NESS, gid, nome, E164, nome, E164, emails, estado))
+    con.commit()
+    return cur.lastrowid
+
+
+def _preparar_email(con, original="11 91234-5678 "):
+    _ligar(con)
+    _graph_linha(con, nome="Beltrano", original=original, telefone=E164)
+    return _email(con)
+
+
+def test_adicionar_email_ok_vira_aplicada_e_chama_a_ponte_com_original(con):
+    pid = _preparar_email(con)
+    graph = FakeEmail()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [("adicionar_email", NESS, "g-1", "Beltrano", "11 91234-5678 ", ["a@x.com", "b@x.com"])]
+    assert r["aplicadas"] == 1 and _estado(con, pid)[0] == "aplicada"
+    assert _linhas_graph(con) == [("g-1", "Beltrano", "11 91234-5678 ", E164)]
+
+
+@pytest.mark.parametrize("quebra", ["nome", "sumiu", "conta_fora", "telefone", "duas_linhas"])
+def test_adicionar_email_revalida_espelho(con, quebra):
+    pid = _preparar_email(con)
+    if quebra == "nome":
+        con.execute("update contato_graph set nome='Mudou'")
+    elif quebra == "sumiu":
+        con.execute("delete from contato_graph")
+    elif quebra == "telefone":
+        con.execute("update contato_graph set telefone='+5511900000000'")
+    elif quebra == "duas_linhas":
+        _graph_linha(con, nome="Beltrano", original="outro", telefone=E164)
+    con.commit()
+    if quebra == "conta_fora":
+        _contas(con, ["outra@x.com"])
+    graph = FakeEmail()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and r["descartadas"] == 1 and _estado(con, pid)[:2] == ("falhou", "contato_alterado")
+
+
+def test_adicionar_email_alterado_pelo_graph(con):
+    pid = _preparar_email(con)
+    r = g.aplicar(con, FakeEmail("alterado"), AGORA)
+    assert _estado(con, pid)[:2] == ("falhou", "contato_alterado") and r["descartadas"] == 1
+
+
+def test_adicionar_email_graph_cai(con):
+    pid = _preparar_email(con)
+    r = g.aplicar(con, FakeEmail(erro=True), AGORA)
+    assert _estado(con, pid)[:2] == ("falhou", "graph_indisponivel") and r["descartadas"] == 0
+
+
+def test_adicionar_email_desligado_nao_chama_o_graph(con):
+    pid = _preparar_email(con)
+    _ligar(con, "desligado")
+    graph = FakeEmail()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and r["simuladas"] == 1 and _estado(con, pid)[0] == "aprovada"
+
+
+@pytest.mark.parametrize("email_primeiro", [True, False])
+def test_adicionar_email_com_corrigir_do_mesmo_contato_nao_quebra_em_nenhuma_ordem(con, email_primeiro):
+    _ligar(con)
+    _graph_linha(con, nome="Beltrano", original="11 91234-5678 ", telefone=E164)
+    if email_primeiro:
+        pe = _email(con)
+        pc = _proposta(con, tipo="corrigir", nome="Beltrano", tel=E164, graph_id="g-1", nome_antes="Beltrano", tel_antes="11 91234-5678 ")
+    else:
+        pc = _proposta(con, tipo="corrigir", nome="Beltrano", tel=E164, graph_id="g-1", nome_antes="Beltrano", tel_antes="11 91234-5678 ")
+        pe = _email(con)
+    graph = FakeEmail()
+    r = g.aplicar(con, graph, AGORA)
+    assert r["aplicadas"] == 2 and _estado(con, pe)[0] == "aplicada" and _estado(con, pc)[0] == "aplicada"
+    original_na_hora = "11 91234-5678 " if email_primeiro else E164
+    assert [c for c in graph.chamadas if c[0] == "adicionar_email"] == [("adicionar_email", NESS, "g-1", "Beltrano", original_na_hora, ["a@x.com", "b@x.com"])]
