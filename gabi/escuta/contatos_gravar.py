@@ -52,6 +52,17 @@ def _registrar(con, gravar) -> bool:
         return False
 
 
+EM_GRAVACAO = "em_gravacao"
+
+
+def _reservar(con, pid: int) -> bool:
+    """Marca a proposta como em gravação ANTES de qualquer chamada ao Graph: `decidir` recusa (409) o que está marcado, então um Recusar do dono não
+    chega depois de um DELETE já feito. O motivo some quando a proposta termina (aplicada ou falhou). Se o processo morrer no meio, a marca fica e a
+    proposta nunca é reenviada: o que pode ter sido apagado fica para o dono conferir."""
+    with transacao(con):
+        return con.execute("update contato_proposta set motivo=? where id=? and estado='aprovada' and motivo is null", (EM_GRAVACAO, pid)).rowcount == 1
+
+
 def _conta_fora(con, p) -> bool:
     """A conta saiu de escuta.contas_contatos: a sincronização apagou o contato_graph dela, então a revalidação local não enxerga mais nada."""
     return p["conta"] not in contas_contatos(con)
@@ -149,7 +160,8 @@ def _aplicar_apagar_telefone(con, graph, p, agora: str) -> str | None:
     if motivo:
         return motivo
     return _gravar_aplicada(con, p, agora, lambda: con.execute(
-        "delete from contato_graph where conta=? and graph_id=? and telefone_original=?", (p["conta"], p["graph_id"], p["telefone_antes"])))
+        "delete from contato_graph where conta=? and graph_id=? and telefone_original=? and campo=?",
+        (p["conta"], p["graph_id"], p["telefone_antes"], linha["campo"])))
 
 
 def _aplicar_apagar_contato(con, graph, p, agora: str) -> str | None:
@@ -163,7 +175,8 @@ def _aplicar_apagar_contato(con, graph, p, agora: str) -> str | None:
 
     def local():
         con.execute("delete from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"]))
-        con.execute("delete from contato_google where conta=? and telefone=?", (p["conta"], p["telefone_antes"]))
+        con.execute("delete from contato_google where conta=? and telefone=? and not exists "
+                    "(select 1 from contato_graph where conta=? and telefone=?)", (p["conta"], p["telefone_antes"], p["conta"], p["telefone_antes"]))
     return _gravar_aplicada(con, p, agora, local)
 
 
@@ -197,7 +210,7 @@ def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
     adicionar_email: o contato não tem mais exatamente uma linha com o mesmo nome e telefone -> contato_alterado."""
     r = {"aplicadas": 0, "falhas": 0, "descartadas": 0, "simuladas": 0}
     indisponivel = 0
-    aprovadas = con.execute("select * from contato_proposta where estado='aprovada' order by id").fetchall()
+    aprovadas = con.execute("select * from contato_proposta where estado='aprovada' and motivo is null order by id").fetchall()
     if not escrita_ligada(con):
         r["simuladas"] = len(aprovadas)
         return r, 0
@@ -207,6 +220,8 @@ def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
             if atual is None or atual["estado"] != "aprovada":
                 continue
             aplicador = APLICADORES.get(p["tipo"])
+            if aplicador is not None and not _reservar(con, p["id"]):
+                continue  # o dono recusou entre a listagem e agora
             motivo = CONTATO_ALTERADO if aplicador is None else aplicador(con, graph, p, agora)
         except Exception:  # noqa: BLE001 - erro local inesperado também não deixa a proposta presa em 'aprovada'
             motivo = GRAPH_INDISPONIVEL

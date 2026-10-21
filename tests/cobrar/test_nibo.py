@@ -1,3 +1,4 @@
+import ast
 import datetime as dt
 import inspect
 import re
@@ -83,16 +84,41 @@ def test_cliente_de_leitura_nao_tem_metodo_de_escrita():
     assert {"organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"} <= set(nomes)
 
 
+def _exclusoes(fonte: str) -> list[str | None]:
+    """Cada exclusão HTTP no código: string "DELETE" (qualquer caixa) ou chamada `.delete(`/`requests.delete`, com o nome da função que a contém.
+    `@router.delete` é a exclusão lógica de cadastros da própria API e não conta."""
+    achados = []
+
+    def visita(no, funcao):
+        if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            funcao = no.name
+            for d in no.decorator_list:
+                if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr == "delete":
+                    d.func.attr = "_ok"  # decorador de rota
+        if isinstance(no, ast.Constant) and isinstance(no.value, str) and no.value.strip().upper() == "DELETE":
+            achados.append(funcao)
+        if isinstance(no, ast.Attribute) and no.attr == "delete" and not (isinstance(no.value, ast.Name) and no.value.id == "router"):
+            achados.append(funcao)
+        for f in ast.iter_child_nodes(no):
+            visita(f, funcao)
+    visita(ast.parse(fonte), None)
+    return achados
+
+
+def test_varredura_de_exclusao_pega_delete_fora_de_apagar():
+    assert _exclusoes('def apagar(x):\n    _escrever(x, "DELETE", u)\ndef outra(x):\n    _escrever(x, "delete", u)\n    x.delete(u)') == ["apagar", "outra", "outra"]
+    assert _exclusoes('@router.delete("/x")\ndef rota():\n    pass') == []
+
+
 def test_nenhuma_rota_de_exclusao_no_codigo():
-    """Chamadas de SAÍDA (urllib/requests). `@router.delete` é a exclusão lógica de cadastros da própria API, não conta."""
+    """O único DELETE do código é o de apagar contato da ness, dentro de `apagar`, aprovado um a um (ADR-021). Qualquer outro, ou outro nesse arquivo, falha."""
     achados = []
     for arq in RAIZ.rglob("*.py"):
-        if "painel" in arq.parts or arq.name == "graph_ness_contatos.py":  # o único DELETE do código: apagar contato da ness, aprovado um a um (ADR-021; travado em test_graph_ness_contatos_escrita)
+        if "painel" in arq.parts:
             continue
-        for i, linha in enumerate(arq.read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r"(?<!router)\.delete\(|requests\.delete|[\"']DELETE[\"']|method\s*=\s*[\"']DELETE", linha) and "re.search" not in linha:
-                achados.append(f"{arq.relative_to(RAIZ)}:{i}")
-    assert achados == []
+        for funcao in _exclusoes(arq.read_text(encoding="utf-8")):
+            achados.append((arq.name, funcao))
+    assert achados == [("graph_ness_contatos.py", "apagar")]
 
 
 def test_nfse_ordena_por_createDate_e_filtra_com_offset():

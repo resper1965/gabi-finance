@@ -153,7 +153,7 @@ def test_apagar_contato_faz_delete_apos_conferir():
     gr, http = _graph([(200, {"displayName": "U", "mobilePhone": "123", "homePhones": [], "businessPhones": [], "emailAddresses": []}), (204, None)])
     assert gr.contato_apagar(CONTA, GID, "U", "123") == {"resultado": "ok"}
     leitura, escrita = http.chamadas
-    assert leitura[1] == f"{URL_ID}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+    assert leitura[1] == f"{URL_ID}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses,personalNotes,companyName,jobTitle,department,birthday"
     assert escrita[0] == "DELETE" and escrita[1] == URL_ID and escrita[2] is None
 
 
@@ -240,3 +240,16 @@ def test_adicionar_email_erro_nao_vaza_dados():
     with pytest.raises(ErroGraphNess) as e:
         gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", ["a@x.com"])
     assert str(e.value) == "contato: HTTP 500"
+
+
+@pytest.mark.parametrize("extra", [{"personalNotes": "mãe da Sirlene"}, {"companyName": "ACME"}, {"jobTitle": "Dentista"}])
+def test_apagar_contato_recusa_o_que_tem_notas_ou_empresa(extra):
+    relida = {"displayName": "U", "mobilePhone": "1", "homePhones": [], "businessPhones": [], "emailAddresses": [], **extra}
+    gr, http = _graph([(200, relida)])
+    assert gr.contato_apagar(CONTA, GID, "U", "1") == {"resultado": "alterado"}
+    assert [c[0] for c in http.chamadas] == ["GET"]
+
+
+def test_apagar_contato_ignora_espaco_nas_pontas_do_nome():
+    gr, http = _graph([(200, {"displayName": " U ", "mobilePhone": "1", "homePhones": [], "businessPhones": [], "emailAddresses": []}), (204, None)])
+    assert gr.contato_apagar(CONTA, GID, "U", "1") == {"resultado": "ok"}

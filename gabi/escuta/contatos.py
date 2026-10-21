@@ -18,6 +18,7 @@ from gabi.fontes.google_contatos import ErroGoogleContatos
 CONTAS_PADRAO = ["resper@gmail.com", "resper@ness.com.br"]
 DESTINO_PADRAO, ORIGEM_PADRAO = "resper@gmail.com", "resper@ness.com.br"
 _E164 = re.compile(r"^\+\d{10,15}$")
+_TEL_CSV = re.compile(r"^\+\d{8,15}$")  # os mesmos 8 a 15 dígitos que o estrangeiro aceito em _telefone
 _CANONICO = re.compile(r"^\+[1-9]\d{7,14}$")
 MAX_EMAILS = 10
 _RAMAL = re.compile(r"(?i)(ramal|\bext|\br\.|\bx\s*\d|#|;|,)")
@@ -73,7 +74,8 @@ def _telefone(item) -> str | None:
         t = "+" + t[2:]
     if t.startswith("+") and not re.sub(r"\D", "", t).startswith("55"):
         digitos = re.sub(r"\D", "", t)
-        return "+" + digitos if 8 <= len(digitos) <= 15 else None  # estrangeiro: vale como está, nunca vira +55
+        # estrangeiro: vale como está, nunca vira +55; DDI não começa com 0 nem com 11 (não existe)
+        return "+" + digitos if 8 <= len(digitos) <= 15 and not digitos.startswith(("0", "11")) else None
     return normalizar_telefone(t)
 
 
@@ -184,7 +186,7 @@ def csv_google(contatos: list[dict]) -> str:
     w.writerow(["Name", "Phone 1 - Value"])
     for c in contatos:
         tel = c.get("telefone")
-        if isinstance(tel, str) and _E164.match(tel):
+        if isinstance(tel, str) and _TEL_CSV.match(tel):
             w.writerow([_celula(c.get("nome")), tel])
     return saida.getvalue()
 

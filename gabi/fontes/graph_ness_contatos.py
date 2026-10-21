@@ -18,6 +18,11 @@ def _texto(v, maximo: int) -> str:
     return v
 
 
+def _mesmo_nome(atual, esperado) -> bool:
+    """O espelho local guarda o nome sem espaço nas pontas; o Graph guarda como veio."""
+    return isinstance(atual, str) and atual.strip() == esperado
+
+
 def _par(d) -> tuple[str, str]:
     if not isinstance(d, dict):
         raise ErroGraphNess("contato inválido")
@@ -62,12 +67,13 @@ def corrigir(gr, conta, graph_id, antes, depois) -> dict:
     nome, telefone = _par(depois)
     url = f"{base}/{urllib.parse.quote(graph_id, safe='')}"
     atual = gr._get(f"{url}?$select=displayName,mobilePhone")
-    if atual.get("displayName") != antes["nome"] or atual.get("mobilePhone") != antes["telefone"]:
+    if not _mesmo_nome(atual.get("displayName"), antes["nome"]) or atual.get("mobilePhone") != antes["telefone"]:
         return {"resultado": "alterado"}
     _escrever(gr, "PATCH", url, {"displayName": nome, "mobilePhone": telefone})
     return {"resultado": "ok"}
 
 
+CAMPOS_DADO = ("personalNotes", "companyName", "jobTitle", "department", "birthday")  # dado que o espelho não guarda: contato com isso não se apaga
 CAMPOS_TELEFONE = {"mobile": "mobilePhone", "home": "homePhones", "business": "businessPhones"}
 
 
@@ -83,7 +89,7 @@ def renomear(gr, conta, graph_id, nome_antes, nome_depois) -> dict:
     url = _url_contato(gr, conta, graph_id)
     nome_antes, nome_depois = _texto(nome_antes, MAX_NOME), _texto(nome_depois, MAX_NOME)
     atual = gr._get(f"{url}?$select=displayName")
-    if atual.get("displayName") != nome_antes:
+    if not _mesmo_nome(atual.get("displayName"), nome_antes):
         return {"resultado": "alterado"}
     _escrever(gr, "PATCH", url, {"displayName": nome_depois})
     return {"resultado": "ok"}
@@ -114,9 +120,10 @@ def apagar(gr, conta, graph_id, nome_antes, telefone_antes) -> dict:
     dono viu): nunca apaga o que ganhou dado, trocou ou perdeu o número depois da proposta."""
     url = _url_contato(gr, conta, graph_id)
     nome_antes, telefone_antes = _texto(nome_antes, MAX_NOME), _texto(telefone_antes, MAX_TELEFONE)
-    atual = gr._get(f"{url}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses")
+    atual = gr._get(f"{url}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses,{','.join(CAMPOS_DADO)}")
     telefones = ([atual.get("mobilePhone")] if atual.get("mobilePhone") else []) + list(atual.get("homePhones") or []) + list(atual.get("businessPhones") or [])
-    if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or telefones != [telefone_antes]:
+    if (not _mesmo_nome(atual.get("displayName"), nome_antes) or atual.get("emailAddresses") or telefones != [telefone_antes]
+            or any(atual.get(c) for c in CAMPOS_DADO)):
         return {"resultado": "alterado"}
     _escrever(gr, "DELETE", url, None)
     return {"resultado": "ok"}
@@ -132,7 +139,7 @@ def adicionar_email(gr, conta, graph_id, nome_antes, telefone_antes, emails) -> 
         raise ErroGraphNess("contato inválido")
     atual = gr._get(f"{url}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses")
     telefones = ([atual.get("mobilePhone")] if atual.get("mobilePhone") else []) + list(atual.get("homePhones") or []) + list(atual.get("businessPhones") or [])
-    if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or telefones != [telefone_antes]:
+    if not _mesmo_nome(atual.get("displayName"), nome_antes) or atual.get("emailAddresses") or telefones != [telefone_antes]:
         return {"resultado": "alterado"}
     _escrever(gr, "PATCH", url, {"emailAddresses": [{"address": e} for e in emails]})
     return {"resultado": "ok"}

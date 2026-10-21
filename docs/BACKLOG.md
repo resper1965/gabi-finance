@@ -17,8 +17,8 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio 
 | D3 | ✅ 16/10 instalado (retry de 3 tentativas, aviso `incompleta`). **Saldos parciais:** `openfinance_list_accounts` devolve 4–17 das 17 contas, conforme a hora (15/10). Repetir a chamada quando vier menos do que o esperado e marcar a rodada incompleta | C | 🔧 aprovado em 16/10 | toda rodada horária lê as contas esperadas ou registra o que faltou; teste cobre os dois casos |
 | D4 | ✅ 16/10 (decisão do Ricardo: todos os bancos entram no caixa único). C6 BANK (12) já estava `sim`; Bradesco 16–18 passaram de `a_decidir` para `sim` (backup `/var/backups/gabi-brain/antes-do-bradesco-*.sqlite`). Saldo do caixa único R$ 37.275,08 inclui Bradesco | R | ✅ | contas decididas em Cadastros |
 | D5 | 145 lançamentos sem dono (Cadastros), depois `sudo ~/aplicar-donos.sh` | R | ⏸ | classificação ≥ 90 % |
-| D6 | Aceite T1.14: 7 rodadas seguidas `conferida=1` e `python -m tools.aceite` | R+C | ⛔ depende de D1–D2 | `docs/aceite-fase-1.md` escrito |
-| D7 | Corte G21: 7 dias de `tools.comparar_agenda` vazio (rodadas 07h, 15h, 23h BRT), depois `python -m tools.congelar --confirm`. Paineiras e Cristina Yabe: vale o brain | R+C | ⛔ depende de D6 | gabi-financeiro congelado |
+| D6 | ~~D6~~ dispensado em 21/10 por ordem do dono (sem esperar as 7 rodadas). | C | ✅ | — |
+| D7 | ~~D7~~ dispensado em 21/10 por ordem do dono; o `gabi-fin` já estava parado e arquivado desde 19/10 e `tools.congelar` nunca foi escrito. | C | ✅ | — |
 | D8 | ✅ 16/10 no código (spec e plano `2026-10-16-reembolso-saude`; `gabi/reembolso_saude/`, migração 0040, `gabi-brain-reembolso-saude.timer` instalado e DESLIGADO, 5 ferramentas MCP `reembolso_saude_*`, rota `GET /api/v1/reembolso-saude/dossies`). **Porte do reembolso de saúde** (`reembolso_fila.py` e `reembolso_segunda`): pistas passam a vir do anexo de saúde que a escuta nova grava no Paperless (`gabi:saude-reembolso`), classificado pelo texto; estado e nomes no cofre cifrado; lista de segunda vira aviso do brain. **Falta (R):** chave do cofre e modelo na ponte, escuta em `ativo`, ligar o timer, 5 ferramentas no include do Hermes, alguns dias em paralelo e então `systemctl disable --now gabi-reembolso.path gabi-reembolso.timer gabi-reembolso-segunda.timer` (runbook `#reembolso-saude`). **Tela ✅ 16/10** (aba Reembolso de saúde; rotas `semana`, `pedi`, `recebi`; mensagens de saúde sem anexo na tela Família). **Depois:** trava do cofre compartilhada com exames e API, leitura de PDF sem texto, campos antigos do Paperless | C | ✅ código; ⏸ passos do dono | `gabi-reembolso*` aposentados sem perder função |
 | D9 | Cancelar BrandYourself (renovou em 16/09) | R | ⏸ | cancelado |
 
@@ -96,7 +96,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 | H5 | WhatsApp do Hermes: **número dedicado** (hoje a conversa usa o seu) | R | ⏸ | número pareado |
 | H6 | Backup fora da VPS (G17): `backup.pub` e primeiro pacote | R | ⏸ | pacote baixado e hash conferido |
 | H7 | 7 dias de Hermes estável + backup exportado → `--dry-run` | R+C | ⛔ depende de E4 e H5 | sem queda em 7 dias |
-| H8 | ~~Desligar o OpenClaw~~ feito em 20/10 (sem gate). Resta arquivar o `gabi-fin`, amarrado ao corte G21/D7. | C | ⏳ | `gabi-fin` arquivado |
+| H8 | ~~H8~~ OpenClaw desligado em 20/10; `gabi-fin` já parado e arquivado (ver D7). | C | ✅ | — |
 
 ### 7. Fechamento
 | # | Item | Dono | Status |

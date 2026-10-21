@@ -33,6 +33,10 @@ def limpar_nome(nome: str) -> str:
     return " ".join(w.strip(_LIXO) if w[0] in _LIXO or w[-1] in _LIXO else w for w in palavras)
 
 
+def _letra_latina_ou_digito(c: str) -> bool:
+    return unicodedata.name(c, "").startswith(("LATIN", "DIGIT"))
+
+
 def _digitos(t: str) -> str:
     return re.sub(r"\D", "", t or "").lstrip("0")
 
@@ -137,6 +141,8 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
         nome = _nome(rs[0]["nome"])
         limpo = limpar_nome(nome) if nome else ""
         if len(limpo) == 1:
+            if not _letra_latina_ou_digito(limpo):
+                continue  # nome de 1 caractere CJK, emoji ou invisível é nome (ou lixo que o dono vê), não "U": nada a apagar
             r = rs[0]
             if len(rs) == 1 and r["telefone"] is not None and not con.execute(
                     "select 1 from contato_google_email where conta=? and telefone=?", (conta, r["telefone"])).fetchone():
@@ -145,7 +151,7 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
             nomes += _inserir(con, agora, "corrigir_nome", conta, gid, nome, None, limpo, "", "nome_sujo")
         if nome:
             for r in rs:
-                if r["telefone"] is None and _sem_cara_de_telefone(r["telefone_original"]):
+                if r["telefone"] is None and len(r["telefone_original"]) <= 30 and _sem_cara_de_telefone(r["telefone_original"]):
                     # telefone_depois repete o número só como chave de deduplicação: um contato pode ter vários inválidos
                     apagar_t += _inserir(con, agora, "apagar_telefone", conta, gid, nome, r["telefone_original"], nome, r["telefone_original"], "telefone_invalido")
     return nomes, apagar_c, apagar_t
@@ -212,10 +218,10 @@ def decidir(con, proposta_id: int, estado: str, login: str, agora: str, auditar=
             raise ErroProposta("Proposta não encontrada.", nao_encontrado=True)
         if r["estado"] not in de:
             raise ErroProposta("A proposta já foi decidida.", conflito=True)
-        n = con.execute(f"update contato_proposta set estado=?, decidida_em=?, decidida_por=? where id=? and estado in ({','.join('?' * len(de))})",
+        n = con.execute(f"update contato_proposta set estado=?, decidida_em=?, decidida_por=? where id=? and motivo is null and estado in ({','.join('?' * len(de))})",
                         (estado, agora, login, proposta_id, *de)).rowcount
         if not n:
-            raise ErroProposta("A proposta já foi decidida.", conflito=True)
+            raise ErroProposta("A proposta já foi decidida ou está sendo gravada.", conflito=True)
         if auditar is not None:
             auditar()  # dentro da transação: se falhar, a decisão não fica
 

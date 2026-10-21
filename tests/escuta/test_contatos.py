@@ -302,3 +302,13 @@ def test_estrangeiro_nao_conta_como_invalido_e_entra_na_tabela(con):
     assert r["invalidos"] == 0
     assert _linhas(con) == [(NESS, "+14155552671", "Bob")]
     assert [x[4] for x in _graph_linhas(con)] == ["+14155552671"]
+
+
+@pytest.mark.parametrize("tel", ["+0 123 456 7890", "+11 2345 6789", "00 11 2345 6789"])
+def test_estrangeiro_com_ddi_inexistente_e_invalido(con, tel):
+    r = c.sincronizar(con, [GMAIL], _listar({GMAIL: [{"nome": "X", "telefone": tel}]}))
+    assert _linhas(con) == [] and r["invalidos"] == 1
+
+
+def test_csv_google_aceita_estrangeiro_de_8_digitos():
+    assert "+12345678" in c.csv_google([{"nome": "X", "telefone": "+12345678"}])

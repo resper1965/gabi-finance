@@ -311,7 +311,7 @@ def test_erro_do_banco_tambem_ao_marcar_falhou_nao_derruba_o_laco(con):
     a = _proposta(con, nome="A", tel="+5511911111111")
     b = _proposta(con, nome="B", tel="+5511922222222")
     graph = FakeGraph(ids=["id-a", "id-b"])
-    r = g.aplicar(_ConProxy(con, "update contato_proposta", vezes=2, so_id=a), graph, AGORA)
+    r = g.aplicar(_ConProxy(con, "update contato_proposta set estado", vezes=2, so_id=a), graph, AGORA)
     assert r["falhas"] == 1 and r["aplicadas"] == 1
     assert [c[2] for c in graph.chamadas] == ["A", "B"]
     assert _estado(con, b)[0] == "aplicada"
@@ -614,3 +614,47 @@ def test_adicionar_email_com_corrigir_do_mesmo_contato_nao_quebra_em_nenhuma_ord
     assert r["aplicadas"] == 2 and _estado(con, pe)[0] == "aplicada" and _estado(con, pc)[0] == "aplicada"
     original_na_hora = "11 91234-5678 " if email_primeiro else E164
     assert [c for c in graph.chamadas if c[0] == "adicionar_email"] == [("adicionar_email", NESS, "g-1", "Beltrano", original_na_hora, ["a@x.com", "b@x.com"])]
+
+
+def test_apagar_contato_preserva_contato_google_de_outro_contato_com_o_mesmo_telefone(con):
+    pid, _ = _preparar(con, "apagar_contato")
+    _graph_linha(con, graph_id="g-2", nome="Outro", original="+55 11 94733-8256", telefone="+5511947338256")
+    con.execute("insert into contato_google(conta, telefone, nome) values (?,?,?)", (NESS, "+5511947338256", "U"))
+    con.commit()
+    g.aplicar(con, FakeLimpeza(), AGORA)
+    assert _estado(con, pid)[0] == "aplicada"
+    assert con.execute("select count(*) from contato_google").fetchone()[0] == 1
+
+
+def test_recusar_durante_a_gravacao_nao_desfaz_o_apagar(con):
+    from gabi.escuta import contatos_propostas as cp
+    pid, _ = _preparar(con, "apagar_contato")
+    resultado = {}
+
+    class Corrida(FakeLimpeza):
+        def contato_apagar(self, *a):
+            try:
+                cp.decidir(con, pid, "recusada", "ricardo", AGORA)
+            except cp.ErroProposta as e:
+                resultado["conflito"] = e.conflito
+            return super().contato_apagar(*a)
+
+    g.aplicar(con, Corrida(), AGORA)
+    assert resultado == {"conflito": True} and _estado(con, pid)[0] == "aplicada"
+
+
+def test_proposta_recusada_antes_de_comecar_nao_chama_o_graph(con):
+    pid, _ = _preparar(con, "apagar_contato")
+    con.execute("update contato_proposta set estado='recusada' where id=?", (pid,))
+    con.commit()
+    graph = FakeLimpeza()
+    r = g.aplicar(con, graph, AGORA)
+    assert graph.chamadas == [] and r["aplicadas"] == 0
+
+
+def test_erro_do_banco_ao_reservar_nao_chama_o_graph(con):
+    _ligar(con)
+    a = _proposta(con, nome="A", tel="+5511911111111")
+    graph = FakeGraph(ids=["id-a"])
+    r = g.aplicar(_ConProxy(con, "update contato_proposta set motivo", vezes=1, so_id=a), graph, AGORA)
+    assert graph.chamadas == [] and r["falhas"] == 1

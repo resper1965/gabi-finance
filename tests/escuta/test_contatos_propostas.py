@@ -589,3 +589,14 @@ def test_teto_de_tres_emails(con):
     con.execute("delete from contato_google_email where email='a3@x.com'")
     r = p.gerar(con, AGORA)
     assert r["adicionar_email"] == 1 and _props(con)[0]["email_depois"] == "a0@x.com;a1@x.com;a2@x.com"
+
+
+@pytest.mark.parametrize("nome", ["李", "😀", "​"])
+def test_nome_de_um_caractere_nao_latino_nao_gera_apagar_contato(con, nome):
+    _graph(con, nome=nome)
+    assert p.gerar(con, AGORA)["apagar_contato"] == 0
+
+
+def test_telefone_longo_demais_nao_gera_apagar_telefone(con):
+    _graph(con, nome="Ana", orig="x" * 31, tel=None)
+    assert p.gerar(con, AGORA)["apagar_telefone"] == 0
