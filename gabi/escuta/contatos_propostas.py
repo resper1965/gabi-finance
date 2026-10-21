@@ -5,6 +5,7 @@ import unicodedata
 
 from gabi.db import transacao
 from gabi.escuta import contatos
+from gabi.escuta.interacao import interacao, passa_piso
 
 _E164 = re.compile(r"^\+\d{10,15}$")
 ESTADOS_DECISAO = ("aprovada", "recusada")
@@ -143,8 +144,9 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
 
 
 def gerar(con, agora: str) -> dict:
-    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros."""
-    criar = corrigir = 0
+    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros,
+    abaixo_do_piso = remetentes aprovados que não viram `criar` por falta de interação (1 resposta ou 5 mensagens nos últimos 12 meses)."""
+    criar = corrigir = abaixo = 0
     conta = contatos.conta_origem(con)
     with transacao(con):
         for r in con.execute("select numero, nome from escuta_remetente where estado='aprovado' and nome is not null and trim(nome)<>'' order by numero").fetchall():
@@ -153,6 +155,9 @@ def gerar(con, agora: str) -> dict:
                 continue
             if con.execute("select 1 from contato_graph where telefone=?", (numero,)).fetchone() or \
                     con.execute("select 1 from contato_google where telefone=?", (numero,)).fetchone():
+                continue
+            if not passa_piso(interacao(con, agora, telefone=numero)):
+                abaixo += 1
                 continue
             criar += _inserir(con, agora, "criar", conta, None, None, None, nome, numero, "whatsapp")
         for r in con.execute("select conta, graph_id, nome, telefone_original, telefone from contato_graph where campo='mobile' and telefone is not null "
@@ -167,7 +172,7 @@ def gerar(con, agora: str) -> dict:
         nomes, apagar_c, apagar_t = _limpeza(con, agora)
         add_email, revisar = _emails(con, agora)
     return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c,
-            "adicionar_email": add_email, "revisar": revisar}
+            "adicionar_email": add_email, "revisar": revisar, "abaixo_do_piso": abaixo}
 
 
 def listar(con, estado: str | None = None) -> list[dict]:

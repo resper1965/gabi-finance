@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -34,12 +35,20 @@ def _graph(con, gid="g1", nome="Beltrano", orig="11 9999-0000", tel="+5511999990
                 (conta, gid, nome, orig, tel, campo))
 
 
+def _interacao(con, numero=NUM, n=5, recente=False):
+    """Semeia n mensagens recentes de WhatsApp (piso de interação do criar); `recente` usa o relógio real (o main usa a hora de agora)."""
+    em = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ") if recente else "2026-10-10T10:00:00Z"
+    for k in range(n):
+        con.execute("insert into escuta_msg(id_externo, de, recebida_em) values (?,?,?)", (f"{numero}-{k}", numero, em))
+
+
 def _props(con):
     return [dict(r) for r in con.execute("select * from contato_proposta order by id")]
 
 
 def test_criar_para_remetente_aprovado_com_nome_sem_contato(con):
     _rem(con, nome="  Fulano  ")
+    _interacao(con)
     assert _antigas(p.gerar(con, AGORA)) == {"criar": 1, "corrigir": 0}
     (r,) = _props(con)
     assert (r["tipo"], r["conta"], r["graph_id"], r["origem"], r["estado"]) == ("criar", NESS, None, "whatsapp", "pendente")
@@ -147,6 +156,7 @@ def test_recusada_nao_repete_mesmo_valor_e_repete_valor_novo(con):
 
 def test_aplicada_nao_repete(con):
     _rem(con)
+    _interacao(con)
     p.gerar(con, AGORA)
     con.execute("update contato_proposta set estado='aplicada'")
     assert p.gerar(con, AGORA)["criar"] == 0
@@ -154,6 +164,7 @@ def test_aplicada_nao_repete(con):
 
 def test_gerar_e_idempotente(con):
     _rem(con)
+    _interacao(con)
     _sync(con, _it("11 9999-0000"))
     assert _antigas(p.gerar(con, AGORA)) == {"criar": 1, "corrigir": 1}
     assert _antigas(p.gerar(con, AGORA)) == {"criar": 0, "corrigir": 0}
@@ -162,6 +173,7 @@ def test_gerar_e_idempotente(con):
 
 def test_decidir_de_pendente_e_recusar_aprovada(con):
     _rem(con)
+    _interacao(con)
     p.gerar(con, AGORA)
     pid = _props(con)[0]["id"]
     p.decidir(con, pid, "aprovada", "ricardo", AGORA)
@@ -186,6 +198,7 @@ def test_decidir_de_pendente_e_recusar_aprovada(con):
 @pytest.mark.parametrize("estado", ["aprovada", "recusada"])
 def test_estados_finais_sao_terminais(con, final, estado):
     _rem(con)
+    _interacao(con)
     p.gerar(con, AGORA)
     pid = _props(con)[0]["id"]
     con.execute("update contato_proposta set estado=?", (final,))
@@ -196,6 +209,7 @@ def test_estados_finais_sao_terminais(con, final, estado):
 
 def test_recusar_aprovada_com_auditoria_quebrada_desfaz(con):
     _rem(con)
+    _interacao(con)
     p.gerar(con, AGORA)
     pid = _props(con)[0]["id"]
     p.decidir(con, pid, "aprovada", "ricardo", AGORA)
@@ -210,6 +224,7 @@ def test_recusar_aprovada_com_auditoria_quebrada_desfaz(con):
 def _duas_correcoes(con):
     _sync(con, _it("11 9999-0000"), _it("11 9888-0000", nome="Ciclano", gid="AAMk0002"))
     _rem(con)
+    _interacao(con)
     p.gerar(con, AGORA)
     por = {(r["tipo"], r["graph_id"]): r["id"] for r in _props(con)}
     return por[("corrigir", "AAMk0001")], por[("corrigir", "AAMk0002")], por[("criar", None)]
@@ -236,6 +251,7 @@ def test_aprovar_correcoes_ids_invalidos(con, ids):
 
 def test_listar_filtra_por_estado_e_ordena(con):
     _rem(con)
+    _interacao(con)
     _sync(con, _it("11 9999-0000"))
     p.gerar(con, AGORA)
     assert [r["tipo"] for r in p.listar(con)] == ["criar", "corrigir"]
@@ -245,10 +261,10 @@ def test_listar_filtra_por_estado_e_ordena(con):
 
 def test_main_gera_propostas_e_imprime_so_contagens(tmp_path, capsys):
     banco = tmp_path / "m.db"
-    k = conectar(banco); migrar(k, MIGR); _rem(k, nome="Segredo"); k.commit(); k.close()
+    k = conectar(banco); migrar(k, MIGR); _rem(k, nome="Segredo"); _interacao(k, n=5, recente=True); k.commit(); k.close()
     code = c.main(banco, listar=lambda conta: [])
     out = capsys.readouterr().out
-    assert code == 0 and "propostas: criar=1 corrigir=0 nomes=0 apagar_telefone=0 apagar_contato=0 adicionar_email=0 revisar=0" in out and "Segredo" not in out and "912345678" not in out
+    assert code == 0 and "propostas: criar=1 corrigir=0 nomes=0 apagar_telefone=0 apagar_contato=0 adicionar_email=0 revisar=0 abaixo_do_piso=0" in out and "Segredo" not in out and "912345678" not in out
 
 
 def test_migracao_0073_aceita_tipos_novos_e_preserva_linhas(tmp_path):
@@ -351,7 +367,7 @@ def test_limpeza_idempotente_e_recusada_nao_volta(con):
 
 
 def test_gerar_retorna_todas_as_contagens(con):
-    assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato", "adicionar_email", "revisar"}
+    assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato", "adicionar_email", "revisar", "abaixo_do_piso"}
 
 
 @pytest.mark.parametrize("bruto", ["11 3456-7890 ramal 12", "(11) 3456-7890, (11) 98765-4321", "999999999", "11912345678 x5"])
@@ -484,3 +500,15 @@ def test_aplicada_ou_recusada_nao_renasce(con, estado):
 def test_gerar_devolve_chaves_novas(con):
     r = p.gerar(con, AGORA)
     assert r["adicionar_email"] == 0 and r["revisar"] == 0
+
+
+def test_criar_so_com_interacao_suficiente(con):
+    _rem(con)
+    r = p.gerar(con, AGORA)
+    assert r["criar"] == 0 and r["abaixo_do_piso"] == 1 and _props(con) == []
+    _interacao(con, n=4)
+    assert p.gerar(con, AGORA)["abaixo_do_piso"] == 1
+    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values ('extra', ?, '2026-10-11T10:00:00Z')", (NUM,))
+    r = p.gerar(con, AGORA)
+    assert r["criar"] == 1 and r["abaixo_do_piso"] == 0
+    assert [x["tipo"] for x in _props(con)] == ["criar"]
