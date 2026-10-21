@@ -414,3 +414,22 @@ def test_unidades_do_teams_seguem_o_padrao_e_nao_sao_habilitadas():
 def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
     unit = _ler("gabi-brain-fontes.service")
     assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
+
+
+# ---------------- simplificação (ADR-023) ----------------
+def test_todo_modulo_que_uma_unit_executa_existe():
+    """Módulo removido referenciado por unit só quebraria em produção: cada `-m gabi.X` (e cada app do uvicorn) precisa importar."""
+    import re
+    nomes = set()
+    for unit in DEPLOY.glob("*.service"):
+        txt = unit.read_text()
+        nomes |= set(re.findall(r"-m (gabi(?:\.\w+)+)", txt))
+        nomes |= {m.split(":")[0] for m in re.findall(r"uvicorn\S* .*?(gabi(?:\.\w+)+:\w+)", txt)}
+    assert nomes
+    for nome in sorted(nomes):
+        assert importlib.util.find_spec(nome) is not None, nome
+
+
+def test_units_cortadas_nao_voltam_ao_instalador():
+    for nome in ("gabi-brain-escuta", "escuta-ouvinte", "gabi-brain-trabalho", "gabi-brain-comprovantes", "gabi-brain-exames", "gabi-brain-reembolso-saude"):
+        assert nome not in INSTALAR and not list(DEPLOY.glob(f"{nome}.*")), nome

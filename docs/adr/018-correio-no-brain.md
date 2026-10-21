@@ -1,6 +1,8 @@
 # ADR-018 · Correio do Google no gabi.brain: ler, priorizar, lixeira e alertar
 Data: 11/10/2026 · Estado: aceito (código completo, instalado desligado; falta o consentimento OAuth e liberar as contas, que são do Ricardo) · Spec: `docs/superpowers/specs/2026-10-11-email-design.md` · Plano: `docs/superpowers/plans/2026-10-11-email.md`
 
+**Alterada pela ADR-023 (22/10/2026):** o módulo Trabalho legado (citado aqui como congelado) saiu; o correio fica como está.
+
 **Contexto.** O Ricardo pediu que a Gabi leia os e-mails, dê prioridade ao que precisa de ação, descarte o obviamente inútil e o alerte só do emergencial. O módulo antigo do Trabalho (`caixa_email`, `item_email`) só marcava "relevante" por palavra-chave, lia pelo próprio job com segredo no usuário do banco e nunca agia na caixa; fica congelado como está (a agenda fez o mesmo com `evento`).
 
 **Decisões e razões.**

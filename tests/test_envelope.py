@@ -220,3 +220,15 @@ def test_bancos_em_dia_nao_mudam_o_envelope(con):
     _sync(con, Itau=(AGORA - dt.timedelta(hours=23)).isoformat())
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False and "bancos_antigos" not in e
+
+
+def test_fontes_cortadas_nao_sao_esperadas_nem_desatualizam(con):
+    """ADR-023: exames, reembolso de saúde, Trabalho, escuta e comprovantes não rodam mais; não podem marcar nada como desatualizado."""
+    from gabi.envelope import ESPERADAS, FONTES
+    cortadas = {"exames", "reembolso-saude", "trabalho", "escuta", "comprovantes-paperless"}
+    assert not cortadas & set(ESPERADAS) and not cortadas & set(FONTES)
+    _r(con, "open-finance", 1, conferida=1)
+    _r(con, "notas-nibo", 1)
+    con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")  # caixa legada liberada não liga fonte nenhuma
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is False and not cortadas & set(_estados(e))

@@ -3,14 +3,14 @@
 **O quê:** serviço único que lê as fontes, guarda as decisões do Ricardo e expõe painel web e servidor MCP. O agente de canal (Hermes) só conversa; os dados ficam aqui.
 
 ```
-fontes (mcp.ai · Nibo · Paperless · e-mail)   [Fases 1-3]
+fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
         │ leitura incremental
         ▼
-  bruto (JSONL.gz imutável) ──► banco SQLite (WAL + FTS5)
+  bruto (JSONL.gz imutável) ──► banco SQLite (WAL)
                                      │
               ┌──────────────────────┼───────────────────┐
               ▼                      ▼                   ▼
-        API /api/*              MCP /mcp [Fase 1]    rodadas (timers)
+        API /api/*              MCP /mcp (18 ferramentas)    rodadas (timers)
               │                      │
               ▼                      ▼
    painel (estático, servido pela API)   Hermes (Telegram, WhatsApp)
@@ -21,10 +21,12 @@ fontes (mcp.ai · Nibo · Paperless · e-mail)   [Fases 1-3]
 **Fronteira de confiança**
 - Só o Tailscale entra. O app escuta num **socket Unix** (`/run/gabi-brain/api.sock`, pasta 0700), sem porta TCP; o cabeçalho de identidade só vale por esse socket; o login precisa estar em `acesso`. POST exige JSON e same-origin (anti-CSRF).
 - Níveis: `terceiros` < `familia_vip` < `boss`. A `matriz_acesso` define o que cada nível vê.
-- Conteúdo de terceiros (e-mail, WhatsApp, PDF) é dado, nunca instrução.
-- A Gabi sugere; o Ricardo decide. Nada paga, envia ou apaga automaticamente.
+- Conteúdo de terceiros (e-mail, Teams, PDF) é dado, nunca instrução.
+- A Gabi sugere; o Ricardo decide (exceção: "para quem" certeiro, ADR-023). Nada paga, envia ou apaga automaticamente.
 
-**Estado atual (Fase 0):** `gabi/db.py` (conexão, migrações) · `importar.py` (staging → banco) · `identidade.py`/`acesso.py` · `api.py` (`/api/eu|saude|seguranca|revogar-tudo`, página Segurança) · `rodada.py` · `bruto.py` · `backup.py`.
+**Módulos (após a ADR-023):** `gabi/dinheiro` (extratos, saldos, regras, conferência informativa, agenda financeira, despesas por empresa) · `gabi/cobrar` (notas e "a receber") · `gabi/agenda` · `gabi/correio` (triagem com modelo e lixeira) · `gabi/teams` · `gabi/contatos` (sincronização e propostas de escrita no Graph da ness) · `gabi/dia.py` (tela Hoje e resumo da manhã) · `gabi/avisos.py` + `telegram.py` · `gabi/mcp` · `gabi/rotas` (API do painel) · `gabi/fontes` (clientes externos, só no serviço de fontes) · base: `db.py`, `identidade.py`/`acesso.py`, `envelope.py`, `rodada.py`, `bruto.py`, `backup.py`, `exportacao.py`.
+
+**Tabelas legadas** (com dado, sem código que as use; ADR-023): `escuta_remetente`, `caixa_email`, `memoria`, `agenda_estado`, `agenda_eventos`. Coluna sem uso: `regra.condicao` só é lida pelas regras com condição (nenhuma hoje).
 
 **Design:** `gabi/static/industry.css` é o `styles.css` do sistema Industry do protótipo, sem alteração (teste garante). Toda tela usa as classes do sistema.
 

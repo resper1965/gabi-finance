@@ -1,6 +1,8 @@
 # ADR-014 · Saúde em arquivo próprio e criptografado
 Data: 10/10/2026 · Estado: aceito (T4.1; o plano mestre a chamava de ADR-008)
 
+**Encerrada pela ADR-023 (22/10/2026):** o código de saúde saiu; o cofre `saude.enc` e a chave ficam intactos, fora do código, até o Ricardo decidir.
+
 **Contexto.** A saúde da família não pode estar no `gabi.db` (backups, exportações e o painel leem esse banco). A spec previa SQLCipher; não há SQLCipher no ambiente (nem pacote nativo instalado) e o Ricardo não quer dependência nativa nova só para isso.
 
 **Decisão.** Arquivo próprio (`/var/lib/gabi-brain/saude.enc`, modo 0600) cifrado inteiro com **AES-256-GCM** (`cryptography`). O SQLite só existe **em memória** enquanto o `with abrir_saude(...)` está aberto; sair sem erro grava (arquivo novo + rename), com erro descarta. A chave (32 bytes) vem de arquivo de ambiente colocado pelo Ricardo (R5), nunca do repositório. Toda leitura entra na tabela `leitura` (quem, pessoa, o quê). Nenhuma tabela ou coluna de saúde existe no banco principal (teste de esquema).

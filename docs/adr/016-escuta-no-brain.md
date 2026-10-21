@@ -1,6 +1,8 @@
 # ADR-016 · Escuta do WhatsApp pessoal no gabi.brain
 Data: 11/10/2026 · Estado: aceito (código completo; falta o paralelo e a troca de modo, que são do Ricardo) · Spec: `docs/superpowers/specs/2026-10-10-escuta-design.md`
 
+**Encerrada pela ADR-023 (22/10/2026):** a escuta do WhatsApp saiu (nunca registrou mensagem); contatos foram para `gabi/contatos/`.
+
 **Contexto.** O agente `escuta` do OpenClaw lê o WhatsApp pessoal do Ricardo (pedidos de pagamento, documentos de saúde, avisos de crise). O OpenClaw sai por completo (`PLANO-DEFINITIVO.md`); a função fica, dentro do brain, sem dar a ninguém o poder de falar em nome do Ricardo (R2: a escuta nunca envia nada ao remetente).
 
 **Decisões e razões.**

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12 + SQLite (gabi.brain, `pytest -q`), React/vitest (painel), bash + systemd (OP-Gabi, `infra/*.sh`), Hermes Agent 2026.9.24 (`hermes` CLI, MCP, cron), OpenRouter, Tailscale.
 
-**Spec:** `docs/TRILHA.md` (ordem e gates), `docs/STATUS.md` (estado real em 10/10), `docs/fontes/hermes.md` + `docs/adr/007-identidade-por-remetente.md` (Canal), `~/OP-Gabi/docs/superpowers/plans/2026-10-07-silencio-e-desempenho.md`, `~/OP-Gabi/docs/superpowers/specs/2026-10-06-financeiro-conciliacao-design.md`, memória `hermes-instalado-10-10`.
+**Spec:** `docs/historico/TRILHA.md` (ordem e gates), `docs/STATUS.md` (estado real em 10/10), `docs/fontes/hermes.md` + `docs/adr/007-identidade-por-remetente.md` (Canal), `~/OP-Gabi/docs/superpowers/plans/2026-10-07-silencio-e-desempenho.md`, `~/OP-Gabi/docs/superpowers/specs/2026-10-06-financeiro-conciliacao-design.md`, memória `hermes-instalado-10-10`.
 
 ## Global Constraints
 
@@ -83,20 +83,20 @@
 
 ### Task 4: Fechar a Fase 2 (Cobrar) com Paperless e Nibo reais
 
-**Files:** Modify `docs/aceite-fase-2.md`, `docs/STATUS.md`.
+**Files:** Modify `docs/historico/aceite-fase-2.md`, `docs/STATUS.md`.
 
 **Interfaces:**
 - Consumes: `gabi-brain-fontes` (socket `/run/gabi-brain-fontes/fontes.sock`), `gabi-brain-comprovantes.timer` (07h BRT), `NIBO_TOKEN` (Task 2).
 - Produces: T2.10 aceito: ≥ 80% de comprovantes casados; lote Nibo 2× sem duplicar (G18/G19); "pedido real pelo canal" adiado (G20, decisão já tomada).
 
 - [ ] **Step 1:** Com `NIBO_TOKEN` e comprovantes reais no Paperless, rodar a ingestão: `sudo systemctl start gabi-brain-comprovantes.service && journalctl -u gabi-brain-comprovantes -n 30 --no-pager`. Expected: vínculos propostos, nenhum confirmado sozinho, `Result=success`.
-- [ ] **Step 2:** Ricardo confirma os vínculos no painel (Cobrar); medir casamento: query de casados/total em `docs/aceite-fase-2.md`. Expected ≥ 80%.
+- [ ] **Step 2:** Ricardo confirma os vínculos no painel (Cobrar); medir casamento: query de casados/total em `docs/historico/aceite-fase-2.md`. Expected ≥ 80%.
 - [ ] **Step 3:** Lote Nibo em conta real, 2 vezes seguidas: segunda execução cria 0 itens novos (idempotência). Registrar IDs.
 - [ ] **Step 4:** Commit `docs: aceite da Fase 2`.
 
 ### Task 5: Fase 4 e Fase 3 — fechar o que depende de decisão
 
-**Files:** Modify `docs/STATUS.md`, `docs/TRILHA.md`.
+**Files:** Modify `docs/STATUS.md`, `docs/historico/TRILHA.md`.
 
 **Interfaces:**
 - Produces: decisão registrada para cada item: G13 (Tailscale da família), `saude.key`, `LINEAR_API_KEY`, e se a Fase 3 (Trabalho) é reaberta agora (G11 Entra ID IONIC, G12 Google, cadastro das 7 caixas) ou fica congelada até depois dos canais.
@@ -202,7 +202,7 @@
 
 ### Task 11: Tag do gabi.brain e congelamento antes dos canais
 
-**Files:** Modify `docs/STATUS.md`, `docs/TRILHA.md`; tag `v1.0-gabi-brain`.
+**Files:** Modify `docs/STATUS.md`, `docs/historico/TRILHA.md`; tag `v1.0-gabi-brain`.
 
 - [ ] **Step 1:** Pré-condições: Task 3 e 4 aceitas, G20 registrado, `pytest -q` e `npm test -- --run` verdes, `systemctl --failed` vazio.
 - [ ] **Step 2:** `git tag -a v1.0-gabi-brain -m "gabi.brain v1.0: Fases 1-2 aceitas"` e `git push --tags`.
@@ -263,7 +263,7 @@
 
 ### Task 16: Encerramento e memória
 
-- [ ] **Step 1:** `docs/STATUS.md` e `docs/TRILHA.md`: tudo aceito/concluído; fim do plano `gabi-agent`.
+- [ ] **Step 1:** `docs/STATUS.md` e `docs/historico/TRILHA.md`: tudo aceito/concluído; fim do plano `gabi-agent`.
 - [ ] **Step 2:** Atualizar memórias `gabi-brain-status`, `gabi-pendencias`, `hermes-instalado-10-10` (virar "operacional") e remover `hermes-openclaw-so-apos-gabi-brain`.
 - [ ] **Step 3:** Commit final; push.
 

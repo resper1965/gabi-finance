@@ -1,5 +1,7 @@
 # ADR-009 — Regra de "buraco" e saldo na conferência (calibrada com dado real)
 
+**Substituída pela ADR-023 (22/10/2026):** a conferência só informa (aviso `saldo_divergente`) e não trava mais o `dados_ate`; buraco de dias e volume saíram.
+
 **Estado:** aceita provisoriamente (decisão D1, 09/10/2026; Ricardo pode ajustar os limites).
 
 ## Contexto

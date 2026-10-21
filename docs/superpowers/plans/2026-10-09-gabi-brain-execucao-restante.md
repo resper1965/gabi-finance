@@ -96,7 +96,7 @@
 Ordem: **T2.1** Paperless (G7) → **T2.2** vínculos → **T2.3** Nibo leitura (G8) → **T2.5** reembolsos → **T2.4** lote Nibo (única gravação externa) → **T2.6** cobrança (só rascunho, ADR-006) → **T2.7** pedidos → **T2.8** MCP propostas → **T2.9** telas → **T2.10** aceite.
 - Cada cliente (Paperless, Nibo) nasce com servidor falso e testes do mestre (`test_cliente_nao_expoe_metodo_de_exclusao`, `test_nenhuma_rota_de_exclusao_no_codigo`, `test_executar_duas_vezes_nao_duplica`).
 - Cada fonte nova entra em `envelope.IGNORADAS`/fontes e em `docs/fontes/<fonte>.md`.
-- **Entrega:** ≥ 80 % de comprovantes casados; lote Nibo roda 2× sem duplicar em conta real com confirmação do Ricardo; pedido real do canal aparece em Pedidos; `docs/aceite-fase-2.md`. **Gates:** G7, G8, G14 (T2.9).
+- **Entrega:** ≥ 80 % de comprovantes casados; lote Nibo roda 2× sem duplicar em conta real com confirmação do Ricardo; pedido real do canal aparece em Pedidos; `docs/historico/aceite-fase-2.md`. **Gates:** G7, G8, G14 (T2.9).
 
 ## FASE 3 — Trabalho (T3.1–T3.7)
 Ordem: **T3.1** Graph (G11) e **T3.2** Google (G12) em paralelo → **T3.3** e-mail/agenda/tarefas → **T3.4** frentes → **T3.5** Hoje → **T3.6** telas → **T3.7** aceite.

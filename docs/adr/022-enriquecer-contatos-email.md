@@ -1,6 +1,8 @@
 # ADR-022 · Enriquecer contatos da ness com e-mail e piso de interação para criar contato
 Data: 21/10/2026 · Estado: aceito (mergeado na `main` em 21/10; instalação em curso) · Spec: `docs/superpowers/specs/2026-10-21-contatos-enriquecer-email-design.md` · Plano: `docs/superpowers/plans/2026-10-21-contatos-enriquecer-email.md` · Estende: ADR-020, ADR-021
 
+**Alterada pela ADR-023 (22/10/2026):** o piso de interação (decisão 6) saiu junto com a escuta; `adicionar_email` segue igual.
+
 **Contexto.** Os contatos da ness no Graph só têm nome e telefone, enquanto `contato_google_email` já guarda e-mails ligados a telefones. O Ricardo quer que a Gabi proponha acrescentar esses e-mails, sempre pela fila `contato_proposta` (mesmo interruptor `contatos.escrita`, mesma aprovação e auditoria). Quer também uma crítica contra contato demais: quem quase não interagiu não vira contato novo.
 
 **Decisões e razões.**
