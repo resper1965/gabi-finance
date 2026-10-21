@@ -1,6 +1,6 @@
 """Aplica no Graph da ness as propostas de contato APROVADAS pelo dono (contato_proposta, migração 0072). Programa: python -m gabi.escuta.contatos_gravar,
 rodado logo após a sincronização de contatos (ExecStartPost da mesma unit). Interruptor `contatos.escrita` em `parametro` (JSON "ligado"); qualquer outro
-valor ou ausência = desligado: nada é enviado e as aprovadas só são contadas como simuladas. Sem rede: a escrita passa pela ponte do serviço de fontes.
+valor ou ausência = desligado: nada é enviado e as aprovadas só são contadas como simuladas. Tipos: criar, corrigir, corrigir_nome, apagar_telefone, apagar_contato, adicionar_email. Sem rede: a escrita passa pela ponte do serviço de fontes.
 Cada proposta roda no seu try (uma falha não aborta as outras) e termina `aplicada` ou `falhou` com motivo FIXO (nunca texto de exceção, nome ou número).
 Saída e logs só com contagens."""
 import fcntl
@@ -167,8 +167,23 @@ def _aplicar_apagar_contato(con, graph, p, agora: str) -> str | None:
     return _gravar_aplicada(con, p, agora, local)
 
 
+def _aplicar_adicionar_email(con, graph, p, agora: str) -> str | None:
+    """Exige UMA linha do contato no espelho com o mesmo nome e telefone da proposta; ao Graph vai o `telefone_original` ATUAL dessa linha (o texto que
+    o Graph guarda, que um `corrigir` aprovado antes pode ter mudado). O espelho não guarda e-mail: nada a ajustar localmente."""
+    linhas = [] if p["graph_id"] is None or p["telefone_antes"] is None or not p["email_depois"] or _conta_fora(con, p) else con.execute(
+        "select nome, telefone, telefone_original from contato_graph where conta=? and graph_id=?", (p["conta"], p["graph_id"])).fetchall()
+    if len(linhas) != 1 or linhas[0]["nome"] != p["nome_antes"] or linhas[0]["telefone"] != p["telefone_antes"]:
+        return CONTATO_ALTERADO
+    motivo = _resultado_graph(lambda: graph.contato_adicionar_email(p["conta"], p["graph_id"], p["nome_antes"], linhas[0]["telefone_original"],
+                                                                     p["email_depois"].split(";")))
+    if motivo:
+        return motivo
+    return _gravar_aplicada(con, p, agora, lambda: None)
+
+
 APLICADORES = {"criar": _aplicar_criar, "corrigir": _aplicar_corrigir, "corrigir_nome": _aplicar_corrigir_nome,
-               "apagar_telefone": _aplicar_apagar_telefone, "apagar_contato": _aplicar_apagar_contato}
+               "apagar_telefone": _aplicar_apagar_telefone, "apagar_contato": _aplicar_apagar_contato,
+               "adicionar_email": _aplicar_adicionar_email}
 
 
 def aplicar(con, graph, agora: str) -> dict:
@@ -178,7 +193,8 @@ def aplicar(con, graph, agora: str) -> dict:
 def _aplicar(con, graph, agora: str) -> tuple[dict, int]:
     """Só `aprovada`. Desligado: nenhuma chamada ao `graph`, estado intacto, tudo conta como simulada. Ligado: revalida contra o banco antes de
     escrever: conta fora de escuta.contas_contatos -> contato_alterado; criar: remetente não está mais aprovado com o mesmo nome -> contato_alterado,
-    número já existe em contato_graph/contato_google (qualquer conta) -> ja_existe; corrigir: a linha lida não é mais a mesma -> contato_alterado."""
+    número já existe em contato_graph/contato_google (qualquer conta) -> ja_existe; corrigir: a linha lida não é mais a mesma -> contato_alterado;
+    adicionar_email: o contato não tem mais exatamente uma linha com o mesmo nome e telefone -> contato_alterado."""
     r = {"aplicadas": 0, "falhas": 0, "descartadas": 0, "simuladas": 0}
     indisponivel = 0
     aprovadas = con.execute("select * from contato_proposta where estado='aprovada' order by id").fetchall()
