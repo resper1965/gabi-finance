@@ -16,20 +16,13 @@ function celular(ativo: boolean) {
 beforeEach(() => { localStorage.clear(); celular(false); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-test("Hoje mostra a frase, as quatro partes e o motivo de cada e-mail", async () => {
+test("Hoje mostra a frase, a agenda e o dinheiro", async () => {
   apiFalsa();
   montar(<Hoje />);
-  expect(await screen.findByText(/coisas pedem você hoje/)).toBeInTheDocument();
+  expect(await screen.findByText(/1 coisa pede você hoje/)).toBeInTheDocument();
   expect(screen.getByText("Revisão Atlas", { exact: false })).toBeInTheDocument();
-  expect(screen.getAllByText(/palavra cadastrada: contrato/).length).toBeGreaterThan(0);
   expect(screen.getByText(/Em atraso: 1/)).toBeInTheDocument();
-});
-
-test("Hoje filtro chama a API com a empresa", async () => {
-  const chamadas = apiFalsa();
-  montar(<Hoje />);
-  fireEvent.click(await screen.findByRole("button", { name: "Ness" }));
-  await waitFor(() => expect(chamadas.some((c) => /\/hoje\?filtro=e1/.test(c.url))).toBe(true));
+  expect(screen.queryByRole("group", { name: "Filtro" })).toBeNull();
 });
 
 test("Hoje celular mostra abas", async () => {

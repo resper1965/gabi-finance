@@ -6,10 +6,10 @@ import pytest
 
 from gabi.agenda import consulta
 from gabi.db import conectar, migrar
-from gabi.mcp.ferramentas_trab import agenda_listar, resumo_da_manha
-from gabi.trabalho import hoje as modulo_hoje
+from gabi.mcp.ferramentas_dia import agenda_listar, resumo_da_manha
+from gabi import dia as modulo_hoje
 
-MIGR = Path(__file__).parent.parent.parent / "migrations"
+MIGR = Path(__file__).parent.parent / "migrations"
 BRT = "America/Sao_Paulo"
 AGORA = dt.datetime(2026, 10, 12, 10, 0, tzinfo=dt.timezone.utc)  # 07:00 BRT, segunda
 
@@ -154,4 +154,3 @@ def test_hoje_usa_agenda_evento(con):
     _ev(con, f, "b", "2026-10-12T10:30:00-03:00", "2026-10-12T11:30:00-03:00", "B")
     d = modulo_hoje.hoje(con, AGORA)
     assert [e["titulo"] for e in d["agenda"]] == ["A", "B"] and any(p["tipo"] == "conflito" for p in d["prioridades"])
-    assert modulo_hoje.hoje(con, AGORA, "e1")["agenda"] == []  # compromisso não tem empresa: a agenda só vai em 'all'

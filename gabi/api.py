@@ -183,6 +183,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_teams)
     from gabi.rotas.correio import router as rotas_correio
     app.include_router(rotas_correio)
+    from gabi.rotas.dia import router as rotas_dia
+    app.include_router(rotas_dia)
     from gabi.rotas.trabalho import router as rotas_trabalho
     app.include_router(rotas_trabalho)
     from gabi.rotas.familia import router as rotas_familia

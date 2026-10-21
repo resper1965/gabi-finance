@@ -21,7 +21,7 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, cobranca_atr
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_dec, ferramentas_prop, ferramentas_reembolso, ferramentas_trab
+from gabi.mcp import ferramentas_dec, ferramentas_prop, ferramentas_reembolso, ferramentas_dia
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
@@ -31,7 +31,7 @@ MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "cobranca_rascunho": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin", "financeiro_vazamentos": "fin", "financeiro_rumo": "fin",
-                       **ferramentas_prop.ESCOPOS, **ferramentas_trab.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_reembolso.ESCOPOS}
+                       **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_reembolso.ESCOPOS}
 
 
 def _reais(v, chave: str = ""):
@@ -143,7 +143,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     def agenda_financeira(dias: int = 3, semanal: bool = False) -> dict:
         """Agenda financeira pronta para o celular, entregar exatamente como vem: atrasadas, o que vence hoje, os próximos `dias` (1 a 45) e a previsão do saldo; com semanal=true, 30 dias agrupados por semana e o primeiro aperto de caixa. Só leitura."""
         def f(con, agora):
-            d = ferramentas_trab._inteiro(dias, 1, 45, "dias")
+            d = ferramentas_dia._inteiro(dias, 1, 45, "dias")
             linhas = agenda_fin.montar(con, agora, dias=30 if semanal else d, semanal=semanal)
             return {"linhas": linhas, "texto": "\n".join(linhas)}
         return executar("agenda_financeira", f)
@@ -178,7 +178,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     def financeiro_previsao(dias: int = 30) -> dict:
         """Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura."""
         def f(con, agora):
-            r = analise.previsao(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(dias, 1, 90, "dias"), hoje=agora.date())
+            r = analise.previsao(FonteAnalise(con, so_liberadas=True), ferramentas_dia._inteiro(dias, 1, 90, "dias"), hoje=agora.date())
             if not r.get("dados_de"):  # sem saldo lido, saldo_inicial 0 não é "zero reais": é "não sei"
                 r = {**r, "saldo_indisponivel": True, "aviso": "sem saldo lido das contas liberadas; os saldos abaixo partem de zero e não valem"}
             return _reais(r)
@@ -188,14 +188,14 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     def financeiro_vazamentos(meses: int = 3) -> dict:
         """Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura."""
         def f(con, agora):
-            return _reais(analise.vazamentos(FonteAnalise(con, so_liberadas=True), ferramentas_trab._inteiro(meses, 1, 12, "meses"), agora.date()))
+            return _reais(analise.vazamentos(FonteAnalise(con, so_liberadas=True), ferramentas_dia._inteiro(meses, 1, 12, "meses"), agora.date()))
         return executar("financeiro_vazamentos", f)
 
     @srv.tool()
     def financeiro_rumo(ano: int | None = None) -> dict:
         """Rumo mês a mês do `ano` (padrão: o atual): entradas, saídas, poupança, gasto e patrimônio. Só leitura."""
         def f(con, agora):
-            a = ferramentas_trab._inteiro(ano if ano is not None else agora.year, 2000, 2100, "ano")
+            a = ferramentas_dia._inteiro(ano if ano is not None else agora.year, 2000, 2100, "ano")
             meses = [{"mes": l.mes, "entradas": formatar(l.entradas), "saidas": formatar(l.saidas), "poupanca": formatar(l.poupanca),
                       "gasto": formatar(l.gasto), "patrimonio": None if l.patrimonio is None else formatar(l.patrimonio)}
                      for l in rumo.rumo_mensal(con, a)]
@@ -229,7 +229,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
         return executar("financeiro_para_onde_vai", f)
 
     ferramentas_prop.registrar(srv, executar, paperless)
-    ferramentas_trab.registrar(srv, executar)
+    ferramentas_dia.registrar(srv, executar)
     ferramentas_dec.registrar(srv, executar)
     ferramentas_reembolso.registrar(srv, executar)
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))

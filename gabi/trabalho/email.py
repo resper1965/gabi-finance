@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Callable
 
+from gabi.agenda.consulta import Conflito
 from gabi.db import transacao
 
 TAM_TRECHO = 280
@@ -16,13 +17,6 @@ Fonte = Callable[[dict, str | None], tuple[list[dict], str | None]]
 class ResumoRodada:
     novos: int
     duplicados: int
-
-
-@dataclass(frozen=True)
-class Conflito:
-    evento_a: int
-    evento_b: int
-    sugestao_inicio: str  # proposta: só sai após confirmação do Ricardo
 
 
 def _json(con, chave: str) -> list[str]:

@@ -7,8 +7,8 @@ import pytest
 from gabi.correio import consulta
 from gabi.db import conectar, migrar
 from gabi.mcp import servidor
-from gabi.mcp.ferramentas_trab import email_listar, resumo_da_manha
-from gabi.trabalho import hoje as modulo_hoje
+from gabi.mcp.ferramentas_dia import email_listar, resumo_da_manha
+from gabi import dia as modulo_hoje
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 12, 10, 0, tzinfo=dt.timezone.utc)  # 07:00 BRT
@@ -121,7 +121,6 @@ def test_hoje_traz_emergencial_nas_prioridades_antes_dos_outros(con):
     d = modulo_hoje.hoje(con, AGORA)
     assert d["prioridades"][0] == {"tipo": "email_emergencial", "titulo": "banco@x.com — Boleto vence hoje", "motivo": "prazo hoje", "ref": 1}
     assert [m["assunto"] for m in d["correio_importantes"]] == ["Boleto vence hoje", "Proposta"]
-    assert modulo_hoje.hoje(con, AGORA, "e1")["prioridades"] == [] and modulo_hoje.hoje(con, AGORA, "e1")["correio_importantes"] == []
 
 
 def test_importantes_so_olha_os_ultimos_dias_em_aberto_e_o_parametro_manda(con):

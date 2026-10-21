@@ -19,7 +19,6 @@ mcp_servers:
       - avisos_pendentes
       - classificar_lancamento
       - cobranca_rascunho
-      - contatos_em_aberto
       - decisao_responder
       - decisoes_abertas
       - documentos_baixar
@@ -34,9 +33,6 @@ mcp_servers:
       - financeiro_rumo
       - financeiro_saldo
       - financeiro_vazamentos
-      - frentes_itens
-      - frentes_listar
-      - hoje_resumo
       - pedidos_estado
       - pedidos_registrar
       - reembolso_saude_dossie

@@ -1,17 +1,17 @@
 import inspect
 
-from gabi.mcp import ferramentas_trab, servidor
+from gabi.mcp import ferramentas_dia, servidor
 from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS
 
 
 def test_ferramentas_de_trabalho_tem_escopo_trabalho():
-    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens", "contatos_em_aberto"}
+    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"agenda_listar", "email_listar", "resumo_manha"}
 
 
 def test_nenhuma_ferramenta_de_trabalho_envia_apaga_ou_confirma():
-    nomes = [n for n in ferramentas_trab.ESCOPOS]
+    nomes = [n for n in ferramentas_dia.ESCOPOS]
     assert not [n for n in nomes if any(p in n for p in ("enviar", "send", "apagar", "delete", "confirmar", "decidir"))]
-    fonte = inspect.getsource(ferramentas_trab)
+    fonte = inspect.getsource(ferramentas_dia)
     assert "insert" not in fonte.lower() and "update " not in fonte.lower() and "delete" not in fonte.lower().replace("nenhuma ferramenta envia, apaga", "")
 
 
@@ -20,7 +20,7 @@ import datetime as dt
 from pathlib import Path
 
 from gabi.db import conectar, migrar
-from gabi.mcp.ferramentas_trab import resumo_da_manha
+from gabi.mcp.ferramentas_dia import resumo_da_manha
 
 AGORA = dt.datetime(2026, 10, 10, 7, 5, tzinfo=dt.timezone.utc)
 
@@ -49,10 +49,11 @@ def test_resumo_comeca_por_desatualizado(tmp_path):
 
 def test_resumo_conta_agenda_emails_e_dinheiro(tmp_path):
     c = _banco(tmp_path)
-    c.execute("insert into caixa_email(endereco, provedor, estado) values ('a@x.com','graph','sim')")
+    c.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
     c.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
     c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values (1,'e1','2026-10-10T17:00:00+00:00','2026-10-10T18:00:00+00:00','2026-10-10','2026-10-10','Reunião IONIC')")
-    c.execute("insert into item_email(caixa_id, message_id, remetente, assunto, recebido_em, relevante, motivo) values (1,'<a>','c@x.com','Proposta','2026-10-10T05:00:00Z',1,'cliente')")
+    c.execute("insert into email_msg(fonte_id, externo_id, thread_id, remetente, assunto, recebida_em, classe, prioridade, motivo, estado, atualizado_em) "
+              "values (1,'m1','m1t','c@x.com','Proposta','2026-10-10T05:00:00Z','importante',2,'cliente','classificada','2026-10-10T05:00:00Z')")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-10T05:00:00+00:00','2026-10-10T05:00:30+00:00','ok',1)")
     txt = resumo_da_manha(c, AGORA)["texto"]
     assert "• 14:00 Reunião IONIC" in txt and "📅 *Agenda* (1)" in txt and "📧 *E-mail* (1 importante)" in txt and "Saldo: sem leitura" in txt
@@ -97,7 +98,7 @@ def test_resumo_nomeia_o_banco_parado_ha_mais_de_24h(tmp_path):
 def test_agenda_listar_recusa_data_compacta_em_vez_de_devolver_vazio(tmp_path):
     import datetime as dt
     from gabi.db import conectar, migrar
-    from gabi.mcp.ferramentas_trab import agenda_listar
+    from gabi.mcp.ferramentas_dia import agenda_listar
     from pathlib import Path
     con = conectar(tmp_path / "t.db")
     migrar(con, Path(__file__).parent.parent.parent / "migrations")
@@ -125,7 +126,7 @@ def test_resumo_avisa_so_a_contagem_de_decisoes_esperando(tmp_path):
 
 def test_bloco_agenda_nao_cita_o_inicio_de_ontem_como_horario_de_hoje():
     """Agenda M6: evento com horário que começou ontem e continua hoje não aparece como "07:00" de hoje."""
-    from gabi.mcp.ferramentas_trab import _bloco_agenda
+    from gabi.mcp.ferramentas_dia import _bloco_agenda
     ontem = {"titulo": "Viagem", "dia_inteiro": False, "inicio_local": "2026-10-09T22:00:00-03:00", "dia_local": "2026-10-09", "dia_fim_local": "2026-10-10"}
     hoje = {"titulo": "Reunião", "dia_inteiro": False, "inicio_local": "2026-10-10T09:30:00-03:00", "dia_local": "2026-10-10", "dia_fim_local": "2026-10-10"}
     linhas = _bloco_agenda([ontem, hoje], "2026-10-10")

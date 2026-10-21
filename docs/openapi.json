@@ -3554,20 +3554,8 @@
   },
   "/api/v1/hoje": {
    "get": {
-    "description": "O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro (filtro all, empresa ou t-<frente>).",
+    "description": "O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro.",
     "operationId": "hoje_api_v1_hoje_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "filtro",
-      "required": false,
-      "schema": {
-       "default": "all",
-       "title": "Filtro",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -3576,16 +3564,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Hoje"
