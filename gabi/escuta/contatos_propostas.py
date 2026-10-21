@@ -73,6 +73,7 @@ def nome_compativel(a: str | None, b: str | None) -> bool:
     return bool(_partes(a) & _partes(b))
 
 
+MAX_EMAILS = 3  # o Outlook guarda poucos e-mails por contato (não verificado; limite seguro) e a ponte recusa mais de 5
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+$")
 
 
@@ -83,7 +84,9 @@ def _email_valido(e) -> str | None:
 
 def _emails(con, agora: str) -> tuple[int, int]:
     """adicionar_email: só para contato da ness com UMA linha em contato_graph (a ponte recusa contato cujos telefones atuais difiram do enviado),
-    telefone que não aparece em outro contato e nome compatível com o do Google. Devolve (propostas novas, contatos com e-mail barrados)."""
+    telefone que não aparece em outro contato. Só entram e-mails de linhas do Google cujo próprio nome é compatível com o do contato; linha de nome
+    incompatível ou nulo no mesmo telefone, mais de MAX_EMAILS e-mails distintos ou conta do contato que já tem e-mail para o telefone: nada se propõe
+    (a última nem conta em revisar). Devolve (propostas novas, contatos com e-mail barrados)."""
     por_contato: dict[tuple, list] = {}
     donos: dict[str, set] = {}
     for r in con.execute("select conta, graph_id, nome, telefone from contato_graph order by conta, graph_id, telefone_original").fetchall():
@@ -93,18 +96,23 @@ def _emails(con, agora: str) -> tuple[int, int]:
     novas = revisar = 0
     for (conta, gid), rs in por_contato.items():
         telefones = {r["telefone"] for r in rs if r["telefone"] is not None}
-        emails: set[str] = set()
-        nomes_google: list = []
-        for t in telefones:
-            for g in con.execute("select email, nome from contato_google_email where telefone=?", (t,)).fetchall():
-                e = _email_valido(g["email"])
-                if e:
-                    emails.add(e)
-                    nomes_google.append(g["nome"])
-        if not emails:
-            continue
         nome, tel = _nome(rs[0]["nome"]), rs[0]["telefone"]
-        if len(rs) != 1 or tel is None or len(donos[tel]) != 1 or not any(nome_compativel(nome, n) for n in nomes_google):
+        emails: set[str] = set()
+        duvida = ja_tem = False
+        for t in telefones:
+            for g in con.execute("select email, nome, conta from contato_google_email where telefone=?", (t,)).fetchall():
+                e = _email_valido(g["email"])
+                if not e:
+                    continue
+                if g["conta"] == conta:
+                    ja_tem = True  # e-mail que o próprio contato da ness já tem (o sincronizar o espelha aqui): nada a propor
+                elif nome_compativel(nome, g["nome"]):
+                    emails.add(e)
+                else:
+                    duvida = True  # e-mail de outra pessoa (ou de linha sem nome) no mesmo telefone: em dúvida, não
+        if ja_tem or not (emails or duvida):
+            continue
+        if duvida or len(emails) > MAX_EMAILS or len(rs) != 1 or tel is None or len(donos[tel]) != 1:
             revisar += 1
             continue
         novas += _inserir(con, agora, "adicionar_email", conta, gid, nome, tel, nome, tel, "google_email", ";".join(sorted(emails)))

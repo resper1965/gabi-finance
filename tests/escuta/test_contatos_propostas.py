@@ -546,3 +546,46 @@ def test_migracao_0074_preserva_linhas_antigas_e_indice(tmp_path):
     assert [r[0] for r in k.execute("select email_depois from contato_proposta")] == [None, None]
     with pytest.raises(sqlite3.IntegrityError):
         k.execute(f"insert into contato_proposta({cols}) values ('corrigir',?,'g1','Ana','x','Ana','+5511999990000','whatsapp','pendente',null,'2026-10-05T10:00:00Z',null,null,null)", (NESS,))
+
+
+def test_email_de_outra_pessoa_no_mesmo_telefone_nao_vaza(con):
+    _ag(con, nome="Maria Souza")
+    _gmail(con, "maria@x.com", "+5511999990000", "Maria Souza")
+    _gmail(con, "joao@x.com", "+5511999990000", "Joao Pereira")  # outra pessoa, mesmo telefone (casa)
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1 and _props(con) == []
+
+
+def test_email_de_linha_sem_nome_no_mesmo_telefone_nao_vaza(con):
+    _ag(con, nome="Maria Souza")
+    _gmail(con, "maria@x.com", "+5511999990000", "Maria Souza")
+    _gmail(con, "anonimo@x.com", "+5511999990000", None)
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1 and _props(con) == []
+
+
+def test_contato_que_ja_tem_email_no_graph_nao_gera_nem_conta(con):
+    _sync(con, dict(_it("+5511999990000", nome="Ana Lima"), emails=["ana@ness.com"]))
+    for _ in range(3):  # sincronizações seguidas
+        _sync(con, dict(_it("+5511999990000", nome="Ana Lima"), emails=["ana@ness.com"]))
+        r = p.gerar(con, AGORA)
+        assert r["adicionar_email"] == 0 and r["revisar"] == 0
+    assert _props(con) == []
+
+
+def test_ja_tem_email_no_graph_mesmo_com_email_novo_no_google(con):
+    _sync(con, dict(_it("+5511999990000", nome="Ana Lima"), emails=["ana@ness.com"]))
+    _gmail(con, "outro@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 0 and _props(con) == []
+
+
+def test_teto_de_tres_emails(con):
+    _ag(con, nome="Ana Lima")
+    for i in range(4):
+        _gmail(con, f"a{i}@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1 and _props(con) == []
+    con.execute("delete from contato_google_email where email='a3@x.com'")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 1 and _props(con)[0]["email_depois"] == "a0@x.com;a1@x.com;a2@x.com"

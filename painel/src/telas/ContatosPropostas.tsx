@@ -15,7 +15,7 @@ const CONFIRMA = "Apagar não dá para desfazer no Outlook. Aprovar esta propost
 interface Proposta {
   id: number; tipo: Tipo; conta: string;
   nome_antes: string | null; telefone_antes: string | null; nome_depois: string | null; telefone_depois: string | null; email_depois: string | null;
-  origem: "whatsapp" | "telefone_invalido" | "nome_sujo" | "nome_curto"; estado: string;
+  origem: "whatsapp" | "telefone_invalido" | "nome_sujo" | "nome_curto" | "google_email"; estado: string;
 }
 interface Fila { itens: Proposta[]; escrita: "ligado" | "desligado" }
 
