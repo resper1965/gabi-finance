@@ -7,7 +7,6 @@ import pytest
 
 from gabi.db import conectar, migrar
 from gabi.contatos import contatos as c
-from gabi.escuta import remetentes
 
 MIGR = Path(__file__).parent.parent.parent / "migrations"
 GMAIL, NESS = "resper@gmail.com", "resper@ness.com.br"
@@ -183,12 +182,6 @@ def test_csv_so_nome_e_telefone_e_telefone_estranho_fica_de_fora():
     s = c.csv_google([{"nome": "A", "telefone": "+5511912345678", "email": "x@y"}, {"nome": "B", "telefone": "=cmd"}, {"nome": None, "telefone": "+5511900000001"}])
     assert "x@y" not in s and "cmd" not in s
     assert list(csv.reader(io.StringIO(s)))[2] == ["", "+5511900000001"]
-
-
-def test_fila_mostra_nome_do_contato_via_nome_do_numero(con):
-    c.sincronizar(con, [NESS, GMAIL], _listar({NESS: [{"nome": "Ness", "telefone": "11912345678"}], GMAIL: [{"nome": "Gmail", "telefone": "11912345678"}]}))
-    con.execute("insert into escuta_remetente(numero, estado, vista_em, qtd) values ('+5511912345678','pendente','2026-10-11T10:00:00',1)")
-    assert remetentes.fila(con)[0]["nome"] == "Gmail"
 
 
 def test_main_imprime_so_contagens(tmp_path, capsys, monkeypatch):

@@ -229,32 +229,6 @@ def test_delete_apaga_tambem_os_emails_dos_contatos(cc, banco):
     c.close()
 
 
-def test_trazer_e_depois_aprovar_resulta_em_uma_so_pessoa(cc, banco):
-    _sinc(cc)
-    assert _trazer(cc, ["+5511988887777"]).json()["dados"]["criadas"] == 1
-    assert _post(cc, "/api/v1/escuta/remetentes/%2B5511988887777/aprovar", {"papel": "familia"}).status_code == 200
-    c = conectar(banco)
-    ps = c.execute("select id, dados from pessoa").fetchall()
-    c.close()
-    assert len(ps) == 1 and ps[0]["id"].startswith("wa-") and json.loads(ps[0]["dados"])["escuta_aprovada"] is True
-
-
-def test_trazer_usa_o_mesmo_id_do_aprovar_e_reativa_pessoa_excluida_sem_aprovar(cc, banco):
-    import hashlib
-    _sinc(cc)
-    pid = "wa-" + hashlib.sha1(b"+5511988887777").hexdigest()[:10]
-    c = conectar(banco)
-    c.execute("insert into pessoa(id, nome, dados, origem, excluido_em) values (?, 'Velho', ?, 'escuta', '2026-01-01')",
-              (pid, json.dumps({"canais": ["whatsapp:+5511988887777"], "escuta_aprovada": True, "papel_escuta": "familia"})))
-    c.close()
-    assert _trazer(cc, ["+5511988887777"]).json()["dados"] == {"criadas": 1, "ignoradas": 0}
-    c = conectar(banco)
-    ps = c.execute("select id, excluido_em, dados from pessoa").fetchall()
-    c.close()
-    assert [p["id"] for p in ps] == [pid] and ps[0]["excluido_em"] is None
-    assert json.loads(ps[0]["dados"]).get("escuta_aprovada") is not True
-
-
 def test_openapi_documenta_o_csv_como_text_csv():
     spec = json.loads((Path(__file__).parent.parent.parent / "docs" / "openapi.json").read_text())
     assert "text/csv" in spec["paths"]["/api/v1/contatos/so-na-ness.csv"]["get"]["responses"]["200"]["content"]

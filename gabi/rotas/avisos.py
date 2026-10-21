@@ -29,33 +29,6 @@ def _ddmm(iso) -> str:
     return f"{str(iso)[8:10]}/{str(iso)[5:7]}" if isinstance(iso, str) and len(iso) >= 10 else "?"
 
 
-def _quem(p: dict) -> str:
-    return p.get("nome") or p.get("numero") or "número desconhecido"
-
-
-def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
-    """Só número e nome: o texto da mensagem nunca vem para o aviso."""
-    if tipo == "escuta_novo_remetente":
-        return f"Novo remetente no WhatsApp: {_quem(p)}", "aprove, ignore ou bloqueie na fila da escuta"
-    if tipo == "escuta_atencao":
-        return f"Possível crise: {_quem(p)}. Abra a conversa.", ""
-    if tipo == "escuta_saude":
-        return f"Mensagem de saúde de {_quem(p)}: abra a conversa", ""
-    if tipo == "escuta_pedido_incompleto":
-        return f"Pedido incompleto de {_quem(p)}", "faltou valor ou vencimento; abra a conversa e peça o que falta"
-    if tipo == "escuta_sem_permissao":
-        return f"Pedido de {_quem(p)} sem permissão: libere em Cadastros", "a mensagem fica retida até a pessoa poder pedir (pode_pedir)"
-    if tipo == "escuta_parada":
-        return "Escuta do WhatsApp parada", p.get("motivo", "")
-    if tipo == "escuta_sem_modelo":
-        return "Escuta sem modelo de leitura", f"a escuta está sem modelo disponível agora: {p.get('motivo') or 'motivo desconhecido'}"
-    if tipo == "escuta_anexo_grande":
-        return f"Anexo grande demais de {_quem(p)}", "acima do teto da escuta (escuta.anexo_max_mb): não foi guardado; abra a conversa"
-    if tipo == "escuta_falhou":
-        return f"Mensagem de {_quem(p)} não foi processada", "falhou 8 vezes seguidas (Paperless, ponte ou modelo fora do ar); abra a conversa"
-    return tipo, ""
-
-
 def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
     """Remetente e assunto são dado do dono (vão só para os canais dele); nunca para log."""
     if tipo == "email_emergencial":
@@ -154,8 +127,6 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
     if tipo.startswith("email_"):
         return _descrever_email(tipo, p)
-    if tipo.startswith("escuta_"):
-        return _descrever_escuta(tipo, p)
     if tipo.startswith("reembolso_saude_"):
         return _descrever_reembolso_saude(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)

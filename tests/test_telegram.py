@@ -85,24 +85,6 @@ def test_um_envio_por_aviso_com_limite_por_rodada(con):
     assert enviar_avisos(con, ENV, AGORA, h) == 10  # no máximo 10 por rodada; o resto vai na próxima
 
 
-def test_i1_escuta_atencao_vai_primeiro_e_nunca_e_descartada_por_idade(con):
-    for i in range(12):
-        _aviso(con, payload={"chave": str(i), "nome": f"C{i}", "vencimento": "2026-10-01", "valor": "R$ 1,00"})
-    velho = _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000001", "nome": "Ana"}, quando=AGORA - dt.timedelta(days=5))
-    novo = _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000002", "nome": "Bia"})
-    h = Http()
-    assert enviar_avisos(con, ENV, AGORA, h) == 10
-    assert "crise" in h.chamadas[0][1]["text"] and "crise" in h.chamadas[1][1]["text"]
-    enviados = {r[0] for r in con.execute("select id from aviso where telegram_em is not null")}
-    assert {velho, novo} <= enviados
-
-
-def test_i1_escuta_atencao_lida_nao_e_enviada(con):
-    _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000001", "nome": "Ana"}, quando=AGORA - dt.timedelta(days=5), lido=True)
-    h = Http()
-    assert enviar_avisos(con, ENV, AGORA, h) == 0
-
-
 # ---- aviso obsoleto não é enviado (fonte única da verdade) ----
 from gabi.avisos import gerar_avisos, ainda_vale  # noqa: E402
 from gabi.telegram import enviar_avisos_contagem  # noqa: E402
@@ -204,13 +186,6 @@ def test_obsoletos_e_incertos_nao_contam_no_limite_de_10(con):
         _aviso(con, payload={"chave": f"c{i}", "nome": f"C{i}", "vencimento": "2026-10-01", "valor": "R$ 1,00"})
     h = Http()
     assert enviar_avisos_contagem(con, ENV, AGORA, h) == (10, 0, 5) and len(h.chamadas) == 10
-
-
-def test_escuta_atencao_nunca_e_descartada_como_obsoleta_e_vai_primeiro(con):
-    _aviso(con, payload={"chave": "sumiu", "nome": "S", "vencimento": "2026-10-01", "valor": "R$ 1,00"}, existe=False)
-    _aviso(con, tipo="escuta_atencao", payload={"numero": "+5511900000001", "nome": "Ana"}, quando=AGORA - dt.timedelta(days=5))
-    h = Http()
-    assert enviar_avisos_contagem(con, ENV, AGORA, h) == (1, 0, 1) and "crise" in h.chamadas[0][1]["text"]
 
 
 def test_log_real_do_main_so_tem_contagens(tmp_path, monkeypatch, capsys):

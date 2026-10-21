@@ -180,27 +180,6 @@ def _parametro(con, chave: str, padrao):
         return padrao
 
 
-def _escuta_parada(con, agora: dt.datetime, novo) -> None:
-    """Vigia do ouvinte: só em modo 'ativo'; sem nenhuma mensagem registrada não avisa. Um aviso por dia, sem texto, nome nem número de telefone."""
-    if _parametro(con, "escuta.modo", "registro") != "ativo":
-        return
-    horas = _parametro(con, "escuta.horas_sem_receber", 12)
-    if isinstance(horas, bool) or not isinstance(horas, (int, float)) or horas <= 0:
-        horas = 12
-    ultima = con.execute("select max(recebida_em) from escuta_msg").fetchone()[0]
-    if not ultima:
-        return
-    try:
-        quando = dt.datetime.fromisoformat(ultima)
-    except ValueError:
-        return
-    if quando.tzinfo is None:
-        quando = quando.replace(tzinfo=BRT)  # o spool grava em UTC; linha antiga sem offset vale como Brasília (convenção do spool)
-    if agora - quando > dt.timedelta(hours=horas):
-        n = int((agora - quando).total_seconds() // 3600)
-        novo("escuta_parada", "ouvinte", {"motivo": f"ouvinte sem receber mensagens há {n} horas"})
-
-
 UNIDADE_HERMES = "hermes-gateway"
 
 
@@ -340,7 +319,6 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
     _bancos_desatualizados(con, agora, novo)
-    _escuta_parada(con, agora, novo)
     if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
         _hermes_parado(con, agora, novo, estado_servico)
     _google_parado(con, agora, novo)

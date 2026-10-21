@@ -3,7 +3,7 @@ import json
 
 from gabi.dinheiro.modelo import Orcamento
 from gabi.correio.modelo import ModeloComCusto
-from gabi.escuta.classificar import recusa_sem_envio
+from gabi.correio.modelo import recusa_sem_envio
 from gabi.fontes.openrouter import ErroOpenRouter
 from tests.familia.test_rodada_exames import LAUDO, _doc, _rodar, _sistema, con  # noqa: F401
 

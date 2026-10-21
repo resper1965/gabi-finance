@@ -338,39 +338,6 @@ def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
 
 
 # ---------------- escuta (WhatsApp): serviço, timer e gatilho por arquivo ----------------
-def test_unidades_escuta_seguem_o_padrao():
-    srv, t, p = _ler("gabi-brain-escuta.service"), _ler("gabi-brain-escuta.timer"), _ler("gabi-brain-escuta.path")
-    assert "-m gabi.escuta" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_ESCUTA_SPOOL=/var/lib/gabi-escuta-spool" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv
-    assert "ReadWritePaths=/var/lib/gabi-brain /var/lib/gabi-escuta-spool" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "OnUnitActiveSec=5min" in t and "OnBootSec=2min" in t and "Unit=gabi-brain-escuta.service" in t
-    assert "PathChanged=/var/lib/gabi-escuta-spool/gatilho" in p and "Unit=gabi-brain-escuta.service" in p
-    assert hasattr(importlib.import_module("gabi.escuta.__main__"), "main")
-    for nome in ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path"):
-        assert nome in INSTALAR
-
-
-def test_instalar_nao_liga_timer_nem_path_da_escuta():
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("escuta" in l for l in ligadas)
-
-
-def test_spool_da_escuta_fica_fora_da_arvore_0700_com_setgid_e_grupo():
-    srv = _ler("gabi-brain-escuta.service")
-    assert "/var/lib/gabi-brain/escuta-spool" not in INSTALAR + srv + _ler("gabi-brain-escuta.path")
-    assert "SupplementaryGroups=gabibrain-escuta" in srv
-    assert "ReadWritePaths=/var/lib/gabi-brain /var/lib/gabi-escuta-spool" in srv
-    assert "groupadd --system gabibrain-escuta" in INSTALAR
-    assert re.search(r"install -d -o gabibrain -g gabibrain-escuta -m 2770 /var/lib/gabi-escuta-spool", INSTALAR)
-
-
-def test_service_da_escuta_sem_limite_de_partidas_para_o_path_nao_se_desligar():
-    assert "StartLimitIntervalSec=0" in _ler("gabi-brain-escuta.service").split("[Service]")[0]
 
 
 # ---------------- contatos do Google ----------------
@@ -400,57 +367,6 @@ def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
 
 
 # ---------------- ouvinte do WhatsApp (serviço separado, só leitura) ----------------
-def test_unidade_do_ouvinte_segue_o_padrao_e_isola_o_brain():
-    u = (DEPLOY / "escuta-ouvinte.service").read_text()
-    for linha in ("User=escuta-ouvinte", "Group=escuta-ouvinte", "SupplementaryGroups=gabibrain-escuta", "UMask=0007",
-                  "Restart=always", "RestartSec=10", "WorkingDirectory=/opt/escuta-ouvinte",
-                  "ExecStart=/usr/bin/node /opt/escuta-ouvinte/src/ouvinte.js",
-                  "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes",
-                  "ProtectKernelTunables=yes", "ProtectKernelModules=yes", "ProtectControlGroups=yes", "CapabilityBoundingSet=\n",
-                  "RestrictAddressFamilies=AF_INET AF_INET6\n", "ReadWritePaths=/var/lib/gabi-escuta-spool /var/lib/escuta-ouvinte\n",
-                  "InaccessiblePaths=/var/lib/gabi-brain /etc/gabi", "MemoryMax=512M",
-                  "ProtectKernelLogs=yes", "ProtectClock=yes", "RestrictNamespaces=yes", "LockPersonality=yes",
-                  "RestrictSUIDSGID=yes", "SystemCallFilter=@system-service", "SystemCallErrorNumber=EPERM",
-                  "RestartPreventExitStatus=78",
-                  "OUVINTE_SPOOL=/var/lib/gabi-escuta-spool", "OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth"):
-        assert linha in u, linha
-    assert "AF_UNIX" not in re.sub(r"(?m)^#.*$", "", u)
-    assert "EnvironmentFile" not in u and "gabi-brain.env" not in u
-
-
-def test_instalar_cria_usuario_do_ouvinte_e_instala_sem_ligar_nem_rodar_npm():
-    assert "escuta-ouvinte.service" in INSTALAR
-    assert re.search(r"useradd --system .*--shell /usr/sbin/nologin .*escuta-ouvinte", INSTALAR)
-    assert "gabibrain-escuta" in re.search(r"useradd .*escuta-ouvinte", INSTALAR).group(0)
-    assert re.search(r"install -d -o escuta-ouvinte -g escuta-ouvinte -m 700 /var/lib/escuta-ouvinte", INSTALAR)
-    assert "/opt/escuta-ouvinte" in INSTALAR
-    assert 'cp -r "$AQUI/ouvinte/vendor" /opt/escuta-ouvinte/vendor' in INSTALAR
-    ativas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith(("#", "echo"))]
-    assert not any("escuta-ouvinte" in l and ("enable" in l or "start" in l) for l in ativas)
-    assert not any(re.search(r"\bnpm\b", l) for l in ativas)
-
-
-def test_runbook_escuta_paralelo_tem_os_passos_e_o_aviso_de_crise():
-    from pathlib import Path
-    rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
-    trecho = rb.split("{#escuta-paralelo}")[1].split("\n## ")[0]
-    for esperado in ("tools.comparar_escuta", "google-contatos.env", "openrouter.env", "limite de crédito", "anexo_caminho",
-                     "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "PYTHONPATH=/opt/gabi-brain", "ilegiveis", "sem_numero", "ambiguos",
-                     "meia-noite", "Aparelhos conectados", "órfãos", "NÃO somem na hora", "set anexo_caminho=null where anexo_caminho is not null", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
-        assert esperado in trecho, esperado
-
-
-def test_instalar_instala_o_comparador_da_escuta():
-    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
-    assert '"$AQUI/tools/comparar_escuta.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
-    assert "PYTHONPATH=/opt/gabi-brain" in (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
-
-
-def test_i7_i8_m4_ouvinte_teto_25_espaco_minimo_e_onfailure():
-    u = (DEPLOY / "escuta-ouvinte.service").read_text()
-    assert "Environment=OUVINTE_ANEXO_MAX_MB=25\n" in u and "Environment=OUVINTE_ESPACO_MIN_MB=2048\n" in u
-    assert "OnFailure=gabi-brain-falha@%n.service\n" in u
-    assert "ReadWritePaths=/var/lib/gabi-brain\n" in (DEPLOY / "gabi-brain-falha@.service").read_text()   # o template grava no banco, como para os gabi-brain-*
 
 
 def test_unit_fontes_le_google_env_e_o_antigo():

@@ -43,7 +43,7 @@ function Linha({ p, children }: { p: Proposta; children: ReactNode }) {
     </li>);
 }
 
-/** Escuta › Contatos: fila de propostas de contato (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato). Só grava o que o dono aprovar; uma aprovada ainda pode ser recusada antes da gravação. */
+/** Cadastros › Contatos: fila de propostas de contato (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato). Só grava o que o dono aprovar; uma aprovada ainda pode ser recusada antes da gravação. */
 export function ContatosPropostas({ acao }: { acao: Acao }) {
   const { ocupado, erros, agir } = acao;
   const [resumo, setResumo] = useState<string | null>(null);
