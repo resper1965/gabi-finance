@@ -74,7 +74,7 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#escuta-paralelo`.
 | # | Item | Dono | Status |
 |---|---|---|---|
-| E1 | Parear o ouvinte (QR); G12 `contacts.readonly` nas duas contas | R | ⏸ |
+| E1 | ~~Parear o ouvinte~~ feito em 19/10 (`escuta-ouvinte` ativo). Resta G12 `contacts.readonly` (contatos Google) | R | ⏸ |
 | E2 | Chave do modelo com limite; aprovar remetentes e grupos na tela | R | ⏸ |
 | E3 | Ligar em `registro` e comparar por N dias (`tools.comparar_escuta`, divergência 0) | R+C | ⏸ |
 | E4 | Aceitar que saúde só de texto não vai ao cofre (desvio ADR-016), depois modo `ativo`; teste de crise (`--teste-crise`) recebido | R | ⏸ |
@@ -82,7 +82,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 ### 5. Exames e saúde
 | # | Item | Dono | Status |
 |---|---|---|---|
-| S1 | Plano `plans/2026-10-11-exames.md` (10 tarefas): **conferir quanto foi executado** (a migração 0024 foi reservada; o STATUS só confirma T4.1/T4.2 de 10/10) | C | ❓ |
+| S1 | ~~Plano de exames~~ executado em 16/10 (tarefas 1-10, instalado; timer ligado em 16/10 21:20). Ver `PROGRESSO-GOAL.md` | C | ✅ |
 | S2 | ✅ 16/10: chave gerada pelo Claude (`/etc/gabi/saude.key`); **leve a cópia `~/saude.key.COPIE-E-APAGUE` para fora da VPS e apague**. `/etc/gabi/saude.key` (sem ela a tela Família responde 503) e a lista de PDFs de exames como aceite | R | ⏸ |
 | S3 | Leitura por imagem de PDF digitalizado (exames e reembolso): código pronto em 16/10, **desligada**. Ricardo liga `saude.visao_pdf` (ver `runbook#visao-pdf`: privacidade, custo) e a rota de reprocessar exames passa `visao=` (`gabi/rotas/familia.py`) | R/C | ⏸ |
 
