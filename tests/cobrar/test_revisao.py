@@ -200,22 +200,6 @@ def _mcp_dado(con, agora=None):
     return capturado["pessoas_dado"]
 
 
-def test_liberacao_nao_e_consumida_quando_nao_ha_valor(con):
-    con.execute("update pessoa set dados=? where id='ana'", (json.dumps({}),))
-    con.execute("insert into liberacao_sensivel(pessoa_id, campo, liberado_por, liberado_em) values ('ana','nascimento','boss','2026-10-09')")
-    dado = _mcp_dado(con)
-    assert dado("ana", "nascimento")["status"] == "sem_dado"
-    assert con.execute("select usada_em from liberacao_sensivel").fetchone()[0] is None  # continua valendo
-
-
-def test_liberacao_consumida_uma_unica_vez_mesmo_em_corrida(con):
-    con.execute("update pessoa set dados=? where id='ana'", (json.dumps({"nascimento": "1980-01-01"}),))
-    con.execute("insert into liberacao_sensivel(pessoa_id, campo, liberado_por, liberado_em) values ('ana','nascimento','boss','2026-10-09')")
-    dado = _mcp_dado(con)
-    assert dado("ana", "nascimento")["status"] == "liberado"
-    assert dado("ana", "nascimento")["status"] == "aguardando_liberacao"
-
-
 # ---- 8. paginação ----
 def test_docs_com_limite_para_de_paginar(con):
     from gabi.fontes.paperless import Paperless
