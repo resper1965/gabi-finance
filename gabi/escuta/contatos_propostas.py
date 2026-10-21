@@ -52,11 +52,62 @@ def _ja_decidida(con, conta, tipo, graph_id, telefone, nome) -> bool:
                        "and estado in ('recusada','aplicada')", (conta, tipo, graph_id, telefone, nome)).fetchone() is not None
 
 
-def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem) -> int:
+def _inserir(con, agora, tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, email=None) -> int:
     if _ja_decidida(con, conta, tipo, graph_id, tel, nome):
         return 0
-    return con.execute("insert or ignore into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, criada_em) "
-                       "values (?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora)).rowcount
+    return con.execute("insert or ignore into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, criada_em, email_depois) "
+                       "values (?,?,?,?,?,?,?,?,?,?)", (tipo, conta, graph_id, antes_nome, antes_tel, nome, tel, origem, agora, email)).rowcount
+
+
+_STOP = {"dos", "das", "del"}  # "de/da/do" já caem fora por ter menos de 3 letras
+
+
+def _partes(nome: str | None) -> set[str]:
+    sem = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode().lower()
+    return set(re.findall(r"[a-z]{3,}", sem)) - _STOP
+
+
+def nome_compativel(a: str | None, b: str | None) -> bool:
+    """Os nomes dividem ao menos uma parte (sem acento nem caixa, só partes de 3+ letras, sem preposição)."""
+    return bool(_partes(a) & _partes(b))
+
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+$")
+
+
+def _email_valido(e) -> str | None:
+    e = (e or "").strip().lower()
+    return e if _EMAIL.match(e) else None
+
+
+def _emails(con, agora: str) -> tuple[int, int]:
+    """adicionar_email: só para contato da ness com UMA linha em contato_graph (a ponte recusa contato cujos telefones atuais difiram do enviado),
+    telefone que não aparece em outro contato e nome compatível com o do Google. Devolve (propostas novas, contatos com e-mail barrados)."""
+    por_contato: dict[tuple, list] = {}
+    donos: dict[str, set] = {}
+    for r in con.execute("select conta, graph_id, nome, telefone from contato_graph order by conta, graph_id, telefone_original").fetchall():
+        por_contato.setdefault((r["conta"], r["graph_id"]), []).append(r)
+        if r["telefone"] is not None:
+            donos.setdefault(r["telefone"], set()).add((r["conta"], r["graph_id"]))
+    novas = revisar = 0
+    for (conta, gid), rs in por_contato.items():
+        telefones = {r["telefone"] for r in rs if r["telefone"] is not None}
+        emails: set[str] = set()
+        nomes_google: list = []
+        for t in telefones:
+            for g in con.execute("select email, nome from contato_google_email where telefone=?", (t,)).fetchall():
+                e = _email_valido(g["email"])
+                if e:
+                    emails.add(e)
+                    nomes_google.append(g["nome"])
+        if not emails:
+            continue
+        nome, tel = _nome(rs[0]["nome"]), rs[0]["telefone"]
+        if len(rs) != 1 or tel is None or len(donos[tel]) != 1 or not any(nome_compativel(nome, n) for n in nomes_google):
+            revisar += 1
+            continue
+        novas += _inserir(con, agora, "adicionar_email", conta, gid, nome, tel, nome, tel, "google_email", ";".join(sorted(emails)))
+    return novas, revisar
 
 
 def _sem_cara_de_telefone(original) -> bool:
@@ -92,6 +143,7 @@ def _limpeza(con, agora: str) -> tuple[int, int, int]:
 
 
 def gerar(con, agora: str) -> dict:
+    """Gera as propostas pendentes e devolve só contagens; adicionar_email = propostas novas, revisar = contatos com e-mail do Google barrados pelos filtros."""
     criar = corrigir = 0
     conta = contatos.conta_origem(con)
     with transacao(con):
@@ -113,7 +165,9 @@ def gerar(con, agora: str) -> dict:
                 continue  # outro contato (ou outro campo deste) já tem o número: corrigir criaria duplicata
             corrigir += _inserir(con, agora, "corrigir", r["conta"], r["graph_id"], r["nome"], r["telefone_original"], nome, novo, "telefone_invalido")
         nomes, apagar_c, apagar_t = _limpeza(con, agora)
-    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c}
+        add_email, revisar = _emails(con, agora)
+    return {"criar": criar, "corrigir": corrigir, "corrigir_nome": nomes, "apagar_telefone": apagar_t, "apagar_contato": apagar_c,
+            "adicionar_email": add_email, "revisar": revisar}
 
 
 def listar(con, estado: str | None = None) -> list[dict]:

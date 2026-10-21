@@ -248,7 +248,7 @@ def test_main_gera_propostas_e_imprime_so_contagens(tmp_path, capsys):
     k = conectar(banco); migrar(k, MIGR); _rem(k, nome="Segredo"); k.commit(); k.close()
     code = c.main(banco, listar=lambda conta: [])
     out = capsys.readouterr().out
-    assert code == 0 and "propostas: criar=1 corrigir=0 nomes=0 apagar_telefone=0 apagar_contato=0" in out and "Segredo" not in out and "912345678" not in out
+    assert code == 0 and "propostas: criar=1 corrigir=0 nomes=0 apagar_telefone=0 apagar_contato=0 adicionar_email=0 revisar=0" in out and "Segredo" not in out and "912345678" not in out
 
 
 def test_migracao_0073_aceita_tipos_novos_e_preserva_linhas(tmp_path):
@@ -351,7 +351,7 @@ def test_limpeza_idempotente_e_recusada_nao_volta(con):
 
 
 def test_gerar_retorna_todas_as_contagens(con):
-    assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato"}
+    assert set(_g(con)) == {"criar", "corrigir", "corrigir_nome", "apagar_telefone", "apagar_contato", "adicionar_email", "revisar"}
 
 
 @pytest.mark.parametrize("bruto", ["11 3456-7890 ramal 12", "(11) 3456-7890, (11) 98765-4321", "999999999", "11912345678 x5"])
@@ -389,3 +389,98 @@ def test_migracao_0074_preserva_linhas_e_indice_aberto(con):
     assert (r["tipo"], r["estado"], r["email_depois"]) == ("corrigir", "pendente", None)
     with pytest.raises(sqlite3.IntegrityError):
         con.execute(_INS, ("corrigir", NESS, "g1", "Fulano", NUM, None, "whatsapp"))
+
+
+def _ag(con, **kw):
+    """Contato da ness com telefone já em E.164 (não vira proposta de corrigir)."""
+    kw.setdefault("orig", "+5511999990000")
+    _graph(con, **kw)
+
+
+def _gmail(con, email, tel, nome, conta="resper@gmail.com"):
+    con.execute("insert into contato_google_email(conta, email, telefone, nome) values (?,?,?,?)", (conta, email, tel, nome))
+
+
+def test_nome_compativel():
+    assert p.nome_compativel("Ricardo Esper", "Esper")
+    assert p.nome_compativel("José da Silva", "Jose Silva")
+    assert not p.nome_compativel("Ana Lima", "Bruno Souza")
+    assert not p.nome_compativel(None, "x")
+    assert not p.nome_compativel("Maria de Souza", "Pedro de Lima")
+
+
+def test_gera_adicionar_email_quando_tudo_confere(con):
+    _ag(con, nome="Ana Lima")
+    _gmail(con, "Ana@X.com", "+5511999990000", "Ana Lima")
+    _gmail(con, "b@x.com", "+5511999990000", "Ana")
+    _gmail(con, "ana@x.com", "+5511999990000", "Ana", conta="outra@gmail.com")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 1 and r["revisar"] == 0
+    (x,) = _props(con)
+    assert (x["tipo"], x["origem"], x["graph_id"], x["email_depois"]) == ("adicionar_email", "google_email", "g1", "ana@x.com;b@x.com")
+    assert (x["nome_antes"], x["nome_depois"]) == ("Ana Lima", "Ana Lima")
+    assert (x["telefone_antes"], x["telefone_depois"]) == ("+5511999990000",) * 2
+
+
+def test_nao_gera_com_telefone_repetido_em_outro_contato(con):
+    _ag(con, gid="g1", nome="Ana Lima")
+    _ag(con, gid="g2", nome="Ana Lima")
+    _gmail(con, "a@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 2  # um por contato barrado
+    assert _props(con) == []
+
+
+def test_nao_gera_com_nome_sem_parte_comum(con):
+    _ag(con, nome="Ana Lima")
+    _gmail(con, "a@x.com", "+5511999990000", "Bruno Souza")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1 and _props(con) == []
+
+
+def test_nao_gera_com_dois_telefones_validos(con):
+    _ag(con, nome="Ana Lima")
+    _ag(con, nome="Ana Lima", orig="+5511988880000", tel="+5511988880000", campo="home")
+    _gmail(con, "a@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1 and _props(con) == []
+
+
+def test_nao_gera_com_outra_linha_de_telefone_invalido(con):
+    _ag(con, nome="Ana Lima")
+    _ag(con, nome="Ana Lima", orig="ramal 12", tel=None, campo="business")
+    _gmail(con, "a@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 1
+
+
+def test_nao_gera_sem_email_no_google(con):
+    _ag(con, nome="Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 0 and _props(con) == []
+
+
+def test_descarta_email_sem_arroba(con):
+    _ag(con, nome="Ana Lima")
+    _gmail(con, "semarroba", "+5511999990000", "Ana Lima")
+    _gmail(con, "a b@x.com", "+5511999990000", "Ana Lima")
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and _props(con) == []
+    _gmail(con, " Ok@X.com ", "+5511999990000", "Ana Lima")
+    assert p.gerar(con, AGORA)["adicionar_email"] == 1
+    assert _props(con)[0]["email_depois"] == "ok@x.com"
+
+
+@pytest.mark.parametrize("estado", ["aplicada", "recusada"])
+def test_aplicada_ou_recusada_nao_renasce(con, estado):
+    _ag(con, nome="Ana Lima")
+    _gmail(con, "a@x.com", "+5511999990000", "Ana Lima")
+    assert p.gerar(con, AGORA)["adicionar_email"] == 1
+    con.execute("update contato_proposta set estado=?", (estado,))
+    assert p.gerar(con, AGORA)["adicionar_email"] == 0
+    assert len(_props(con)) == 1
+
+
+def test_gerar_devolve_chaves_novas(con):
+    r = p.gerar(con, AGORA)
+    assert r["adicionar_email"] == 0 and r["revisar"] == 0
