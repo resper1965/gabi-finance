@@ -32,7 +32,7 @@ Método novo `adicionar_email(gr, conta, graph_id, nome_antes, telefone_antes, e
 - wrapper em `graph_ness.py` e entrada na allowlist de `ponte.py`.
 
 ### 4. Gravação e aprovação
-`contatos_gravar.py`: `_aplicar_adicionar_email` com o mesmo desenho dos outros (revalida no banco local, chama a ponte, grava `aplicada` e atualiza o espelho local). `aprovar_correcoes` passa a aceitar também `adicionar_email`, nunca `criar` nem `apagar_*`. Painel: bloco de `adicionar_email` com "aprovar todos" e lista do que será gravado (nome, telefone, e-mails).
+`contatos_gravar.py`: `_aplicar_adicionar_email` com o mesmo desenho dos outros (revalida no banco local, chama a ponte, grava `aplicada`; o espelho local não é alterado, porque `contato_graph` não guarda e-mail). `aprovar_correcoes` passa a aceitar também `adicionar_email`, nunca `criar` nem `apagar_*`. Painel: bloco de `adicionar_email` com "aprovar todos" e lista do que será gravado (nome, telefone, e-mails).
 
 ### 5. Piso de interação para `criar` (novo módulo `gabi/escuta/interacao.py`)
 `interacao(con, agora, endereco=None, telefone=None) -> {"mensagens": n, "respostas": r}` conta, nos 12 meses até `agora`:
