@@ -42,6 +42,8 @@ Passa se `respostas >= 1` ou `mensagens >= 5`. `gerar()` só insere `criar` (hoj
 
 Com os dados de hoje quase ninguém passa; é o comportamento esperado da decisão 5.
 
+Nota (revisão final, 21/10): a janela efetiva não é de 12 meses. A retenção da escuta (`escuta.retencao_dias`, 30 dias por padrão; `caixa.purgar_antigas`) apaga as mensagens 1:1 processadas de tipo `nada`, e `email_msg` é podado em 180 dias; o piso vale, na prática, para ~30 dias de WhatsApp. Aumentar a retenção alarga a janela. Ver ADR-022, decisão 7.
+
 ## Segurança e consequências
 - E-mail na pessoa errada é pior que e-mail faltando: por isso telefone único + nome compatível + só acrescenta. O ganho esperado é parcial (~33% dos contatos têm e-mail por telefone; parte cai fora pelos filtros).
 - Depois de acrescentar e-mail, `apagar` (que recusa contato com e-mail) fica ainda mais conservador.
