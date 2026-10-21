@@ -13,27 +13,27 @@ class PaperlessFalso:
         return [{"id": 1, "title": "x", **f}]
 
     def baixar(self, id):
+        if id == 999:
+            raise ErroPaperless("GET /x -> 500")
         return b"%PDF\x00\xff" + bytes([id])
 
     def preparar_usuario(self, token_admin):
         return "segredo"
 
-    def etiquetar(self, id, tags):
-        raise ErroPaperless("PATCH /x -> 500")
 
 
 class NiboFalso:
     def __init__(self):
         self.anexos = []
 
-    def anexar_arquivo(self, sid, nome, conteudo):
-        self.anexos.append((sid, nome, conteudo))
+    def obter_arquivo(self, file_id):
+        return b"\x00\x01bin" + file_id.encode()
 
-    def socios(self):
-        return iter([{"id": "s1"}])
+    def agendamentos_a_receber(self):
+        return iter([{"scheduleId": "s1"}])
 
-    def agendamento_por_reference(self, reference):
-        return None
+    def nfse(self, desde=None):
+        return []
 
     def explode(self):
         raise RuntimeError("token=abc")
@@ -55,18 +55,17 @@ def test_chamada_simples_e_bytes_ida_e_volta(ponte):
     p, n = Ponte(sock, "paperless"), Ponte(sock, "nibo")
     assert p.docs(query="luz") == [{"id": 1, "title": "x", "query": "luz"}]
     assert p.baixar(7) == b"%PDF\x00\xff\x07"
-    n.anexar_arquivo("s", "a.pdf", b"\x00\x01bin")
-    assert nibo.anexos == [("s", "a.pdf", b"\x00\x01bin")]
-    assert n.agendamento_por_reference("r") is None
+    assert n.obter_arquivo("f") == b"\x00\x01binf"
+    assert n.nfse() == []
 
 
 def test_gerador_vira_lista(ponte):
-    assert Ponte(ponte[0], "nibo").socios() == [{"id": "s1"}]
+    assert Ponte(ponte[0], "nibo").agendamentos_a_receber() == [{"scheduleId": "s1"}]
 
 
 def test_erro_da_fonte_volta_como_a_mesma_excecao(ponte):
-    with pytest.raises(ErroPaperless, match="PATCH /x -> 500"):
-        Ponte(ponte[0], "paperless").etiquetar(1, ["a"])
+    with pytest.raises(ErroPaperless, match="GET /x -> 500"):
+        Ponte(ponte[0], "paperless").baixar(999)
 
 
 def test_metodo_fora_da_lista_branca_nao_existe_e_nem_o_servidor_aceita(ponte):
@@ -98,7 +97,7 @@ def test_fonte_nao_configurada(tmp_path):
 
 def test_servico_fora_do_ar_vira_erro_da_fonte(tmp_path):
     with pytest.raises(ErroNibo, match="indisponível"):
-        Ponte(tmp_path / "nada.sock", "nibo").socios()
+        Ponte(tmp_path / "nada.sock", "nibo").agendamentos_a_receber()
     assert Ponte(tmp_path / "nada.sock", "nibo").configurada() is False
 
 
@@ -131,27 +130,6 @@ def _servir(tmp_path, fontes):
     srv = Servidor(tmp_path / "g.sock", fontes)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, tmp_path / "g.sock"
-
-
-def test_ponte_permite_enviar_e_so_gabi_tags(tmp_path):
-    chamadas = []
-
-    def http(metodo, url, corpo=None, cab=None):
-        chamadas.append((metodo, url))
-        if "/api/tags/" in url and metodo == "GET":
-            return 200, {"results": [{"id": 3, "name": "gabi:escuta"}], "next": None}
-        return 200, "tarefa-1"
-    srv, sock = _servir(tmp_path, {"paperless": Paperless("http://p", "t", http=http)})
-    try:
-        p = Ponte(sock, "paperless")
-        with pytest.raises(ErroPaperless, match="etiquetas gabi"):
-            p.enviar(b"x", "a.pdf", ["outra"])
-        assert chamadas == []  # rejeitada antes de qualquer rede
-        assert p.enviar(b"%PDF\x00", "a.pdf", ["gabi:escuta"]) == "tarefa-1"
-        assert any(m == "POST" and u.endswith("/post_document/") for m, u in chamadas)
-    finally:
-        srv.shutdown()
-        srv.server_close()
 
 
 def test_ponte_openrouter_so_completar(tmp_path):
@@ -187,17 +165,6 @@ def test_ponte_modelo_resposta_malformada_vira_erro_tipado(tmp_path, monkeypatch
         monkeypatch.setattr(m._ponte, "_chamar", lambda *a, **k: ruim)
         with pytest.raises(ErroOpenRouter, match="resposta inválida"):
             m.completar("p", forte=False)
-
-
-def test_tag_invalida_atravessa_a_ponte_com_a_mensagem(tmp_path):
-    srv, sock = _servir(tmp_path, {"paperless": Paperless("http://p", "t", http=lambda *a: pytest.fail("rede"))})
-    try:
-        for chamada in (lambda p: p.enviar(b"x", "a", ["outra"]), lambda p: p.etiquetar(1, ["outra"])):
-            with pytest.raises(ErroPaperless, match=r"^o app só mexe em etiquetas gabi:\*$"):
-                chamada(Ponte(sock, "paperless"))
-    finally:
-        srv.shutdown()
-        srv.server_close()
 
 
 def test_tag_invalida_e_erro_paperless_e_value_error():
@@ -618,3 +585,9 @@ def test_cliente_graph_limpeza_ida_e_volta_e_resposta_invalida(sock_graph):
     assert p.contato_adicionar_email("resper@ness.com.br", "AAMkAGI2TG93AAA=", "U", "1", ["a@x.com"]) == {"resultado": "ok"}
     with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
         p.contato_renomear("malformada@x.com", "AAMkAGI2TG93AAA=", "A", "B")
+
+
+def test_nibo_e_paperless_so_leitura_que_tem_uso():
+    """ADR-023: lote do Nibo, comprovantes e reembolso saíram; a ponte não pode mais deixar ninguém escrever no Nibo nem no Paperless (R2)."""
+    assert PERMITIDOS["nibo"] == frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"})
+    assert PERMITIDOS["paperless"] == frozenset({"docs", "baixar"})

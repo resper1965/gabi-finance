@@ -21,7 +21,7 @@ from gabi.fontes.paperless import ErroPaperless
 
 MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
-    "paperless": frozenset({"docs", "baixar", "etiquetar", "campos", "enviar", "por_etiqueta", "texto", "restringir"}),
+    "paperless": frozenset({"docs", "baixar"}),  # ADR-023: só a busca e o download do MCP; nada escreve no Paperless
     "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
@@ -29,8 +29,7 @@ PERMITIDOS = {
                              "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
                              "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
-    "nibo": frozenset({"agendamento_por_reference", "criar_agendamento_debito", "anexar_arquivo", "baixar_pagamento",
-                       "organizations", "contas", "agendamentos", "extrato", "nfse", "obter_arquivo", "agendamentos_a_receber", "socios", "clientes", "categorias"}),
+    "nibo": frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"}),  # ADR-023: só o que notas_importar lê; o lote (escrita) saiu
 }
 ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo, "openrouter": ErroOpenRouter, "google_contatos": ErroGoogleContatos,
         "google_agenda": ErroGoogleOAuth, "google_email": ErroGoogleOAuth, "graph_ness": ErroGraphNess}
