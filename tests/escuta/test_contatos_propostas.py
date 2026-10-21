@@ -243,6 +243,17 @@ def test_aprovar_correcoes_so_dos_ids_dados_e_so_corrigir_pendente(con):
     assert {r["id"]: r["estado"] for r in _props(con)} == {a: "aprovada", b: "recusada", criar: "pendente"}
 
 
+def test_aprovar_correcoes_aceita_adicionar_email_e_nao_criar_nem_apagar(con):
+    ids = {}
+    for tipo, origem, email in (("adicionar_email", "google_email", "a@x.com"), ("corrigir", "telefone_invalido", None), ("criar", "whatsapp", None),
+                                ("apagar_contato", "nome_curto", None), ("apagar_telefone", "telefone_invalido", None)):
+        ids[tipo] = con.execute("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, origem, email_depois) values (?, ?, ?, 'A', '+5511900000001', ?, ?)",
+                                (tipo, NESS, None if tipo == "criar" else "g-" + tipo, origem, email)).lastrowid
+    assert p.aprovar_correcoes(con, "ricardo", AGORA, list(ids.values())) == 2
+    estados = {r["tipo"]: r["estado"] for r in _props(con)}
+    assert estados == {"adicionar_email": "aprovada", "corrigir": "aprovada", "criar": "pendente", "apagar_contato": "pendente", "apagar_telefone": "pendente"}
+
+
 @pytest.mark.parametrize("ids", [[], None, "1", [1, "2"], [True], [1.5]])
 def test_aprovar_correcoes_ids_invalidos(con, ids):
     with pytest.raises(p.ErroProposta):

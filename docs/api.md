@@ -89,8 +89,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
 | DELETE | `/api/v1/escuta/contatos` | Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam). |
 | GET | `/api/v1/escuta/contatos` | Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado. |
-| GET | `/api/v1/escuta/contatos/propostas` | Lista as propostas de contato da ness (criar, corrigir, corrigir nome, apagar telefone, apagar contato) (padrão: pendentes) com nome e telefone, e diz se a escrita no Graph está ligada. |
-| POST | `/api/v1/escuta/contatos/propostas/aprovar-correcoes` | Aprova as correções (telefone e nome) pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam; devolve quantas. |
+| GET | `/api/v1/escuta/contatos/propostas` | Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada. |
+| POST | `/api/v1/escuta/contatos/propostas/aprovar-correcoes` | Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({"ids": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas. |
 | POST | `/api/v1/escuta/contatos/propostas/{proposta_id}/decisao` | Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {"estado": "aprovada"|"recusada"}); 404 se não existe, 409 se já foi decidida. |
 | POST | `/api/v1/escuta/contatos/sincronizar` | Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou. |
 | GET | `/api/v1/escuta/contatos/so-na-ness.csv` | CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino. |

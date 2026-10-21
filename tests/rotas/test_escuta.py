@@ -574,6 +574,18 @@ def test_falha_na_auditoria_desfaz_aprovar_correcoes(banco, monkeypatch):
     c.close()
 
 
+def test_aprovar_correcoes_aprova_adicionar_email_e_lista_email_depois(cli, banco):
+    c = conectar(banco)
+    pid = c.execute("insert into contato_proposta(tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, email_depois) "
+                    "values ('adicionar_email', 'resper@ness.com.br', 'g9', 'Joana', '+5511912345678', 'Joana', '+5511912345678', 'google_email', 'a@x.com;b@x.com')").lastrowid
+    c.close()
+    item = [i for i in cli.get(P, headers=BOSS).json()["dados"]["itens"] if i["id"] == pid][0]
+    assert item["tipo"] == "adicionar_email" and item["email_depois"] == "a@x.com;b@x.com"
+    r = _post(cli, f"{P}/aprovar-correcoes", {"ids": [pid]})
+    assert r.status_code == 200 and r.json()["dados"] == {"aprovadas": 1}
+    assert [i["id"] for i in cli.get(P + "?estado=aprovada", headers=BOSS).json()["dados"]["itens"]] == [pid]
+
+
 def test_aprovar_correcoes_sem_nenhuma_nao_audita(cli, banco):
     pid = _proposta(banco, "criar")
     assert _post(cli, f"{P}/aprovar-correcoes", {"ids": [pid]}).json()["dados"] == {"aprovadas": 0}

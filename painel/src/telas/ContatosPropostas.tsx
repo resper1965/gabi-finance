@@ -6,15 +6,15 @@ import { api } from "../lib/api";
 import { Aviso, type Acao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
-type Tipo = "criar" | "corrigir" | "corrigir_nome" | "apagar_telefone" | "apagar_contato";
-const ROTULOS: Record<Tipo, string> = { criar: "Criar", corrigir: "Corrigir", corrigir_nome: "Corrigir nome", apagar_telefone: "Apagar telefone", apagar_contato: "Apagar contato" };
-const EM_LOTE: Tipo[] = ["corrigir", "corrigir_nome"];  // apagar nunca entra em lote
+type Tipo = "criar" | "corrigir" | "corrigir_nome" | "adicionar_email" | "apagar_telefone" | "apagar_contato";
+const ROTULOS: Record<Tipo, string> = { criar: "Criar", corrigir: "Corrigir", corrigir_nome: "Corrigir nome", adicionar_email: "Adicionar e-mail", apagar_telefone: "Apagar telefone", apagar_contato: "Apagar contato" };
+const EM_LOTE: Tipo[] = ["corrigir", "corrigir_nome", "adicionar_email"];  // apagar nunca entra em lote
 const APAGA = (t: Tipo) => t === "apagar_telefone" || t === "apagar_contato";
 const CONFIRMA = "Apagar não dá para desfazer no Outlook. Aprovar esta proposta?";
 
 interface Proposta {
   id: number; tipo: Tipo; conta: string;
-  nome_antes: string | null; telefone_antes: string | null; nome_depois: string | null; telefone_depois: string | null;
+  nome_antes: string | null; telefone_antes: string | null; nome_depois: string | null; telefone_depois: string | null; email_depois: string | null;
   origem: "whatsapp" | "telefone_invalido" | "nome_sujo" | "nome_curto"; estado: string;
 }
 interface Fila { itens: Proposta[]; escrita: "ligado" | "desligado" }
@@ -26,7 +26,9 @@ const AVISO_DESLIGADO = "A gravação está desligada: aprovar não grava ainda.
 const ROTA = "/api/v1/escuta/contatos/propostas";
 const texto = (nome: string | null, tel: string | null) => [nome, tel].filter(Boolean).join(" ") || "—";
 
-const rotulo = (acao: string, p: Proposta) => `${acao} proposta ${p.id} (${p.tipo})`; // sem nome nem telefone
+const emails = (e: string | null) => (e ? e.split(";").filter(Boolean).join(", ") : "—");  // o banco guarda separado por ;
+
+const rotulo = (acao: string, p: Proposta) => `${acao} proposta ${p.id} (${p.tipo})`; // sem nome, telefone nem e-mail
 
 function Linha({ p, children }: { p: Proposta; children: ReactNode }) {
   return (
@@ -35,13 +37,13 @@ function Linha({ p, children }: { p: Proposta; children: ReactNode }) {
         <strong>{ROTULOS[p.tipo]}</strong> <span style={suave}>· {p.conta}</span><br />
         <span style={suave}>{p.tipo === "criar" ? "— (novo)" : texto(p.nome_antes, p.telefone_antes)}</span>
         {" → "}
-        <span>{p.tipo === "apagar_telefone" ? "(telefone removido)" : p.tipo === "apagar_contato" ? "(contato apagado)" : texto(p.nome_depois, p.telefone_depois)}</span>
+        <span>{p.tipo === "apagar_telefone" ? "(telefone removido)" : p.tipo === "apagar_contato" ? "(contato apagado)" : p.tipo === "adicionar_email" ? emails(p.email_depois) : texto(p.nome_depois, p.telefone_depois)}</span>
       </span>
       {children}
     </li>);
 }
 
-/** Escuta › Contatos: fila de propostas de contato (criar, corrigir, corrigir nome, apagar telefone, apagar contato). Só grava o que o dono aprovar; uma aprovada ainda pode ser recusada antes da gravação. */
+/** Escuta › Contatos: fila de propostas de contato (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato). Só grava o que o dono aprovar; uma aprovada ainda pode ser recusada antes da gravação. */
 export function ContatosPropostas({ acao }: { acao: Acao }) {
   const { ocupado, erros, agir } = acao;
   const [resumo, setResumo] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function ContatosPropostas({ acao }: { acao: Acao }) {
       {(d) => {
         const correcoes = d.itens.filter((p) => EM_LOTE.includes(p.tipo)).map((p) => p.id);
         return (
-          <Bloco titulo={`Propostas de contatos · ${d.itens.length}`} nota="Contatos novos do WhatsApp, telefones e nomes a corrigir, e o que apagar. Nada muda na Microsoft (conta ness) até você aprovar.">
+          <Bloco titulo={`Propostas de contatos · ${d.itens.length}`} nota="Contatos novos do WhatsApp, telefones e nomes a corrigir, e-mails a adicionar, e o que apagar. Nada muda na Microsoft (conta ness) até você aprovar.">
             {d.escrita === "desligado" && <p role="status" style={{ margin: 0, ...suave }}>{AVISO_DESLIGADO}</p>}
             <Aviso erro={erros.propostas} />
             {resumo && <p role="status" style={{ margin: 0, ...suave }}>{resumo}</p>}
@@ -72,7 +74,7 @@ export function ContatosPropostas({ acao }: { acao: Acao }) {
                   const r = await api.post<{ aprovadas: number }>(`${ROTA}/aprovar-correcoes`, { ids: correcoes });
                   setResumo(`${r.dados.aprovadas} correção(ões) aprovada(s).`);
                 }, "Correções aprovadas."); }}>Aprovar todas as correções</button>
-                <span style={suave}>Só as correções (telefone e nome) listadas aqui. Não inclui contatos novos nem apagar.</span>
+                <span style={suave}>Só as correções (telefone e nome) e os e-mails a adicionar listados aqui. Não inclui contatos novos nem apagar.</span>
               </div>)}
             {d.itens.length === 0 ? <Vazio frase="Nenhuma proposta pendente." /> : (
               <ul style={lista}>
