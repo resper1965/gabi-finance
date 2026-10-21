@@ -14,6 +14,8 @@ from gabi.dinheiro.regras import casa
 
 CAMPOS = (("categoria", "categoria_id"), ("para_quem", "para_quem_id"), ("empresa", "empresa_id"))
 CONFIANCA = {"regra": 1.0, "banco": 0.9, "cache": 0.6}
+MIN_DECISOES_CERTEIRO = 2  # "para quem" é aplicado sozinho quando o Ricardo já decidiu ao menos isto, sempre igual, para o estabelecimento (ADR-023)
+QUEM_CERTEIRO = "gabi (para quem certeiro)"
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,22 @@ def _regras_ativas(con) -> list[tuple[re.Pattern, dict, dict | None]]:
 
 def _preencher(con, lid: int, campo: str, col: str, valor, origem: str) -> None:
     con.execute(f"update lancamento set {col}=?, {campo}_origem=? where id=?", (valor, origem, lid))
+
+
+def para_quem_certeiro(con, lid: int, estab: str | None) -> str | None:
+    """A pessoa que o Ricardo escolheu em TODAS as suas decisões (>= MIN_DECISOES_CERTEIRO) para o mesmo estabelecimento; senão None."""
+    if not estab:
+        return None
+    r = con.execute("select count(*) n, count(distinct para_quem_id) d, max(para_quem_id) p from lancamento "
+                    "where estabelecimento=? and para_quem_origem='voce' and para_quem_id is not null and id<>?", (estab, lid)).fetchone()
+    return r["p"] if r["n"] >= MIN_DECISOES_CERTEIRO and r["d"] == 1 else None
+
+
+def aplicar_certeiro(con, lid: int, estab: str, pessoa: str) -> None:
+    """Preenche com origem 'gabi' e registra em `decisao` (o Ricardo desfaz trocando a pessoa no painel: vira 'voce')."""
+    _preencher(con, lid, "para_quem", "para_quem_id", pessoa, "gabi")
+    con.execute("insert into decisao(quando, quem, o_que, origem) values (datetime('now'), ?, ?, 'classificacao')",
+                (QUEM_CERTEIRO, f"lançamento {lid}: para quem = {pessoa} ({estab}: todas as suas decisões foram iguais)"))
 
 
 def _sugerir_por_cache(con, lid: int, estab: str, campo: str, col: str) -> bool:
@@ -146,7 +164,12 @@ def classificar(con, lancamento_id: int) -> Classificacao:
             _preencher(con, lancamento_id, "para_quem", "para_quem_id", dono, "fonte")
             atual["para_quem_id"], origens["para_quem"], confianca = dono, "fonte", max(confianca, CONFIANCA["regra"])
 
-    # 3) cache por estabelecimento: só sugestão
+    # 3) "para quem" certeiro: todas as decisões do Ricardo para o estabelecimento (>= 2) iguais -> aplica sozinho (ADR-023)
+    if atual["para_quem_id"] is None and (dono := para_quem_certeiro(con, lancamento_id, r["estabelecimento"])) is not None:
+        aplicar_certeiro(con, lancamento_id, r["estabelecimento"], dono)
+        atual["para_quem_id"], origens["para_quem"], confianca = dono, "gabi", max(confianca, CONFIANCA["cache"])
+
+    # 4) cache por estabelecimento: só sugestão
     if r["estabelecimento"]:
         for campo, col in CAMPOS[:2]:
             if atual[col] is None and _sugerir_por_cache(con, lancamento_id, r["estabelecimento"], campo, col):

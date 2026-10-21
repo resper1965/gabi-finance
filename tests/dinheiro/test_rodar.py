@@ -84,6 +84,13 @@ def test_extratos_classifica_o_que_ficou_sem_categoria(con, tmp_path):
     assert con.execute("select count(*) from lancamento where categoria_id is null").fetchone()[0] == 0
 
 
+def test_extratos_aplica_a_fila_de_para_quem_certeiro(con, tmp_path, monkeypatch):
+    chamadas = []
+    monkeypatch.setattr("gabi.dinheiro.rodar.aplicar_fila_para_quem", lambda c, agora_iso: chamadas.append(agora_iso) or 0)
+    _rodar_ext(con, FakeFin([BANCO], _boa_historia()), tmp_path)
+    assert len(chamadas) == 1
+
+
 def test_extratos_atualiza_compromissos_do_cadastro(con, tmp_path):
     from gabi.dinheiro import repositorio
     repositorio.gravar_leitura(con, {"linhas": [{"id": "aluguel", "nome": "Aluguel", "extrato": "LOJA 5", "apelidos": [], "vencimento": "dia:5",
