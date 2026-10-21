@@ -57,7 +57,7 @@ Relatório e contexto: `docs/RELATORIO-2026-10-16.md`.
 | C1 | G18: subir os comprovantes Pix reais para o Paperless (hoje só 2 com a etiqueta, sem valor legível) | R | ⛔ | ≥ 80 % dos itens com comprovante casado (`docs/aceite-fase-2.md`) |
 | C2 | G19: lote do Nibo em conta real, 2 vezes sem duplicar | R | ⛔ depende de C1 | conferido no Nibo |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ❓ | G8 fechado |
-| C4 | G20: aceitar a Fase 2 sem o item "pedido real pelo canal" (adiado ao gabi-agent) | R | ⏸ | registrado em `aceite-fase-2.md` |
+| C4 | ~~C4~~ aceito/criado em 21/10 por ordem do dono (Fase 2 aceita sem o 'pedido real pelo canal'; tag `v1.0-gabi-brain`). | R+C | ✅ | — |
 
 ### 3. Agenda e e-mail (ligados em 12/10)
 | # | Item | Dono | Status | Pronto quando |
@@ -101,7 +101,7 @@ Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#es
 ### 7. Fechamento
 | # | Item | Dono | Status |
 |---|---|---|---|
-| F1 | Tag `v1.0-gabi-brain` (depois de D6, C4 e G20) | C | ⛔ |
+| F1 | ~~F1~~ aceito/criado em 21/10 por ordem do dono (Fase 2 aceita sem o 'pedido real pelo canal'; tag `v1.0-gabi-brain`). | R+C | ✅ | — |
 | F2 | Encerramento e memória (Task 16 do fechamento) | C | ⛔ |
 
 ## Depois (não bloqueia a v1.0)
