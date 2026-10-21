@@ -29,18 +29,6 @@ def test_socio_do_nibo_define_e_le(cli):
     assert put(cli, "/api/v1/cadastros/nibo", {"socio_id": "x"}, VIP).status_code == 403
 
 
-def test_liberar_leitura_de_dado_sensivel_e_so_do_boss_e_fica_auditada(cli, banco):
-    r = post(cli, "/api/v1/cadastros/liberacoes", {"pessoa_id": "ana", "campo": "cpf"})
-    assert r.status_code == 201
-    assert post(cli, "/api/v1/cadastros/liberacoes", {"pessoa_id": "ana", "campo": "senha"}).status_code == 400
-    assert post(cli, "/api/v1/cadastros/liberacoes", {"pessoa_id": "fantasma", "campo": "cpf"}).status_code == 404
-    assert post(cli, "/api/v1/cadastros/liberacoes", {"pessoa_id": "ana", "campo": "cpf"}, VIP).status_code == 403
-    pend = get(cli, "/api/v1/cadastros/liberacoes").json()["dados"]["itens"]
-    assert [(x["pessoa_id"], x["campo"]) for x in pend] == [("ana", "cpf")]
-    from gabi.db import conectar
-    assert conectar(banco).execute("select count(*) from decisao where o_que like '%liberou%'").fetchone()[0] == 1
-
-
 def test_conciliar_recebimento_pela_api(cli, banco):
     from gabi.db import conectar
     c = conectar(banco)

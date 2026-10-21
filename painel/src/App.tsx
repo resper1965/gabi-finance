@@ -32,9 +32,6 @@ import { Agenda } from "./telas/Trabalho/Agenda";
 import { Mensagens } from "./telas/Trabalho/Mensagens";
 import { Tarefas } from "./telas/Trabalho/Tarefas";
 import { Entregas } from "./telas/Trabalho/Entregas";
-import { Configuracao } from "./telas/Configuracao";
-import { Familia } from "./telas/Familia";
-import { Reembolso } from "./telas/Reembolso";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
 import { Qualidade } from "./telas/Gabi/Qualidade";
@@ -44,8 +41,8 @@ import { AReceber } from "./telas/Cobrar/AReceber";
 const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
-  regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades, setup: Configuracao,
-  qualidade: Qualidade, hoje: Hoje, temas: Frentes, familia: Familia, reembolso: Reembolso, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
+  regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
+  qualidade: Qualidade, hoje: Hoje, temas: Frentes, agenda: Agenda, emails: Mensagens, tarefas: Tarefas, entregas: Entregas,
 };
 
 function tela(area: Area, aba: string) {

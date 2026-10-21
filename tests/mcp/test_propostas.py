@@ -126,21 +126,3 @@ def test_avisos_so_saem_da_fila_apos_a_confirmacao_do_canal(cli2, banco2, tokens
     assert len(chamar(cli2, tokens2["pedidos"], "avisos_pendentes")["dados"]["itens"]) == 1  # ler não tira da fila
     chamar(cli2, tokens2["pedidos"], "avisos_confirmar_entrega", aviso_id=av[0]["id"])
     assert chamar(cli2, tokens2["pedidos"], "avisos_pendentes")["dados"]["itens"] == []
-
-
-def test_pessoas_dado_sem_liberacao_devolve_aguardando_liberacao(cli2, banco2, tokens2):
-    r = chamar(cli2, tokens2["sensivel"], "pessoas_dado", pessoa_id="ana", campo="cpf")["dados"]
-    assert r == {"status": "aguardando_liberacao", "pessoa_id": "ana", "campo": "cpf"}
-    assert "123.456" not in json.dumps(r)
-    c = conectar(banco2)
-    c.execute("insert into liberacao_sensivel(pessoa_id, campo, liberado_por, liberado_em) values ('ana','cpf','boss@x.com','2026-10-09T10:00:00')")
-    c.close()
-    ok = chamar(cli2, tokens2["sensivel"], "pessoas_dado", pessoa_id="ana", campo="cpf")["dados"]
-    assert ok["status"] == "liberado" and ok["valor"] == "123.456.789-09"
-    de_novo = chamar(cli2, tokens2["sensivel"], "pessoas_dado", pessoa_id="ana", campo="cpf")["dados"]
-    assert de_novo["status"] == "aguardando_liberacao"  # liberação única: uma leitura
-    assert conectar(banco2).execute("select count(*) from chamada_mcp where ferramenta='pessoas_dado' and status='ok'").fetchone()[0] == 3
-
-
-def test_pessoas_dado_exige_escopo_sensivel(cli2, tokens2):
-    assert chamar(cli2, tokens2["fin"], "pessoas_dado", pessoa_id="ana", campo="cpf")["erro"] == "sem_escopo"

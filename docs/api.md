@@ -25,8 +25,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | PUT | `/api/v1/cadastros/categorias/equivalencias` | Cria ou troca uma equivalência de categoria. |
 | GET | `/api/v1/cadastros/categorias/equivalencias/pendentes` | Categorias do banco que aparecem nos lançamentos e ainda não têm equivalência, as de maior volume primeiro. |
 | DELETE | `/api/v1/cadastros/categorias/equivalencias/{origem}` | Remove uma equivalência de categoria. |
-| GET | `/api/v1/cadastros/liberacoes` | Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente). |
-| POST | `/api/v1/cadastros/liberacoes` | Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada. |
 | GET | `/api/v1/cadastros/nibo` | Parâmetros do Nibo: id do sócio (stakeholder) usado no lote diário. |
 | PUT | `/api/v1/cadastros/nibo` | Define o id do sócio no Nibo (stakeholderId), necessário para o lote "Lançar na PJ". |
 | GET | `/api/v1/cadastros/pessoas/{pid}/cpf` | Documentos da pessoa (sempre mascarados); a consulta fica auditada. |
@@ -94,25 +92,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/entregas` | Entregas abertas da Linear (somente leitura), as com prazo primeiro. |
-| GET | `/api/v1/familia/edicoes` | Edições feitas fora (Obsidian) esperando decisão do boss, com o texto novo. |
-| POST | `/api/v1/familia/edicoes/{edicao_id}/decidir` | Aprova (você aplicou o que mudou) ou rejeita (o arquivo volta ao exportado) uma edição externa. |
-| POST | `/api/v1/familia/exames/reprocessar` | Relê no Paperless e extrai de novo (versão nova; a anterior fica). Corpo: {paperless_id} ou {pessoa_id, laboratorio?, de?, ate?} ou {todos: true}. |
-| GET | `/api/v1/familia/exames/{pessoa_id}` | Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde. |
-| GET | `/api/v1/familia/exames/{pessoa_id}/laudos/{paperless_id}/versoes` | Versões da extração de um documento (para comparar a atual com a anterior). |
-| GET | `/api/v1/familia/exames/{pessoa_id}/resumo` | Texto "resumo para a consulta" só da pessoa escolhida. |
-| GET | `/api/v1/familia/exames/{pessoa_id}/serie` | Série no tempo de um marcador da pessoa, com a marca de fora da faixa de referência. |
-| GET | `/api/v1/familia/laudos` | Laudos lidos do Paperless esperando a confirmação de quem é o laudo, e os documentos que falharam com o motivo (só boss). |
-| POST | `/api/v1/familia/laudos` | Lê o texto de um documento do Paperless e grava PROPOSTAS de marcador (não entram até confirmar de quem é o laudo). |
-| GET | `/api/v1/familia/laudos/contagem` | Quantos documentos esperam a confirmação do dono. É o ÚNICO dado de exame fora da tela de saúde: só a contagem, lida do `gabi.db` (sem chave, sem valor, sem nome). |
-| POST | `/api/v1/familia/laudos/lote` | Confirma o dono de vários laudos de uma vez (`itens: [{paperless_id, pessoa_id}]`): todos ou nenhum. |
-| POST | `/api/v1/familia/laudos/{paperless_id}/confirmar` | Confirma DE QUEM é o laudo (pessoa_id); só então as propostas viram exames. |
-| POST | `/api/v1/familia/laudos/{paperless_id}/rejeitar` | Descarta as propostas de um laudo sem registrar nenhum exame. |
-| GET | `/api/v1/familia/marcadores/apelidos` | Apelidos de marcador definidos e sugestões de grafias parecidas para juntar. |
-| PUT | `/api/v1/familia/marcadores/apelidos` | Define um apelido (`{apelido, marcador}`); vale para as próximas extrações e para `reaplicar`. |
-| POST | `/api/v1/familia/marcadores/reaplicar` | Reescreve os marcadores de exames e propostas conforme os apelidos, sem chamar o modelo. |
-| GET | `/api/v1/familia/mensagens` | Mensagens de saúde guardadas no cofre (id, de_pessoa, recebida_em, texto, lida_em); a leitura entra no log do cofre. O texto é dado de terceiros (R14). |
-| POST | `/api/v1/familia/mensagens/{mensagem_id}/lida` | Marca a mensagem como lida, no cofre. Não apaga nada. |
-| GET | `/api/v1/familia/pessoas` | Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria). |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/frentes` | Frentes de trabalho com a contagem de itens confirmados. |
 | POST | `/api/v1/frentes` | Abre uma frente (nome, tipo, empresa e regra vêm do Ricardo). |
@@ -125,17 +104,10 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | PATCH | `/api/v1/lancamentos/{lid}` | Muda categoria, para quem, empresa ou frente de um lançamento (a origem vira 'voce'). |
 | GET | `/api/v1/mensagens` | E-mails recentes (cabeçalho e trecho) e os ids que o expurgo sugere (nada é apagado aqui). |
 | GET | `/api/v1/parcelas` | Parcelas: comprometido por mês e andamento de cada compra parcelada. |
-| GET | `/api/v1/reembolso-saude/dossies` | Dossiês (número, paciente, prestador, mês, estado, o que falta e os documentos com tipo e estado); o acesso fica no log de saúde. |
-| POST | `/api/v1/reembolso-saude/dossies/{dossie_id}/pedi` | "Marquei como pedido": registra que o Ricardo pediu (corpo opcional `{protocolo}`); aplica na próxima rodada. |
-| POST | `/api/v1/reembolso-saude/dossies/{dossie_id}/recebi` | "Recebi": registra que o reembolso chegou; aplica na próxima rodada. |
-| GET | `/api/v1/reembolso-saude/semana` | Texto da lista de segunda ("Resumo da semana"), o mesmo da ferramenta MCP e do aviso; sem nomes (lê só a projeção do `gabi.db`). |
 | GET | `/api/v1/regras` | Regras de classificação. |
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
 | GET | `/api/v1/rodadas` | Últimas rodadas de ingestão e se foram conferidas. |
 | GET | `/api/v1/rumo` | Rumo do ano, mês a mês: entradas, saídas, poupança, gasto (por pessoa e por frente) e patrimônio das contas liberadas. |
-| GET | `/api/v1/setup` | Os 7 passos do assistente de configuração, com o estado salvo de cada um (pendente, feito ou depois). |
-| GET | `/api/v1/setup/{passo}` | Um passo do assistente: explicação em português (o que o app lê, o que nunca faz e onde vai a credencial) e o estado salvo. |
-| POST | `/api/v1/setup/{passo}` | Testa a conexão do passo na hora (acao=testar; feito só se der certo) ou deixa para depois (acao=depois). Devolve {ok, detalhe, estado}. |
 | GET | `/api/v1/sugestoes` | Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra. |
 | POST | `/api/v1/sugestoes/{sid}/aprovar` | Aprova uma sugestão; sugestão de regra cria a regra ATIVA e a aplica ao passado. |
 | POST | `/api/v1/sugestoes/{sid}/rejeitar` | Rejeita uma sugestão (nada é criado). |
@@ -171,12 +143,6 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `financeiro_vazamentos` | `fin` | meses | Onde o dinheiro vaza nos últimos `meses` (1 a 12): tarifas e juros, assinaturas, aumentos, possíveis duplicidades. Só leitura. |
 | `pedidos_estado` | `pedidos` | pedido_id | Estado de um pedido (pendente, aprovado, recusado ou info_pedida) e a mensagem ao solicitante, se houver. |
 | `pedidos_registrar` | `pedidos` | anexo_paperless_id, canal, descricao, linha_digitavel, mensagem_original, para_quem, pix_chave, solicitante, valor, vencimento | Registra um pedido de pagamento feito por alguém no canal (solicitante = "canal:identificador"). Fica PENDENTE; quem decide é o Ricardo, no painel. |
-| `pessoas_dado` | `sensivel` | campo, pessoa_id | Dado sensível de uma pessoa (cpf, nascimento ou documento). Só sai depois de uma liberação ÚNICA do Ricardo; sem ela devolve aguardando_liberacao. |
-| `reembolso_saude_dossie` | `docs` | dossie_id | Documentos de um dossiê de reembolso de saúde (ids do Paperless) e o RASCUNHO do pedido. Não envia nada: os PDFs saem por documentos_baixar, para o Ricardo enviar. |
-| `reembolso_saude_pedi` | `propostas` | dossie_id, protocolo | REGISTRA que o Ricardo pediu o reembolso do dossiê (protocolo opcional). Só chame depois de ele dizer que pediu. Nada é enviado; o estado muda na próxima rodada. |
-| `reembolso_saude_pendentes` | `fin` | estado | Reembolsos do PLANO DE SAÚDE (não os de ness/IONIC) por número de dossiê: estado (a_pedir, sem_nf, sem_aprovacao, a_conferir, pedido, recebido), o que falta e há quantos dias está parado. Nunca traz nome de paciente ou prestador. Só leitura. |
-| `reembolso_saude_recebi` | `propostas` | dossie_id | REGISTRA que o Ricardo recebeu o reembolso do dossiê (quando o crédito não foi casado sozinho). Só chame depois de ele dizer. O estado muda na próxima rodada. |
-| `reembolso_saude_segunda` | `fin` | — | Lista "reembolsos de saúde a pedir e a conferir" pronta para o celular, entregar exatamente como vem. Sem nomes: quem é cada dossiê o Ricardo vê no painel. Só leitura. |
 | `reembolsos_listar` | `fin` | — | Reembolsos em aberto por empresa contratante (ness, IONIC): valor a receber, número de itens e cobranças em andamento. |
 | `reembolsos_preparar_email` | `propostas` | empresa_id, itens | Prepara o RASCUNHO do e-mail de cobrança de reembolso de uma empresa contratante. Não envia nada: o rascunho fica no painel (ADR-006). |
 | `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |

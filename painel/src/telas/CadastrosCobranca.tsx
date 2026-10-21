@@ -9,7 +9,6 @@ interface Pessoa { id: string; nome: string; dados: Record<string, unknown> }
 interface Categoria { id: number; nome: string; nibo_category_id: string | null }
 
 const RELACOES: [string, string][] = [["", "não definida"], ["contratante", "contratante (cobra reembolso)"], ["pj_titular", "PJ titular (lote do Nibo)"], ["outra", "outra"]];
-const CAMPOS: [string, string][] = [["cpf", "CPF"], ["nascimento", "Nascimento"], ["documento", "Documento"]];
 const caixa = { height: 32, border: "1px solid var(--color-divider)", background: "var(--color-surface)", color: "inherit", font: "500 14px var(--font-body)", padding: "0 8px" } as const;
 
 /** Cadastros que a cobrança precisa (Fase 2): relação e e-mail das empresas, quem pode pedir, ids do Nibo e a liberação de dado sensível.
@@ -19,13 +18,11 @@ export function CadastrosCobranca() {
   const pessoas = useApi<{ itens: Pessoa[] }>("/api/v1/cadastros/pessoas");
   const categorias = useApi<{ itens: Categoria[] }>("/api/v1/cadastros/categorias");
   const nibo = useApi<{ socio_id: string | null }>("/api/v1/cadastros/nibo");
-  const liberacoes = useApi<{ itens: { id: number; pessoa_id: string; campo: string }[] }>("/api/v1/cadastros/liberacoes");
   const avisar = useToast();
   const [edit, setEdit] = useState<Record<string, string>>({});
   const v = (k: string, padrao: string) => edit[k] ?? padrao;
   const set = (k: string, valor: string) => setEdit({ ...edit, [k]: valor });
   const [socio, setSocio] = useState<string | null>(null);
-  const [lib, setLib] = useState({ pessoa: "", campo: "cpf" });
 
   const salvarEmpresa = async (e: Empresa) => {
     const relacao = v(`rel:${e.id}`, String(e.dados.relacao ?? "")), email = v(`mail:${e.id}`, String(e.dados.email_cobranca ?? ""));
@@ -43,10 +40,6 @@ export function CadastrosCobranca() {
   };
   const salvarSocio = async () => {
     try { await api.put("/api/v1/cadastros/nibo", { socio_id: socio ?? nibo.env?.dados.socio_id ?? "" }); avisar("Sócio do Nibo salvo."); nibo.recarregar(); } catch (x) { avisar((x as Error).message); }
-  };
-  const liberar = async () => {
-    try { await api.post("/api/v1/cadastros/liberacoes", { pessoa_id: lib.pessoa, campo: lib.campo }); avisar("Liberei UMA leitura para o agente. Fica registrado."); liberacoes.recarregar(); }
-    catch (x) { avisar((x as Error).message); }
   };
   const linha = { display: "flex", gap: 8, flexWrap: "wrap" as const, alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--line2)" };
 
@@ -96,18 +89,6 @@ export function CadastrosCobranca() {
           <input aria-label="Id do sócio no Nibo" placeholder="stakeholderId do sócio" value={socio ?? nibo.env?.dados.socio_id ?? ""} onChange={(x) => setSocio(x.target.value)} style={{ ...caixa, flex: "1 1 240px" }} />
           <button className="btn btn-secondary" aria-label="Salvar sócio" onClick={salvarSocio}>Salvar</button>
           <span style={{ fontSize: 12.5, color: "var(--ink2)" }}>O token do Nibo não passa por aqui: vai no arquivo de ambiente do servidor.</span>
-        </section>
-      </Bloco>
-      <Bloco titulo="Dado sensível" nota="cada liberação vale uma leitura pelo agente">
-        <section role="region" aria-label="Dado sensível" style={linha}>
-          <select aria-label="Pessoa" value={lib.pessoa} onChange={(x) => setLib({ ...lib, pessoa: x.target.value })} style={caixa}>
-            <option value="">escolha</option>{(pessoas.env?.dados.itens ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-          </select>
-          <select aria-label="Campo" value={lib.campo} onChange={(x) => setLib({ ...lib, campo: x.target.value })} style={caixa}>
-            {CAMPOS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}
-          </select>
-          <button className="btn btn-primary" disabled={!lib.pessoa} onClick={liberar}>Liberar uma leitura</button>
-          <span style={{ fontSize: 12.5, color: "var(--ink2)" }}>{(liberacoes.env?.dados.itens ?? []).length} liberação(ões) ainda não usada(s)</span>
         </section>
       </Bloco>
     </div>

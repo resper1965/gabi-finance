@@ -80,7 +80,7 @@ test("textos da navegacao iguais ao prototipo", () => {
     Dia: ["Hoje", "Frentes"],
     Trabalho: ["Agenda", "Mensagens", "Tarefas"],
     Dinheiro: ["Caixa", "Gastos", "Cobrar", "Regras"],
-    Casa: ["Família", "Cadastros", "Gabi"],
+    Casa: ["Cadastros", "Gabi"],
   });
 });
 

@@ -18,7 +18,7 @@ install -d -o root -g root -m 755 /opt/gabi-brain
 rm -rf /opt/gabi-brain/gabi /opt/gabi-brain/migrations /opt/gabi-brain/seeds /opt/gabi-brain/tools
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/
 # Utilitário de administração (seeds editáveis): carregadores de seeds, a correção de moeda e o comparador do G21, não o diretório tools inteiro.
-install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" "$AQUI/tools/medir_exames.py" /opt/gabi-brain/tools/
+install -d /opt/gabi-brain/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" /opt/gabi-brain/tools/
 find /opt/gabi-brain -name __pycache__ -prune -exec rm -rf {} +
 [ -d /opt/gabi-brain/venv ] || python3 -m venv /opt/gabi-brain/venv
 # Só as dependências, com versão fixa; o código roda direto de /opt/gabi-brain (WorkingDirectory), sem pip install do projeto.
@@ -35,8 +35,6 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
   "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
-  "$AQUI"/deploy/gabi-brain-exames.service "$AQUI"/deploy/gabi-brain-exames.timer \
-  "$AQUI"/deploy/gabi-brain-reembolso-saude.service "$AQUI"/deploy/gabi-brain-reembolso-saude.timer \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-comprovantes.timer gabi-brain-trabalho.timer gabi-brain-telegram.timer
@@ -44,8 +42,6 @@ systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-bra
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
 # O timer da agenda do Google (gabi-brain-agenda.timer) também fica instalado e DESLIGADO (liga quando houver fonte liberada na aba Agenda; precisa de calendar.readonly no /etc/gabi/google.env).
-# O timer dos exames em PDF (gabi-brain-exames.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: precisa da chave do cofre de saúde (a mesma da api) e do Paperless e do modelo na ponte).
-# O timer do reembolso de saúde (gabi-brain-reembolso-saude.timer) também fica instalado e DESLIGADO (liga quando o Ricardo mandar: mesmas precondições dos exames mais o modelo na ponte; runbook#reembolso-saude).
 # O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
 # O timer do Teams (gabi-brain-teams.timer) também fica instalado e DESLIGADO (liga quando houver conta de Teams liberada; runbook#graph-ness passo 7).
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).

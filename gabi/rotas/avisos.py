@@ -48,25 +48,6 @@ def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
     return tipo, json.dumps(p, ensure_ascii=False)
 
 
-def _descrever_reembolso_saude(tipo: str, p: dict) -> tuple[str, str]:
-    """Só número do dossiê, mês e códigos do que falta: nome de paciente ou prestador nunca vem para o aviso (ADR-014)."""
-    quem = f"dossiê {p.get('dossie', '?')} ({str(p.get('mes', '?'))[5:7]}/{str(p.get('mes', '?'))[:4]})"
-    if tipo == "reembolso_saude_abre":
-        return f"Reembolso a pedir: {quem}", "falta " + (", ".join(p.get("faltam") or []) or "conferir")
-    if tipo == "reembolso_saude_pronto":
-        return f"Reembolso pronto para pedir: {quem}", "monte o pedido com reembolso_saude_dossie; quem envia à operadora é você"
-    if tipo == "reembolso_saude_sem_requisito":
-        return f"Não é reembolsável: {quem}", f"sem {p.get('requisito') or 'item exigido'}; mande o que falta e eu reabro"
-    if tipo == "reembolso_saude_semana":
-        linhas = [x for x in (p.get("linhas") or []) if isinstance(x, str)]
-        return (linhas[0] if linhas else "Reembolsos de saúde"), "\n".join(linhas[1:])
-    if tipo == "reembolso_saude_requisitos":
-        return "Requisitos do reembolso de saúde inválidos", "corrija o parâmetro reembolso_saude.requisitos; o reembolso está parado até lá"
-    if tipo == "reembolso_saude_sem_modelo":
-        return "Reembolso de saúde sem modelo de leitura", f"os documentos esperam: {p.get('motivo') or 'motivo desconhecido'}"
-    return tipo, ""
-
-
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "vence_em_breve":
         itens = p.get("itens") or []
@@ -127,8 +108,6 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
     if tipo.startswith("email_"):
         return _descrever_email(tipo, p)
-    if tipo.startswith("reembolso_saude_"):
-        return _descrever_reembolso_saude(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

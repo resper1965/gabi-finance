@@ -47,20 +47,14 @@ test("Cadastros da cobranca: categoria recebe o id equivalente no Nibo", async (
   expect(chamadas.find((c) => c.metodo === "PATCH")!.corpo).toEqual({ nibo_category_id: "cat-sw" });
 });
 
-test("Cadastros da cobranca: define o socio do Nibo e libera uma leitura sensivel", async () => {
+test("Cadastros da cobranca: define o socio do Nibo", async () => {
   const chamadas = apiFalsa({ "cadastros-empresas": empresas(), "cadastros-pessoas": pessoas(), "cadastros-categorias": categorias(),
-    "cadastros-nibo": env("cadastros-nibo", { socio_id: null }), "cadastros-liberacoes": env("cadastros-liberacoes", { itens: [] }) });
+    "cadastros-nibo": env("cadastros-nibo", { socio_id: null }) });
   montar(<CadastrosCobranca />);
   const nibo = await screen.findByRole("region", { name: "Nibo" });
   fireEvent.change(within(nibo).getByLabelText("Id do sócio no Nibo"), { target: { value: "socio-1" } });
   fireEvent.click(within(nibo).getByRole("button", { name: "Salvar sócio" }));
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "PUT" || (c.metodo === "POST" && /cadastros\/nibo$/.test(c.url)))).toBe(true));
-  const sens = screen.getByRole("region", { name: "Dado sensível" });
-  fireEvent.change(within(sens).getByLabelText("Pessoa"), { target: { value: "ana" } });
-  fireEvent.change(within(sens).getByLabelText("Campo"), { target: { value: "cpf" } });
-  fireEvent.click(within(sens).getByRole("button", { name: "Liberar uma leitura" }));
-  await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST" && /cadastros\/liberacoes$/.test(c.url))).toBe(true));
-  expect(chamadas.find((c) => c.metodo === "POST" && /liberacoes$/.test(c.url))!.corpo).toEqual({ pessoa_id: "ana", campo: "cpf" });
 });
 
 test("Reembolsos: crédito recebido na PJ pode ser baixado nos itens cobrados", async () => {

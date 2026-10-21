@@ -16,10 +16,9 @@ ESCOPOS = {
     "documentos_buscar": "docs", "documentos_baixar": "docs",
     "pedidos_registrar": "pedidos", "pedidos_estado": "pedidos", "avisos_pendentes": "pedidos", "avisos_confirmar_entrega": "pedidos",
     "classificar_lancamento": "propostas", "regras_sugerir": "propostas", "tarefas_propor": "propostas", "reembolsos_preparar_email": "propostas",
-    "reembolsos_listar": "fin", "pessoas_dado": "sensivel",
+    "reembolsos_listar": "fin",
 }
 LIMITE_PDF = 5 * 1024 * 1024
-CAMPOS_SENSIVEIS = ("cpf", "nascimento", "documento")
 
 
 class ErroFerramenta(Exception):
@@ -158,26 +157,3 @@ def registrar(srv, executar, paperless) -> None:
                                   "select id, estado from reembolso where empresa_id=? and estado<>'quitado' order by id", (e["id"],))]})
             return {"empresas": saida}
         return executar("reembolsos_listar", f)
-
-    @srv.tool()
-    def pessoas_dado(pessoa_id: str, campo: str) -> dict:
-        """Dado sensível de uma pessoa (cpf, nascimento ou documento). Só sai depois de uma liberação ÚNICA do Ricardo; sem ela devolve aguardando_liberacao."""
-        def f(con, agora):
-            if campo not in CAMPOS_SENSIVEIS:
-                raise ValueError(f"campo deve ser um de {CAMPOS_SENSIVEIS}")
-            lib = con.execute("select id from liberacao_sensivel where pessoa_id=? and campo=? and usada_em is null order by id limit 1", (pessoa_id, campo)).fetchone()
-            if lib is None:
-                return {"status": "aguardando_liberacao", "pessoa_id": pessoa_id, "campo": campo}
-            p = con.execute("select dados from pessoa where id=?", (pessoa_id,)).fetchone()
-            dados = json.loads((p["dados"] if p else None) or "{}")
-            docs = dados.get("documentos") or []
-            valor = (next((d["numero"] for d in docs if d.get("tipo", "").upper() == "CPF"), None) if campo == "cpf"
-                     else dados.get("nascimento") if campo == "nascimento"
-                     else next((d["numero"] for d in docs if d.get("tipo", "").upper() != "CPF"), None))
-            if valor is None:  # não há o que entregar: a liberação NÃO é gasta
-                return {"status": "sem_dado", "pessoa_id": pessoa_id, "campo": campo}
-            # reivindica a liberação de forma atômica: duas chamadas concorrentes não leem o valor com uma só liberação
-            if con.execute("update liberacao_sensivel set usada_em=? where id=? and usada_em is null", (agora.isoformat(), lib["id"])).rowcount != 1:
-                return {"status": "aguardando_liberacao", "pessoa_id": pessoa_id, "campo": campo}
-            return {"status": "liberado", "pessoa_id": pessoa_id, "campo": campo, "valor": valor}
-        return executar("pessoas_dado", f)
