@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -366,3 +367,25 @@ def test_contato_com_dois_invalidos_ganha_uma_proposta_para_cada(con):
     con.execute("update contato_proposta set estado='aplicada' where telefone_antes='123'")
     con.execute("update contato_proposta set estado='recusada' where telefone_antes='456'")
     assert _g(con)["apagar_telefone"] == 0 and len(_props(con)) == 2
+
+
+_INS = ("insert into contato_proposta(tipo, conta, graph_id, nome_depois, telefone_depois, email_depois, origem) "
+        "values (?,?,?,?,?,?,?)")
+
+
+def test_migracao_0074_aceita_adicionar_email_e_google_email(con):
+    con.execute(_INS, ("adicionar_email", NESS, "g1", "Fulano", NUM, "a@x.com;b@x.com", "google_email"))
+    (r,) = _props(con)
+    assert (r["tipo"], r["origem"], r["email_depois"], r["telefone_depois"]) == ("adicionar_email", "google_email", "a@x.com;b@x.com", NUM)
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute(_INS, ("xis", NESS, "g1", "Fulano", NUM, None, "google_email"))
+
+
+def test_migracao_0074_preserva_linhas_e_indice_aberto(con):
+    con.execute(_INS, ("corrigir", NESS, "g1", "Fulano", NUM, None, "whatsapp"))
+    con.commit()
+    migrar(con, MIGR)
+    (r,) = _props(con)
+    assert (r["tipo"], r["estado"], r["email_depois"]) == ("corrigir", "pendente", None)
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute(_INS, ("corrigir", NESS, "g1", "Fulano", NUM, None, "whatsapp"))
