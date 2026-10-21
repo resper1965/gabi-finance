@@ -51,6 +51,53 @@ def test_dados_com_mais_de_3_dias_avisam_mesmo_sem_rodada_recente(con):
     assert _tipos(con) == ["rodada_parada"]
 
 
+def _divergente(con, horas_atras: float, status="ok", conferida=1):
+    fim = (AGORA - dt.timedelta(hours=horas_atras)).isoformat()
+    rid = con.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance',?,?,?,?)", (fim, fim, status, conferida)).lastrowid
+    con.execute("insert into conferencia(rodada_id, tipo, conta_id, ok, detalhe, criado_em) values (?, 'saldo_final', 1, 0, "
+                "'variação do saldo -5000 ≠ lançamentos -3000: diferença de -2000 centavos', ?)", (rid, fim))
+    return rid
+
+
+def test_divergencia_gera_saldo_divergente_uma_vez_por_dia(con):
+    con.execute("update conta set apelido='Itaú PF' where id=1")
+    _divergente(con, 3)
+    gerar_avisos(con, AGORA)
+    _divergente(con, 1)
+    gerar_avisos(con, AGORA + dt.timedelta(minutes=15))
+    av = con.execute("select tipo, payload from aviso").fetchall()
+    assert [a["tipo"] for a in av] == ["saldo_divergente"]
+    p = json.loads(av[0]["payload"])
+    assert (p["conta_id"], p["conta"], p["diferenca_centavos"]) == (1, "Itaú PF", -2000) and "diferença" in p["detalhe"]
+
+
+def test_saldo_divergente_so_da_ultima_rodada_e_de_conta_liberada(con):
+    _divergente(con, 3)
+    _rodada(con, 1, 1)  # a última rodada não tem divergência
+    gerar_avisos(con, AGORA)
+    assert "saldo_divergente" not in _tipos(con)
+    con.execute("delete from conferencia"); con.execute("delete from rodada")
+    con.execute("update conta set estado='a_decidir'")
+    _divergente(con, 1)
+    gerar_avisos(con, AGORA)
+    assert "saldo_divergente" not in _tipos(con)
+
+
+def test_rodada_parada_so_por_falha(con):
+    _divergente(con, 2); _divergente(con, 1)          # ok e conferidas, mesmo divergentes
+    gerar_avisos(con, AGORA)
+    assert "rodada_parada" not in _tipos(con)
+    _divergente(con, 0.5, status="erro", conferida=0); _divergente(con, 0.2, status="erro", conferida=0)
+    gerar_avisos(con, AGORA)
+    assert "rodada_parada" in _tipos(con)
+
+
+def test_descrever_saldo_divergente():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("saldo_divergente", {"conta": "Itaú PF", "diferenca_centavos": -2000, "detalhe": "x"})
+    assert "Itaú PF" in titulo and "20,00" in texto
+
+
 def test_banco_vazio_nao_gera_aviso(con):
     assert gerar_avisos(con, AGORA) == []
 

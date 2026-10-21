@@ -62,6 +62,10 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Valor diferente: {p.get('nome', '?')}", f"estimado {_reais(p.get('estimado'))}, veio {_reais(p.get('real'))} (vence {_ddmm(p.get('vencimento'))})"
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
+    if tipo == "saldo_divergente":
+        d = p.get("diferenca_centavos")
+        quanto = _reais(abs(d) / 100) if isinstance(d, int) else "um valor"
+        return f"Saldo não bate com os lançamentos: {p.get('conta', '?')}", f"diferença de {quanto} entre o saldo do banco e os lançamentos lidos; só para você conferir (os dados seguem valendo)"
     if tipo == "banco_desatualizado":
         try:
             d = dt.datetime.fromisoformat(str(p["desde"]).replace("Z", "+00:00"))

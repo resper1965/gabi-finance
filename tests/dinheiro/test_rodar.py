@@ -47,12 +47,12 @@ def test_extratos_encadeia_captura_conferencia_classificacao_e_compromissos(con,
     con.execute("insert into categoria(nome) values ('Compras')")
     r = _rodar_ext(con, FakeFin([BANCO], _boa_historia()), tmp_path)
     assert r.captura.lidos > 10 and r.captura.falhas == []
-    assert con.execute("select count(*) from conferencia where rodada_id=?", (r.captura.rodada_id,)).fetchone()[0] == 3  # 1 conta x 3 conferências
+    assert con.execute("select count(*) from conferencia where rodada_id=?", (r.captura.rodada_id,)).fetchone()[0] == 1  # 1 conta x saldo_final (ADR-023)
     assert r.conferida is True and con.execute("select conferida from rodada where id=?", (r.captura.rodada_id,)).fetchone()[0] == 1
     assert r.compromissos.gerados == 0  # sem Cadastros de compromissos ainda: roda sem quebrar
 
 
-def test_rodada_com_saldo_incoerente_nao_e_conferida_e_dados_ate_nao_avanca(con, tmp_path):
+def test_rodada_com_saldo_incoerente_e_conferida_e_so_registra_a_divergencia(con, tmp_path):
     _liberada(con)
     from gabi.envelope import envelope
     fin = FakeFin([BANCO], _boa_historia())
@@ -61,9 +61,10 @@ def test_rodada_com_saldo_incoerente_nao_e_conferida_e_dados_ate_nao_avanca(con,
     # no dia seguinte o saldo despenca sem lançamento que o explique
     fin2 = FakeFin([{**BANCO, "balance": 1.0}], _boa_historia())
     r2 = rodar_extratos(con, fin2, HOJE + dt.timedelta(days=1), AGORA + dt.timedelta(days=1), tmp_path / "bruto", tmp_path / "locks")
-    assert r2.conferida is False
+    assert r2.conferida is True  # ADR-023: a conferência só informa
+    assert con.execute("select ok from conferencia where rodada_id=?", (r2.captura.rodada_id,)).fetchone()[0] == 0
     e = envelope(con, {}, agora=(AGORA + dt.timedelta(days=1)).astimezone(dt.timezone.utc))
-    assert e["fontes"][0]["estado"] == "nao_conferida" and e["dados_ate"] == envelope(con, {}, agora=AGORA.astimezone(dt.timezone.utc))["dados_ate"]
+    assert {f["nome"]: f["estado"] for f in e["fontes"]}["open-finance"] == "ok"
 
 
 def test_conta_que_falhou_impede_a_conferencia(con, tmp_path):
