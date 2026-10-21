@@ -523,3 +523,26 @@ def test_criar_so_com_interacao_suficiente(con):
     r = p.gerar(con, AGORA)
     assert r["criar"] == 1 and r["abaixo_do_piso"] == 0
     assert [x["tipo"] for x in _props(con)] == ["criar"]
+
+
+def test_migracao_0074_preserva_linhas_antigas_e_indice(tmp_path):
+    """Aplica as migrações até a 0073, semeia linhas no formato antigo e só então aplica a 0074."""
+    ate73 = tmp_path / "ate73"
+    ate73.mkdir()
+    for arq in sorted(MIGR.glob("[0-9][0-9][0-9][0-9]_*.sql")):
+        if arq.name < "0074":
+            (ate73 / arq.name).write_text(arq.read_text(encoding="utf-8"), encoding="utf-8")
+    k = conectar(tmp_path / "m.db")
+    migrar(k, ate73)
+    cols = ("tipo, conta, graph_id, nome_antes, telefone_antes, nome_depois, telefone_depois, origem, estado, motivo, "
+            "criada_em, decidida_em, decidida_por, aplicada_em")
+    k.execute(f"insert into contato_proposta({cols}) values ('corrigir',?,'g1','Ana','11 9999-0000','Ana','+5511999990000','whatsapp','pendente','m1','2026-10-01T10:00:00Z',null,null,null)", (NESS,))
+    k.execute(f"insert into contato_proposta({cols}) values ('criar',?,null,null,null,'Bia','+5511988887777','whatsapp','aplicada','m2','2026-10-02T10:00:00Z','2026-10-03T10:00:00Z','ricardo','2026-10-04T10:00:00Z')", (NESS,))
+    antes = k.execute(f"select id, {cols} from contato_proposta order by id").fetchall()
+    assert len(antes) == 2
+    assert migrar(k, MIGR) == ["0074_contato_proposta_email.sql"]
+    depois = k.execute(f"select id, {cols} from contato_proposta order by id").fetchall()
+    assert [tuple(r) for r in depois] == [tuple(r) for r in antes]
+    assert [r[0] for r in k.execute("select email_depois from contato_proposta")] == [None, None]
+    with pytest.raises(sqlite3.IntegrityError):
+        k.execute(f"insert into contato_proposta({cols}) values ('corrigir',?,'g1','Ana','x','Ana','+5511999990000','whatsapp','pendente',null,'2026-10-05T10:00:00Z',null,null,null)", (NESS,))
