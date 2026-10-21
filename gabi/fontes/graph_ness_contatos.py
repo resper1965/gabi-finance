@@ -1,4 +1,4 @@
-"""Escrita de contatos da ness no Graph: CRIAR, CORRIGIR (nome e celular), RENOMEAR, APAGAR UM TELEFONE e APAGAR O CONTATO (ADR-021), nada mais.
+"""Escrita de contatos da ness no Graph: CRIAR, CORRIGIR (nome e celular), RENOMEAR, APAGAR UM TELEFONE e APAGAR O CONTATO (ADR-021) e ADICIONAR E-MAIL (ADR-022), nada mais.
 Fica fora de `graph_ness.py` para que a trava de leitura daquele arquivo continue valendo. Antes de alterar, relê o contato e só escreve se
 o que o chamador viu (`antes`) ainda confere; senão devolve `alterado`. Erro nunca leva corpo de resposta, nome nem telefone."""
 import json
@@ -8,6 +8,8 @@ from gabi.fontes.graph_ness import _ID_CONTATO, BASE, ErroGraphNess, _chamar
 
 MAX_NOME = 200
 MAX_TELEFONE = 30
+MAX_EMAILS = 5
+MAX_EMAIL = 254
 
 
 def _texto(v, maximo: int) -> str:
@@ -117,4 +119,20 @@ def apagar(gr, conta, graph_id, nome_antes, telefone_antes) -> dict:
     if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or telefones != [telefone_antes]:
         return {"resultado": "alterado"}
     _escrever(gr, "DELETE", url, None)
+    return {"resultado": "ok"}
+
+
+def adicionar_email(gr, conta, graph_id, nome_antes, telefone_antes, emails) -> dict:
+    """Acrescenta e-mails a um contato que ainda não tem nenhum: PATCH só de `emailAddresses`. Só escreve se o contato ainda tiver `nome_antes`,
+    exatamente o telefone `telefone_antes` (texto original do Graph) e nenhum e-mail; senão devolve `alterado` sem escrever."""
+    url = _url_contato(gr, conta, graph_id)
+    nome_antes, telefone_antes = _texto(nome_antes, MAX_NOME), _texto(telefone_antes, MAX_TELEFONE)
+    if (not isinstance(emails, list) or not 1 <= len(emails) <= MAX_EMAILS
+            or not all(isinstance(e, str) and "@" in e and len(e) <= MAX_EMAIL for e in emails)):
+        raise ErroGraphNess("contato inválido")
+    atual = gr._get(f"{url}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses")
+    telefones = ([atual.get("mobilePhone")] if atual.get("mobilePhone") else []) + list(atual.get("homePhones") or []) + list(atual.get("businessPhones") or [])
+    if atual.get("displayName") != nome_antes or atual.get("emailAddresses") or telefones != [telefone_antes]:
+        return {"resultado": "alterado"}
+    _escrever(gr, "PATCH", url, {"emailAddresses": [{"address": e} for e in emails]})
     return {"resultado": "ok"}

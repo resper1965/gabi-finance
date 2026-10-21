@@ -184,3 +184,59 @@ def test_limpeza_recusa_conta_e_id_invalidos_sem_http():
     with pytest.raises(ErroGraphNess, match="id de contato inválido"):
         gr.contato_renomear(CONTA, "../x", "A", "B")
     assert http.chamadas == []
+
+
+# ---------------- enriquecer (ADR-022): adicionar e-mail ----------------
+def _relida_email(**kw):
+    base = {"displayName": "U", "mobilePhone": "(11) 9", "homePhones": [], "businessPhones": [], "emailAddresses": []}
+    return {**base, **kw}
+
+
+def test_adicionar_email_escreve_so_emailaddresses():
+    gr, http = _graph([(200, _relida_email()), (200, {})])
+    assert gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", ["a@x.com", "b@x.com"]) == {"resultado": "ok"}
+    leitura, escrita = http.chamadas
+    assert leitura[0] == "GET" and leitura[1] == f"{URL_ID}?$select=displayName,mobilePhone,homePhones,businessPhones,emailAddresses"
+    assert escrita[0] == "PATCH" and escrita[1] == URL_ID
+    assert json.loads(escrita[2]) == {"emailAddresses": [{"address": "a@x.com"}, {"address": "b@x.com"}]}
+
+
+@pytest.mark.parametrize("relida", [
+    _relida_email(displayName="Outro"),                       # nome mudou
+    _relida_email(mobilePhone="(11) 8"),                      # telefone mudou
+    _relida_email(homePhones=["2"]),                          # ganhou outro telefone
+    _relida_email(mobilePhone=None),                          # ficou sem telefone
+    _relida_email(emailAddresses=[{"address": "a@b.com"}]),   # já tem e-mail
+])
+def test_adicionar_email_alterado_nao_escreve(relida):
+    gr, http = _graph([(200, relida)])
+    assert gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", ["a@x.com"]) == {"resultado": "alterado"}
+    assert [c[0] for c in http.chamadas] == ["GET"]
+
+
+@pytest.mark.parametrize("emails", [[], ["a@x.com"] * 6, ["semarroba"], ["a@" + "x" * 253], "a@x.com", [1]])
+def test_adicionar_email_valida_entrada(emails):
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="contato inválido"):
+        gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", emails)
+    assert http.chamadas == []
+
+
+def test_adicionar_email_id_invalido_sem_http():
+    gr, http = _graph([])
+    with pytest.raises(ErroGraphNess, match="id de contato inválido"):
+        gr.contato_adicionar_email(CONTA, "../x", "U", "1", ["a@x.com"])
+    assert http.chamadas == []
+
+
+def test_adicionar_email_nunca_usa_delete():
+    gr, http = _graph([(200, _relida_email()), (200, {})])
+    gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", ["a@x.com"])
+    assert "DELETE" not in [c[0] for c in http.chamadas]
+
+
+def test_adicionar_email_erro_nao_vaza_dados():
+    gr, _ = _graph([(200, _relida_email()), (500, {"x": "U a@x.com"})])
+    with pytest.raises(ErroGraphNess) as e:
+        gr.contato_adicionar_email(CONTA, GID, "U", "(11) 9", ["a@x.com"])
+    assert str(e.value) == "contato: HTTP 500"

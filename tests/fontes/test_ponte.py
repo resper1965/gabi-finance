@@ -489,6 +489,9 @@ class _FalsoGraph:
     def contato_apagar(self, conta, graph_id, nome_antes, telefone_antes):
         return {"resultado": "ok" if nome_antes == "U" else "alterado"}
 
+    def contato_adicionar_email(self, conta, graph_id, nome_antes, telefone_antes, emails):
+        return {"resultado": "ok" if (nome_antes, telefone_antes, emails) == ("U", "1", ["a@x.com"]) else "alterado"}
+
     def enviar(self):
         return "nunca"
 
@@ -504,7 +507,7 @@ def sock_graph(tmp_path):
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
                                                   "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
-                                                  "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar"})
+                                                  "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -612,5 +615,6 @@ def test_cliente_graph_limpeza_ida_e_volta_e_resposta_invalida(sock_graph):
     assert p.contato_renomear("resper@ness.com.br", "AAMkAGI2TG93AAA=", "A⁹", "A") == {"resultado": "ok"}
     assert p.contato_apagar_telefone("resper@ness.com.br", "AAMkAGI2TG93AAA=", "home", "1") == {"resultado": "ok"}
     assert p.contato_apagar("resper@ness.com.br", "AAMkAGI2TG93AAA=", "X", "1") == {"resultado": "alterado"}
+    assert p.contato_adicionar_email("resper@ness.com.br", "AAMkAGI2TG93AAA=", "U", "1", ["a@x.com"]) == {"resultado": "ok"}
     with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
         p.contato_renomear("malformada@x.com", "AAMkAGI2TG93AAA=", "A", "B")
