@@ -144,6 +144,24 @@ def test_recusa_de_formato_requisicao_invalida(con, msg):
     assert out == {"id": r["id"], "estado": "falhou", "motivo": "requisicao_invalida"}
 
 
+@pytest.mark.parametrize("msg", ["texto inválido", "equipe inválida", "canal inválido", "conta inválida", "link inválido",
+                                 "ErroGraphNess: texto inválido", "ErroGoogleOAuth: conta inválida"])
+def test_recusa_certa_antes_do_envio_falhou_requisicao_invalida(con, msg):
+    """Recusas das fontes antes de qualquer requisição (nada saiu): falhou, não incerto."""
+    _ligar(con)
+    r = _chat(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError(msg)))
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "requisicao_invalida"}
+
+
+@pytest.mark.parametrize("msg", ["troca de token -> 503", "GET /me -> 502"])
+def test_5xx_antes_do_envio_continua_incerto(con, msg):
+    _ligar(con)
+    r = _chat(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError(msg)))
+    assert out["estado"] == "incerto"
+
+
 def test_timeout_teams_incerto_uma_chamada(con):
     _ligar(con)
     r = _chat(con)

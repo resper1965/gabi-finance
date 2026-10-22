@@ -18,7 +18,8 @@ _TIPO = re.compile(r"^[A-Za-z_]\w*: ")  # prefixo "<Tipo>: " que a ponte põe qu
 _FIXOS = {"login_teams_expirado": "login_teams_expirado", "teams_sem_login": "teams_sem_login",
           "login_teams_conta_diferente": "login_teams_conta_diferente", "conta não autorizada": "conta_nao_permitida",
           "token recusado": "login_google_expirado", "chave inválida": "requisicao_invalida", "evento inválido": "requisicao_invalida",
-          "chat inválido": "requisicao_invalida"}
+          "chat inválido": "requisicao_invalida", "texto inválido": "requisicao_invalida", "equipe inválida": "requisicao_invalida",
+          "canal inválido": "requisicao_invalida", "conta inválida": "requisicao_invalida", "link inválido": "requisicao_invalida"}
 
 
 def _banco(con) -> Path:
