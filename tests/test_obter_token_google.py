@@ -27,7 +27,8 @@ def test_url_de_consentimento_pede_offline_consentimento_e_os_tres_escopos():
     q = parse_qs(urlparse(t.url_de_consentimento("cid.apps", "DESAFIO", "estado1")).query)
     assert q["client_id"] == ["cid.apps"] and q["response_type"] == ["code"] and q["access_type"] == ["offline"] and q["prompt"] == ["consent"]
     assert q["code_challenge"] == ["DESAFIO"] and q["code_challenge_method"] == ["S256"] and q["state"] == ["estado1"] and q["redirect_uri"] == [t.REDIRECT]
-    assert set(q["scope"][0].split()) == set(t.ESCOPOS) and len(t.ESCOPOS) == 3
+    assert set(q["scope"][0].split()) == set(t.ESCOPOS) and len(t.ESCOPOS) == 4
+    assert "https://www.googleapis.com/auth/calendar.events" in t.ESCOPOS
     assert "gmail.modify" in q["scope"][0] and "calendar.readonly" in q["scope"][0] and "contacts.readonly" in q["scope"][0]
 
 

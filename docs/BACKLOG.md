@@ -12,7 +12,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 ## Aberto
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
-| AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR de exceção à R2) | C | 🔧 desenho | ADR aprovada, implementado e instalado |
+| AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR de exceção à R2) | C | 🔧 código pronto na branch `feat/envios-anuencia`; passos do dono no runbook `#envios` | instalar e fazer os 5 passos do dono |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |

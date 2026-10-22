@@ -3,7 +3,7 @@ O Hermes é **só interface**: lê e propõe pelo MCP, não guarda dado (trocar 
 **instalar o Hermes e desligar o OpenClaw só depois do término do gabi.brain** (decisão do Ricardo, 08/10). Esta página é o lado do gabi.brain.
 
 ## Conexão ao MCP (TC.2)
-Token emitido pelo painel/CLI com os escopos `fin, docs, trabalho, propostas, pedidos, decisoes` (nunca `sensivel`), colado pelo Ricardo no `.env` do Hermes (R5). Config do Hermes:
+Token emitido pelo painel/CLI com os escopos `fin, docs, trabalho, propostas, pedidos, decisoes, envios` (nunca `sensivel`), colado pelo Ricardo no `.env` do Hermes (R5). Config do Hermes:
 
 ```yaml
 mcp_servers:
@@ -29,6 +29,8 @@ mcp_servers:
       - financeiro_previsao
       - financeiro_recorrentes
       - financeiro_saldo
+      - propor_evento
+      - propor_teams
       - regras_sugerir
       - resumo_manha
 ```

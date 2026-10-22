@@ -24,6 +24,7 @@ import { CadastrosCorreio } from "./telas/CadastrosCorreio";
 import { Prioridades } from "./telas/Trabalho/Prioridades";
 import { Hoje } from "./telas/Trabalho/Hoje";
 import { Agenda } from "./telas/Trabalho/Agenda";
+import { Envios } from "./telas/Envios";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
 import { Qualidade } from "./telas/Gabi/Qualidade";
@@ -34,7 +35,7 @@ export const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
   regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
-  qualidade: Qualidade, hoje: Hoje, agenda: Agenda,
+  qualidade: Qualidade, hoje: Hoje, agenda: Agenda, envios: Envios,
 };
 
 function tela(area: Area, aba: string) {

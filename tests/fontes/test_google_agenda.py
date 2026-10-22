@@ -169,11 +169,12 @@ def test_conta_e_calendario_invalidos():
         ga.listar_eventos("a@gmail.com", "x/../y", None, JANELA, Token(), http=lambda *a, **k: (200, {}))
 
 
-def test_cliente_so_faz_get_e_nao_tem_metodo_de_escrita():
+def test_cliente_so_cria_evento_e_nao_tem_outro_metodo_de_escrita():
+    """ADR-024: a única escrita é o insert (POST); nada de PUT/PATCH/DELETE nem update/patch/delete/move."""
     fonte = Path(ga.__file__).read_text()
-    assert not re.search(r"""["'](POST|PUT|PATCH|DELETE)["']""", fonte)
-    assert not re.search(r"events\.(insert|update|patch|delete|move|import|quickAdd)", fonte, re.I)
-    assert not [n for n in dir(ga.GoogleAgenda) if n.lstrip("_").startswith(("criar", "apagar", "atualizar", "mover", "responder"))]
+    assert not re.search(r"""["'](PUT|PATCH|DELETE)["']""", fonte)
+    assert not re.search(r"events\.(update|patch|delete|move|import|quickAdd)", fonte, re.I)
+    assert not [n for n in dir(ga.GoogleAgenda) if n.lstrip("_").startswith(("apagar", "atualizar", "mover", "responder"))]
 
 
 def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
@@ -219,3 +220,76 @@ def test_link_de_reuniao_vem_do_conference_data_de_qualquer_provedor_e_so_https(
     assert _link(conferenceData={"entryPoints": [{"entryPointType": "video", "uri": "http://x.com/j/1"}]}) is None
     assert _link(conferenceData="lixo") is None and _link(conferenceData={"entryPoints": "x"}) is None
     assert _link(location="https://zoom.us/j/999") is None  # o local nunca é lido (privacidade)
+
+
+# ---- criar evento (ADR-024) ----
+CHAVE = "0123456789abcdefghijklmnop"
+EVENTO = {"conta": "resper@gmail.com", "provedor": "google", "titulo": "Alinhamento", "inicio_utc": "2026-10-23T13:00:00Z",
+          "fim_utc": "2026-10-23T14:00:00Z", "fuso": "America/Sao_Paulo", "convidados": ["ana@x.com", "bia@y.com"],
+          "descricao": "Pauta do dia", "online": True}
+URL_CRIAR = "https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1"
+
+
+def _http_post(respostas, chamadas):
+    fila = list(respostas)
+
+    def http(m, url, corpo=None, cab=None):
+        chamadas.append((m, url, corpo, cab))
+        return fila.pop(0)
+    return http
+
+
+def test_evento_criar_post_com_id_sendupdates_e_meet():
+    ch = []
+    r = ga.GoogleAgenda(Token(), http=_http_post([(200, {"id": CHAVE})], ch)).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert r == {"externo_id": CHAVE, "ja_existia": False}
+    assert len(ch) == 1
+    m, url, corpo, cab = ch[0]
+    assert m == "POST" and url == URL_CRIAR and cab["Authorization"] == "Bearer TOK1"
+    assert corpo == {"id": CHAVE, "summary": "Alinhamento", "description": "Pauta do dia",
+                     "start": {"dateTime": "2026-10-23T13:00:00Z", "timeZone": "America/Sao_Paulo"},
+                     "end": {"dateTime": "2026-10-23T14:00:00Z", "timeZone": "America/Sao_Paulo"},
+                     "attendees": [{"email": "ana@x.com"}, {"email": "bia@y.com"}],
+                     "conferenceData": {"createRequest": {"requestId": CHAVE, "conferenceSolutionKey": {"type": "hangoutsMeet"}}}}
+
+
+def test_evento_criar_sem_online_nao_pede_conferencia():
+    ch = []
+    ga.GoogleAgenda(Token(), http=_http_post([(200, {"id": CHAVE})], ch)).evento_criar("resper@gmail.com", CHAVE, {**EVENTO, "online": False})
+    _, url, corpo, _ = ch[0]
+    assert "conferenceDataVersion" not in url and "conferenceData" not in corpo and "sendUpdates=all" in url
+
+
+def test_evento_criar_409_e_ja_existia():
+    r = ga.GoogleAgenda(Token(), http=_http_post([(409, {})], [])).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert r == {"externo_id": CHAVE, "ja_existia": True}
+
+
+def test_evento_criar_4xx_levanta_com_status():
+    with pytest.raises(ErroGoogleOAuth) as e:
+        ga.GoogleAgenda(Token(), http=_http_post([(403, {})], [])).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert str(e.value) == "calendar.events.insert -> 403"
+
+
+@pytest.mark.parametrize("chave", ["", "abc", "ABCDEFGHIJ", "w" * 26, "a" * 1025, "abcde/../x", None, 5])
+def test_evento_criar_chave_invalida(chave):
+    ch = []
+    with pytest.raises(ErroGoogleOAuth):
+        ga.GoogleAgenda(Token(), http=_http_post([], ch)).evento_criar("resper@gmail.com", chave, EVENTO)
+    assert ch == []
+
+
+def test_evento_criar_401_renova_token_uma_vez():
+    ch, tok = [], Token()
+    r = ga.GoogleAgenda(tok, http=_http_post([(401, {}), (200, {"id": CHAVE})], ch)).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert r["ja_existia"] is False and tok.invalidacoes == 1 and len(ch) == 2
+    assert ch[0][3]["Authorization"] == "Bearer TOK1" and ch[1][3]["Authorization"] == "Bearer TOK2"
+    with pytest.raises(ErroGoogleOAuth) as e:
+        ga.GoogleAgenda(Token(), http=_http_post([(401, {}), (401, {})], [])).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert str(e.value) == "calendar.events.insert -> 401"
+
+
+def test_evento_criar_erro_nao_vaza_conteudo():
+    with pytest.raises(ErroGoogleOAuth) as e:
+        ga.GoogleAgenda(Token(), http=_http_post([(500, {"error": "Alinhamento ana@x.com"})], [])).evento_criar("resper@gmail.com", CHAVE, EVENTO)
+    assert "Alinhamento" not in str(e.value) and "ana@x.com" not in str(e.value)

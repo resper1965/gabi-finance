@@ -1,5 +1,6 @@
 """Microsoft Graph da ness (resper@ness.com.br): LEITURA de contatos, agenda e e-mail; as únicas escritas são MOVER mensagem de e-mail entre a Caixa de
-Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho) e criar/corrigir contato, delegado a `graph_ness_contatos` (ADR-020). Não existe método de enviar, responder, encaminhar, apagar de vez nem de
+Entrada e os Itens Excluídos (a lixeira; o Exchange a esvazia sozinho) e criar/corrigir contato, delegado a `graph_ness_contatos` (ADR-020). Criar evento e escrever no Teams (token delegado, ADR-024) com proposta
+aprovada vivem em `graph_ness_envios`; aqui só os métodos que delegam. Neste arquivo não existe método de enviar, responder, encaminhar, apagar de vez nem de
 escrever em agenda: o POST aqui é só o do token e o `/move` com destino fixo (um teste varre o código). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5);
 o resto do brain chega aqui pela ponte (`PonteGraph`). Autenticação do app por client credentials com secret (M365_TENANT_ID, M365_CLIENT_ID,
 M365_CLIENT_SECRET no ambiente do serviço). O app tem permissão no tenant inteiro: a conta lida vem sempre de `M365_CONTAS` (padrão só
@@ -123,10 +124,12 @@ class TokenApp:
 
 
 class GraphNess:
-    """Objeto da ponte (JSON puro). Lê por GET; só escreve o move de e-mail e, delegado a `graph_ness_contatos`, criar/corrigir contato (ADR-020). Sem o token provider nada sai."""
+    """Objeto da ponte (JSON puro). Lê por GET; só escreve o move de e-mail e, delegado a `graph_ness_contatos`, criar/corrigir contato (ADR-020); evento e Teams
+    aprovados (ADR-024) delegam a `graph_ness_envios`. Sem o token provider nada sai."""
 
-    def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time):
+    def __init__(self, token: Callable[[], str], contas: list[str], http=_http_real, agora=time.time, token_teams: Callable[[], str] | None = None):
         self._token, self._contas, self._http, self._agora = token, [c.lower() for c in contas], http, agora
+        self._token_teams = token_teams  # TokenDelegado (Teams); None sem GRAPH_NESS_TEAMS_REFRESH: os envios do Teams dão `teams_sem_login`
         self._meu_ids: dict[str, str] = {}  # conta -> id AAD (Teams: de_eu / mencoes_eu)
 
     def __repr__(self):
@@ -338,6 +341,32 @@ class GraphNess:
         """Acrescenta e-mails se o contato ainda estiver como `nome_antes`/`telefone_antes` e sem e-mail; senão {"resultado": "alterado"}."""
         from gabi.fontes import graph_ness_contatos
         return graph_ness_contatos.adicionar_email(self, conta, graph_id, nome_antes, telefone_antes, emails)
+
+    # ---------------- envios aprovados (ADR-024): a escrita vive em `graph_ness_envios` ----------------
+    def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
+        """Cria o evento (token de app) com `transactionId` = chave; devolve {"externo_id"}."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.evento_criar(self, conta, chave, evento)
+
+    def teams_equipes(self, conta: str) -> list[dict]:
+        """[{id, nome}] das equipes da conta (token delegado)."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.teams_equipes(self, conta)
+
+    def teams_canais(self, conta: str, equipe_id: str) -> list[dict]:
+        """[{id, nome}] dos canais da equipe (token delegado)."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.teams_canais(self, conta, equipe_id)
+
+    def teams_chat_enviar(self, conta: str, chat_id: str, texto: str) -> dict:
+        """Escreve em chat que já existe (token delegado); devolve {"externo_id"}."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.teams_chat_enviar(self, conta, chat_id, texto)
+
+    def teams_canal_enviar(self, conta: str, equipe_id: str, canal_id: str, texto: str) -> dict:
+        """Posta em canal de equipe (token delegado); devolve {"externo_id"}."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.teams_canal_enviar(self, conta, equipe_id, canal_id, texto)
 
     def _enviar_mover(self, url: str, destino: str) -> int:
         """Único POST além do token: mover a mensagem para `destino` (de `_DESTINOS`). Um 401 invalida o token e repete UMA vez."""
@@ -579,9 +608,15 @@ def _emails(lista) -> list[str]:
 
 
 def graph_ness_do_ambiente(env) -> GraphNess | None:
-    """None ("não configurada") sem tenant, client id e secret no ambiente do serviço."""
+    """None ("não configurada") sem tenant, client id e secret no ambiente do serviço. Com GRAPH_NESS_TEAMS_REFRESH, monta o token delegado do
+    Teams para a primeira conta de M365_CONTAS; sem ele o resto funciona e os envios do Teams dão `teams_sem_login`."""
     t, i, s = env.get("M365_TENANT_ID"), env.get("M365_CLIENT_ID"), env.get("M365_CLIENT_SECRET")
     if not (t and i and s):
         return None
     contas = [c.strip() for c in (env.get("M365_CONTAS") or "").split(",") if c.strip()] or list(CONTAS_PADRAO)
-    return GraphNess(TokenApp(t, i, s), contas)
+    refresh = (env.get("GRAPH_NESS_TEAMS_REFRESH") or "").strip()
+    delegado = None
+    if refresh:
+        from gabi.fontes.graph_ness_envios import TokenDelegado
+        delegado = TokenDelegado(t, i, refresh, contas[0])
+    return GraphNess(TokenApp(t, i, s), contas, token_teams=delegado)

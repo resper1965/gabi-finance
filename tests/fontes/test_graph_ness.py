@@ -45,9 +45,9 @@ class TokenFalso:
         self.invalidacoes += 1
 
 
-def _graph(respostas, contas=("resper@ness.com.br",), token=None):
+def _graph(respostas, contas=("resper@ness.com.br",), token=None, token_teams=None):
     http = _http(respostas)
-    return GraphNess(token or TokenFalso(), list(contas), http=http), http
+    return GraphNess(token or TokenFalso(), list(contas), http=http, token_teams=token_teams), http
 
 
 def test_token_troca_credenciais_e_cacheia():

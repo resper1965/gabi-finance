@@ -74,6 +74,9 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/decisoes/perguntas` | Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem). |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
+| GET | `/api/v1/envios` | Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada. |
+| POST | `/api/v1/envios/{envio_id}/enviar` | Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto). |
+| POST | `/api/v1/envios/{envio_id}/recusar` | Recusa a proposta pendente; nada é enviado. |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/gabi/qualidade` | A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias). |
 | GET | `/api/v1/hoje` | O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro. |
@@ -112,6 +115,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `financeiro_previsao` | `fin` | dias | Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura. |
 | `financeiro_recorrentes` | `fin` | sentido | Entradas e saídas recorrentes aprendidas dos últimos 6 meses (valor médio, dia típico, fixo ou variável). `sentido`: entrada ou saida. Só leitura. |
 | `financeiro_saldo` | `fin` | conta | Saldo do caixa único (só as contas que o Ricardo liberou) e faturas de cartão em aberto. `conta` filtra pelo apelido. |
+| `propor_evento` | `envios` | conta, convidados, descricao, duracao_min, inicio, online, titulo | PROPÕE um evento na agenda (conta liberada, `inicio` ISO de Brasília, duração 5 a 720 min, 1 a 30 convidados por e-mail ou nome de contato). |
+| `propor_teams` | `envios` | canal, chat_com, equipe, texto | PROPÕE uma mensagem no Teams da ness (texto simples, 1 a 4000 caracteres). Exatamente um destino: `chat_com` (nome da conversa) ou `equipe` + `canal`. |
 | `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |
 | `resumo_manha` | `trabalho` | — | Resumo da manhã já formatado para o celular, em blocos Financeiro, Agenda e E-mail (começa por 'dados desatualizados' se for o caso). Entregar exatamente como vem. |
 

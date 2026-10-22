@@ -1,5 +1,5 @@
-"""Obtém o refresh token de UMA conta Google para a Gabi (cliente OAuth do tipo "Computador"), com os três escopos de uma vez:
-contacts.readonly, calendar.readonly e gmail.modify. Roda no terminal do dono, não no servidor da Gabi: nada é gravado em arquivo e o
+"""Obtém o refresh token de UMA conta Google para a Gabi (cliente OAuth do tipo "Computador"), com os escopos de uma vez:
+contacts.readonly, calendar.readonly, calendar.events (criar evento aprovado, ADR-024) e gmail.modify. Roda no terminal do dono, não no servidor da Gabi: nada é gravado em arquivo e o
 Client secret é pedido sem eco. Fluxo: mostra o link de consentimento; você abre no navegador, entra na conta, e o navegador termina numa página de erro
 em localhost (esperado); copie a URL dessa página e cole aqui. A linha final vai para /etc/gabi/google.env (root:root 0600).
 Uso: sudo .venv/bin/python -m tools.obter_token_google resper@gmail.com --env /etc/gabi/google.env --gravar
@@ -18,7 +18,8 @@ from pathlib import Path
 
 from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida, nome_da_variavel
 
-ESCOPOS = ("https://www.googleapis.com/auth/contacts.readonly", "https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/gmail.modify")
+ESCOPOS = ("https://www.googleapis.com/auth/contacts.readonly", "https://www.googleapis.com/auth/calendar.readonly",
+          "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/gmail.modify")
 REDIRECT = "http://localhost:8765"
 AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"

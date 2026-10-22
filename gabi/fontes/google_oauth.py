@@ -1,5 +1,5 @@
 """OAuth do usuário para as fontes Google (contatos e agenda), compartilhado. Só o serviço `gabi-brain-fontes` tem rede e segredos (R5).
-Um refresh token por conta (GOOGLE_REFRESH_<CONTA>) pode carregar VÁRIOS escopos (contacts.readonly + calendar.readonly): o Ricardo
+Um refresh token por conta (GOOGLE_REFRESH_<CONTA>) pode carregar VÁRIOS escopos (contacts.readonly + calendar.readonly + calendar.events, este só para criar evento aprovado): o Ricardo
 refaz o consentimento uma vez e o mesmo token serve às duas fontes. Cliente OAuth: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (aceita os nomes
 legados GOOGLE_OAUTH_CLIENT_ID/SECRET). Segredo e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/google.md."""
 import json

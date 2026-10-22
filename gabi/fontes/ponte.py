@@ -24,10 +24,12 @@ PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar"}),  # ADR-023: só a busca e o download do MCP; nada escreve no Paperless
     "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
-    "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
+    "google_agenda": frozenset({"listar_calendarios", "listar_eventos", "evento_criar"}),  # ADR-024: criar só com proposta aprovada
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
                              "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
-                             "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"}),
+                             "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
+                             # ADR-024: criar evento e escrever no Teams só com proposta aprovada (graph_ness_envios)
+                             "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"}),
     "nibo": frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"}),  # ADR-023: só o que notas_importar lê; o lote (escrita) saiu
 }
@@ -187,7 +189,7 @@ class PonteContatos:
 
 
 class PonteAgenda:
-    """Agenda do Google lida no serviço de fontes (único com rede e segredos), somente leitura."""
+    """Agenda do Google lida no serviço de fontes (único com rede e segredos), leitura + criar evento aprovado."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "google_agenda")
@@ -201,6 +203,12 @@ class PonteAgenda:
             raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
         return r
 
+    def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
+        r = self._ponte._chamar("evento_criar", (conta, chave, evento))
+        if not isinstance(r, dict) or not isinstance(r.get("externo_id"), str) or not isinstance(r.get("ja_existia"), bool):
+            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+        return r
+
     def listar_eventos(self, conta: str, calendario_id: str, sync_token: str | None, janela: dict) -> ResultadoEventos:
         r = self._ponte._chamar("listar_eventos", (conta, calendario_id, sync_token, janela))
         if (not isinstance(r, dict) or not isinstance(r.get("eventos"), list) or not isinstance(r.get("cancelados"), list)
@@ -210,7 +218,7 @@ class PonteAgenda:
 
 
 class PonteGraph:
-    """Graph da ness lido no serviço de fontes (único com rede e segredos), somente leitura. Lista fixa de métodos."""
+    """Graph da ness no serviço de fontes (único com rede e segredos): leitura, escrita de contatos e os envios aprovados (evento e Teams). Lista fixa de métodos."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "graph_ness")
@@ -280,6 +288,34 @@ class PonteGraph:
                 and x["tipo"] in ("um_a_um", "grupo") and (x["ultima_em"] is None or isinstance(x["ultima_em"], str)) for x in r)):
             raise ErroGraphNess("resposta inválida do serviço de fontes")
         return r
+
+    def _externo(self, metodo: str, *args) -> dict:
+        r = self._ponte._chamar(metodo, args)
+        if not isinstance(r, dict) or not isinstance(r.get("externo_id"), str) or not r["externo_id"]:
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
+
+    def _id_nome(self, metodo: str, *args) -> list[dict]:
+        r = self._ponte._chamar(metodo, args)
+        if not isinstance(r, list) or not all(isinstance(x, dict) and set(x) == {"id", "nome"} and isinstance(x["id"], str)
+                                               and isinstance(x["nome"], str) for x in r):
+            raise ErroGraphNess("resposta inválida do serviço de fontes")
+        return r
+
+    def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
+        return self._externo("evento_criar", conta, chave, evento)
+
+    def teams_equipes(self, conta: str) -> list[dict]:
+        return self._id_nome("teams_equipes", conta)
+
+    def teams_canais(self, conta: str, equipe_id: str) -> list[dict]:
+        return self._id_nome("teams_canais", conta, equipe_id)
+
+    def teams_chat_enviar(self, conta: str, chat_id: str, texto: str) -> dict:
+        return self._externo("teams_chat_enviar", conta, chat_id, texto)
+
+    def teams_canal_enviar(self, conta: str, equipe_id: str, canal_id: str, texto: str) -> dict:
+        return self._externo("teams_canal_enviar", conta, equipe_id, canal_id, texto)
 
     def teams_mensagens(self, conta: str, chat_id: str, desde: str) -> list[dict]:
         """Só metadados (sem texto da mensagem) atravessam a ponte."""
