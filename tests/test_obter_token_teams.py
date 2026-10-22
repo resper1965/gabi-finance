@@ -121,3 +121,15 @@ def test_main_sem_ids_no_env_falha_com_codigo_2(tmp_path, capsys):
     env = tmp_path / "vazio.env"
     env.write_text("A=1\n")
     assert t.main(["--env", str(env)], http=_http([], []), dormir=lambda s: None) == 2
+
+
+def test_main_gravar_falhando_nao_mostra_o_token(tmp_path, capsys):
+    env = _env(tmp_path)
+    env.chmod(0o400)
+    os.chmod(tmp_path, 0o500)  # sem escrita no diretório: o arquivo temporário não pode ser criado
+    try:
+        rc = t.main(["--env", str(env), "--gravar"], http=_http_fluxo(), dormir=lambda s: None)
+    finally:
+        os.chmod(tmp_path, 0o700)
+    cap = capsys.readouterr()
+    assert rc != 0 and REFRESH not in cap.out + cap.err and "ERRO" in cap.err

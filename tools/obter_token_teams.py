@@ -130,8 +130,7 @@ def main(argv=None, *, http=_http_form, dormir=time.sleep) -> int:
         try:
             gravar_no_env(env, token)
         except OSError:
-            print(f"ERRO: não consegui gravar em {env} (rode com sudo?). Guarde esta linha:\n\n{VARIAVEL}={token}\n")
-            print(f"ERRO: não consegui gravar em {env}.", file=sys.stderr)
+            print(f"ERRO: não consegui gravar em {env} (rode com sudo?). Rode de novo sem --gravar para receber a linha.", file=sys.stderr)
             return 1
         print(f"\nPronto. {VARIAVEL} gravado em {env} (o token não é mostrado).")
         return 0
