@@ -6,3 +6,13 @@ def test_fabrica_do_mcp_monta_o_paperless_do_ambiente(tmp_path, monkeypatch):
     assert fabrica().paperless is not None
     monkeypatch.delenv("PAPERLESS_TOKEN")
     assert fabrica().paperless is None
+
+
+def test_fabrica_do_mcp_monta_o_graph_pela_ponte_so_com_socket(tmp_path, monkeypatch):
+    from gabi.fontes.ponte import PonteGraph
+    from gabi.mcp.servidor import fabrica
+    monkeypatch.setenv("GABI_BANCO", str(tmp_path / "g.db"))
+    monkeypatch.delenv("GABI_FONTES_SOCKET", raising=False)
+    assert fabrica().graph is None
+    monkeypatch.setenv("GABI_FONTES_SOCKET", str(tmp_path / "fontes.sock"))
+    assert isinstance(fabrica().graph, PonteGraph)

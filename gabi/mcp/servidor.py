@@ -21,7 +21,7 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_emp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_dec, ferramentas_prop, ferramentas_dia
+from gabi.mcp import ferramentas_dec, ferramentas_envios, ferramentas_prop, ferramentas_dia
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
@@ -31,7 +31,7 @@ MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin",
-                       **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS}
+                       **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS}
 
 
 def _reais(v, chave: str = ""):
@@ -45,7 +45,7 @@ def _reais(v, chave: str = ""):
     return v
 
 
-ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
+ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes", "envios")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
 
 
 def ferramentas_do_token(escopos) -> list[str]:
@@ -94,7 +94,7 @@ class _Auth:
             _token.reset(marca)
 
 
-def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
+def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph=None):
     banco = Path(banco)
     agora_fn = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))
     srv = MCPServer("gabi-brain", instructions=(
@@ -216,10 +216,12 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None):
     ferramentas_prop.registrar(srv, executar, paperless)
     ferramentas_dia.registrar(srv, executar)
     ferramentas_dec.registrar(srv, executar)
+    ferramentas_envios.registrar(srv, executar, graph)  # só propõem; o envio é do botão Enviar do painel
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada
     resultado.paperless = paperless  # idem, para o teste da fábrica
+    resultado.graph = graph
     return resultado
 
 
@@ -233,8 +235,9 @@ def fabrica():
         con.close()
     hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8081,localhost:8081").split(",") if h.strip()]
     from gabi.fontes.ambiente import fontes_do_ambiente
-    from gabi.fontes.ponte import Ponte
+    from gabi.fontes.ponte import Ponte, PonteGraph
     caminho = os.environ.get("GABI_FONTES_SOCKET")
     # Pela ponte o objeto existe sempre (o serviço pode subir depois); "não configurado" chega como ErroPaperless a cada chamada.
     paperless = Ponte(caminho, "paperless") if caminho else fontes_do_ambiente()["paperless"]()
-    return criar_mcp(banco, hosts, paperless=paperless)
+    graph = PonteGraph(caminho) if caminho else None  # lista viva de equipes/canais do Teams (só leitura) para propor_teams
+    return criar_mcp(banco, hosts, paperless=paperless, graph=graph)
