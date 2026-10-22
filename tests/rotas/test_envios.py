@@ -130,3 +130,34 @@ def test_nao_boss_403(cli, banco):
     assert cli.get("/api/v1/envios", headers=VIP).status_code == 403
     assert _post(cli, f"/api/v1/envios/{r['id']}/enviar", {"hash": r["hash"]}, VIP).status_code == 403
     assert _post(cli, f"/api/v1/envios/{r['id']}/recusar", h=VIP).status_code == 403
+
+
+class _GraphForaDoLaco(_Graph):
+    """Registra se a chamada ao provedor rodou fora do laço de eventos da API (num thread de trabalho)."""
+
+    def __init__(self):
+        super().__init__()
+        self.no_laco = None
+
+    def evento_criar(self, conta, chave, conteudo):
+        import asyncio
+        try:
+            asyncio.get_running_loop()
+            self.no_laco = True
+        except RuntimeError:
+            self.no_laco = False
+        return super().evento_criar(conta, chave, conteudo)
+
+
+def test_enviar_roda_fora_do_laco_e_devolve_resultado_do_dominio(banco):
+    g = _GraphForaDoLaco()
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA, fontes={"graph_ness": (lambda: g)}), client=("127.0.0.1", 50000))
+    _ligar(banco)
+    r = _proposta(banco)
+    resp = _post(cli, f"/api/v1/envios/{r['id']}/enviar", {"hash": r["hash"]})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["dados"] == {"id": r["id"], "estado": "enviada"}
+    assert g.no_laco is False and len(g.chamadas) == 1
+    c = conectar(banco)
+    assert tuple(c.execute("select estado, externo_id from envio_proposta where id=?", (r["id"],)).fetchone()) == ("enviada", "ev1")
+    c.close()

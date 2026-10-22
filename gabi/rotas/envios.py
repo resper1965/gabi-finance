@@ -1,6 +1,8 @@
 """Envios (/api/v1/envios): fila de propostas do Hermes (evento de agenda, mensagem do Teams) que só saem depois do "Enviar" do dono. Só o boss.
 A API não tem rede: o envio usa as fontes injetadas (fábricas `google_agenda` e `graph_ness`).
 Consome: envios.propostas, envios.enviar."""
+import asyncio
+
 from fastapi import APIRouter, Depends, Request
 
 from gabi.envelope import envelope
@@ -53,11 +55,16 @@ async def enviar_envio(envio_id: int, request: Request, ident: Identidade = Depe
     h = corpo.get("hash")
     if not isinstance(h, str) or not h:
         raise erro(400, "requisicao_invalida", "hash é obrigatório")
+    return await asyncio.to_thread(_enviar_sincrono, request, envio_id, h, ident.login)  # rede bloqueante (até ~130 s): fora do laço da API
+
+
+def _enviar_sincrono(request: Request, envio_id: int, h: str, login: str):
+    """Fábricas, conexão e envio no thread de trabalho: a conexão sqlite abre e fecha aqui (ela só vale no thread que a criou)."""
     google, graph = _fonte(request, "google_agenda"), _fonte(request, "graph_ness")
     con = _con(request)
     try:
         try:
-            r = ex.enviar(con, envio_id, h, ident.login, _agora(request), google, graph)
+            r = ex.enviar(con, envio_id, h, login, _agora(request), google, graph)
         except ErroEnvio as e:
             raise _erro(e) from None
         return envelope(con, r, agora=_agora(request))
