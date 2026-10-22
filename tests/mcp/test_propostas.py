@@ -76,9 +76,10 @@ def test_documentos_baixar_exige_escopo_docs(cli2, tokens2):
     assert d["id"] == 5 and d["pdf_base64"]
 
 
-def test_documentos_buscar_devolve_so_metadados(cli2, tokens2):
+def test_documentos_buscar_devolve_metadados_trecho_e_referencia(cli2, tokens2):
     itens = chamar(cli2, tokens2["docs"], "documentos_buscar", texto="luz")["dados"]["itens"]
-    assert itens == [{"id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01"}]
+    assert itens == [{"id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01", "trecho": "ENEL",
+                      "referencia": {"paperless_id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01"}}]
 
 
 def test_documentos_sem_paperless_configurado_devolve_fonte_indisponivel(banco2, tokens2):

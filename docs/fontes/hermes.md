@@ -21,6 +21,7 @@ mcp_servers:
       - despesas_por_empresa
       - documentos_baixar
       - documentos_buscar
+      - documentos_texto
       - email_listar
       - familia_atualizar_contato
       - familia_consultar

@@ -629,7 +629,7 @@ def test_cliente_graph_limpeza_ida_e_volta_e_resposta_invalida(sock_graph):
 def test_nibo_e_paperless_so_leitura_que_tem_uso():
     """ADR-023: lote do Nibo, comprovantes e reembolso saíram; a ponte não pode mais deixar ninguém escrever no Nibo nem no Paperless (R2)."""
     assert PERMITIDOS["nibo"] == frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"})
-    assert PERMITIDOS["paperless"] == frozenset({"docs", "baixar"})
+    assert PERMITIDOS["paperless"] == frozenset({"docs", "baixar", "texto"})
 
 
 def test_ponte_agenda_evento_criar_cruza_e_valida_a_forma(sock_agenda):
