@@ -4,8 +4,8 @@
 O histórico detalhado (09/10 a 21/10/2026) está em `docs/historico/`: só consulte para saber o que foi feito e quando; não é lista de pendências.
 
 ## Estado em 22/10/2026
-- **Simplificação (ADR-023) na branch `feat/simplificacao`, ainda NÃO instalada:** saem a escuta do WhatsApp, a saúde, o módulo Trabalho, a cobrança e o reembolso PJ (troca por `despesas_por_empresa`), ferramentas MCP sem uso (ficam 18) e 26 tabelas vazias (migração 0075). "Para quem" certeiro passa a ser aplicado sozinho (≥2 decisões iguais do Ricardo); a conferência de saldo só informa (aviso `saldo_divergente`). Instalar é o item SP1 do BACKLOG.
-- **No ar (produção, antes da simplificação):** dinheiro (extratos e saldos), a receber, agenda, e-mail (com regras "sempre lixo"), Teams, contatos da ness, avisos e Telegram, Hermes (Telegram e WhatsApp). Escuta, exames e reembolso de saúde estão desligados.
+- **Simplificação (ADR-023) instalada em 22/10 (merge `662099f`):** saíram a escuta do WhatsApp, a saúde, o módulo Trabalho, a cobrança e o reembolso PJ (troca por `despesas_por_empresa`), ferramentas MCP sem uso (o Hermes ficou com 18 em `~/.hermes/config.yaml`) e 26 tabelas vazias (migração 0075 aplicada; `escuta_msg` e `memoria_fts` não existem mais). "Para quem" certeiro é aplicado sozinho (≥2 decisões iguais do Ricardo); a conferência de saldo só informa (aviso `saldo_divergente`). Conferido: API no ar, nenhuma unit em `failed`, rodada de extratos de 22/10 13:37 `contas=17 novos=12 falhas=[] conferida=True`.
+- **No ar (produção):** dinheiro (extratos e saldos), a receber, despesas por empresa, agenda, e-mail (com regras "sempre lixo"), Teams, contatos da ness, avisos e Telegram, Hermes (Telegram e WhatsApp).
 - **Graph da ness ligado desde 20/10:** agenda, e-mail (lixeira desligada), Teams e contatos (`resper@ness.com.br`). ionic espera o administrador do tenant. Google contatos, ionic e Nibo em espera por chave (não alertar).
 - **Conferência de extratos:** em 21/10 a correção do `saldo_final` foi instalada e a rodada 3527 saiu `conferida=1`. Com a ADR-023 a conferência deixa de travar.
 - **Release:** tag `v1.0-gabi-brain` no GitHub.

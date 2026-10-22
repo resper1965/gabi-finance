@@ -12,14 +12,12 @@ Google (contatos G12), Graph da ionic e Nibo (A7/C3) aguardam chave ou consentim
 ## Aberto
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
-| SP1 | **Instalar a simplificação (ADR-023)** na VPS: confirmar tabelas vazias, parar e remover as units cortadas, `sudo ~/instalar-brain.sh`, alinhar o `tools.include` do Hermes com `docs/fontes/hermes.md` (18 ferramentas) e conferir (spec "Produção") | R+C | ⏸ aguarda autorização | API, MCP e painel no ar; rodada de extratos `conferida=1`; nenhuma unit em `failed` |
 | SP2 | Decidir o que fazer com o que a simplificação deixou parado: pareamento do WhatsApp e pastas do ouvinte, cofre `saude.enc` e chave, `~/saude.key.COPIE-E-APAGUE` | R | ⏸ | decidido (apagar ou guardar) |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A6 | Teto de custo do modelo: com a escuta fora, o teto global agora é só do correio. Conferir se `email_sem_modelo` voltou (não aparece desde 19/10) e se o modelo de reserva (`email-falha`, US$ 6,18 em 11 dias contra US$ 0,12 do normal) precisa de ajuste | R+C | ❓ | aviso some e custo de reserva explicado |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
 | H7 | 7 dias de Hermes estável + backup exportado | R+C | ⛔ depende de H5 (número dedicado, lista do Ricardo) | sem queda em 7 dias |
-| F2 | Encerramento e memória (Task 16 do fechamento): atualizar a memória do Claude com o estado pós-simplificação | C | 🔧 | memória coerente com ADR-023 |
 
 ## Decisões do Ricardo sem resposta
 - **Extratos 4x por dia** (em vez de 06h e 14h): muda custo de chamadas ao mcp.ai.
