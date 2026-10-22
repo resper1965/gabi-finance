@@ -132,11 +132,20 @@ def test_criar_teams_chat_resolve_por_de_nome(con):
     con.execute("insert into teams_conversa(conta, chat_id, tipo, de_nome) values (?, 'c1','um_a_um','Ana Souza')", (NESS,))
     r = p.criar_teams_chat(con, AGORA, conta=NESS, chat_com="ana souza", texto="oi <b>&")
     l = con.execute("select * from envio_proposta where id=?", (r["id"],)).fetchone()
-    assert json.loads(l["conteudo"]) == {"conta": NESS, "chat_id": "c1", "destino_nome": "Ana Souza", "texto": "oi <b>&"}
+    assert json.loads(l["conteudo"]) == {"conta": NESS, "chat_id": "c1", "destino_nome": "Ana Souza", "tipo": "um_a_um", "texto": "oi <b>&"}
     assert l["vence_em"] == "2026-10-23T12:00:00Z" and l["tipo"] == "teams_chat" and r["resumo"] == "Teams: chat com Ana Souza"
     con.execute("insert into teams_conversa(conta, chat_id, tipo, de_nome) values (?, 'c2','grupo','Ana Souza')", (NESS,))
     e = _codigo(p.criar_teams_chat, con, AGORA, conta=NESS, chat_com="Ana Souza", texto="x")
     assert e.codigo == "destino_ambiguo" and len(e.candidatos) == 2
+
+
+def test_criar_teams_chat_de_grupo_guarda_tipo_e_avisa_no_resumo(con):
+    _teams(con)
+    con.execute("insert into teams_conversa(conta, chat_id, tipo, de_nome) values (?, 'g1','grupo','Bruno Lima')", (NESS,))
+    r = p.criar_teams_chat(con, AGORA, conta=NESS, chat_com="Bruno Lima", texto="oi")
+    l = con.execute("select conteudo, hash from envio_proposta where id=?", (r["id"],)).fetchone()
+    assert json.loads(l["conteudo"])["tipo"] == "grupo" and r["resumo"] == "Teams: chat com Bruno Lima (grupo)"
+    assert l["hash"] == hashlib.sha256(l["conteudo"].encode()).hexdigest()  # o tipo está coberto pelo hash
 
 
 def test_teams_conta_nao_permitida(con):

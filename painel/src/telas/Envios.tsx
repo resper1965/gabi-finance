@@ -9,7 +9,8 @@ import { Aviso, useAcao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
 interface Evento { conta: string; provedor: string; titulo: string; inicio_utc: string; fim_utc: string; fuso: string; convidados: string[]; descricao: string; online: boolean }
-interface Chat { conta: string; chat_id: string; destino_nome: string; texto: string }
+/** `tipo` só nas propostas novas (as antigas não o têm e ficam sem aviso). */
+interface Chat { conta: string; chat_id: string; destino_nome: string; tipo?: "um_a_um" | "grupo"; texto: string }
 interface Canal { conta: string; equipe_id: string; canal_id: string; equipe_nome: string; canal_nome: string; texto: string }
 interface Envio {
   id: number; tipo: "evento" | "teams_chat" | "teams_canal"; conta: string; conteudo: Evento & Chat & Canal; hash: string;
@@ -49,7 +50,8 @@ function Corpo({ e }: { e: Envio }) {
         {c.descricao && <p style={{ margin: "4px 0 0", whiteSpace: "pre-wrap" }}>{c.descricao}</p>}
       </>);
   }
-  const destino = e.tipo === "teams_chat" ? c.destino_nome : `${c.equipe_nome} › ${c.canal_nome}`;
+  // "chat com Fulano" pode ser um grupo (Fulano foi quem escreveu por último): o dono precisa ver isso antes de enviar
+  const destino = e.tipo === "teams_chat" ? `${c.destino_nome}${c.tipo === "grupo" ? " (grupo)" : ""}` : `${c.equipe_nome} › ${c.canal_nome}`;
   return (
     <>
       <strong>{destino}</strong>

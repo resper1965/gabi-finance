@@ -103,13 +103,14 @@ def _conta_teams(con, conta: str) -> str:
 
 
 def resolver_chat(con, conta: str, nome: str) -> dict:
-    """Chat do Teams da conta pelo `de_nome` (sem caixa e acento); 0 ou mais de 1 dá destino_ambiguo."""
+    """Chat do Teams da conta pelo `de_nome` (sem caixa e acento); 0 ou mais de 1 dá destino_ambiguo.
+    `de_nome` é quem por último escreveu ao Ricardo (ou o mencionou), então o chat pode ser de grupo: o `tipo` vai junto para o dono ver."""
     alvo = normalizar_nome(nome)
     achados = [r for r in con.execute("select chat_id, tipo, de_nome from teams_conversa where lower(conta)=? and de_nome is not null order by chat_id", (conta.strip().lower(),))
                if alvo and normalizar_nome(r["de_nome"]) == alvo]
     if len(achados) != 1:
         raise ErroEnvio("destino_ambiguo", candidatos=[{"nome": r["de_nome"], "tipo": r["tipo"]} for r in achados])
-    return {"chat_id": achados[0]["chat_id"], "destino_nome": achados[0]["de_nome"]}
+    return {"chat_id": achados[0]["chat_id"], "destino_nome": achados[0]["de_nome"], "tipo": achados[0]["tipo"]}
 
 
 def _utc(t: dt.datetime) -> str:
@@ -177,7 +178,7 @@ def criar_teams_chat(con, agora: dt.datetime, *, conta, chat_com, texto) -> dict
     c = _conta_teams(con, conta)
     alvo = resolver_chat(con, c, chat_com)
     r = _gravar(con, agora, "teams_chat", c, {"conta": c, **alvo, "texto": texto}, agora + dt.timedelta(hours=24))
-    r["resumo"] = f"Teams: chat com {alvo['destino_nome']}"
+    r["resumo"] = f"Teams: chat com {alvo['destino_nome']}" + (" (grupo)" if alvo["tipo"] == "grupo" else "")
     return r
 
 

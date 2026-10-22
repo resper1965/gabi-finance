@@ -50,6 +50,16 @@ test("cartão de Teams mostra o destino e o texto completo", async () => {
   expect(canal.textContent).toContain("Aviso");
 });
 
+test("cartão de chat de grupo avisa (grupo); conversa a dois e proposta antiga sem tipo não", async () => {
+  const GRUPO = { ...TEAMS, id: 4, hash: "h-grupo", conteudo: { ...TEAMS.conteudo, chat_id: "g1", destino_nome: "Bruno Lima", tipo: "grupo" } };
+  const DOIS = { ...TEAMS, id: 5, hash: "h-dois", conteudo: { ...TEAMS.conteudo, chat_id: "c5", destino_nome: "Dora Reis", tipo: "um_a_um" } };
+  fake([TEAMS, GRUPO, DOIS]);
+  montar();
+  expect((await screen.findByText(/Bruno Lima/)).closest("li")!.textContent).toContain("Bruno Lima (grupo)");
+  expect(screen.getByText(/Dora Reis/).closest("li")!.textContent).not.toContain("(grupo)");
+  expect(screen.getByText(/Carlos Souza/).closest("li")!.textContent).not.toContain("(grupo)");
+});
+
 test("Enviar manda o hash da listagem e recarrega", async () => {
   const c = fake([EVENTO]);
   montar();

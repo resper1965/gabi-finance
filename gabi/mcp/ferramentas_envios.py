@@ -24,7 +24,10 @@ _MENSAGENS = {
 
 
 def _candidato(c: dict) -> str:
-    return f"{c['nome']} <{c['email']}>" if c.get("email") else str(c.get("nome", ""))
+    """"Nome <email>" para convidado; "Nome (grupo)" para chat de grupo do Teams; senão só o nome."""
+    if c.get("email"):
+        return f"{c['nome']} <{c['email']}>"
+    return str(c.get("nome", "")) + (" (grupo)" if c.get("tipo") == "grupo" else "")
 
 
 def _erro(e: ErroEnvio) -> ErroFerramenta:

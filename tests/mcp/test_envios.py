@@ -128,7 +128,7 @@ def test_propor_teams_canal_inexistente_da_destino_ambiguo(cli3, banco3, tok):
 def test_propor_teams_chat_ambiguo_devolve_candidatos(cli3, banco3, tok):
     conectar(banco3).execute("insert into teams_conversa(conta, chat_id, tipo, de_nome) values (?, 'c2','grupo','Ana Souza')", (NESS,))
     r = chamar(cli3, tok["envios"], "propor_teams", texto="x", chat_com="Ana Souza")
-    assert r["erro"] == "destino_ambiguo" and "Ana Souza" in r["mensagem"]
+    assert r["erro"] == "destino_ambiguo" and "candidatos: Ana Souza; Ana Souza (grupo)" in r["mensagem"]
 
 
 @pytest.mark.parametrize("args", [dict(chat_com="Ana Souza", equipe="Comercial", canal="Geral"), dict(), dict(equipe="Comercial"),

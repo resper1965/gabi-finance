@@ -35,7 +35,7 @@ O Ricardo pede ao Hermes "marca com Fulano quinta 15h pela ness" ou "posta no ca
 Os estados finais são `enviada`, `recusada`, `falhou`, `incerto` e `vencida`. `vence_em` = criada + 24h. Num evento, vence também quando o início passa: o menor dos dois prazos.
 
 **Conteúdo de `evento`:** `{conta, provedor ("graph"|"google"), titulo, inicio_utc, fim_utc, fuso: "America/Sao_Paulo", convidados: [e-mail...], descricao?, online: bool}`. Com `online`, a ness ganha link do Teams (`isOnlineMeeting`) e o Google ganha link do Meet (`conferenceData.createRequest`, `requestId` = chave).
-**Conteúdo de `teams_chat`:** `{conta, chat_id, destino_nome, texto}`. **De `teams_canal`:** `{conta, equipe_id, canal_id, equipe_nome, canal_nome, texto}`.
+**Conteúdo de `teams_chat`:** `{conta, chat_id, destino_nome, tipo, texto}` (`tipo` = `um_a_um` | `grupo`, de `teams_conversa`: `de_nome` é quem escreveu por último, então o chat pode ser de grupo; o cartão e o resumo mostram "(grupo)"; propostas antigas sem `tipo` ficam sem aviso). **De `teams_canal`:** `{conta, equipe_id, canal_id, equipe_nome, canal_nome, texto}`.
 
 ## Configuração (dados, não código)
 - `parametro envios.escrita`: só `"ligado"` liga, o padrão é desligado. Desligado, a proposta é criada e listada, mas Enviar responde 409 `envios_desligados` e não chama nenhum provedor.
