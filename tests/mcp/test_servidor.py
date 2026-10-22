@@ -21,7 +21,9 @@ NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "classificar_lancamento
 NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
 NOVAS_ENVIOS = {"propor_evento", "propor_teams"}  # só propõem; o envio sai do botão Enviar do painel
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento"}
+# contato grava direto a pedido do Ricardo (histórico e Desfazer no painel); documento só é proposto
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
 
 @pytest.fixture
@@ -109,9 +111,10 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_20_ferramentas_da_simplificacao_e_dos_envios():
+def test_sobram_exatamente_as_25_ferramentas_da_simplificacao_dos_envios_e_da_familia():
     assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "classificar_lancamento", "decisao_responder", "decisoes_abertas",
-                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "email_listar", "fechamento_dia",
+                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "email_listar", "familia_atualizar_contato",
+                                           "familia_consultar", "familia_listar", "familia_propor_documento", "familia_vencimentos", "fechamento_dia",
                                            "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
                                            "financeiro_recorrentes", "financeiro_saldo", "propor_evento", "propor_teams", "regras_sugerir", "resumo_manha"]
 
@@ -121,6 +124,8 @@ def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar"}
     for n in nomes:
+        if n == "familia_atualizar_contato":  # escrita de contato com histórico e Desfazer (spec do cadastro familiar), nunca documento
+            continue
         palavras = set(n.replace("contas_a_pagar", "contas").split("_"))  # "contas a pagar" é consulta, não ação
         assert not (palavras & proibidas), n
 
