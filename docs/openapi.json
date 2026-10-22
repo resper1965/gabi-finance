@@ -2083,6 +2083,121 @@
     "summary": "Destino Agrupado"
    }
   },
+  "/api/v1/envios": {
+   "get": {
+    "description": "Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada.",
+    "operationId": "listar_envios_api_v1_envios_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Envios"
+   }
+  },
+  "/api/v1/envios/{envio_id}/enviar": {
+   "post": {
+    "description": "Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto).",
+    "operationId": "enviar_envio_api_v1_envios__envio_id__enviar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "envio_id",
+      "required": true,
+      "schema": {
+       "title": "Envio Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Enviar Envio"
+   }
+  },
+  "/api/v1/envios/{envio_id}/recusar": {
+   "post": {
+    "description": "Recusa a proposta pendente; nada é enviado.",
+    "operationId": "recusar_envio_api_v1_envios__envio_id__recusar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "envio_id",
+      "required": true,
+      "schema": {
+       "title": "Envio Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Recusar Envio"
+   }
+  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",
