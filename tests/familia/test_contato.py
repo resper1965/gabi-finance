@@ -108,3 +108,51 @@ def test_auditoria_sem_valor(con):
     linhas = [x["o_que"] for x in con.execute("select o_que from decisao where origem='familia'")]
     assert len(linhas) == 2 and all("ana" in t and "telefones" in t for t in linhas)
     assert not any("98888" in t for t in linhas)
+
+
+def _cru(con, bruto):
+    con.execute("update pessoa set dados=? where id='ana'", (bruto,))
+
+
+@pytest.mark.parametrize("bruto", ["{quebrado", "[1,2]", '"texto"', json.dumps({"telefones": "+5511"}),
+                                   json.dumps({"emails": {"a": 1}, "x": 1})])
+def test_dados_corrompidos_nao_sao_sobrescritos(con, bruto):
+    _cru(con, bruto)
+    lista_ruim = "telefones" in bruto or "emails" in bruto
+    for campo, acao, v in (("apelido", "definir", "A"), ("telefones", "adicionar", "(11) 98888-7777"),
+                           ("emails", "adicionar", "a@x.com")):
+        if lista_ruim and (campo == "apelido" or campo not in bruto):
+            continue  # só o campo de lista corrompido é recusado; os outros gravariam sem perder nada
+        assert _erro(con, campo, acao, v) == "requisicao_invalida"
+        assert con.execute("select dados from pessoa where id='ana'").fetchone()["dados"] == bruto
+    assert contato.historico(con) == []
+
+
+def test_dados_nulo_ou_vazio_vira_vazio(con):
+    for bruto in (None, ""):
+        _cru(con, bruto)
+        contato.atualizar(con, "ana", "apelido", "definir", "A", "boss", AGORA)
+        assert _dados(con) == {"apelido": "A"}
+
+
+def test_remover_normaliza_itens_existentes(con):
+    _cru(con, json.dumps({"telefones": ["(11) 98888-7777"], "emails": ["A@X.com "]}))
+    contato.atualizar(con, "ana", "telefones", "remover", "+5511988887777", "boss", AGORA)
+    contato.atualizar(con, "ana", "emails", "remover", "a@x.com", "boss", AGORA)
+    assert _dados(con) == {}
+
+
+def test_nascimento_data_inexistente(con):
+    assert _erro(con, "nascimento", "definir", "2000-13-45") == "valor_invalido"
+
+
+def test_atomicidade(con, monkeypatch):
+    antes = con.execute("select dados from pessoa where id='ana'").fetchone()["dados"]
+
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(contato, "_historico", falha)
+    with pytest.raises(RuntimeError):
+        contato.atualizar(con, "ana", "apelido", "definir", "A", "boss", AGORA)
+    assert con.execute("select dados from pessoa where id='ana'").fetchone()["dados"] == antes
+    assert con.execute("select count(*) n from decisao where origem='familia'").fetchone()["n"] == 0

@@ -55,19 +55,35 @@ def _texto_item(item):
     return None
 
 
-def _casa(item, valor) -> bool:
-    return item == valor or _texto_item(item) == valor
+def _canon(campo: str, item):
+    """Forma comparável de um item já guardado (telefone E.164, e-mail minúsculo); None se não der para normalizar."""
+    if campo == "telefones":
+        return normalizar_telefone(item) if isinstance(item, str) else None
+    if campo == "emails":
+        return item.strip().lower() if isinstance(item, str) else None
+    return None
+
+
+def _casa(campo: str, item, valor) -> bool:
+    if item == valor or _texto_item(item) == valor:
+        return True
+    c = _canon(campo, item)
+    return c is not None and c == valor
 
 
 def _dados_da(con, pessoa_id: str) -> dict:
     r = con.execute("select dados from pessoa where id=? and excluido_em is null", (pessoa_id,)).fetchone()
     if r is None:
         raise ErroFamilia("nao_encontrado")
+    if not r["dados"]:
+        return {}
     try:
-        d = json.loads(r["dados"]) if r["dados"] else {}
+        d = json.loads(r["dados"])
     except (TypeError, ValueError):
-        d = {}
-    return d if isinstance(d, dict) else {}
+        raise ErroFamilia("requisicao_invalida")
+    if not isinstance(d, dict):
+        raise ErroFamilia("requisicao_invalida")
+    return d
 
 
 def _gravar(con, pessoa_id: str, dados: dict) -> None:
@@ -77,7 +93,11 @@ def _gravar(con, pessoa_id: str, dados: dict) -> None:
 def _atual(dados: dict, campo: str):
     if campo in LISTAS:
         v = dados.get(campo)
-        return list(v) if isinstance(v, list) else []
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ErroFamilia("requisicao_invalida")
+        return list(v)
     return dados.get(campo)
 
 
@@ -105,8 +125,13 @@ def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agor
         raise ErroFamilia("campo_invalido")
     if acao not in ("definir", "adicionar", "remover") or (campo in LISTAS) == (acao == "definir"):
         raise ErroFamilia("requisicao_invalida")
-    if campo == "nascimento" and not (isinstance(valor, str) and _DATA.match(valor.strip())):
-        raise ErroFamilia("valor_invalido")
+    if campo == "nascimento":
+        try:
+            if not (isinstance(valor, str) and _DATA.match(valor.strip())):
+                raise ValueError
+            dt.date.fromisoformat(valor.strip())
+        except ValueError:
+            raise ErroFamilia("valor_invalido")
     with transacao(con, imediata=True):
         dados = _dados_da(con, pessoa_id)
         antes = _atual(dados, campo)
@@ -114,12 +139,12 @@ def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agor
             depois = _normalizar(campo, valor)
         elif acao == "adicionar":
             novo = _normalizar(campo, valor)
-            if len(antes) >= MAX_ITENS or any(_casa(i, novo) for i in antes):
+            if len(antes) >= MAX_ITENS or any(_casa(campo, i, novo) for i in antes):
                 raise ErroFamilia("valor_invalido")
             depois = antes + [novo]
         else:
             alvo = _normalizar(campo, valor)
-            ficam = [i for i in antes if not _casa(i, alvo)]
+            ficam = [i for i in antes if not _casa(campo, i, alvo)]
             if len(ficam) == len(antes):
                 raise ErroFamilia("valor_invalido")
             depois = ficam
