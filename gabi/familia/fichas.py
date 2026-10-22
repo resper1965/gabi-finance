@@ -4,10 +4,16 @@ O número do documento só sai por `ficha`; listas, vencimentos, erros e a audit
 import calendar
 import datetime as dt
 import json
+import re
 
 from gabi.envios.propostas import normalizar_nome
 
 CAMPOS_DOC = ("emissao", "validade", "emissor", "numero")
+
+
+def normalizar_numero(numero) -> str:
+    """Número de documento comparável: sem espaços, pontos e hífens, em maiúsculas."""
+    return re.sub(r"[\s.\-]", "", str(numero or "")).upper()
 
 
 class ErroFamilia(Exception):
@@ -67,7 +73,10 @@ def divergencias(con, pessoa_id: str) -> list[dict]:
             " where p.pessoa_id=? and p.estado='pendente' and d.excluido_em is null order by p.id", (pessoa_id,)):
         pares = {"emissao": (p["pe"], p["de"]), "validade": (p["pv"], p["dv"]),
                  "emissor": (p["pm"], p["dm"]), "numero": (p["pn"], p["dn"])}
-        campos = [c for c in CAMPOS_DOC if (pares[c][0] or None) != (pares[c][1] or None)]
+        # Campo vazio na proposta não muda nada ao aprovar, então não é divergência; o número compara normalizado.
+        campos = [c for c in CAMPOS_DOC if pares[c][0]
+                  and (normalizar_numero(pares[c][0]) != normalizar_numero(pares[c][1]) if c == "numero"
+                       else pares[c][0] != (pares[c][1] or None))]
         if campos:
             saida.append({"documento_id": p["documento_id"], "tipo": p["tipo"], "campos": campos})
     return saida
