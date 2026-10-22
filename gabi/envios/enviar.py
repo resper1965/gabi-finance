@@ -1,7 +1,7 @@
 """Executor do envio: depois do "Enviar" do dono, reserva a proposta, faz UMA chamada ao provedor e fecha em enviada, falhou ou incerto.
 Consome: envio_proposta (via propostas.reservar/concluir, que já auditam em `decisao`), Google (evento_criar) e Graph da ness (evento_criar,
 teams_chat_enviar, teams_canal_enviar) pela ponte. Grava: o estado final da proposta; trava em <pasta do banco>/locks/envios.lock.
-Nunca repete: qualquer erro sem status HTTP vira incerto (o provedor pode ter recebido). Motivos são códigos fixos; a mensagem do provedor
+Nunca repete: 5xx e erro sem status HTTP nem código conhecido viram incerto (o provedor pode ter recebido); 4xx e recusas certas viram falhou. Motivos são códigos fixos; a mensagem do provedor
 não vai para log, stderr nem `decisao`."""
 import contextlib
 import datetime as dt
@@ -13,8 +13,12 @@ from pathlib import Path
 from gabi.envios.propostas import ErroEnvio, concluir, reservar
 
 _STATUS = re.compile(r"-> (\d{3})$")
+_TIPO = re.compile(r"^[A-Za-z_]\w*: ")  # prefixo "<Tipo>: " que a ponte põe quando o tipo do erro remoto é outro
+# Recusas certas antes do envio (nada saiu): falhou com código fixo. Casam por igualdade ou como prefixo "<código>: ..." (sem guardar o resto).
 _FIXOS = {"login_teams_expirado": "login_teams_expirado", "teams_sem_login": "teams_sem_login",
-          "login_teams_conta_diferente": "login_teams_conta_diferente", "conta não autorizada": "conta_nao_permitida"}
+          "login_teams_conta_diferente": "login_teams_conta_diferente", "conta não autorizada": "conta_nao_permitida",
+          "token recusado": "login_google_expirado", "chave inválida": "requisicao_invalida", "evento inválido": "requisicao_invalida",
+          "chat inválido": "requisicao_invalida"}
 
 
 def _banco(con) -> Path:
@@ -43,13 +47,16 @@ def trava(banco: Path):
 
 
 def _motivo(erro: Exception) -> tuple[str, str]:
-    """(estado, motivo) a partir só da mensagem (a ponte preserva a mensagem, não o atributo .status)."""
+    """(estado, motivo) a partir só da mensagem (a ponte preserva a mensagem, não o atributo .status). 4xx = falhou; 5xx = incerto."""
     msg = str(erro)
     m = _STATUS.search(msg)
     if m:
-        return "falhou", f"provedor_{m.group(1)}"
-    if msg in _FIXOS:
-        return "falhou", _FIXOS[msg]
+        # 5xx num POST pode ter sido aceito (Graph/Teams sem idempotência): incerto, nunca repetido
+        return ("incerto" if m.group(1).startswith("5") else "falhou"), f"provedor_{m.group(1)}"
+    for texto in (msg, _TIPO.sub("", msg, count=1)):
+        for k, motivo in _FIXOS.items():
+            if texto == k or texto.startswith(k + ":"):
+                return "falhou", motivo
     return "incerto", "sem_confirmacao"
 
 

@@ -1,6 +1,8 @@
 import fcntl
 import json
 
+import pytest
+
 from tests.envios.test_ciclo import _estado, _ligar
 from tests.envios.test_propostas import AGORA, NESS, _agenda, _codigo, _evento, _teams, con  # noqa: F401
 
@@ -99,6 +101,49 @@ def test_google_403_falhou_provedor_403(con):
     assert l["estado"] == "falhou" and l["motivo"] == "provedor_403" and l["externo_id"] is None
 
 
+def test_graph_503_incerto_provedor_503(con):
+    _ligar(con)
+    r = _chat(con)
+    graph = Falso(erro=RuntimeError("POST /chats/c1/messages -> 503"))
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert out == {"id": r["id"], "estado": "incerto", "motivo": "provedor_503"}
+    assert len(graph.chamadas) == 1 and _estado(con, r["id"])["motivo"] == "provedor_503"
+
+
+def test_google_conta_nao_autorizada_com_conta_na_mensagem(con):
+    _agenda(con, conta=GMAIL, provedor="google")
+    _ligar(con)
+    r = _evento(con, conta=GMAIL)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, Falso(erro=RuntimeError(f"conta não autorizada: {GMAIL}")), None)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "conta_nao_permitida"}
+    assert _estado(con, r["id"])["motivo"] == "conta_nao_permitida"
+    textos = [x[0] for x in con.execute("select o_que from decisao where origem='envios'")]
+    assert all("conta não autorizada" not in t for t in textos)  # a mensagem do provedor não vai para decisao
+
+
+def test_prefixo_do_tipo_da_ponte(con):
+    _ligar(con)
+    r = _chat(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError("ErroGraphNess: teams_sem_login")))
+    assert out["estado"] == "falhou" and out["motivo"] == "teams_sem_login"
+
+
+def test_token_recusado_login_google_expirado(con):
+    _agenda(con, conta=GMAIL, provedor="google")
+    _ligar(con)
+    r = _evento(con, conta=GMAIL)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, Falso(erro=RuntimeError(f"token recusado: {GMAIL}")), None)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "login_google_expirado"}
+
+
+@pytest.mark.parametrize("msg", ["chave inválida", "evento inválido", "chat inválido"])
+def test_recusa_de_formato_requisicao_invalida(con, msg):
+    _ligar(con)
+    r = _chat(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError(msg)))
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "requisicao_invalida"}
+
+
 def test_timeout_teams_incerto_uma_chamada(con):
     _ligar(con)
     r = _chat(con)
@@ -187,5 +232,5 @@ def test_auditoria_e_stderr_sem_conteudo(con, capsys):
         assert s not in out and s not in err
     auditoria = [x[0] for x in con.execute("select o_que from decisao where origem='envios' order by rowid")]
     assert len(auditoria) == 4  # reservar + concluir de cada uma, sem linha duplicada
-    assert auditoria[1].endswith("falhou") and auditoria[3].endswith("incerto")
+    assert auditoria[1].endswith("incerto") and auditoria[3].endswith("incerto")
     assert all("Segredo" not in a and "Secreto" not in a and "Ana" not in a for a in auditoria)
