@@ -1,4 +1,4 @@
-"""Criação das propostas de envio (evento de agenda, mensagem do Teams) que só saem depois do "Enviar" do dono no painel.
+"""Criação e ciclo de vida das propostas de envio (evento de agenda, mensagem do Teams) que só saem depois do "Enviar" do dono no painel.
 Consome: parametro (envios.escrita, envios.contas_agenda), agenda_fonte, teams_fonte, teams_conversa, contato_google e contato_google_email. Grava: envio_proposta (migração 0076).
 Sem rede e sem envio: aqui só se valida, resolve nomes e grava o conteúdo canônico. Título, texto, nome e e-mail nunca vão para log nem para mensagem de erro: as falhas são códigos fixos (ErroEnvio.codigo)."""
 import base64
@@ -190,3 +190,99 @@ def criar_teams_canal(con, agora: dt.datetime, *, conta, equipe_id, canal_id, eq
     r = _gravar(con, agora, "teams_canal", c, obj, agora + dt.timedelta(hours=24))
     r["resumo"] = f"Teams: canal {canal_nome} da equipe {equipe_nome}"
     return r
+
+
+# ---- ciclo de vida: listar, vencer, recusar, reservar, concluir ----
+
+_COLUNAS = "id, tipo, conta, conteudo, hash, estado, motivo, criada_em, vence_em, decidida_em, enviada_em"
+
+
+def auditar(con, quem: str, agora: dt.datetime, texto: str) -> None:
+    """Registra em `decisao` (origem 'envios'). O texto só leva id, tipo, conta e estado; a transação é a do chamador."""
+    con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,'envios')", (_utc(agora), quem, texto))
+
+
+def _texto_auditoria(l, estado: str) -> str:
+    return f"Envio {l['id']} ({l['tipo']}, {l['conta']}): {estado}"
+
+
+def _vencer(con, agora: dt.datetime) -> None:
+    """Pendentes com vence_em <= agora viram vencida (dentro da transação do chamador)."""
+    con.execute("update envio_proposta set estado='vencida' where estado='pendente' and vence_em<=?", (_utc(agora),))
+
+
+def listar(con, agora: dt.datetime, estado: str = "pendente") -> list[dict]:
+    """Marca as vencidas e lista. estado="decididas": as 20 mais recentes não pendentes, por decidida_em desc."""
+    with transacao(con, imediata=True):
+        _vencer(con, agora)
+        if estado == "decididas":
+            linhas = con.execute(f"select {_COLUNAS} from envio_proposta where estado!='pendente' order by decidida_em desc, id desc limit 20").fetchall()
+        else:
+            linhas = con.execute(f"select {_COLUNAS} from envio_proposta where estado=? order by id", (estado,)).fetchall()
+    return [{**{k: l[k] for k in l.keys()}, "conteudo": json.loads(l["conteudo"])} for l in linhas]
+
+
+def recusar(con, id: int, quem: str, agora: dt.datetime) -> None:
+    with transacao(con, imediata=True):
+        l = con.execute("select id, tipo, conta, estado from envio_proposta where id=?", (id,)).fetchone()
+        if l is None:
+            erro = "nao_encontrado"
+        elif con.execute("update envio_proposta set estado='recusada', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
+                         (_utc(agora), quem, id)).rowcount == 0:
+            erro = "conflito"
+        else:
+            erro = None
+            auditar(con, quem, agora, _texto_auditoria(l, "recusada"))
+    if erro:
+        raise ErroEnvio(erro)
+
+
+def reservar(con, id: int, hash: str, quem: str, agora: dt.datetime) -> dict:
+    """Transição atômica pendente → enviando, com as checagens na ordem do spec. Vencida e conta_nao_permitida gravam o estado e só depois levantam."""
+    with transacao(con, imediata=True):
+        l = con.execute("select * from envio_proposta where id=?", (id,)).fetchone()
+        erro = None
+        if l is None:
+            erro = "nao_encontrado"
+        elif l["estado"] == "pendente" and l["vence_em"] <= _utc(agora):
+            con.execute("update envio_proposta set estado='vencida' where id=? and estado='pendente'", (id,))
+            erro = "vencida"
+        elif l["estado"] != "pendente":
+            erro = "conflito"
+        elif l["hash"] != hash:
+            erro = "hash_diferente"
+        elif not escrita_ligada(con):
+            erro = "envios_desligados"
+        else:
+            permitida = (l["conta"] in contas_agenda(con) and provedor_da_conta(con, l["conta"]) is not None) if l["tipo"] == "evento" \
+                else l["conta"] in contas_teams(con)
+            if not permitida:
+                con.execute("update envio_proposta set estado='falhou', motivo='conta_nao_permitida', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
+                            (_utc(agora), quem, id))
+                auditar(con, quem, agora, _texto_auditoria(l, "falhou"))
+                erro = "conta_nao_permitida"
+            elif con.execute("update envio_proposta set estado='enviando', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
+                             (_utc(agora), quem, id)).rowcount == 0:
+                erro = "conflito"
+            else:
+                auditar(con, quem, agora, _texto_auditoria(l, "enviando"))
+                return dict(con.execute("select * from envio_proposta where id=?", (id,)).fetchone())
+    raise ErroEnvio(erro)
+
+
+def concluir(con, id: int, estado: str, *, motivo: str | None = None, externo_id: str | None = None, agora: dt.datetime) -> None:
+    """Fecha uma proposta que estava enviando: enviada, falhou ou incerto. `motivo` é código fixo, nunca texto do provedor."""
+    if estado not in ("enviada", "falhou", "incerto"):
+        raise _invalida()
+    with transacao(con, imediata=True):
+        l = con.execute("select id, tipo, conta from envio_proposta where id=?", (id,)).fetchone()
+        if l is None:
+            erro = "nao_encontrado"
+        elif con.execute("update envio_proposta set estado=?, motivo=?, externo_id=?, enviada_em=? where id=? and estado='enviando'",
+                         (estado, motivo, externo_id, _utc(agora) if estado == "enviada" else None, id)).rowcount == 0:
+            erro = "conflito"
+        else:
+            erro = None
+            auditar(con, "sistema", agora, _texto_auditoria(l, estado))
+    if erro:
+        raise ErroEnvio(erro)
