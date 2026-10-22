@@ -1,0 +1,88 @@
+"""Executor do envio: depois do "Enviar" do dono, reserva a proposta, faz UMA chamada ao provedor e fecha em enviada, falhou ou incerto.
+Consome: envio_proposta (via propostas.reservar/concluir, que já auditam em `decisao`), Google (evento_criar) e Graph da ness (evento_criar,
+teams_chat_enviar, teams_canal_enviar) pela ponte. Grava: o estado final da proposta; trava em <pasta do banco>/locks/envios.lock.
+Nunca repete: qualquer erro sem status HTTP vira incerto (o provedor pode ter recebido). Motivos são códigos fixos; a mensagem do provedor
+não vai para log, stderr nem `decisao`."""
+import contextlib
+import datetime as dt
+import fcntl
+import json
+import re
+from pathlib import Path
+
+from gabi.envios.propostas import ErroEnvio, concluir, reservar
+
+_STATUS = re.compile(r"-> (\d{3})$")
+_FIXOS = {"login_teams_expirado": "login_teams_expirado", "teams_sem_login": "teams_sem_login",
+          "login_teams_conta_diferente": "login_teams_conta_diferente", "conta não autorizada": "conta_nao_permitida"}
+
+
+def _banco(con) -> Path:
+    """Arquivo do banco principal da conexão (a trava fica ao lado dele)."""
+    for r in con.execute("pragma database_list"):
+        if r[1] == "main" and r[2]:
+            return Path(r[2])
+    raise ErroEnvio("requisicao_invalida")  # banco em memória: sem pasta para a trava
+
+
+@contextlib.contextmanager
+def trava(banco: Path):
+    """Um envio por vez (flock não bloqueante em <pasta do banco>/locks/envios.lock). Rende True com a trava, False se outro envio a tem."""
+    pasta = Path(banco).parent / "locks"
+    pasta.mkdir(parents=True, exist_ok=True)
+    f = open(pasta / "envios.lock", "w")
+    try:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        yield True
+    finally:
+        f.close()  # fechar libera a trava, mesmo em erro
+
+
+def _motivo(erro: Exception) -> tuple[str, str]:
+    """(estado, motivo) a partir só da mensagem (a ponte preserva a mensagem, não o atributo .status)."""
+    msg = str(erro)
+    m = _STATUS.search(msg)
+    if m:
+        return "falhou", f"provedor_{m.group(1)}"
+    if msg in _FIXOS:
+        return "falhou", _FIXOS[msg]
+    return "incerto", "sem_confirmacao"
+
+
+def _chamar(l: dict, conteudo: dict, google, graph) -> dict | None:
+    if l["tipo"] == "evento":
+        prov = google if conteudo.get("provedor") == "google" else graph if conteudo.get("provedor") == "graph" else None
+        if prov is None:
+            return None
+        return prov.evento_criar(l["conta"], l["chave"], conteudo)
+    if graph is None:
+        return None
+    if l["tipo"] == "teams_chat":
+        return graph.teams_chat_enviar(l["conta"], conteudo["chat_id"], conteudo["texto"])
+    return graph.teams_canal_enviar(l["conta"], conteudo["equipe_id"], conteudo["canal_id"], conteudo["texto"])
+
+
+def enviar(con, proposta_id: int, hash: str, quem: str, agora: dt.datetime, google, graph) -> dict:
+    """Envia uma proposta pendente uma única vez. Propaga o ErroEnvio de `reservar`; trava ocupada = ErroEnvio("conflito") sem reservar.
+    Devolve {"id", "estado"} e, se não enviada, "motivo"."""
+    with trava(_banco(con)) as tenho:
+        if not tenho:
+            raise ErroEnvio("conflito")
+        l = reservar(con, proposta_id, hash, quem, agora)
+        conteudo = json.loads(l["conteudo"])
+        try:
+            r = _chamar(l, conteudo, google, graph)
+        except Exception as e:  # noqa: BLE001 - uma tentativa só; o erro vira código fixo
+            estado, motivo = _motivo(e)
+        else:
+            if r is None:
+                estado, motivo = "falhou", "fonte_indisponivel"
+            else:
+                concluir(con, proposta_id, "enviada", externo_id=r["externo_id"], agora=agora)
+                return {"id": proposta_id, "estado": "enviada"}
+        concluir(con, proposta_id, estado, motivo=motivo, agora=agora)
+        return {"id": proposta_id, "estado": estado, "motivo": motivo}
