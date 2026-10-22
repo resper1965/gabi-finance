@@ -65,8 +65,6 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
     from gabi.fontes.ambiente import fontes_do_ambiente
     app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábricas de Nibo/Paperless (injetáveis nos testes)
-    from gabi.familia.ambiente import saude_do_ambiente
-    app.state.saude = saude_do_ambiente(Path(banco).parent)  # (arquivo, chave) ou None sem chave configurada (as rotas respondem 503)
     app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)
@@ -169,8 +167,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_cobrar)
     from gabi.rotas.avisos import router as rotas_avisos
     app.include_router(rotas_avisos)
-    from gabi.rotas.escuta import router as rotas_escuta
-    app.include_router(rotas_escuta)
+    from gabi.rotas.contatos import router as rotas_contatos
+    app.include_router(rotas_contatos)
     from gabi.rotas.decisoes import router as rotas_decisoes
     app.include_router(rotas_decisoes)
     from gabi.rotas.qualidade import router as rotas_qualidade
@@ -181,14 +179,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_teams)
     from gabi.rotas.correio import router as rotas_correio
     app.include_router(rotas_correio)
-    from gabi.rotas.trabalho import router as rotas_trabalho
-    app.include_router(rotas_trabalho)
-    from gabi.rotas.familia import router as rotas_familia
-    app.include_router(rotas_familia)
-    from gabi.rotas.reembolso_saude import router as rotas_reembolso_saude
-    app.include_router(rotas_reembolso_saude)
-    from gabi.rotas.setup import router as rotas_setup
-    app.include_router(rotas_setup)
+    from gabi.rotas.dia import router as rotas_dia
+    app.include_router(rotas_dia)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")

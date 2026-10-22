@@ -12,7 +12,7 @@ from gabi.avisos import _inicio_do_dia_utc, _novo
 from gabi.correio.classificar import Classe, classificar, decidir_lixeira
 from gabi.correio.regras import endereco, protegido, regra_lixo, texto_protegido
 from gabi.correio.sincronizar import JANELA_PADRAO, respondidos_prontos
-from gabi.escuta.classificar import Falha
+from gabi.correio.modelo import Falha
 
 BRT = ZoneInfo("America/Sao_Paulo")
 BACKOFF_BASE_MIN = 5

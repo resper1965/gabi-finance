@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12 (stdlib + FastAPI), SQLite (WAL, FTS5), React/Vite no painel, systemd (units/timers em `deploy/`), pytest + vitest.
 
-**Spec:** `/home/ricardo/handoff/docs/superpowers/plans/2026-10-08-gabi-brain-plano-mestre.md` (restrições R1–R17, gates G1–G14, aceites T1.14 e T2.10), `docs/TRILHA.md`, `docs/STATUS.md` (estado de 09–10/10/2026) e `/home/ricardo/handoff/docs/superpowers/specs/2026-10-08-gabi-brain-migracao-design.md`.
+**Spec:** `/home/ricardo/handoff/docs/superpowers/plans/2026-10-08-gabi-brain-plano-mestre.md` (restrições R1–R17, gates G1–G14, aceites T1.14 e T2.10), `docs/historico/TRILHA.md`, `docs/STATUS.md` (estado de 09–10/10/2026) e `/home/ricardo/handoff/docs/superpowers/specs/2026-10-08-gabi-brain-migracao-design.md`.
 
 ## Estado de partida (10/10/2026, verificado)
 
@@ -188,12 +188,12 @@
 
 ### Task 9: Primeiro lote do Nibo em conta real (G18)
 
-**Files:** `docs/aceite-fase-2.md` (evidência); código só se o formato de resposta do Nibo divergir.
+**Files:** `docs/historico/aceite-fase-2.md` (evidência); código só se o formato de resposta do Nibo divergir.
 
 - [ ] **Step 1 (Ricardo, G18):** escolher 1 item de reembolso com comprovante; ler o `texto_confirmacao` do `GET /api/v1/cobrar/reembolsos`; confirmar na tela.
 - [ ] **Step 2:** conferir o agendamento no Nibo e o anexo; **rodar o lote de novo** e conferir que **não duplicou** (`reference gabi:<id>`).
 - [ ] **Step 3:** se o Nibo responder em formato diferente do suposto (`scheduleId`, `fileId`, rota de baixa), escrever o teste vermelho com a resposta real em `tests/cobrar/test_nibo_escrita.py`, ajustar `gabi/fontes/nibo_escrita.py` e commitar.
-- [ ] **Step 4:** registrar a evidência em `docs/aceite-fase-2.md`.
+- [ ] **Step 4:** registrar a evidência em `docs/historico/aceite-fase-2.md`.
 
 ### Task 10: Ingestão de comprovantes do Paperless (só com dado real, G19)
 
@@ -248,17 +248,17 @@
 
 ### Task 13: Aceites e dívidas pequenas
 
-**Files:** `docs/aceite-fase-1.md`, `docs/aceite-fase-2.md`; **Modify** `gabi/cobrar/` (dívidas do ledger).
+**Files:** `docs/aceite-fase-1.md`, `docs/historico/aceite-fase-2.md`; **Modify** `gabi/cobrar/` (dívidas do ledger).
 
 - [ ] **Step 1:** rodar `python -m tools.aceite` (tarefa 1) quando houver 7 rodadas seguidas conferidas (≈ 16/10) e `classificado_pct >= 0.90`; commitar `docs/aceite-fase-1.md`.
-- [ ] **Step 2 (G20):** escrever `docs/aceite-fase-2.md` com os 3 itens do T2.10; o item "pedido real pelo canal" fica **adiado para o plano gabi-agent**, por decisão do Ricardo.
+- [ ] **Step 2 (G20):** escrever `docs/historico/aceite-fase-2.md` com os 3 itens do T2.10; o item "pedido real pelo canal" fica **adiado para o plano gabi-agent**, por decisão do Ricardo.
 - [ ] **Step 3: Dívidas** (cada uma com teste): unificar `_brl`/`_agora` duplicados em 5 módulos de `gabi/cobrar`; "Marcar como cobrado" respeitar os itens selecionados e ligar-se ao rascunho; `extrator.tipo_documento(texto, hoje)` receber a data (hoje usa `date.today()`).
 - [ ] **Step 4: Commit.**
 
 ### Task 14: Documentação e encerramento
 
 **Files:**
-- Modify: `/home/ricardo/handoff/docs/superpowers/plans/2026-10-08-gabi-brain-plano-mestre.md` (marcar as tarefas feitas e retirar o bloco CANAL para o plano gabi-agent), `docs/TRILHA.md`, `docs/STATUS.md`, `docs/runbook.md`, `docs/ARQUITETURA.md`
+- Modify: `/home/ricardo/handoff/docs/superpowers/plans/2026-10-08-gabi-brain-plano-mestre.md` (marcar as tarefas feitas e retirar o bloco CANAL para o plano gabi-agent), `docs/historico/TRILHA.md`, `docs/STATUS.md`, `docs/runbook.md`, `docs/ARQUITETURA.md`
 - Create: `docs/adr/010-donos-padrao-e-origem-fonte.md`, `docs/adr/011-favorecido-nao-e-para-quem.md`, `docs/adr/012-nfse-previsao-e-nibo-defasado.md` (≤ 15 linhas cada: Contexto · Decisão · Consequência · Quando reverter)
 
 - [ ] **Step 1:** atualizar plano mestre, TRILHA e STATUS com o que foi feito entre 09 e 10/10 e com este plano.

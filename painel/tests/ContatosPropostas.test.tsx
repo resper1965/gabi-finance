@@ -45,7 +45,7 @@ test("lista pendentes com antes e depois lado a lado", async () => {
   expect(li.textContent).toContain("Ana +5511991234567");
   const novo = screen.getByText(/\+5511988887777/).closest("li")!;
   expect(novo.textContent).toContain("— (novo)");
-  expect(gets(c, "pendente")[0].url).toBe("/api/v1/escuta/contatos/propostas?estado=pendente");
+  expect(gets(c, "pendente")[0].url).toBe("/api/v1/contatos/propostas?estado=pendente");
 });
 
 test("nota diz que nada muda na Microsoft (conta ness) e não fala em Google", async () => {
@@ -73,7 +73,7 @@ test.each([["Aprovar", "aprovada"], ["Recusar", "recusada"]])("%s envia a decis�
   const li = (await screen.findByText(/\+551191234567/)).closest("li")!;
   fireEvent.click(within(li).getByRole("button", { name: new RegExp(`^${rotulo}`) }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/propostas/7/decisao", corpo: { estado } });
+  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/contatos/propostas/7/decisao", corpo: { estado } });
   await waitFor(() => expect(gets(c, "pendente")).toHaveLength(2));
   await waitFor(() => expect(gets(c, "aprovada")).toHaveLength(2));
 });
@@ -84,7 +84,7 @@ test("botão em lote envia só os ids das correções na tela e avisa que não i
   expect(await screen.findByText(/Não inclui contatos novos nem apagar\./)).toBeTruthy();
   fireEvent.click(await screen.findByRole("button", { name: "Aprovar todas as correções" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/propostas/aprovar-correcoes", corpo: { ids: [1, 3] } });
+  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/contatos/propostas/aprovar-correcoes", corpo: { ids: [1, 3] } });
   expect(await screen.findByText("2 correção(ões) aprovada(s).")).toBeTruthy();
 });
 
@@ -160,13 +160,13 @@ test("aprovadas aguardando gravação aparecem com Recusar, que desfaz a aprova�
   const c = fake([CRIAR], { aprovadas: [APROVADA] });
   montar();
   const titulo = await screen.findByText(/Aprovadas aguardando gravação · 1/);
-  expect(gets(c, "aprovada")[0].url).toBe("/api/v1/escuta/contatos/propostas?estado=aprovada");
+  expect(gets(c, "aprovada")[0].url).toBe("/api/v1/contatos/propostas?estado=aprovada");
   const li = screen.getByText(/\+5511977776666/).closest("li")!;
   expect(titulo).toBeTruthy();
   expect(within(li).queryByRole("button", { name: /^Aprovar/ })).toBeNull();
   fireEvent.click(within(li).getByRole("button", { name: "Recusar proposta 9 (criar)" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/escuta/contatos/propostas/9/decisao", corpo: { estado: "recusada" } });
+  expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/contatos/propostas/9/decisao", corpo: { estado: "recusada" } });
   await waitFor(() => expect(gets(c, "aprovada")).toHaveLength(2));
   await waitFor(() => expect(gets(c, "pendente")).toHaveLength(2));
 });
@@ -219,7 +219,7 @@ test("apagar contato só aprova depois de confirmar", async () => {
   confirma.mockReturnValueOnce(true);
   fireEvent.click(botao);
   await waitFor(() => expect(posts(c)).toHaveLength(1));
-  expect(posts(c)[0]).toMatchObject({ url: "/api/v1/escuta/contatos/propostas/13/decisao", corpo: { estado: "aprovada" } });
+  expect(posts(c)[0]).toMatchObject({ url: "/api/v1/contatos/propostas/13/decisao", corpo: { estado: "aprovada" } });
   expect(confirma.mock.calls[0][0]).not.toMatch(/U|5511947338256/);
   confirma.mockRestore();
 });

@@ -82,7 +82,7 @@
 
 ### Task 7: Gate do corte (H8) — só humano/tempo
 
-- [ ] **Step 1:** Conferir cada condição e registrar em `docs/PROGRESSO-GOAL.md`:
+- [ ] **Step 1:** Conferir cada condição e registrar em `docs/historico/PROGRESSO-GOAL.md`:
   - `escuta.modo='ativo'` e `escuta-ouvinte.service` active (hoje: inactive; depende de QR E1 e remetentes E2–E4 do Ricardo);
   - 7 dias de Hermes sem queda desde 19/10 12:54 → liberado em 26/10;
   - backup exportado com hash (H6, chave gpg do Ricardo);

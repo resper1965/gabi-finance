@@ -544,38 +544,6 @@
     "summary": "Equivalencia Excluir"
    }
   },
-  "/api/v1/cadastros/liberacoes": {
-   "get": {
-    "description": "Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente).",
-    "operationId": "liberacoes_api_v1_cadastros_liberacoes_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Liberacoes"
-   },
-   "post": {
-    "description": "Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada.",
-    "operationId": "liberar_api_v1_cadastros_liberacoes_post",
-    "responses": {
-     "201": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Liberar"
-   }
-  },
   "/api/v1/cadastros/nibo": {
    "get": {
     "description": "Parâmetros do Nibo: id do sócio (stakeholder) usado no lote diário.",
@@ -1026,76 +994,6 @@
     "summary": "Semanas"
    }
   },
-  "/api/v1/caixas-email": {
-   "get": {
-    "description": "Caixas de e-mail cadastradas (as 7 do aceite), com quantos itens cada uma já trouxe.",
-    "operationId": "listar_caixas_api_v1_caixas_email_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar Caixas"
-   },
-   "post": {
-    "description": "Cadastra uma caixa de e-mail; nasce 'a_decidir' e só é lida depois que o Ricardo a libera (estado sim).",
-    "operationId": "criar_caixa_api_v1_caixas_email_post",
-    "responses": {
-     "201": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Criar Caixa"
-   }
-  },
-  "/api/v1/caixas-email/{caixa_id}": {
-   "patch": {
-    "description": "Edita uma caixa (liberar, mudar provedor, frente padrão, a partir de quando ler).",
-    "operationId": "atualizar_caixa_api_v1_caixas_email__caixa_id__patch",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "caixa_id",
-      "required": true,
-      "schema": {
-       "title": "Caixa Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Atualizar Caixa"
-   }
-  },
   "/api/v1/cartoes": {
    "get": {
     "description": "Cartões: fatura aberta, % do limite, série de 12 meses e categorias.",
@@ -1128,204 +1026,6 @@
      }
     },
     "summary": "A Receber"
-   }
-  },
-  "/api/v1/cobrar/cobrancas": {
-   "get": {
-    "description": "Rascunhos de cobrança guardados (opcionalmente de uma empresa).",
-    "operationId": "cobrancas_api_v1_cobrar_cobrancas_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "empresa_id",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Empresa Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Cobrancas"
-   },
-   "post": {
-    "description": "Monta o RASCUNHO do e-mail de cobrança (não envia). Corpo: {\"empresa_id\", \"itens\"?: [lancamento_id]}.",
-    "operationId": "cobranca_montar_api_v1_cobrar_cobrancas_post",
-    "responses": {
-     "201": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Cobranca Montar"
-   }
-  },
-  "/api/v1/cobrar/cobrancas/{cid}/enviar": {
-   "post": {
-    "description": "Desabilitado (ADR-006): o app só guarda o rascunho.",
-    "operationId": "cobranca_enviar_api_v1_cobrar_cobrancas__cid__enviar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "cid",
-      "required": true,
-      "schema": {
-       "title": "Cid",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Cobranca Enviar"
-   }
-  },
-  "/api/v1/cobrar/comprovantes": {
-   "get": {
-    "description": "Vínculos propostos (comprovante × lançamento, com confiança e motivo) e as despesas de empresa ainda sem comprovante (padrão: últimos 90 dias).",
-    "operationId": "comprovantes_api_v1_cobrar_comprovantes_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "desde",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Desde"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Comprovantes"
-   }
-  },
-  "/api/v1/cobrar/lote/montar": {
-   "post": {
-    "description": "Monta (ou remonta) o lote do dia para o Nibo da Bekaa e devolve o texto de confirmação gerado pelo servidor.",
-    "operationId": "lote_montar_api_v1_cobrar_lote_montar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Lote Montar"
-   }
-  },
-  "/api/v1/cobrar/lote/{lote_id}/executar": {
-   "post": {
-    "description": "ÚNICA gravação externa: grava o lote no Nibo. Exige {\"confirmacao\": <texto exato>}; divergência = 409 e nada é gravado.",
-    "operationId": "lote_executar_api_v1_cobrar_lote__lote_id__executar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "lote_id",
-      "required": true,
-      "schema": {
-       "title": "Lote Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Lote Executar"
    }
   },
   "/api/v1/cobrar/notas": {
@@ -1365,83 +1065,6 @@
      }
     },
     "summary": "Notas"
-   }
-  },
-  "/api/v1/cobrar/pedidos": {
-   "get": {
-    "description": "Pedidos pendentes (inclui os com informação pedida) ou `decididos`.",
-    "operationId": "pedidos_api_v1_cobrar_pedidos_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "estado",
-      "required": false,
-      "schema": {
-       "default": "pendentes",
-       "title": "Estado",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Pedidos"
-   }
-  },
-  "/api/v1/cobrar/pedidos/{pid}/decidir": {
-   "post": {
-    "description": "aprovar (exige conta_id e beneficiario_id), recusar ou pedir_info. Só o Ricardo decide, pelo painel.",
-    "operationId": "pedido_decidir_api_v1_cobrar_pedidos__pid__decidir_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "pid",
-      "required": true,
-      "schema": {
-       "title": "Pid",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Pedido Decidir"
    }
   },
   "/api/v1/cobrar/previsao": {
@@ -1576,169 +1199,6 @@
     "summary": "Recebimento Rejeitar"
    }
   },
-  "/api/v1/cobrar/reembolsos": {
-   "get": {
-    "description": "Reembolsos por empresa contratante (itens em aberto e cobranças) e a prévia do lote do Nibo da Bekaa.",
-    "operationId": "reembolsos_api_v1_cobrar_reembolsos_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Reembolsos"
-   },
-   "post": {
-    "description": "Abre uma cobrança (a_cobrar) com os itens ainda sem cobrança da empresa contratante.",
-    "operationId": "reembolso_abrir_api_v1_cobrar_reembolsos_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Reembolso Abrir"
-   }
-  },
-  "/api/v1/cobrar/reembolsos/conciliar": {
-   "post": {
-    "description": "Baixa um crédito (entrada em conta PJ classificada como da empresa) contra os itens já cobrados, do mais antigo ao mais novo.",
-    "operationId": "reembolso_conciliar_api_v1_cobrar_reembolsos_conciliar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Reembolso Conciliar"
-   }
-  },
-  "/api/v1/cobrar/reembolsos/{rid}/cobrado": {
-   "post": {
-    "description": "Marca a cobrança como cobrada (a_cobrar → cobrado); repetir dá 409.",
-    "operationId": "reembolso_cobrado_api_v1_cobrar_reembolsos__rid__cobrado_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "rid",
-      "required": true,
-      "schema": {
-       "title": "Rid",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Reembolso Cobrado"
-   }
-  },
-  "/api/v1/cobrar/vinculos/{vid}/confirmar": {
-   "post": {
-    "description": "Confirma um vínculo proposto (comprovante × lançamento); só o Ricardo confirma.",
-    "operationId": "vinculo_confirmar_api_v1_cobrar_vinculos__vid__confirmar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "vid",
-      "required": true,
-      "schema": {
-       "title": "Vid",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Vinculo Confirmar"
-   }
-  },
-  "/api/v1/cobrar/vinculos/{vid}/rejeitar": {
-   "post": {
-    "description": "Rejeita um vínculo proposto; o par não volta a ser proposto como confirmado.",
-    "operationId": "vinculo_rejeitar_api_v1_cobrar_vinculos__vid__rejeitar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "vid",
-      "required": true,
-      "schema": {
-       "title": "Vid",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Vinculo Rejeitar"
-   }
-  },
   "/api/v1/contagens": {
    "get": {
     "description": "Itens que pedem decisão por área do menu (caixa, gastos, regras) e o total do sino.",
@@ -1840,9 +1300,9 @@
    }
   },
   "/api/v1/contatos": {
-   "get": {
-    "description": "Com quem tenho algo em aberto: e-mail importante sem resposta, reunião nos próximos 7 dias, pedido aberto e WhatsApp que pediu algo (só contagem e data). Só leitura.",
-    "operationId": "contatos_api_v1_contatos_get",
+   "delete": {
+    "description": "Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam).",
+    "operationId": "apagar_contatos_api_v1_contatos_delete",
     "responses": {
      "200": {
       "content": {
@@ -1853,7 +1313,211 @@
       "description": "Successful Response"
      }
     },
-    "summary": "Contatos"
+    "summary": "Apagar Contatos"
+   },
+   "get": {
+    "description": "Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado.",
+    "operationId": "listar_contatos_api_v1_contatos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "busca",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Busca",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limite",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "title": "Limite",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Contatos"
+   }
+  },
+  "/api/v1/contatos/propostas": {
+   "get": {
+    "description": "Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada.",
+    "operationId": "listar_propostas_api_v1_contatos_propostas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Propostas"
+   }
+  },
+  "/api/v1/contatos/propostas/aprovar-correcoes": {
+   "post": {
+    "description": "Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas.",
+    "operationId": "aprovar_correcoes_propostas_api_v1_contatos_propostas_aprovar_correcoes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Aprovar Correcoes Propostas"
+   }
+  },
+  "/api/v1/contatos/propostas/{proposta_id}/decisao": {
+   "post": {
+    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
+    "operationId": "decidir_proposta_api_v1_contatos_propostas__proposta_id__decisao_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposta_id",
+      "required": true,
+      "schema": {
+       "title": "Proposta Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Proposta"
+   }
+  },
+  "/api/v1/contatos/sincronizar": {
+   "post": {
+    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
+    "operationId": "sincronizar_contatos_api_v1_contatos_sincronizar_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Sincronizar Contatos"
+   }
+  },
+  "/api/v1/contatos/so-na-ness.csv": {
+   "get": {
+    "description": "CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino.",
+    "operationId": "contatos_so_na_ness_api_v1_contatos_so_na_ness_csv_get",
+    "responses": {
+     "200": {
+      "content": {
+       "text/csv": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "CSV do importador do Google (Name, Phone 1 - Value)"
+     }
+    },
+    "summary": "Contatos So Na Ness"
+   }
+  },
+  "/api/v1/contatos/trazer": {
+   "post": {
+    "description": "Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir.",
+    "operationId": "trazer_contatos_api_v1_contatos_trazer_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Trazer Contatos"
    }
   },
   "/api/v1/correio/dispensadas": {
@@ -2419,1005 +2083,6 @@
     "summary": "Destino Agrupado"
    }
   },
-  "/api/v1/entregas": {
-   "get": {
-    "description": "Entregas abertas da Linear (somente leitura), as com prazo primeiro.",
-    "operationId": "entregas_api_v1_entregas_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Entregas"
-   }
-  },
-  "/api/v1/escuta/contatos": {
-   "delete": {
-    "description": "Revoga: apaga todos os contatos do Google guardados (as pessoas já criadas ficam).",
-    "operationId": "apagar_contatos_api_v1_escuta_contatos_delete",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Apagar Contatos"
-   },
-   "get": {
-    "description": "Contatos (um por telefone; o nome do Gmail vence), com as contas em que existem e se o número já é uma pessoa. Paginado.",
-    "operationId": "listar_contatos_api_v1_escuta_contatos_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "busca",
-      "required": false,
-      "schema": {
-       "default": "",
-       "title": "Busca",
-       "type": "string"
-      }
-     },
-     {
-      "in": "query",
-      "name": "limite",
-      "required": false,
-      "schema": {
-       "default": 50,
-       "title": "Limite",
-       "type": "integer"
-      }
-     },
-     {
-      "in": "query",
-      "name": "offset",
-      "required": false,
-      "schema": {
-       "default": 0,
-       "title": "Offset",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Listar Contatos"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas": {
-   "get": {
-    "description": "Lista as propostas de contato da ness (criar, corrigir, corrigir nome, adicionar e-mail, apagar telefone, apagar contato) (padrão: pendentes) com nome, telefone e e-mails (email_depois, separados por ;), e diz se a escrita no Graph está ligada.",
-    "operationId": "listar_propostas_api_v1_escuta_contatos_propostas_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "estado",
-      "required": false,
-      "schema": {
-       "default": "pendente",
-       "title": "Estado",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Listar Propostas"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas/aprovar-correcoes": {
-   "post": {
-    "description": "Aprova as correções (telefone e nome) e os adicionar e-mail pendentes cujos ids vieram no corpo ({\"ids\": [int, ...]}, as que o painel mostra); criar, apagar e não pendentes ficam (só um a um); devolve quantas.",
-    "operationId": "aprovar_correcoes_propostas_api_v1_escuta_contatos_propostas_aprovar_correcoes_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Aprovar Correcoes Propostas"
-   }
-  },
-  "/api/v1/escuta/contatos/propostas/{proposta_id}/decisao": {
-   "post": {
-    "description": "Aprova ou recusa uma proposta pendente de contato, ou recusa uma já aprovada (corpo {\"estado\": \"aprovada\"|\"recusada\"}); 404 se não existe, 409 se já foi decidida.",
-    "operationId": "decidir_proposta_api_v1_escuta_contatos_propostas__proposta_id__decisao_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "proposta_id",
-      "required": true,
-      "schema": {
-       "title": "Proposta Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Decidir Proposta"
-   }
-  },
-  "/api/v1/escuta/contatos/sincronizar": {
-   "post": {
-    "description": "Lê os contatos das contas do Google (pela ponte) e grava nome, telefone e e-mail; devolve contagens e o erro de cada conta que falhou.\n200 se ao menos uma conta sincronizou; 503 `fonte_indisponivel` se nenhuma sincronizou ou a ponte está fora do ar.",
-    "operationId": "sincronizar_contatos_api_v1_escuta_contatos_sincronizar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Sincronizar Contatos"
-   }
-  },
-  "/api/v1/escuta/contatos/so-na-ness.csv": {
-   "get": {
-    "description": "CSV (importador do Google: Name, Phone 1 - Value) dos contatos que estão na conta de origem e não na de destino.",
-    "operationId": "contatos_so_na_ness_api_v1_escuta_contatos_so_na_ness_csv_get",
-    "responses": {
-     "200": {
-      "content": {
-       "text/csv": {
-        "schema": {
-         "type": "string"
-        }
-       }
-      },
-      "description": "CSV do importador do Google (Name, Phone 1 - Value)"
-     }
-    },
-    "summary": "Contatos So Na Ness"
-   }
-  },
-  "/api/v1/escuta/contatos/trazer": {
-   "post": {
-    "description": "Cria uma `pessoa` (canal whatsapp, nome do contato) para cada telefone escolhido que ainda não é pessoa. NUNCA aprova a escuta nem dá pode_pedir.",
-    "operationId": "trazer_contatos_api_v1_escuta_contatos_trazer_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Trazer Contatos"
-   }
-  },
-  "/api/v1/escuta/grupos": {
-   "get": {
-    "description": "Grupos de WhatsApp vistos pela escuta e se já foram aprovados.",
-    "operationId": "grupos_api_v1_escuta_grupos_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Grupos"
-   }
-  },
-  "/api/v1/escuta/grupos/{id_grupo}/aprovar": {
-   "post": {
-    "description": "Aprova um grupo de WhatsApp para a escuta (404 se o grupo nunca foi visto).",
-    "operationId": "aprovar_grupo_api_v1_escuta_grupos__id_grupo__aprovar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "id_grupo",
-      "required": true,
-      "schema": {
-       "title": "Id Grupo",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Aprovar Grupo"
-   }
-  },
-  "/api/v1/escuta/grupos/{id_grupo}/comprovantes": {
-   "post": {
-    "description": "Define a caixa de comprovantes (CP1 B): só anexos encaminhados a este grupo vão ao Paperless. Um grupo por vez; troca a anterior.\n404 se o grupo nunca foi visto; 409 se não está aprovado.",
-    "operationId": "grupo_comprovantes_api_v1_escuta_grupos__id_grupo__comprovantes_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "id_grupo",
-      "required": true,
-      "schema": {
-       "title": "Id Grupo",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Grupo Comprovantes"
-   }
-  },
-  "/api/v1/escuta/parametros": {
-   "get": {
-    "description": "Parâmetros da escuta: modo, palavras de risco, horas sem receber e tamanho máximo de anexo (padrões se não definidos).",
-    "operationId": "parametros_api_v1_escuta_parametros_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Parametros"
-   },
-   "put": {
-    "description": "Grava parâmetros da escuta (só os enviados); valida modo, lista de palavras e faixas, e audita só os nomes.",
-    "operationId": "gravar_parametros_api_v1_escuta_parametros_put",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Gravar Parametros"
-   }
-  },
-  "/api/v1/escuta/remetentes": {
-   "get": {
-    "description": "Fila de remetentes novos (pendentes) e a lista de aprovados da escuta.",
-    "operationId": "remetentes_api_v1_escuta_remetentes_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Remetentes"
-   }
-  },
-  "/api/v1/escuta/remetentes/{numero}/aprovar": {
-   "post": {
-    "description": "Aprova um remetente com um papel (familia, prestador ou cobranca); nome é opcional.",
-    "operationId": "aprovar_api_v1_escuta_remetentes__numero__aprovar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "numero",
-      "required": true,
-      "schema": {
-       "title": "Numero",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Aprovar"
-   }
-  },
-  "/api/v1/escuta/remetentes/{numero}/bloquear": {
-   "post": {
-    "description": "Bloqueia um remetente: nada novo dele é guardado.",
-    "operationId": "bloquear_api_v1_escuta_remetentes__numero__bloquear_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "numero",
-      "required": true,
-      "schema": {
-       "title": "Numero",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Bloquear"
-   }
-  },
-  "/api/v1/escuta/remetentes/{numero}/ignorar": {
-   "post": {
-    "description": "Ignora um remetente: some da fila e as mensagens retidas dele perdem o texto.",
-    "operationId": "ignorar_api_v1_escuta_remetentes__numero__ignorar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "numero",
-      "required": true,
-      "schema": {
-       "title": "Numero",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Ignorar"
-   }
-  },
-  "/api/v1/familia/edicoes": {
-   "get": {
-    "description": "Edições feitas fora (Obsidian) esperando decisão do boss, com o texto novo.",
-    "operationId": "edicoes_api_v1_familia_edicoes_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Edicoes"
-   }
-  },
-  "/api/v1/familia/edicoes/{edicao_id}/decidir": {
-   "post": {
-    "description": "Aprova (você aplicou o que mudou) ou rejeita (o arquivo volta ao exportado) uma edição externa.",
-    "operationId": "decidir_edicao_api_v1_familia_edicoes__edicao_id__decidir_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "edicao_id",
-      "required": true,
-      "schema": {
-       "title": "Edicao Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Decidir Edicao"
-   }
-  },
-  "/api/v1/familia/exames/reprocessar": {
-   "post": {
-    "description": "Relê no Paperless e extrai de novo (versão nova; a anterior fica). Corpo: {paperless_id} ou {pessoa_id, laboratorio?, de?, ate?} ou {todos: true}.\nAté 30 documentos por chamada; o que sobrar vem em `restantes`. Devolve só contagens.",
-    "operationId": "reprocessar_api_v1_familia_exames_reprocessar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Reprocessar"
-   }
-  },
-  "/api/v1/familia/exames/{pessoa_id}": {
-   "get": {
-    "description": "Último valor de cada marcador de exame da pessoa; o acesso fica no log de saúde.",
-    "operationId": "lista_api_v1_familia_exames__pessoa_id__get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "pessoa_id",
-      "required": true,
-      "schema": {
-       "title": "Pessoa Id",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Lista"
-   }
-  },
-  "/api/v1/familia/exames/{pessoa_id}/laudos/{paperless_id}/versoes": {
-   "get": {
-    "description": "Versões da extração de um documento (para comparar a atual com a anterior).",
-    "operationId": "versoes_do_laudo_api_v1_familia_exames__pessoa_id__laudos__paperless_id__versoes_get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "pessoa_id",
-      "required": true,
-      "schema": {
-       "title": "Pessoa Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "path",
-      "name": "paperless_id",
-      "required": true,
-      "schema": {
-       "title": "Paperless Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Versoes Do Laudo"
-   }
-  },
-  "/api/v1/familia/exames/{pessoa_id}/resumo": {
-   "get": {
-    "description": "Texto \"resumo para a consulta\" só da pessoa escolhida.",
-    "operationId": "resumo_api_v1_familia_exames__pessoa_id__resumo_get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "pessoa_id",
-      "required": true,
-      "schema": {
-       "title": "Pessoa Id",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Resumo"
-   }
-  },
-  "/api/v1/familia/exames/{pessoa_id}/serie": {
-   "get": {
-    "description": "Série no tempo de um marcador da pessoa, com a marca de fora da faixa de referência.",
-    "operationId": "serie_do_marcador_api_v1_familia_exames__pessoa_id__serie_get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "pessoa_id",
-      "required": true,
-      "schema": {
-       "title": "Pessoa Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "query",
-      "name": "marcador",
-      "required": true,
-      "schema": {
-       "title": "Marcador",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Serie Do Marcador"
-   }
-  },
-  "/api/v1/familia/laudos": {
-   "get": {
-    "description": "Laudos lidos do Paperless esperando a confirmação de quem é o laudo, e os documentos que falharam com o motivo (só boss).",
-    "operationId": "laudos_api_v1_familia_laudos_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Laudos"
-   },
-   "post": {
-    "description": "Lê o texto de um documento do Paperless e grava PROPOSTAS de marcador (não entram até confirmar de quem é o laudo).",
-    "operationId": "ler_laudo_api_v1_familia_laudos_post",
-    "responses": {
-     "201": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Ler Laudo"
-   }
-  },
-  "/api/v1/familia/laudos/contagem": {
-   "get": {
-    "description": "Quantos documentos esperam a confirmação do dono. É o ÚNICO dado de exame fora da tela de saúde: só a contagem, lida do `gabi.db` (sem chave, sem valor, sem nome).",
-    "operationId": "contagem_api_v1_familia_laudos_contagem_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Contagem"
-   }
-  },
-  "/api/v1/familia/laudos/lote": {
-   "post": {
-    "description": "Confirma o dono de vários laudos de uma vez (`itens: [{paperless_id, pessoa_id}]`): todos ou nenhum.",
-    "operationId": "confirmar_em_lote_api_v1_familia_laudos_lote_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Confirmar Em Lote"
-   }
-  },
-  "/api/v1/familia/laudos/{paperless_id}/confirmar": {
-   "post": {
-    "description": "Confirma DE QUEM é o laudo (pessoa_id); só então as propostas viram exames.",
-    "operationId": "confirmar_api_v1_familia_laudos__paperless_id__confirmar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "paperless_id",
-      "required": true,
-      "schema": {
-       "title": "Paperless Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Confirmar"
-   }
-  },
-  "/api/v1/familia/laudos/{paperless_id}/rejeitar": {
-   "post": {
-    "description": "Descarta as propostas de um laudo sem registrar nenhum exame.",
-    "operationId": "rejeitar_api_v1_familia_laudos__paperless_id__rejeitar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "paperless_id",
-      "required": true,
-      "schema": {
-       "title": "Paperless Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Rejeitar"
-   }
-  },
-  "/api/v1/familia/marcadores/apelidos": {
-   "get": {
-    "description": "Apelidos de marcador definidos e sugestões de grafias parecidas para juntar.",
-    "operationId": "listar_apelidos_api_v1_familia_marcadores_apelidos_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar Apelidos"
-   },
-   "put": {
-    "description": "Define um apelido (`{apelido, marcador}`); vale para as próximas extrações e para `reaplicar`.",
-    "operationId": "definir_apelido_api_v1_familia_marcadores_apelidos_put",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Definir Apelido"
-   }
-  },
-  "/api/v1/familia/marcadores/reaplicar": {
-   "post": {
-    "description": "Reescreve os marcadores de exames e propostas conforme os apelidos, sem chamar o modelo.",
-    "operationId": "reaplicar_apelidos_api_v1_familia_marcadores_reaplicar_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Reaplicar Apelidos"
-   }
-  },
-  "/api/v1/familia/mensagens": {
-   "get": {
-    "description": "Mensagens de saúde guardadas no cofre (id, de_pessoa, recebida_em, texto, lida_em); a leitura entra no log do cofre. O texto é dado de terceiros (R14).",
-    "operationId": "mensagens_de_saude_api_v1_familia_mensagens_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Mensagens De Saude"
-   }
-  },
-  "/api/v1/familia/mensagens/{mensagem_id}/lida": {
-   "post": {
-    "description": "Marca a mensagem como lida, no cofre. Não apaga nada.",
-    "operationId": "mensagem_lida_api_v1_familia_mensagens__mensagem_id__lida_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "mensagem_id",
-      "required": true,
-      "schema": {
-       "title": "Mensagem Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Mensagem Lida"
-   }
-  },
-  "/api/v1/familia/pessoas": {
-   "get": {
-    "description": "Pessoas cujos exames o login pode ver (boss: todas; familiar: só a própria).",
-    "operationId": "pessoas_api_v1_familia_pessoas_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Pessoas"
-   }
-  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",
@@ -3433,123 +2098,6 @@
      }
     },
     "summary": "Fontes"
-   }
-  },
-  "/api/v1/frentes": {
-   "get": {
-    "description": "Frentes de trabalho com a contagem de itens confirmados.",
-    "operationId": "listar_frentes_api_v1_frentes_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar Frentes"
-   },
-   "post": {
-    "description": "Abre uma frente (nome, tipo, empresa e regra vêm do Ricardo).",
-    "operationId": "criar_frente_api_v1_frentes_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Criar Frente"
-   }
-  },
-  "/api/v1/frentes/{frente_id}": {
-   "get": {
-    "description": "Uma frente: e-mails confirmados e os sugeridos que aguardam confirmação.",
-    "operationId": "detalhe_frente_api_v1_frentes__frente_id__get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "frente_id",
-      "required": true,
-      "schema": {
-       "title": "Frente Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Detalhe Frente"
-   }
-  },
-  "/api/v1/frentes/{frente_id}/itens/{item_id}/confirmar": {
-   "post": {
-    "description": "Confirma que um e-mail entra na frente (só o Ricardo decide).",
-    "operationId": "confirmar_item_api_v1_frentes__frente_id__itens__item_id__confirmar_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "frente_id",
-      "required": true,
-      "schema": {
-       "title": "Frente Id",
-       "type": "integer"
-      }
-     },
-     {
-      "in": "path",
-      "name": "item_id",
-      "required": true,
-      "schema": {
-       "title": "Item Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Confirmar Item"
    }
   },
   "/api/v1/gabi/qualidade": {
@@ -3571,20 +2119,8 @@
   },
   "/api/v1/hoje": {
    "get": {
-    "description": "O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro (filtro all, empresa ou t-<frente>).",
+    "description": "O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro.",
     "operationId": "hoje_api_v1_hoje_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "filtro",
-      "required": false,
-      "schema": {
-       "default": "all",
-       "title": "Filtro",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -3593,16 +2129,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Hoje"
@@ -3840,45 +2366,6 @@
     "summary": "Lancamento Patch"
    }
   },
-  "/api/v1/mensagens": {
-   "get": {
-    "description": "E-mails recentes (cabeçalho e trecho) e os ids que o expurgo sugere (nada é apagado aqui).",
-    "operationId": "mensagens_api_v1_mensagens_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "limite",
-      "required": false,
-      "schema": {
-       "default": 50,
-       "title": "Limite",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Mensagens"
-   }
-  },
   "/api/v1/parcelas": {
    "get": {
     "description": "Parcelas: comprometido por mês e andamento de cada compra parcelada.",
@@ -3894,116 +2381,6 @@
      }
     },
     "summary": "Parcelas"
-   }
-  },
-  "/api/v1/reembolso-saude/dossies": {
-   "get": {
-    "description": "Dossiês (número, paciente, prestador, mês, estado, o que falta e os documentos com tipo e estado); o acesso fica no log de saúde.",
-    "operationId": "listar_api_v1_reembolso_saude_dossies_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Listar"
-   }
-  },
-  "/api/v1/reembolso-saude/dossies/{dossie_id}/pedi": {
-   "post": {
-    "description": "\"Marquei como pedido\": registra que o Ricardo pediu (corpo opcional `{protocolo}`); aplica na próxima rodada.",
-    "operationId": "pedi_api_v1_reembolso_saude_dossies__dossie_id__pedi_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "dossie_id",
-      "required": true,
-      "schema": {
-       "title": "Dossie Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Pedi"
-   }
-  },
-  "/api/v1/reembolso-saude/dossies/{dossie_id}/recebi": {
-   "post": {
-    "description": "\"Recebi\": registra que o reembolso chegou; aplica na próxima rodada.",
-    "operationId": "recebi_api_v1_reembolso_saude_dossies__dossie_id__recebi_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "dossie_id",
-      "required": true,
-      "schema": {
-       "title": "Dossie Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Recebi"
-   }
-  },
-  "/api/v1/reembolso-saude/semana": {
-   "get": {
-    "description": "Texto da lista de segunda (\"Resumo da semana\"), o mesmo da ferramenta MCP e do aviso; sem nomes (lê só a projeção do `gabi.db`).",
-    "operationId": "semana_api_v1_reembolso_saude_semana_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Semana"
    }
   },
   "/api/v1/regras": {
@@ -4145,97 +2522,6 @@
     "summary": "Rumo"
    }
   },
-  "/api/v1/setup": {
-   "get": {
-    "description": "Os 7 passos do assistente de configuração, com o estado salvo de cada um (pendente, feito ou depois).",
-    "operationId": "passos_api_v1_setup_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Passos"
-   }
-  },
-  "/api/v1/setup/{passo}": {
-   "get": {
-    "description": "Um passo do assistente: explicação em português (o que o app lê, o que nunca faz e onde vai a credencial) e o estado salvo.",
-    "operationId": "um_passo_api_v1_setup__passo__get",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "passo",
-      "required": true,
-      "schema": {
-       "title": "Passo",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Um Passo"
-   },
-   "post": {
-    "description": "Testa a conexão do passo na hora (acao=testar; feito só se der certo) ou deixa para depois (acao=depois). Devolve {ok, detalhe, estado}.",
-    "operationId": "agir_api_v1_setup__passo__post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "passo",
-      "required": true,
-      "schema": {
-       "title": "Passo",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Agir"
-   }
-  },
   "/api/v1/sugestoes": {
    "get": {
     "description": "Sugestões da Gabi (padrão: pendentes), com o impacto de cada regra.",
@@ -4349,61 +2635,6 @@
      }
     },
     "summary": "Sugestao Rejeitar"
-   }
-  },
-  "/api/v1/tarefas": {
-   "get": {
-    "description": "Tarefas abertas e concluídas, de todas as origens.",
-    "operationId": "tarefas_api_v1_tarefas_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Tarefas"
-   }
-  },
-  "/api/v1/tarefas/{tarefa_id}/concluir": {
-   "post": {
-    "description": "Conclui a tarefa NA ORIGEM (Graph ou Google) e só então marca aqui.",
-    "operationId": "concluir_api_v1_tarefas__tarefa_id__concluir_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "tarefa_id",
-      "required": true,
-      "schema": {
-       "title": "Tarefa Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Concluir"
    }
   },
   "/api/v1/teams/fontes": {

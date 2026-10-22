@@ -538,43 +538,6 @@ async def nibo_definir(request: Request, ident: Identidade = Depends(exigir("bos
         con.close()
 
 
-CAMPOS_SENSIVEIS = ("cpf", "nascimento", "documento")
-
-
-@router.get("/liberacoes")
-def liberacoes(request: Request):
-    """Liberações de dado sensível ainda não usadas (cada uma vale uma leitura pelo agente)."""
-    con = _con(request)
-    try:
-        itens = [{"id": r["id"], "pessoa_id": r["pessoa_id"], "campo": r["campo"], "liberado_por": r["liberado_por"], "liberado_em": r["liberado_em"]}
-                 for r in con.execute("select * from liberacao_sensivel where usada_em is null order by id")]
-        return envelope(con, {"itens": itens}, agora=_agora(request))
-    finally:
-        con.close()
-
-
-@router.post("/liberacoes", status_code=201)
-async def liberar(request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Libera UMA leitura de um dado sensível (cpf, nascimento ou documento) de uma pessoa para o agente; fica registrada."""
-    corpo = _corpo(await _json(request))
-    _so(corpo, {"pessoa_id", "campo"})
-    pessoa, campo = _texto(corpo, "pessoa_id", True), _texto(corpo, "campo", True)
-    if campo not in CAMPOS_SENSIVEIS:
-        raise erro(400, "requisicao_invalida", f"campo deve ser um de {list(CAMPOS_SENSIVEIS)}")
-    con = _con(request)
-    try:
-        if con.execute("select 1 from pessoa where id=? and excluido_em is null", (pessoa,)).fetchone() is None:
-            raise erro(404, "nao_encontrado", f"pessoa {pessoa} não existe")
-
-        def fazer():
-            lid = con.execute("insert into liberacao_sensivel(pessoa_id, campo, liberado_por, liberado_em) values (?,?,?,?)",
-                              (pessoa, campo, ident.login, _agora(request).isoformat())).lastrowid
-            con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cadastros')",
-                        (_agora(request).isoformat(), ident.login, f"liberou uma leitura de {campo} de {pessoa} para o agente"))
-            return lid
-        return envelope(con, {"id": _tx(con, fazer), "pessoa_id": pessoa, "campo": campo}, agora=_agora(request))
-    finally:
-        con.close()
 
 
 @router.get("/{tipo}")

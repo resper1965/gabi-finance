@@ -7,7 +7,7 @@ from gabi.api import criar_app
 from gabi.db import conectar
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 
-from tests.rotas.test_escuta import AGORA, BOSS, JSON, VIP, banco  # noqa: F401  (fixture banco)
+from tests.rotas.test_contatos import AGORA, BOSS, JSON, VIP, banco  # noqa: F401  (fixture banco)
 
 U = "/api/v1/correio"
 

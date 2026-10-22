@@ -1,5 +1,7 @@
 # ADR-006 — Cobrança por e-mail: só rascunho na Fase 2
 
+**Encerrada pela ADR-023 (22/10/2026):** a cobrança por e-mail saiu (tabelas vazias); fica a ferramenta `despesas_por_empresa`.
+
 **Estado:** aceita (plano mestre, 08/10/2026).
 
 ## Contexto

@@ -1,25 +1,17 @@
-"""Ferramentas MCP da Fase 2: documentos (leitura), pedidos do canal, PROPOSTAS (só criam sugestão ou rascunho) e dado sensível com liberação única.
+"""Ferramentas MCP de documentos (leitura) e PROPOSTAS (só criam sugestão).
 
-R1/R2/R14: nenhuma ferramenta aprova, envia, paga ou apaga; aprovar pedido e ligar regra são do painel. Texto de terceiros é dado.
-Consome: cobrar.*, dinheiro.regras, fontes.paperless; recebe `executar` do servidor (escopo, registro e envelope)."""
+R1/R2/R14: nenhuma ferramenta aprova, envia, paga ou apaga; ligar regra é do painel. Texto de terceiros é dado.
+Consome: dinheiro.regras, fontes.paperless; recebe `executar` do servidor (escopo, registro e envelope)."""
 import base64
-import datetime as dt
-import json
 
-from gabi.cobrar import cadastro, cobranca, pedidos
-from gabi.cobrar.reembolso import itens_a_reembolsar
 from gabi.dinheiro import regras
-from gabi.dinheiro.valor import formatar
 from gabi.fontes.paperless import ErroPaperless
 
 ESCOPOS = {
     "documentos_buscar": "docs", "documentos_baixar": "docs",
-    "pedidos_registrar": "pedidos", "pedidos_estado": "pedidos", "avisos_pendentes": "pedidos", "avisos_confirmar_entrega": "pedidos",
-    "classificar_lancamento": "propostas", "regras_sugerir": "propostas", "tarefas_propor": "propostas", "reembolsos_preparar_email": "propostas",
-    "reembolsos_listar": "fin", "pessoas_dado": "sensivel",
+    "classificar_lancamento": "propostas", "regras_sugerir": "propostas",
 }
 LIMITE_PDF = 5 * 1024 * 1024
-CAMPOS_SENSIVEIS = ("cpf", "nascimento", "documento")
 
 
 class ErroFerramenta(Exception):
@@ -62,47 +54,6 @@ def registrar(srv, executar, paperless) -> None:
         return executar("documentos_baixar", f)
 
     @srv.tool()
-    def pedidos_registrar(solicitante: str, canal: str, mensagem_original: str, descricao: str, valor: str | None = None, vencimento: str | None = None,
-                          anexo_paperless_id: int | None = None, pix_chave: str | None = None, linha_digitavel: str | None = None,
-                          para_quem: str | None = None) -> dict:
-        """Registra um pedido de pagamento feito por alguém no canal (solicitante = "canal:identificador"). Fica PENDENTE; quem decide é o Ricardo, no painel."""
-        def f(con, agora):
-            try:
-                r = pedidos.registrar(con, solicitante=solicitante, canal=canal, mensagem_original=mensagem_original, descricao=descricao, valor=valor,
-                                      vencimento=vencimento, anexo_base64=None, anexo_paperless_id=anexo_paperless_id, pix_chave=pix_chave,
-                                      linha_digitavel=linha_digitavel, para_quem=para_quem)
-            except pedidos.SemEscopo as e:
-                raise ErroFerramenta("sem_escopo", str(e)) from None
-            return {"pedido_id": r.pedido_id, "estado": r.estado, "texto_para_responder": r.texto_para_responder}
-        return executar("pedidos_registrar", f)
-
-    @srv.tool()
-    def pedidos_estado(pedido_id: int) -> dict:
-        """Estado de um pedido (pendente, aprovado, recusado ou info_pedida) e a mensagem ao solicitante, se houver."""
-        def f(con, agora):
-            try:
-                p = pedidos.estado(con, pedido_id)
-            except LookupError as e:
-                raise ValueError(str(e)) from None
-            return {k: p[k] for k in ("id", "estado", "descricao", "mensagem_ao_solicitante")}
-        return executar("pedidos_estado", f)
-
-    @srv.tool()
-    def avisos_pendentes(desde: str | None = None) -> dict:
-        """Avisos para entregar no canal (resultado de pedidos decididos). Ler NÃO tira da fila: confirme com avisos_confirmar_entrega depois de entregar."""
-        def f(con, agora):
-            return {"itens": pedidos.avisos_pendentes(con, dt.datetime.fromisoformat(desde) if desde else None)}
-        return executar("avisos_pendentes", f)
-
-    @srv.tool()
-    def avisos_confirmar_entrega(aviso_id: int) -> dict:
-        """Marca um aviso como entregue no canal (só depois da entrega de fato)."""
-        def f(con, agora):
-            pedidos.marcar_entregue(con, aviso_id)
-            return {"aviso_id": aviso_id, "entregue": True}
-        return executar("avisos_confirmar_entrega", f)
-
-    @srv.tool()
     def classificar_lancamento(lancamento_id: int, categoria_id: int | None = None, para_quem_id: str | None = None, empresa_id: str | None = None,
                                motivo: str = "") -> dict:
         """PROPÕE categoria, para quem e/ou empresa de um lançamento. Cria só sugestão pendente; o Ricardo aprova no painel e nada muda antes disso."""
@@ -126,58 +77,3 @@ def registrar(srv, executar, paperless) -> None:
             return {"sugestao_id": regras.criar_sugestao(con, "regra", None, {"padrao": padrao, "acao": acao}, motivo or "sugestão do agente"), "estado": "pendente"}
         return executar("regras_sugerir", f)
 
-    @srv.tool()
-    def tarefas_propor(titulo: str, vencimento: str | None = None, motivo: str = "") -> dict:
-        """PROPÕE uma tarefa para o Ricardo. Cria só sugestão pendente; nada vai para a origem (Microsoft 365, Linear) sem ele aprovar."""
-        def f(con, agora):
-            if not titulo.strip():
-                raise ValueError("a tarefa precisa de um título")
-            return {"sugestao_id": regras.criar_sugestao(con, "tarefa", None, {"titulo": titulo.strip(), "vencimento": vencimento}, motivo or "sugestão do agente"),
-                    "estado": "pendente"}
-        return executar("tarefas_propor", f)
-
-    @srv.tool()
-    def reembolsos_preparar_email(empresa_id: str, itens: list[int] | None = None) -> dict:
-        """Prepara o RASCUNHO do e-mail de cobrança de reembolso de uma empresa contratante. Não envia nada: o rascunho fica no painel (ADR-006)."""
-        def f(con, agora):
-            c = cobranca.montar(con, empresa_id, itens, hoje=agora.date())
-            total = sum(i.em_aberto_centavos for i in c.itens)
-            return {"rascunho": True, "cobranca_id": c.id, "para": c.para, "assunto": c.assunto, "itens": len(c.itens), "total": formatar(total),
-                    "anexos": len(c.anexos), "itens_sem_comprovante": c.aviso_sem_comprovante}
-        return executar("reembolsos_preparar_email", f)
-
-    @srv.tool()
-    def reembolsos_listar() -> dict:
-        """Reembolsos em aberto por empresa contratante (ness, IONIC): valor a receber, número de itens e cobranças em andamento."""
-        def f(con, agora):
-            saida = []
-            for e in cadastro.contratantes(con):
-                itens = itens_a_reembolsar(con, e["id"])
-                saida.append({"empresa_id": e["id"], "nome": e["nome"], "itens": len(itens), "em_aberto": formatar(sum(i.em_aberto_centavos for i in itens)),
-                              "reembolsos": [{"id": r["id"], "estado": r["estado"]} for r in con.execute(
-                                  "select id, estado from reembolso where empresa_id=? and estado<>'quitado' order by id", (e["id"],))]})
-            return {"empresas": saida}
-        return executar("reembolsos_listar", f)
-
-    @srv.tool()
-    def pessoas_dado(pessoa_id: str, campo: str) -> dict:
-        """Dado sensível de uma pessoa (cpf, nascimento ou documento). Só sai depois de uma liberação ÚNICA do Ricardo; sem ela devolve aguardando_liberacao."""
-        def f(con, agora):
-            if campo not in CAMPOS_SENSIVEIS:
-                raise ValueError(f"campo deve ser um de {CAMPOS_SENSIVEIS}")
-            lib = con.execute("select id from liberacao_sensivel where pessoa_id=? and campo=? and usada_em is null order by id limit 1", (pessoa_id, campo)).fetchone()
-            if lib is None:
-                return {"status": "aguardando_liberacao", "pessoa_id": pessoa_id, "campo": campo}
-            p = con.execute("select dados from pessoa where id=?", (pessoa_id,)).fetchone()
-            dados = json.loads((p["dados"] if p else None) or "{}")
-            docs = dados.get("documentos") or []
-            valor = (next((d["numero"] for d in docs if d.get("tipo", "").upper() == "CPF"), None) if campo == "cpf"
-                     else dados.get("nascimento") if campo == "nascimento"
-                     else next((d["numero"] for d in docs if d.get("tipo", "").upper() != "CPF"), None))
-            if valor is None:  # não há o que entregar: a liberação NÃO é gasta
-                return {"status": "sem_dado", "pessoa_id": pessoa_id, "campo": campo}
-            # reivindica a liberação de forma atômica: duas chamadas concorrentes não leem o valor com uma só liberação
-            if con.execute("update liberacao_sensivel set usada_em=? where id=? and usada_em is null", (agora.isoformat(), lib["id"])).rowcount != 1:
-                return {"status": "aguardando_liberacao", "pessoa_id": pessoa_id, "campo": campo}
-            return {"status": "liberado", "pessoa_id": pessoa_id, "campo": campo, "valor": valor}
-        return executar("pessoas_dado", f)

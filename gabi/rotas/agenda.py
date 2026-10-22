@@ -1,6 +1,6 @@
 """Fontes e parâmetros da agenda pelo painel (/api/v1/agenda/fontes, /api/v1/agenda/parametros). Só o boss.
 A API não tem rede nem segredo: descobrir calendários passa pela ponte do serviço de fontes. A auditoria leva só ids e nomes de chave, nunca valores nem títulos.
-(GET /api/v1/agenda — os compromissos — fica em `gabi.rotas.trabalho`.) Consome: agenda.fontes."""
+(GET /api/v1/agenda — os compromissos — fica em `gabi.rotas.dia`.) Consome: agenda.fontes."""
 import asyncio
 import datetime as dt
 

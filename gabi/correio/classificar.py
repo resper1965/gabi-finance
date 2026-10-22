@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 
 from gabi.dinheiro.modelo import ModeloCliente, Orcamento
-from gabi.escuta.classificar import Falha, _chamar
+from gabi.correio.modelo import Falha, _chamar
 from gabi.mascara import mascarar_texto
 
 CLASSES = ("emergencial", "importante", "normal", "lixo")

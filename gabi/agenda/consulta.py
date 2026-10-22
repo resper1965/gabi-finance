@@ -3,13 +3,20 @@ Só lê. Tudo em horário local (`parametro agenda.fuso`), por `dia_local`/`dia_
 O mesmo compromisso em duas contas (convidado em ambas) aparece UMA vez: trio (início, fim, título normalizado). Política de privados: `agenda.privados`."""
 import datetime as dt
 import json
+from dataclasses import dataclass
 
 from gabi.agenda import tempo
-from gabi.trabalho.email import Conflito
 
 FUSO_PADRAO = "America/Sao_Paulo"
 MASCARA = "Compromisso privado"
 POLITICAS = ("mostrar", "so_painel", "ocultar")
+
+
+@dataclass(frozen=True)
+class Conflito:
+    evento_a: int
+    evento_b: int
+    sugestao_inicio: str  # proposta: só sai após confirmação do Ricardo
 
 
 def _parametro(con, chave: str, padrao):

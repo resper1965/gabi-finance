@@ -4,7 +4,7 @@ import pytest
 
 from gabi.correio import classificar as cl
 from gabi.dinheiro.modelo import Orcamento
-from gabi.escuta.classificar import Falha
+from gabi.correio.modelo import Falha
 
 MSG = {"remetente": "promo@loja.com", "assunto": "Oferta imperdível", "trecho": "Só hoje 50% de desconto", "lista": True}
 

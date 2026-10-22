@@ -51,6 +51,53 @@ def test_dados_com_mais_de_3_dias_avisam_mesmo_sem_rodada_recente(con):
     assert _tipos(con) == ["rodada_parada"]
 
 
+def _divergente(con, horas_atras: float, status="ok", conferida=1):
+    fim = (AGORA - dt.timedelta(hours=horas_atras)).isoformat()
+    rid = con.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance',?,?,?,?)", (fim, fim, status, conferida)).lastrowid
+    con.execute("insert into conferencia(rodada_id, tipo, conta_id, ok, detalhe, criado_em) values (?, 'saldo_final', 1, 0, "
+                "'variação do saldo -5000 ≠ lançamentos -3000: diferença de -2000 centavos', ?)", (rid, fim))
+    return rid
+
+
+def test_divergencia_gera_saldo_divergente_uma_vez_por_dia(con):
+    con.execute("update conta set apelido='Itaú PF' where id=1")
+    _divergente(con, 3)
+    gerar_avisos(con, AGORA)
+    _divergente(con, 1)
+    gerar_avisos(con, AGORA + dt.timedelta(minutes=15))
+    av = con.execute("select tipo, payload from aviso").fetchall()
+    assert [a["tipo"] for a in av] == ["saldo_divergente"]
+    p = json.loads(av[0]["payload"])
+    assert (p["conta_id"], p["conta"], p["diferenca_centavos"]) == (1, "Itaú PF", -2000) and "diferença" in p["detalhe"]
+
+
+def test_saldo_divergente_so_da_ultima_rodada_e_de_conta_liberada(con):
+    _divergente(con, 3)
+    _rodada(con, 1, 1)  # a última rodada não tem divergência
+    gerar_avisos(con, AGORA)
+    assert "saldo_divergente" not in _tipos(con)
+    con.execute("delete from conferencia"); con.execute("delete from rodada")
+    con.execute("update conta set estado='a_decidir'")
+    _divergente(con, 1)
+    gerar_avisos(con, AGORA)
+    assert "saldo_divergente" not in _tipos(con)
+
+
+def test_rodada_parada_so_por_falha(con):
+    _divergente(con, 2); _divergente(con, 1)          # ok e conferidas, mesmo divergentes
+    gerar_avisos(con, AGORA)
+    assert "rodada_parada" not in _tipos(con)
+    _divergente(con, 0.5, status="erro", conferida=0); _divergente(con, 0.2, status="erro", conferida=0)
+    gerar_avisos(con, AGORA)
+    assert "rodada_parada" in _tipos(con)
+
+
+def test_descrever_saldo_divergente():
+    from gabi.rotas.avisos import descrever
+    titulo, texto = descrever("saldo_divergente", {"conta": "Itaú PF", "diferenca_centavos": -2000, "detalhe": "x"})
+    assert "Itaú PF" in titulo and "20,00" in texto
+
+
 def test_banco_vazio_nao_gera_aviso(con):
     assert gerar_avisos(con, AGORA) == []
 
@@ -138,18 +185,6 @@ def test_exportacao_recente_nao_avisa(con):
     assert "exportacao_parada" not in _tipos(con)
 
 
-def test_descrever_tipos_da_escuta():
-    from gabi.rotas.avisos import descrever
-    t, x = descrever("escuta_atencao", {"numero": "+5511912345678", "nome": "Maria", "texto": "NAO"})
-    assert t == "Possível crise: Maria. Abra a conversa." and "NAO" not in x and "NAO" not in t
-    assert descrever("escuta_atencao", {"numero": "+5511912345678"})[0] == "Possível crise: +5511912345678. Abra a conversa."
-    assert descrever("escuta_saude", {"numero": "+55119", "nome": "Ana"})[0] == "Mensagem de saúde de Ana: abra a conversa"
-    for tipo, p in [("escuta_novo_remetente", {"numero": "+55119", "nome": None}), ("escuta_parada", {"motivo": "sem leitura"}),
-                    ("escuta_sem_modelo", {}), ("escuta_pedido_incompleto", {"numero": "+55119", "nome": "Ana"})]:
-        titulo, texto = descrever(tipo, p)
-        assert titulo != tipo and titulo and not titulo.startswith("escuta_")
-
-
 # ---------------- escuta_parada ----------------
 def _param_escuta(con, chave, valor):
     import json as _j
@@ -161,47 +196,9 @@ def _msg_em(con, horas_atras):
     con.execute("insert into escuta_msg(id_externo, de, recebida_em) values (?,?,?)", (f"x{horas_atras}", "+5511900000000", quando))
 
 
-def test_aviso_escuta_parada_so_em_modo_ativo(con):
-    _msg_em(con, 20)
-    assert "escuta_parada" not in _tipos_novos(con)          # sem parametro = registro
-    _param_escuta(con, "escuta.modo", "registro")
-    assert "escuta_parada" not in _tipos_novos(con)
-    _param_escuta(con, "escuta.modo", "ativo")
-    gerar_avisos(con, AGORA)
-    r = con.execute("select payload from aviso where tipo='escuta_parada'").fetchall()
-    assert len(r) == 1 and "20 horas" in r[0][0]
-    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1   # um por dia
-
-
-def test_escuta_parada_respeita_limite_e_sem_mensagens(con):
-    _param_escuta(con, "escuta.modo", "ativo")
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0   # sem linhas = sem aviso
-    _msg_em(con, 5)
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0   # dentro das 12h
-    _param_escuta(con, "escuta.horas_sem_receber", 4)
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1
-
-
 def _tipos_novos(con):
     gerar_avisos(con, AGORA)
     return [r[0] for r in con.execute("select tipo from aviso")]
-
-
-def test_escuta_parada_compara_instantes_com_entradas_mistas(con):
-    from gabi.escuta.caixa import _utc
-    _param_escuta(con, "escuta.modo", "ativo")
-    _param_escuta(con, "escuta.horas_sem_receber", 12)
-    # AGORA = 12:00 UTC; 12h atrás = 00:00 UTC do mesmo dia = 21:00 BRT do dia anterior
-    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values ('a','+5511900000000',?)", (_utc("2026-10-15T21:30:00"),))   # ingênuo BRT = 00:30 UTC: 11,5h
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 0
-    con.execute("update escuta_msg set recebida_em=?", (_utc("2026-10-15T20:30:00-03:00"),))   # 23:30 UTC: 12,5h
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='escuta_parada'").fetchone()[0] == 1
 
 
 # ---- aviso obsoleto: produtor ----

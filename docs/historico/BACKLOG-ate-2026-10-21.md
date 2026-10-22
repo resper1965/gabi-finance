@@ -1,0 +1,136 @@
+# gabi.brain · BACKLOG (fonte única do que falta)
+Criado: 16/10/2026. **Este arquivo manda sobre o que falta.** `STATUS.md` é a retomada rápida (o histórico foi para `docs/historico/`); `PLANO-DEFINITIVO.md` guarda as decisões; `TRILHA.md` e `/home/ricardo/PENDENCIAS-RICARDO.md` passam a apontar para cá.
+
+## "Completa" quer dizer
+O núcleo que deixa **desligar o `gabi-fin` e o OpenClaw** e marcar a tag `v1.0-gabi-brain`: dinheiro, cobrar, agenda, e-mail, escuta, exames/saúde e canais (Hermes). O que não bloqueia isso está em **Depois**.
+
+Legenda: dono **R** = Ricardo · **C** = Claude · **R+C** = juntos. Status: ✅ pronto · 🔧 em curso · ⛔ bloqueado · ⏸ em espera · ❓ a verificar.
+Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático · segredos só o Ricardo coloca · dados nunca chumbados · nada no claude.ai · esquema novo = migração 0027+ (confirmar o próximo número em `migrations/`).
+
+## Em espera por chave de terceiros (ordem do dono, 21/10)
+Google (contatos G12), Graph da ionic e Nibo (A7/C2/C3) aguardam chave ou consentimento. **Não alertar, não cobrar e não propor ações sobre eles até o Ricardo dizer que estamos liberados.** Feito em 21/10: `gabi-brain-notas.timer` desligado (religar: `sudo systemctl enable --now gabi-brain-notas.timer`); fontes Google de agenda e e-mail (esper.ws, gmail.com) já estavam em `nao`; a ionic não tem fonte criada.
+
+## Núcleo
+
+### 1. Dinheiro
+| # | Item | Dono | Status | Pronto quando |
+|---|---|---|---|---|
+| D1 | ✅ 16/10 feito pelo Claude: conta 10 em `nao` (backup antes-conta10-nao). Conta 10 (XP Investimentos, cartão) para estado `nao` em Cadastros › Contas. A XP Investimentos saiu do mcp.ai em 11/10 (Bradesco entrou). Só ela; XP Banking (13–15) é outra conexão | R | ⛔ aguarda o Ricardo | conta 10 fora da conferência e dos avisos; histórico (181 lançamentos) preservado |
+| D2 | ✅ 16/10 corrigido no código: `saldo_final` aceita a diferença que bate com os lançamentos do dia-base lidos depois do último saldo (C6 e XP em 15→16/10); `volume_proximo` não reprova dia vazio com saldo igual. **Confirmado em produção 16/10 19:43: rodada 1316 `conferida=1`, 0 reprovações; começa aqui a contagem das 7 rodadas do D6.** Descobrir por que a rodada de extratos segue `conferida=0` (último conferido 13/10). **Causa achada 16/10:** não é conta morta nem captura (falhas=[]). Reprovam só `saldo_final` e `volume_proximo` de duas contas: **C6 BANK (12)** (saldo 14/10→16/10 sobe R$ 8.314 com 0 lançamentos na janela; ontem 0 lançamentos; 12 já está `sim`) e **Itaú (6)** (volume; saldo_final −R$ 800 em 16/10); em 14/10 também a conta 2. Heurística `saldo_final` é risco conhecido (sem saldo inicial). Decidir: liberar/excluir a 12 (D4) e/ou tolerar `saldo_final` em conta que ainda não entrou no caixa único | C+R | 🔧 causa achada | causa registrada aqui; ajuste de código ou ação do Ricardo definidos |
+| D3 | ✅ 16/10 instalado (retry de 3 tentativas, aviso `incompleta`). **Saldos parciais:** `openfinance_list_accounts` devolve 4–17 das 17 contas, conforme a hora (15/10). Repetir a chamada quando vier menos do que o esperado e marcar a rodada incompleta | C | 🔧 aprovado em 16/10 | toda rodada horária lê as contas esperadas ou registra o que faltou; teste cobre os dois casos |
+| D4 | ✅ 16/10 (decisão do Ricardo: todos os bancos entram no caixa único). C6 BANK (12) já estava `sim`; Bradesco 16–18 passaram de `a_decidir` para `sim` (backup `/var/backups/gabi-brain/antes-do-bradesco-*.sqlite`). Saldo do caixa único R$ 37.275,08 inclui Bradesco | R | ✅ | contas decididas em Cadastros |
+| D6 | ~~D6~~ dispensado em 21/10 por ordem do dono (sem esperar as 7 rodadas). | C | ✅ | — |
+| D7 | ~~D7~~ dispensado em 21/10 por ordem do dono; o `gabi-fin` já estava parado e arquivado desde 19/10 e `tools.congelar` nunca foi escrito. | C | ✅ | — |
+| D8 | ⏹ DESCARTADO 21/10 (saúde). Antes: ✅ 16/10 no código (spec e plano `2026-10-16-reembolso-saude`; `gabi/reembolso_saude/`, migração 0040, `gabi-brain-reembolso-saude.timer` instalado e DESLIGADO, 5 ferramentas MCP `reembolso_saude_*`, rota `GET /api/v1/reembolso-saude/dossies`). **Porte do reembolso de saúde** (`reembolso_fila.py` e `reembolso_segunda`): pistas passam a vir do anexo de saúde que a escuta nova grava no Paperless (`gabi:saude-reembolso`), classificado pelo texto; estado e nomes no cofre cifrado; lista de segunda vira aviso do brain. **Falta (R):** chave do cofre e modelo na ponte, escuta em `ativo`, ligar o timer, 5 ferramentas no include do Hermes, alguns dias em paralelo e então `systemctl disable --now gabi-reembolso.path gabi-reembolso.timer gabi-reembolso-segunda.timer` (runbook `#reembolso-saude`). **Tela ✅ 16/10** (aba Reembolso de saúde; rotas `semana`, `pedi`, `recebi`; mensagens de saúde sem anexo na tela Família). **Depois:** trava do cofre compartilhada com exames e API, leitura de PDF sem texto, campos antigos do Paperless | C | ✅ código; ⏸ passos do dono | `gabi-reembolso*` aposentados sem perder função |
+
+### 1b. Agenda financeira, "a receber" e perfil de normalidade (novo em 16/10)
+Relatório e contexto: `docs/historico/RELATORIO-2026-10-16.md`.
+| # | Item | Dono | Status | Pronto quando |
+|---|---|---|---|---|
+| AF1 | ✅ 16/10 instalada (commit 5cef4b5; verificada com dado real em leitura). Agenda financeira **B**: diária (atrasadas, hoje, 3 dias, previsão com o saldo) dentro do bloco Financeiro do resumo; segunda: 30 dias por semana. Módulo `gabi/dinheiro/agenda_financeira.py` + ferramenta MCP `agenda_financeira` | C | 🔧 aprovada 16/10 | testes de falta de saldo, estimado `~`, débito automático, dia vazio, saldo velho |
+| AF2 | ✅ 16/10: `resumo-semanal-pagamentos` pausado (`hermes cron resume d70bee6dc6db` desfaz) e `forecast-semanal` (segunda 08:00) chama `agenda_financeira` (semanal) | C | ✅ | job pausado e prompt trocado |
+| AF3 | ✅ 16/10: `forecast-semanal` agora é `no_agent` (`~/.hermes/scripts/agenda_financeira_semanal.py`, mesma mensagem, sem LLM); a diária segue dentro do resumo da manhã (mistura agenda e e-mail, precisa do modelo). Cron `no_agent` do Hermes para a diária e a semanal (sem modelo); verificar se o script alcança o MCP com o token | C | ⏸ | mensagem idêntica sem chamada de LLM |
+| PF1 | ✅ 16/10 no código: `gabi/dinheiro/perfil.py` (regular/semi/irregular por série). **Perfil de 5 meses** (`gabi/dinheiro/perfil.py`): média, regularidade, dia típico, classe regular/semi/irregular por pagador e favorecido, separando camadas por faixa de valor e conta | C | ⏸ direção do Ricardo 16/10 | IONIC, FGV e Barra do Pará saem "regular"; NESS e Bekaa separadas em camadas |
+| AR1 | ✅ 16/10: a receber atrasado em produção desde a agenda financeira (X2). **A receber** aprendido do perfil + detecção de atraso (em dado real, a partir de 16/10 só a X2 Intermediações fica atrasada, R$ 10.208, dia limite 15; nenhum falso alarme nas demais 9 séries) (primeiro caso: contrato ORM família Reis, ~R$ 10.208 no C6; pagador a confirmar, candidato X2 Intermediações) | R+C | ⏸ | atraso vira linha na mensagem das 07:05 |
+| AR2 | ✅ 16/10 no código: ferramenta MCP `cobranca_rascunho` (só texto, nada enviado). **Cobrança com anuência**: só rascunho no chat (opção A); envio por e-mail com aprovação exige ADR novo (exceção à R2) | C | ⏸ | rascunho sai; Ricardo envia |
+| AR3 | ✅ 16/10 no código: `sugestoes_agenda.py` vira pergunta no canal (efeito `criar_compromisso`, nasce desativado). Sugerir compromissos a partir de eventos da agenda ("Pagar…", "Adiantamento Sirlene" dia 20, "Contabilidade Holding" dia 15) | C | ⏸ | sugestão aprovada vira compromisso |
+| AR4 | ✅ 16/10 em produção: `sirlene-adiantamento` (R$ 800, dia 20) e `contabilidade-holding-prolink` (variável, dia 15) criados a partir do extrato; `sirlene-salario` ganhou R$ 1.766,02. Cadastrar já, com valores e formas: Adiantamento Sirlene e Contabilidade Holding | R | ⏸ | aparecem na agenda financeira |
+| AF4 | ✅ 16/10 no código: semanal ganha a linha "Com recorrentes esperadas". Entradas recorrentes na previsão: usar `analise.recorrentes` (entradas) como segundo cenário na agenda financeira ("só o contratado" × "com recorrentes esperadas") | C | ⏸ | dois cenários lado a lado na mensagem da segunda |
+| AR5 | ✅ instalado 16/10 (commit fcd03ca; `gabi/dinheiro/esperados.py`, 11 testes; suíte completa 2116 verdes). **Alerta "esperado e não veio":** recorrente de entrada com dia típico passado e `ja_ocorreu_este_mes=False` vira aviso e linha na mensagem | C | ⏸ | IONIC/FGV/NESS/Bekaa monitorados; teste com banco fixo |
+| AR6 | ✅ código 16/10. Aceitar contrato novo com 2 meses consecutivos (confiança menor, rótulo "novo") | C | ⏸ | X2/ORM detectado |
+| AR7 | ✅ código 16/10 (razão 1,3 entre valores vizinhos; NESS 16k × 26k separadas em dado real; a camada do Itaú ainda se mistura com Pix avulsos e não alerta). Separar camadas por faixa de valor e dia (NESS 16k × 26k no C6) | C | ⏸ | cada camada sai como série própria; teste golden |
+| AR8 | ✅ 16/10 em produção (`desvio.py`). Desvio do normal: valor fora de ±2 desvios, atraso além do espalhamento; estender "cobrada depois de cancelar" a todo recorrente | C | ⏸ | aviso `fora_do_normal` |
+| MC1 | ✅ 16/10 (a6cbeaa + correção): `financeiro_recorrentes`, `financeiro_previsao`, `financeiro_vazamentos`, `financeiro_rumo` (assinaturas saem dentro de vazamentos). **Falta o passo do dono:** incluir as quatro no `tools.include` do Hermes, reiniciar `hermes-gateway` e o MCP (runbook#analise-hermes). Ferramentas MCP de análise leem só contas liberadas (`FonteAnalise(so_liberadas=True)`); o painel ainda usa o padrão antigo | C | ⏸ | listadas, escopo `fin`, testes de "nenhuma destrutiva" |
+| FU2 | ✅ 16/10 (commit 2e99efc + `financeiro_previsao` avisa `saldo_indisponivel`). Menores da revisão de 16/10: `_fora_do_normal` sem proteção contra exceção (derruba a diária); `financeiro_previsao` sem saldo devolve `saldo_inicial` 0 sem sinal; ferramentas usam `agora.date()` sem `astimezone(BRT)` e `desvio` cai em `date.today()` (ver FU1) | C | ⏸ | cada um com teste |
+| DC1 | ✅ 16/10 instalado: migração 0028, token novo (escopo `decisoes`) no Hermes, ferramentas no include, skill em `references/decisoes.md`. Falta só transformar pendências em perguntas. código 16/10. **Canal de decisão** (Telegram/WhatsApp): migração 0028 (`pergunta`), `gabi/decisoes.py`, ferramentas MCP `decisoes_abertas` e `decisao_responder` (escopo novo `decisoes`), rotas `/api/v1/decisoes/perguntas`, skill sugerida em `docs/fontes/hermes-skill-decisoes.md`. **Falta:** instalar, emitir token com o escopo `decisoes`, incluir as 2 ferramentas e a skill no Hermes (runbook#decisoes); depois transformar as pendências do Ricardo (conta 10, ORM Reis, NESS) em perguntas | C+R | 🔧 | pergunta criada e respondida pelo WhatsApp com a decisão gravada |
+| EV1 | ✅ dispensado 16/10: latência medida de 50 a 270 ms por chamada; snapshot só somaria risco de dado velho. Snapshot pré-calculado do resumo e da agenda financeira (ferramenta responde sem consultar o banco) | C | ⏸ | latência medida |
+| EV2 | ✅ 16/10 no código: migração 0029 `captura_conta`, a rodada seguinte não refaz conta já gravada (janela de 3 h, mesmo dia) e rodada presa vira `interrompida`. Checkpoint por conta e leitura concorrente nas rodadas de captura (retomável após queda) | C | ⏸ | rodada interrompida retoma sem refazer contas prontas |
+| EV3 | ✅ 16/10: `tests/evals` com cenário fixo e golden (diária, semanal, cobrança) e regras de toda mensagem. Evals de mensagens e perguntas antes de instalar (resumo, agenda financeira, cobrança, classificação) | C | ⏸ | suíte de evals no `pytest` |
+| EV4 | Subagentes por capacidade com ferramentas mínimas (financeiro leitura, cobrança, agenda/e-mail) | R+C | ⏸ junto do H0 | listas por canal testadas |
+| EV5 | ✅ 16/10 no código: `gabi/qualidade.py`, rota `/api/v1/gabi/qualidade`, migração 0030 `duracao_ms`, tela Gabi › Qualidade. Painel de qualidade: taxa de aceite das sugestões, custo por tarefa, latência | C | ⏸ | tela no painel |
+| FU1 | ✅ 16/10: `gabi/hoje.py` (`hoje_brt`) e os `date.today()` padrão trocados. Auditar `agora.date()` e o relógio do servidor (CEST) nos timers; "hoje" sempre Brasília | C | ⏸ | testes com `agora` perto da meia-noite |
+| H0 | ✅ 16/10 17:05 (backup `~/.hermes/config.yaml.bak-antes-h0`; gateway reiniciado 17:06). Telegram e WhatsApp sem `terminal`, `file`, `code_execution`, `browser`, `delegation`; `skills.write_approval` e `memory.write_approval` = true; `tool_progress: log` (menos ruído). Terminal em Docker: dispensado nos canais (não têm terminal); o `cli` segue local. Teste feito 16/10 (Hermes local com os toolsets dos canais: "SEM TERMINAL") | C | ✅ | teste pelo canal |
+
+### 2. Cobrar (Fase 2)
+| # | Item | Dono | Status | Pronto quando |
+|---|---|---|---|---|
+| C1 | G18: subir os comprovantes Pix reais para o Paperless (hoje só 2 com a etiqueta, sem valor legível) | R | ⛔ | ≥ 80 % dos itens com comprovante casado (`docs/historico/aceite-fase-2.md`) |
+| C2 | G19: lote do Nibo em conta real, 2 vezes sem duplicar | R | ⏸ on hold 21/10 (chave da Nibo; depende também de C1) | conferido no Nibo |
+| C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold 21/10 (chave da Nibo) | G8 fechado |
+| C4 | ~~C4~~ aceito/criado em 21/10 por ordem do dono (Fase 2 aceita sem o 'pedido real pelo canal'; tag `v1.0-gabi-brain`). | R+C | ✅ | — |
+
+### 3. Agenda e e-mail (ligados em 12/10)
+| # | Item | Dono | Status | Pronto quando |
+|---|---|---|---|---|
+| A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
+| A3 | ✅ decidido 16/10: sem calendários extras (feriados vêm do código). Decidir calendários extras (feriados) | R | ⏸ | decidido |
+| A4 | ✅ 16/10 instalado (suíte 2149 verdes). Minors de maior risco: exceção qualquer não derruba as outras fontes e janela corrompida usa o padrão (agenda M3); recarga vazia não apaga a fonte (M4); 400 não é credencial e 403 só avisa na 2ª falha seguida (M1); mensagem veneno 4xx é pulada (e-mail M7); `_mover` só aceita trash/untrash (e-mail M1); restaurar e descobrir fora do laço da API (e-mail M2, agenda M9, 404 antes de 503). Resta: veneno 5xx persistente ainda trava a conta (pular perderia mensagem) | C | ✅ | cada um com teste |
+| A5 | ✅ 16/10 no código (pacote de fechamento; testes focados verdes). Antes: lixo sugerido (e-mail M3), "Dispensar", "Na lixeira" com conta desligada (M5), poda de `email_msg`/`email_respondido` (M8), iCalUID e "livre" (agenda M5), última leitura no fuso e `noopener` (agenda M8), proteção por `pessoa.dados.emails`. **Agora:** campo de retenção (`email.retencao_msg_dias`, piso 90) em Cadastros › E-mail e piso 0,7 da confiança da lixeira no painel (e-mail M9); **e-mail M4**: leitura de contatos pede `emailAddresses` (decisão do Ricardo), migração 0070 `contato_google_email`, aprovar remetente preenche `email:<endereço>` (um só) ou pergunta pelo canal de decisão (vários); agenda M6 (bloco da agenda cita "desde DD/MM" em evento de ontem), M8 "só Meet" (`conferenceData`, só https), M9 (conta minúscula, `ultimo_erro` limpa ao desligar, `auth=delegacao` sem cliente); agenda M1, M7 e e-mail M1/M2/M7(4xx) já estavam resolvidos e ganharam a conferência em teste. Triagem completa nos ledgers (`docs/superpowers/ledgers/2026-10-11-{agenda,email}.md`, seção "Triagem final"). **Ficam fora (com motivo):** e-mail M7 veneno 5xx persistente (pular perderia mensagem); agenda M8 "Liberar em fonte Microsoft deixa todas falharam" (Graph só quando a ness migrar); agenda Task 7 (timer fora do envelope de frescor: só quando a agenda for habilitada de vez); `_adiar` sem conferir estado (baixo risco). **Passo do dono:** instalar (aplica a 0070) e consentimento `contacts.readonly` (E1/G12) para os e-mails dos contatos chegarem | C | ✅ | restantes triados: fazer, descartar ou virar Depois |
+| A6 | ✅ 16/10: causa era a reserva fixa de US$ 0,05 por falha (20 timeouts/dia = US$ 1 > teto US$ 0,70); agora a reserva segue o custo real da tarefa. O teto continua global (decisão). `email_sem_modelo` ("teto de custo do modelo") aparece todo dia às 09:45: o teto de custo é global e escuta e correio dividem. Decidir o teto | R+C | ❓ | aviso some ou o teto é separado |
+| A7 | ⏸ ON HOLD 21/10 (ordem do dono): a Nibo ainda não disponibilizou a chave nova; nada a fazer até ela chegar. `gabi-brain-notas.service` falhou em 16/10 (aviso `servico_falhou`, "notas-nibo erro"). **Causa: `GET /schedules/credit -> 401: Api token expirado`** (Nibo). Última rodada boa: 5 notas novas. Código está certo; falta renovar o `NIBO_TOKEN` (segredo: só o Ricardo coloca) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
+
+### 4. Escuta do WhatsApp pessoal
+Código completo (ADR-016), tudo desligado. Passo a passo em `docs/runbook.md#escuta-paralelo`.
+| # | Item | Dono | Status |
+|---|---|---|---|
+| E1 | ~~Parear o ouvinte~~ feito em 19/10 (`escuta-ouvinte` ativo). Resta G12 `contacts.readonly` (contatos Google) | R | ⏸ |
+| E2 | Chave do modelo com limite; aprovar remetentes e grupos na tela | R | ⏸ |
+| E3 | Ligar em `registro` e comparar por N dias (`tools.comparar_escuta`, divergência 0) | R+C | ⏸ |
+| E4 | (saúde descartada em 21/10: só o modo `ativo` e o teste de crise seguem) Aceitar que saúde só de texto não vai ao cofre (desvio ADR-016), depois modo `ativo`; teste de crise (`--teste-crise`) recebido | R | ⏸ |
+
+### 5. Exames e saúde — DESCARTADO em 21/10 (o dono desistiu dos dados de saúde)
+Timers `gabi-brain-exames` e `gabi-brain-reembolso-saude` desligados em 21/10 (religar: `sudo systemctl enable --now <timer>`). Código, cofre `saude.enc` e `/etc/gabi/saude.key` ficam como estão, sem uso; nada de saúde entra em alerta ou pendência. S1-S3, D8 e a parte de saúde do E4 deixam de ser pendência. Apagar dados ou remover código só por pedido novo.
+| # | Item | Dono | Status |
+|---|---|---|---|
+| S1 | ~~Plano de exames~~ executado em 16/10 (tarefas 1-10, instalado; timer ligado em 16/10 21:20). Ver `PROGRESSO-GOAL.md` | C | ✅ |
+| S2 | ⏹ DESCARTADO 21/10. Antes: ✅ 16/10: chave gerada pelo Claude (`/etc/gabi/saude.key`); **leve a cópia `~/saude.key.COPIE-E-APAGUE` para fora da VPS e apague**. `/etc/gabi/saude.key` (sem ela a tela Família responde 503) e a lista de PDFs de exames como aceite | R | ⏸ |
+| S3 | ⏹ DESCARTADO 21/10. Leitura por imagem de PDF digitalizado (exames e reembolso): código pronto em 16/10, **desligada**. Ricardo liga `saude.visao_pdf` (ver `runbook#visao-pdf`: privacidade, custo) e a rota de reprocessar exames passa `visao=` (`gabi/rotas/familia.py`) | R/C | ⏸ |
+
+### 6. Canal (Hermes) e corte do OpenClaw
+| # | Item | Dono | Status | Pronto quando |
+|---|---|---|---|---|
+| H1 | Idioma pt no Hermes (`display.language`, `stt.language`) | C | ✅ 16/10 | confirmar nos logs que o WhatsApp reconectou |
+| H2 | Resumo da manhã em blocos Financeiro (agenda financeira de 3 dias) / Agenda / E-mail | C | ✅ instalado 16/10 | conferir a mensagem das 07:05 |
+| H3 | ✅ 16/10 no código: `fechamento_dia` (MCP) + script `no_agent`. Fechamento noturno (21:00 BRT) e outros jobs do Hermes no mesmo formato | C | ⏸ | prompts revisados |
+| H4 | ✅ 16/10 no código: aviso `hermes_parado` (Telegram do próprio brain, independente do Hermes). `gabi-vigia` vigiar o `hermes-gateway` (plano definitivo) | C | ❓ | verificado |
+| H7 | 7 dias de Hermes estável + backup exportado → `--dry-run` | R+C | ⛔ depende de E4 e H5 | sem queda em 7 dias |
+| H8 | ~~H8~~ OpenClaw desligado em 20/10; `gabi-fin` já parado e arquivado (ver D7). | C | ✅ | — |
+
+### 7. Fechamento
+| # | Item | Dono | Status |
+|---|---|---|---|
+| F1 | ~~F1~~ aceito/criado em 21/10 por ordem do dono (Fase 2 aceita sem o 'pedido real pelo canal'; tag `v1.0-gabi-brain`). | R+C | ✅ | — |
+| F2 | Encerramento e memória (Task 16 do fechamento) | C | ⛔ |
+
+## Depois (não bloqueia a v1.0)
+Estado real em 16/10/2026, com o motivo de cada item não ter sido feito:
+- **Microsoft Graph (G11), ionic:** ⏸ DECISÃO 16/10 à noite (revertendo a da tarde): o Ricardo manda ler e-mail, agenda e Teams de resper@ionic.health (a ionic usa Teams, não WhatsApp). **Parado por depender do administrador do tenant** (registrar o app, subir o certificado, consentimento; passo a passo em `docs/fontes/graph-ionic-passo-a-passo.md`; certificado e x5t já gerados na VPS). Quando vierem tenant e client id: criar `/etc/gabi/graph.env` e implementar agenda, correio (Itens Excluídos, nunca apaga de vez) e Teams (modelo da escuta: sem guardar texto) sobre `gabi/fontes/graph.py` (o cliente existe e nada o usa). A ness continua para depois da migração dela. **ness (19/10): contatos e agenda no código, nada ligado (ADR-019, runbook `#graph-ness`); e-mail pronto no código; Teams da ness implementado na branch feat/graph-ness (20/10), nada habilitado. Falta no Teams: ionic, canais, modelo (fase 2), responder (exige ADR de exceção à R2).**
+- **Marcação de agenda com anuência (exceção controlada à R2) e Teams:** ⛔ dependem de decisão do Ricardo. Criar ou aceitar convite é envio externo: exige exceção à R2 por novo ADR (e, no Teams, também a conta Microsoft, ver item acima). Sem ADR aprovado, nada é implementado.
+- **Tela Entregas (Linear):** ⛔ precisa de `LINEAR_API_KEY`, segredo que só o Ricardo coloca. O cliente (`gabi/fontes/linear.py`) e a rota existem; a tela segue "ainda não construída" até a chave.
+- **Tailscale da família (G13):** ⏸ é ação no admin do Tailscale (ACL e convites), fora do código; fica com o Ricardo.
+- **Obsidian por pessoa:** ⏸ o código (T4.6) existe e está testado; o uso real depende do Ricardo (criar o cofre e dizer quem entra).
+- Ideias do Vercel Eve, só como prática: evals de mensagem (resumo, fechamento, avisos), manifesto único por capacidade, retomada por passo nos jobs com modelo, aprovação explícita por ferramenta de escrita. Não reestruturar o brain nesse modelo.
+- Fase 3 (Trabalho): Entregas segue "ainda não construída". Contatos (16/10) feita; **frente por pessoa feita em 16/10** só onde há vínculo real (e-mail confirmado numa frente liga a frente ao remetente: Contatos mostra "frente: <nome>"); **tarefa por pessoa fica sem linha** (`tarefa` não tem remetente nem pessoa; inventar o vínculo seria chute). Segue de fora: reunião da agenda nova por participante (guarda só `participantes_qtd`, ADR-017), e "respondido" por conversa (o brain só sabe o endereço, `email_respondido`).
+
+## Análise de 20/10/2026 (simplificar, medir, endurecer)
+- ✅ 20/10 testes mais rápidos: `tests/conftest.py` copia um banco-modelo migrado (suíte de ~20 min de CPU para uns poucos minutos).
+- ✅ 20/10 banco parado há mais de 24 h vira aviso `banco_desatualizado` (um por banco por dia), entra no `desatualizado` do envelope (campo `bancos_antigos`) e no resumo da manhã. Antes só aparecia no log. Fonte: `dinheiro.sync_banco`, gravado a cada sincronização do provedor.
+- ✅ 20/10 timers de agenda e correio escalonados (trabalho :00, correio :05, agenda :10, a cada 15 min) para não baterem na ponte no mesmo segundo. Valem depois de `sudo ~/instalar-brain.sh`.
+- ⏸ **Podar ferramentas do Hermes (36 no include):** sem evidência hoje (o log do Hermes tem ~10 chamadas reais em 3 dias). O uso por ferramenta já está em Gabi › Qualidade (`chamada_mcp`). Reavaliar em 2 semanas: cortar do include (`~/.hermes/config.yaml`) as que tiverem 0 chamadas.
+- ⏸ **Candidatos a corte, hoje esperando decisão ou chave do Ricardo (não são código morto):** cliente do Linear e tela Entregas (falta `LINEAR_API_KEY`; `trabalho` e `tokens` ainda o usam), Obsidian por pessoa (`gabi/familia/obsidian.py`), `gabi-brain-escuta.path`. Decidir: ligar ou remover.
+- ⏸ **Varredura "só no log":** o único achado até agora foi o banco parado (resolvido). Os demais `AVISO:` das rodadas (agenda, e-mail, Teams, contatos) viram `rodada.aviso` e entram no envelope; sem pendência conhecida.
+- ⏸ **Extratos 4x por dia (em vez de 06h e 14h):** muda custo de chamadas ao mcp.ai; só com ok do Ricardo. A rodada leva ~10 min por esperar a sincronização de cada banco.
+- **Não fazer:** juntar correio, agenda e trabalho num timer só (acopla falhas e quebra o aviso `servico_falhou`).
+
+## Obsoleto (não fazer)
+- **G16** reconectar XP Investimentos: a conexão saiu do mcp.ai em 11/10. Issue `docs/issues/0001` vale só para o C6.
+- Qualquer "plano B" no OpenClaw; trabalho novo no `gabi-fin`, `gabi-app`, `gabi-fluxos-*`, `gabi-contas-cartoes`, `gabi-guarda-sessoes`.
+
+## Achados de 16/10 (origem dos itens D2, D3, H1, H2, A6, A7)
+- Saldos horários com 4–17 contas lidas: provedor devolve lista parcial e o código grava o que vem.
+- Hermes sem idioma definido (mensagens fixas em inglês) e STT fixado em `en`.
+- Resumo da manhã era texto corrido; passou a blocos.
+- Conta 10 liberada (`sim`) e parada desde 12/08 ainda conta como fonte ativa.
+
+## Como manter
+Ao fechar um item: troque o status por ✅ com a data e a evidência (comando, número, commit). Item novo entra no bloco certo, com dono. Não duplique pendência em `STATUS.md`: lá fica só o histórico.

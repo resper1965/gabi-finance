@@ -49,7 +49,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
                    "e `avisos_pendentes` não devolve aviso de pedido desse canal (R2: a Gabi não escreve a terceiros).", "",
                    "## Hoje {#hoje}", "",
                    "`GET /api/v1/hoje?filtro=all|<empresa>|t-<frente>` devolve `prioridades[]`, `agenda[]`, `emails_importantes[]` e `dinheiro` (só em `all`). Lê apenas de tabelas prontas, sem rede. "
-                   "No MCP: `hoje_resumo`, `frentes_listar`, `frentes_itens` (escopo `trabalho`, só leitura). Concluir tarefa age na origem; criar rascunho é o único efeito externo e nunca envia.", ""]
+                   "No MCP: `resumo_manha`, `agenda_listar`, `email_listar` (escopo `trabalho`, só leitura). Concluir tarefa age na origem; criar rascunho é o único efeito externo e nunca envia.", ""]
         return "\n".join(linhas), openapi
 
 

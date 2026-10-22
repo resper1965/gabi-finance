@@ -7,6 +7,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -180,27 +181,6 @@ def _parametro(con, chave: str, padrao):
         return padrao
 
 
-def _escuta_parada(con, agora: dt.datetime, novo) -> None:
-    """Vigia do ouvinte: só em modo 'ativo'; sem nenhuma mensagem registrada não avisa. Um aviso por dia, sem texto, nome nem número de telefone."""
-    if _parametro(con, "escuta.modo", "registro") != "ativo":
-        return
-    horas = _parametro(con, "escuta.horas_sem_receber", 12)
-    if isinstance(horas, bool) or not isinstance(horas, (int, float)) or horas <= 0:
-        horas = 12
-    ultima = con.execute("select max(recebida_em) from escuta_msg").fetchone()[0]
-    if not ultima:
-        return
-    try:
-        quando = dt.datetime.fromisoformat(ultima)
-    except ValueError:
-        return
-    if quando.tzinfo is None:
-        quando = quando.replace(tzinfo=BRT)  # o spool grava em UTC; linha antiga sem offset vale como Brasília (convenção do spool)
-    if agora - quando > dt.timedelta(hours=horas):
-        n = int((agora - quando).total_seconds() // 3600)
-        novo("escuta_parada", "ouvinte", {"motivo": f"ouvinte sem receber mensagens há {n} horas"})
-
-
 UNIDADE_HERMES = "hermes-gateway"
 
 
@@ -316,6 +296,18 @@ def _bancos_desatualizados(con, agora: dt.datetime, novo) -> None:
         novo("banco_desatualizado", b["banco"], b)
 
 
+def _saldo_divergente(con, novo) -> None:
+    """Conferência de saldo que não bateu na ÚLTIMA rodada de extratos, por conta liberada: só informa (ADR-023); um por conta por dia (chave = conta)."""
+    r = con.execute("select id from rodada where fonte='open-finance' and fim is not null and status='ok' order by id desc limit 1").fetchone()
+    if r is None:
+        return
+    for c in con.execute("select cf.conta_id, cf.detalhe, coalesce(ct.apelido, ct.instituicao) as nome from conferencia cf join conta ct on ct.id=cf.conta_id "
+                         "where cf.rodada_id=? and cf.ok=0 and ct.estado='sim' and ct.excluido_em is null order by cf.conta_id", (r["id"],)):
+        m = re.search(r"diferença de (-?\d+) centavos", c["detalhe"] or "")
+        novo("saldo_divergente", c["conta_id"], {"conta_id": c["conta_id"], "conta": c["nome"], "diferenca_centavos": int(m.group(1)) if m else None,
+                                                 "detalhe": c["detalhe"]})
+
+
 def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
@@ -329,18 +321,19 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
 
     ult = con.execute("select conferida, fim from rodada where fonte='open-finance' and fim is not null order by id desc limit 2").fetchall()
     if len(ult) == 2 and not any(r["conferida"] for r in ult):
-        novo("rodada_parada", "duas_nao_conferidas", {"motivo": "as 2 últimas rodadas de extratos não foram conferidas"})
+        novo("rodada_parada", "duas_nao_conferidas", {"motivo": "as 2 últimas rodadas de extratos falharam"})
     elif ult:
         conf = con.execute("select max(fim) from rodada where fonte='open-finance' and conferida=1").fetchone()[0]
         if conf is None or agora - dt.datetime.fromisoformat(conf) > dt.timedelta(hours=HORAS_DADOS_ANTIGOS):
-            novo("rodada_parada", "dados_antigos", {"motivo": f"nenhuma rodada conferida nas últimas {HORAS_DADOS_ANTIGOS} horas"})
+            novo("rodada_parada", "dados_antigos", {"motivo": f"nenhuma rodada de extratos terminou bem nas últimas {HORAS_DADOS_ANTIGOS} horas"})
+
+    _saldo_divergente(con, novo)
 
     ref = con.execute("select coalesce((select max(fim) from rodada where fonte='exportacao' and status='ok'), min(inicio)) from rodada").fetchone()[0]
     if ref and agora - dt.datetime.fromisoformat(ref) > dt.timedelta(hours=HORAS_EXPORTACAO):
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
     _bancos_desatualizados(con, agora, novo)
-    _escuta_parada(con, agora, novo)
     if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
         _hermes_parado(con, agora, novo, estado_servico)
     _google_parado(con, agora, novo)

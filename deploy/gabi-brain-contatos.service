@@ -12,9 +12,9 @@ WorkingDirectory=/opt/gabi-brain
 Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
 # Os contatos chegam pela ponte do serviço de fontes (único com rede e segredos, R5): aqui não há token nem rede.
 Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
-ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos
+ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos
 # Depois da sincronização: aplica só as propostas APROVADAS no painel; com contatos.escrita desligado (padrão) só conta o que aplicaria.
-ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos_gravar
+ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos_gravar
 TimeoutStartSec=300
 UMask=0077
 NoNewPrivileges=yes

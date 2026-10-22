@@ -29,33 +29,6 @@ def _ddmm(iso) -> str:
     return f"{str(iso)[8:10]}/{str(iso)[5:7]}" if isinstance(iso, str) and len(iso) >= 10 else "?"
 
 
-def _quem(p: dict) -> str:
-    return p.get("nome") or p.get("numero") or "número desconhecido"
-
-
-def _descrever_escuta(tipo: str, p: dict) -> tuple[str, str]:
-    """Só número e nome: o texto da mensagem nunca vem para o aviso."""
-    if tipo == "escuta_novo_remetente":
-        return f"Novo remetente no WhatsApp: {_quem(p)}", "aprove, ignore ou bloqueie na fila da escuta"
-    if tipo == "escuta_atencao":
-        return f"Possível crise: {_quem(p)}. Abra a conversa.", ""
-    if tipo == "escuta_saude":
-        return f"Mensagem de saúde de {_quem(p)}: abra a conversa", ""
-    if tipo == "escuta_pedido_incompleto":
-        return f"Pedido incompleto de {_quem(p)}", "faltou valor ou vencimento; abra a conversa e peça o que falta"
-    if tipo == "escuta_sem_permissao":
-        return f"Pedido de {_quem(p)} sem permissão: libere em Cadastros", "a mensagem fica retida até a pessoa poder pedir (pode_pedir)"
-    if tipo == "escuta_parada":
-        return "Escuta do WhatsApp parada", p.get("motivo", "")
-    if tipo == "escuta_sem_modelo":
-        return "Escuta sem modelo de leitura", f"a escuta está sem modelo disponível agora: {p.get('motivo') or 'motivo desconhecido'}"
-    if tipo == "escuta_anexo_grande":
-        return f"Anexo grande demais de {_quem(p)}", "acima do teto da escuta (escuta.anexo_max_mb): não foi guardado; abra a conversa"
-    if tipo == "escuta_falhou":
-        return f"Mensagem de {_quem(p)} não foi processada", "falhou 8 vezes seguidas (Paperless, ponte ou modelo fora do ar); abra a conversa"
-    return tipo, ""
-
-
 def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
     """Remetente e assunto são dado do dono (vão só para os canais dele); nunca para log."""
     if tipo == "email_emergencial":
@@ -75,25 +48,6 @@ def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
     return tipo, json.dumps(p, ensure_ascii=False)
 
 
-def _descrever_reembolso_saude(tipo: str, p: dict) -> tuple[str, str]:
-    """Só número do dossiê, mês e códigos do que falta: nome de paciente ou prestador nunca vem para o aviso (ADR-014)."""
-    quem = f"dossiê {p.get('dossie', '?')} ({str(p.get('mes', '?'))[5:7]}/{str(p.get('mes', '?'))[:4]})"
-    if tipo == "reembolso_saude_abre":
-        return f"Reembolso a pedir: {quem}", "falta " + (", ".join(p.get("faltam") or []) or "conferir")
-    if tipo == "reembolso_saude_pronto":
-        return f"Reembolso pronto para pedir: {quem}", "monte o pedido com reembolso_saude_dossie; quem envia à operadora é você"
-    if tipo == "reembolso_saude_sem_requisito":
-        return f"Não é reembolsável: {quem}", f"sem {p.get('requisito') or 'item exigido'}; mande o que falta e eu reabro"
-    if tipo == "reembolso_saude_semana":
-        linhas = [x for x in (p.get("linhas") or []) if isinstance(x, str)]
-        return (linhas[0] if linhas else "Reembolsos de saúde"), "\n".join(linhas[1:])
-    if tipo == "reembolso_saude_requisitos":
-        return "Requisitos do reembolso de saúde inválidos", "corrija o parâmetro reembolso_saude.requisitos; o reembolso está parado até lá"
-    if tipo == "reembolso_saude_sem_modelo":
-        return "Reembolso de saúde sem modelo de leitura", f"os documentos esperam: {p.get('motivo') or 'motivo desconhecido'}"
-    return tipo, ""
-
-
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "vence_em_breve":
         itens = p.get("itens") or []
@@ -108,6 +62,10 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Valor diferente: {p.get('nome', '?')}", f"estimado {_reais(p.get('estimado'))}, veio {_reais(p.get('real'))} (vence {_ddmm(p.get('vencimento'))})"
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
+    if tipo == "saldo_divergente":
+        d = p.get("diferenca_centavos")
+        quanto = _reais(abs(d) / 100) if isinstance(d, int) else "um valor"
+        return f"Saldo não bate com os lançamentos: {p.get('conta', '?')}", f"diferença de {quanto} entre o saldo do banco e os lançamentos lidos; só para você conferir (os dados seguem valendo)"
     if tipo == "banco_desatualizado":
         try:
             d = dt.datetime.fromisoformat(str(p["desde"]).replace("Z", "+00:00"))
@@ -154,10 +112,6 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
     if tipo.startswith("email_"):
         return _descrever_email(tipo, p)
-    if tipo.startswith("escuta_"):
-        return _descrever_escuta(tipo, p)
-    if tipo.startswith("reembolso_saude_"):
-        return _descrever_reembolso_saude(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

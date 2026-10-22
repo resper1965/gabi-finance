@@ -9,20 +9,18 @@ from starlette.testclient import TestClient
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro.valor import formatar
-from gabi.mcp.servidor import criar_mcp
+from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, criar_mcp
 from gabi.mcp.tokens import emitir, revogar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
-                 "financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo", "cobranca_rascunho", "fechamento_dia"}
-NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "pedidos_registrar", "pedidos_estado", "avisos_pendentes", "avisos_confirmar_entrega",
-               "classificar_lancamento", "regras_sugerir", "tarefas_propor", "reembolsos_preparar_email", "reembolsos_listar", "pessoas_dado"}
-NOVAS_FASE3 = {"agenda_listar", "email_listar", "hoje_resumo", "resumo_manha", "frentes_listar", "frentes_itens", "contatos_em_aberto"}  # só leitura do Trabalho
+                 "financeiro_recorrentes", "financeiro_previsao", "despesas_por_empresa", "fechamento_dia"}
+NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "classificar_lancamento", "regras_sugerir"}
+NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
-NOVAS_REEMBOLSO_SAUDE = {"reembolso_saude_pendentes", "reembolso_saude_segunda", "reembolso_saude_dossie", "reembolso_saude_pedi", "reembolso_saude_recebi"}  # leitura da projeção + intenção "pedi/recebi"
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_REEMBOLSO_SAUDE  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
 
 @pytest.fixture
@@ -47,7 +45,7 @@ def banco(tmp_path):
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'padrao', 'boleto', ?, '{}')", (cid, cid.split(':')[0], nome, vu, vu, v, est))
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
-    for f in ('notas-nibo', 'comprovantes-paperless'):  # fontes esperadas do envelope
+    for f in ('notas-nibo',):  # fontes esperadas do envelope
         c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.close()
     return p
@@ -110,6 +108,13 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
+def test_sobram_exatamente_as_18_ferramentas_da_simplificacao():
+    assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "classificar_lancamento", "decisao_responder", "decisoes_abertas",
+                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "email_listar", "fechamento_dia",
+                                           "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
+                                           "financeiro_recorrentes", "financeiro_saldo", "regras_sugerir", "resumo_manha"]
+
+
 def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     nomes = {t["name"] for t in rpc(cli, tokens["fin"], "tools/list").json()["result"]["tools"]}
     assert nomes == PERMITIDAS
@@ -136,6 +141,18 @@ def test_saldo_so_das_contas_liberadas_e_com_dados_ate(cli, tokens):
     assert r["dados_ate"] == "2026-10-08T17:00:30Z" and "desatualizado" in r
     d = r["dados"]
     assert d["caixa_unico"] == "12345.60" and [c["apelido"] for c in d["contas"]] == ["C6 PJ"] and d["faturas_abertas"] == "0.00"
+
+
+def test_despesas_por_empresa_usa_o_mes_corrente_e_formata_em_reais(cli, banco, tokens):
+    c = conectar(banco)
+    c.execute("insert into empresa(id, nome) values ('ness','NESS')")
+    pf = c.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado, pj) values ('pf-mcp','Itau','BANK','PF','sim',0)").lastrowid
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, natureza, empresa_id, descricao_original) values (?,'mcp1','2026-10-02',-12345,'custo','ness','HOTEL')", (pf,))
+    c.close()
+    d = chamar(cli, tokens["fin"], "despesas_por_empresa")["dados"]
+    assert d["mes"] == "2026-10" and d["empresas"] == [{"empresa_id": "ness", "empresa": "NESS", "total": "123.45",
+                                                        "itens": [{"lancamento_id": d["empresas"][0]["itens"][0]["lancamento_id"], "data": "2026-10-02", "descricao": "HOTEL", "valor": "123.45"}]}]
+    assert chamar(cli, tokens["docs"], "despesas_por_empresa")["erro"] == "sem_escopo"
 
 
 def test_saldo_filtra_por_conta(cli, tokens):
@@ -262,7 +279,7 @@ def test_smoke_cliente_oficial_streamable_http(banco, tokens):
 
 
 # ---------------- MC1: análises somente leitura ----------------
-ANALISE = ("financeiro_recorrentes", "financeiro_previsao", "financeiro_vazamentos", "financeiro_rumo")
+ANALISE = ("financeiro_recorrentes", "financeiro_previsao")
 
 
 def _academia(banco):
@@ -293,33 +310,10 @@ def test_previsao_e_dias_invalido(cli, tokens):
     assert chamar(cli, tokens["fin"], "financeiro_previsao", dias=9999)["erro"] == "requisicao_invalida"
 
 
-def test_vazamentos_traz_chaves_e_meses_invalido(cli, tokens):
-    d = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=3)["dados"]
-    assert {"assinaturas", "aumentos"} <= set(d)
-    assert chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=0)["erro"] == "requisicao_invalida"
-
-
-def test_rumo_formata_valores(cli, tokens):
-    d = chamar(cli, tokens["fin"], "financeiro_rumo", ano=2026)["dados"]
-    out = next(l for l in d["meses"] if l["mes"] == "2026-10")
-    assert out["entradas"] == formatar(800000)
-    assert chamar(cli, tokens["fin"], "financeiro_rumo", ano=1900)["erro"] == "requisicao_invalida"
-
-
 def test_previsao_parte_do_caixa_unico_e_sem_float(cli, tokens):
     saldo = chamar(cli, tokens["fin"], "financeiro_saldo")["dados"]["caixa_unico"]
     p = chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
     assert p["saldo_inicial"] == saldo == "12345.60" and isinstance(p["menor_saldo"], str)
-
-
-def test_vazamentos_sem_float_em_dinheiro(cli, banco, tokens):
-    c = conectar(banco)
-    for i, m in enumerate(["2026-06", "2026-07", "2026-08", "2026-09"], start=20):
-        c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
-                  "values (1,?,?,-5990,'STREAMING','caixa+custo','posted')", (f"v{i}", f"{m}-05"))
-    c.close()
-    ass = chamar(cli, tokens["fin"], "financeiro_vazamentos", meses=4)["dados"]["assinaturas"]
-    assert [a["mensal"] for a in ass if a["item"].startswith("STREAMING")] == ["59.90"]
 
 
 def test_previsao_sem_saldo_avisa_em_vez_de_zero(cli, banco, tokens):

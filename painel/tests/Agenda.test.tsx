@@ -171,7 +171,7 @@ test("escolher Amanhã pede só o dia de amanhã", async () => {
 
 test("o link da reunião em Hoje abre em nova aba com rel noopener noreferrer", async () => {
   const evento = { id: 1, titulo: "Daily", inicio_local: "2026-10-12T09:00:00-03:00", fim_local: "2026-10-12T09:30:00-03:00", dia_local: "2026-10-12", dia_fim_local: "2026-10-12", dia_inteiro: false, link_reuniao: "https://meet.google.com/abc", fonte: "a@x.com", privado: false };
-  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => env({ filtro: "", prioridades: [], agenda: [evento], emails_importantes: [], dinheiro: null }) }) as Response));
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => env({ prioridades: [], agenda: [evento], correio_importantes: [], dinheiro: { saldo: "R$ 0,00", atrasadas: { n: 0, valor: "R$ 0,00" }, sai_hoje: "R$ 0,00", pago_hoje: "R$ 0,00" } }) }) as Response));
   montar(<Hoje />);
   const a = await screen.findByRole("link", { name: "entrar" });
   expect(a.getAttribute("target")).toBe("_blank");

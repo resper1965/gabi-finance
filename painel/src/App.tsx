@@ -10,10 +10,6 @@ import { AREAS_DINHEIRO, type Area } from "./navegacao";
 import { Resumo } from "./telas/Caixa/Resumo";
 import { Semanas } from "./telas/Caixa/Semanas";
 import { APagar } from "./telas/Caixa/APagar";
-import { Pedidos } from "./telas/Caixa/Pedidos";
-import { Reembolsos } from "./telas/Cobrar/Reembolsos";
-import { Comprovantes } from "./telas/Cobrar/Comprovantes";
-import { EmailCobranca } from "./telas/Cobrar/EmailCobranca";
 import { Lancamentos } from "./telas/Gastos/Lancamentos";
 import { ParaOndeVai } from "./telas/Gastos/ParaOndeVai";
 import { Cartoes } from "./telas/Gastos/Cartoes";
@@ -21,32 +17,24 @@ import { Parcelas } from "./telas/Gastos/Parcelas";
 import { Assinaturas } from "./telas/Gastos/Assinaturas";
 import { Regras } from "./telas/Regras";
 import { Cadastros } from "./telas/Cadastros";
-import { Escuta } from "./telas/Escuta";
+import { CadastrosContatos } from "./telas/CadastrosContatos";
 import { CadastrosAgenda } from "./telas/CadastrosAgenda";
 import { CadastrosTeams } from "./telas/CadastrosTeams";
 import { CadastrosCorreio } from "./telas/CadastrosCorreio";
 import { Prioridades } from "./telas/Trabalho/Prioridades";
 import { Hoje } from "./telas/Trabalho/Hoje";
-import { Frentes } from "./telas/Trabalho/Frentes";
 import { Agenda } from "./telas/Trabalho/Agenda";
-import { Mensagens } from "./telas/Trabalho/Mensagens";
-import { Contatos } from "./telas/Trabalho/Contatos";
-import { Tarefas } from "./telas/Trabalho/Tarefas";
-import { Entregas } from "./telas/Trabalho/Entregas";
-import { Configuracao } from "./telas/Configuracao";
-import { Familia } from "./telas/Familia";
-import { Reembolso } from "./telas/Reembolso";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
 import { Qualidade } from "./telas/Gabi/Qualidade";
 import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
 import { AReceber } from "./telas/Cobrar/AReceber";
 
-const TELAS: Record<string, () => ReactNode> = {
-  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar, pedidos: Pedidos, reemb: Reembolsos, docs: Comprovantes, email: EmailCobranca,
+export const TELAS: Record<string, () => ReactNode> = {
+  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
-  regras: Regras, cadastros: Cadastros, escuta: Escuta, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades, setup: Configuracao,
-  qualidade: Qualidade, hoje: Hoje, temas: Frentes, familia: Familia, reembolso: Reembolso, agenda: Agenda, emails: Mensagens, contatos: Contatos, tarefas: Tarefas, entregas: Entregas,
+  regras: Regras, cadastros: Cadastros, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
+  qualidade: Qualidade, hoje: Hoje, agenda: Agenda,
 };
 
 function tela(area: Area, aba: string) {

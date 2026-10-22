@@ -14,16 +14,16 @@ LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 FONTES = {
     "open-finance": LIMITE_DESATUALIZADO,
     "notas-nibo": dt.timedelta(hours=30),               # diária 06:40
-    "comprovantes-paperless": dt.timedelta(hours=30),   # diária 07:00
-    "trabalho": dt.timedelta(hours=12),                 # a cada 15 min, 06-22h (a pausa noturna chega a 8 h); só conta se estiver em uso
     "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
     "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
-    "exames": None, "reembolso-saude": None, "teams": None,  # timers instalados e desligados até o Ricardo ligar; fontes None são filtradas (ficam fora da lista) e nunca contam em dados_ate
+    "teams": None,  # timers instalados e desligados até o Ricardo ligar; fontes None são filtradas (ficam fora da lista) e nunca contam em dados_ate
 }
 COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
-ESPERADAS = ("notas-nibo", "comprovantes-paperless")
+ESPERADAS = ("notas-nibo",)
+# Fontes cortadas pela ADR-023: as rodadas antigas ficam no banco (histórico), mas nunca entram na lista nem no dados_ate.
+CORTADAS = frozenset({"trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta"})
 BRT = dt.timezone(dt.timedelta(hours=-3))
 LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
@@ -59,13 +59,8 @@ def _em_uso(con, tabela: str) -> bool:
         return False
 
 
-def _trabalho_em_uso(con) -> bool:
-    """`trabalho` (e-mail e tarefas) só vale como fonte com caixa de e-mail liberada."""
-    return _em_uso(con, "caixa_email")
-
-
 def _agenda_em_uso(con) -> bool:
-    """`agenda` só vale como fonte com alguma fonte de agenda liberada: liberar agenda não liga o `trabalho`."""
+    """`agenda` só vale como fonte com alguma fonte de agenda liberada."""
     return _em_uso(con, "agenda_fonte")
 
 
@@ -98,10 +93,9 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     fontes, ultimas, falta, atrasada = [], [], False, False
     nomes = {r[0] for r in con.execute("select distinct fonte from rodada")}
     nomes |= set(ESPERADAS)
-    nomes.add("trabalho") if _trabalho_em_uso(con) else nomes.discard("trabalho")
     nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
     nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
-    nomes = sorted(n for n in nomes if not (n in FONTES and FONTES[n] is None))
+    nomes = sorted(n for n in nomes if n not in CORTADAS and not (n in FONTES and FONTES[n] is None))
     for nome in nomes:
         conta = FONTES.get(nome) is not None
         tent = con.execute("select status, conferida from rodada where fonte=? order by id desc limit 1", (nome,)).fetchone()

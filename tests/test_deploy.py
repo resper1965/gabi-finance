@@ -286,34 +286,6 @@ def test_timer_de_exportacao_semanal_instalado():
     assert "gabi-brain-exportacao.timer" in ligadas[0]
 
 
-def test_ingestao_de_comprovantes_tem_timer_diario_usa_a_ponte_e_avisa_quando_falha():
-    srv, t = _ler("gabi-brain-comprovantes.service"), _ler("gabi-brain-comprovantes.timer")
-    assert "gabi.cobrar.ingestao" in srv and "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv and "User=gabibrain" in srv
-    assert "OnCalendar=*-*-* 07:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-comprovantes.service" in t
-    for nome in ("gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-comprovantes.timer" in ligadas[0]
-
-
-def test_job_do_trabalho_roda_de_15_em_15_min_com_credenciais_so_do_ambiente_e_avisa_quando_falha():
-    srv, t = _ler("gabi-brain-trabalho.service"), _ler("gabi-brain-trabalho.timer")
-    assert "-m gabi.trabalho" in srv and "EnvironmentFile=-/etc/gabi/trabalho.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "User=gabibrain" in srv and "NoNewPrivileges=yes" in srv and "ProtectSystem=strict" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    assert "Unit=gabi-brain-trabalho.service" in t
-    for nome in ("gabi-brain-trabalho.service", "gabi-brain-trabalho.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-trabalho.timer" in ligadas[0]
-
-
-def test_api_le_a_chave_da_saude_so_de_arquivo_e_grava_o_cofre_na_pasta_do_banco():
-    api = _ler("gabi-brain-api.service")
-    assert "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in api and "ReadWritePaths=/var/lib/gabi-brain" in api
-    assert "saude.key" not in INSTALAR or "chmod" in INSTALAR  # a chave nunca é criada pelo instalador
-
-
 def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_no_repositorio():
     srv, t = _ler("gabi-brain-telegram.service"), _ler("gabi-brain-telegram.timer")
     assert "-m gabi.telegram" in srv and "EnvironmentFile=-/etc/gabi/telegram.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
@@ -338,45 +310,12 @@ def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
 
 
 # ---------------- escuta (WhatsApp): serviço, timer e gatilho por arquivo ----------------
-def test_unidades_escuta_seguem_o_padrao():
-    srv, t, p = _ler("gabi-brain-escuta.service"), _ler("gabi-brain-escuta.timer"), _ler("gabi-brain-escuta.path")
-    assert "-m gabi.escuta" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_ESCUTA_SPOOL=/var/lib/gabi-escuta-spool" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv
-    assert "ReadWritePaths=/var/lib/gabi-brain /var/lib/gabi-escuta-spool" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "OnUnitActiveSec=5min" in t and "OnBootSec=2min" in t and "Unit=gabi-brain-escuta.service" in t
-    assert "PathChanged=/var/lib/gabi-escuta-spool/gatilho" in p and "Unit=gabi-brain-escuta.service" in p
-    assert hasattr(importlib.import_module("gabi.escuta.__main__"), "main")
-    for nome in ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path"):
-        assert nome in INSTALAR
-
-
-def test_instalar_nao_liga_timer_nem_path_da_escuta():
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("escuta" in l for l in ligadas)
-
-
-def test_spool_da_escuta_fica_fora_da_arvore_0700_com_setgid_e_grupo():
-    srv = _ler("gabi-brain-escuta.service")
-    assert "/var/lib/gabi-brain/escuta-spool" not in INSTALAR + srv + _ler("gabi-brain-escuta.path")
-    assert "SupplementaryGroups=gabibrain-escuta" in srv
-    assert "ReadWritePaths=/var/lib/gabi-brain /var/lib/gabi-escuta-spool" in srv
-    assert "groupadd --system gabibrain-escuta" in INSTALAR
-    assert re.search(r"install -d -o gabibrain -g gabibrain-escuta -m 2770 /var/lib/gabi-escuta-spool", INSTALAR)
-
-
-def test_service_da_escuta_sem_limite_de_partidas_para_o_path_nao_se_desligar():
-    assert "StartLimitIntervalSec=0" in _ler("gabi-brain-escuta.service").split("[Service]")[0]
 
 
 # ---------------- contatos do Google ----------------
 def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
     srv, t = _ler("gabi-brain-contatos.service"), _ler("gabi-brain-contatos.timer")
-    assert "-m gabi.escuta.contatos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "-m gabi.contatos.contatos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
     assert "OnFailure=gabi-brain-falha@%n.service" in srv
     assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
     assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
@@ -384,11 +323,11 @@ def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
         assert dur in srv, dur
     assert "EnvironmentFile" not in srv
     assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-contatos.service" in t
-    assert hasattr(importlib.import_module("gabi.escuta.contatos"), "main")
+    assert hasattr(importlib.import_module("gabi.contatos.contatos"), "main")
     # escrita aprovada no Graph da ness roda depois da sincronização, na mesma unit e no mesmo sandbox (só AF_UNIX)
-    assert "ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos_gravar" in srv
-    assert srv.index("ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.escuta.contatos\n") < srv.index("ExecStartPost=")
-    assert hasattr(importlib.import_module("gabi.escuta.contatos_gravar"), "main")
+    assert "ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos_gravar" in srv
+    assert srv.index("ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos\n") < srv.index("ExecStartPost=")
+    assert hasattr(importlib.import_module("gabi.contatos.contatos_gravar"), "main")
     for nome in ("gabi-brain-contatos.service", "gabi-brain-contatos.timer"):
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
@@ -400,57 +339,6 @@ def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
 
 
 # ---------------- ouvinte do WhatsApp (serviço separado, só leitura) ----------------
-def test_unidade_do_ouvinte_segue_o_padrao_e_isola_o_brain():
-    u = (DEPLOY / "escuta-ouvinte.service").read_text()
-    for linha in ("User=escuta-ouvinte", "Group=escuta-ouvinte", "SupplementaryGroups=gabibrain-escuta", "UMask=0007",
-                  "Restart=always", "RestartSec=10", "WorkingDirectory=/opt/escuta-ouvinte",
-                  "ExecStart=/usr/bin/node /opt/escuta-ouvinte/src/ouvinte.js",
-                  "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes",
-                  "ProtectKernelTunables=yes", "ProtectKernelModules=yes", "ProtectControlGroups=yes", "CapabilityBoundingSet=\n",
-                  "RestrictAddressFamilies=AF_INET AF_INET6\n", "ReadWritePaths=/var/lib/gabi-escuta-spool /var/lib/escuta-ouvinte\n",
-                  "InaccessiblePaths=/var/lib/gabi-brain /etc/gabi", "MemoryMax=512M",
-                  "ProtectKernelLogs=yes", "ProtectClock=yes", "RestrictNamespaces=yes", "LockPersonality=yes",
-                  "RestrictSUIDSGID=yes", "SystemCallFilter=@system-service", "SystemCallErrorNumber=EPERM",
-                  "RestartPreventExitStatus=78",
-                  "OUVINTE_SPOOL=/var/lib/gabi-escuta-spool", "OUVINTE_AUTH_DIR=/var/lib/escuta-ouvinte/auth"):
-        assert linha in u, linha
-    assert "AF_UNIX" not in re.sub(r"(?m)^#.*$", "", u)
-    assert "EnvironmentFile" not in u and "gabi-brain.env" not in u
-
-
-def test_instalar_cria_usuario_do_ouvinte_e_instala_sem_ligar_nem_rodar_npm():
-    assert "escuta-ouvinte.service" in INSTALAR
-    assert re.search(r"useradd --system .*--shell /usr/sbin/nologin .*escuta-ouvinte", INSTALAR)
-    assert "gabibrain-escuta" in re.search(r"useradd .*escuta-ouvinte", INSTALAR).group(0)
-    assert re.search(r"install -d -o escuta-ouvinte -g escuta-ouvinte -m 700 /var/lib/escuta-ouvinte", INSTALAR)
-    assert "/opt/escuta-ouvinte" in INSTALAR
-    assert 'cp -r "$AQUI/ouvinte/vendor" /opt/escuta-ouvinte/vendor' in INSTALAR
-    ativas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith(("#", "echo"))]
-    assert not any("escuta-ouvinte" in l and ("enable" in l or "start" in l) for l in ativas)
-    assert not any(re.search(r"\bnpm\b", l) for l in ativas)
-
-
-def test_runbook_escuta_paralelo_tem_os_passos_e_o_aviso_de_crise():
-    from pathlib import Path
-    rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
-    trecho = rb.split("{#escuta-paralelo}")[1].split("\n## ")[0]
-    for esperado in ("tools.comparar_escuta", "google-contatos.env", "openrouter.env", "limite de crédito", "anexo_caminho",
-                     "gabi-wa-docs", "gabi-reembolso.path", "escuta.py", "PYTHONPATH=/opt/gabi-brain", "ilegiveis", "sem_numero", "ambiguos",
-                     "meia-noite", "Aparelhos conectados", "órfãos", "NÃO somem na hora", "set anexo_caminho=null where anexo_caminho is not null", "NÃO pode ser desligado antes de `escuta.modo='ativo'`"):
-        assert esperado in trecho, esperado
-
-
-def test_instalar_instala_o_comparador_da_escuta():
-    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
-    assert '"$AQUI/tools/comparar_escuta.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
-    assert "PYTHONPATH=/opt/gabi-brain" in (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
-
-
-def test_i7_i8_m4_ouvinte_teto_25_espaco_minimo_e_onfailure():
-    u = (DEPLOY / "escuta-ouvinte.service").read_text()
-    assert "Environment=OUVINTE_ANEXO_MAX_MB=25\n" in u and "Environment=OUVINTE_ESPACO_MIN_MB=2048\n" in u
-    assert "OnFailure=gabi-brain-falha@%n.service\n" in u
-    assert "ReadWritePaths=/var/lib/gabi-brain\n" in (DEPLOY / "gabi-brain-falha@.service").read_text()   # o template grava no banco, como para os gabi-brain-*
 
 
 def test_unit_fontes_le_google_env_e_o_antigo():
@@ -528,41 +416,35 @@ def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
     assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
 
 
-# ---------------- exames em PDF: serviço e timer (instalados, NÃO habilitados) ----------------
-def test_unidades_exames_seguem_o_padrao():
-    srv, t = _ler("gabi-brain-exames.service"), _ler("gabi-brain-exames.timer")
-    assert "-m gabi.familia" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv  # a chave é arquivo próprio, não variável de ambiente
-    assert "OnUnitActiveSec=30min" in t and "Unit=gabi-brain-exames.service" in t
-    assert hasattr(importlib.import_module("gabi.familia.__main__"), "main")
-    for nome in ("gabi-brain-exames.service", "gabi-brain-exames.timer"):
-        assert nome in INSTALAR
+# ---------------- simplificação (ADR-023) ----------------
+def test_todo_modulo_que_uma_unit_executa_existe():
+    """Módulo removido referenciado por unit só quebraria em produção: cada `-m gabi.X` (e cada app do uvicorn) precisa importar."""
+    import re
+    nomes = set()
+    for unit in DEPLOY.glob("*.service"):
+        txt = unit.read_text()
+        nomes |= set(re.findall(r"-m (gabi(?:\.\w+)+)", txt))
+        nomes |= {m.split(":")[0] for m in re.findall(r"uvicorn\S* .*?(gabi(?:\.\w+)+:\w+)", txt)}
+    assert nomes
+    for nome in sorted(nomes):
+        assert importlib.util.find_spec(nome) is not None, nome
 
 
-def test_instalar_nao_liga_o_timer_dos_exames():
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and all("gabi-brain-exames" not in l for l in ligadas)
+CORTADAS = ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path", "escuta-ouvinte.service", "gabi-brain-trabalho.service",
+            "gabi-brain-trabalho.timer", "gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer", "gabi-brain-exames.service",
+            "gabi-brain-exames.timer", "gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer")
 
 
-# ---------------- reembolso de saúde: serviço e timer (instalados, NÃO habilitados) ----------------
-def test_unidades_reembolso_saude_seguem_o_padrao():
-    srv, t = _ler("gabi-brain-reembolso-saude.service"), _ler("gabi-brain-reembolso-saude.timer")
-    assert "-m gabi.reembolso_saude" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv and "GABI_SAUDE_CHAVE_ARQUIVO=/etc/gabi/saude.key" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv  # a chave é arquivo próprio, não variável de ambiente
-    assert "OnUnitActiveSec=15min" in t and "Unit=gabi-brain-reembolso-saude.service" in t
-    assert hasattr(importlib.import_module("gabi.reembolso_saude.__main__"), "main")
-    for nome in ("gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer"):
-        assert nome in INSTALAR
+def test_units_cortadas_nao_voltam_ao_repositorio():
+    for nome in CORTADAS:
+        assert not (DEPLOY / nome).exists(), nome
 
 
-def test_instalar_nao_liga_o_timer_do_reembolso_de_saude():
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and all("gabi-brain-reembolso-saude" not in l for l in ligadas)
+def test_instalador_desliga_e_remove_as_units_cortadas_antes_do_reload():
+    """Na VPS elas seguem ligadas desde o instalador antigo: sem desligar, `python -m gabi.trabalho` falharia a cada 15 min (ADR-023)."""
+    linhas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith("#")]
+    texto = "\n".join(linhas)
+    reload = texto.index("systemctl daemon-reload")
+    for nome in CORTADAS:
+        assert f"/etc/systemd/system/{nome}" in texto[:reload] or nome in texto[:reload], nome
+    assert "disable --now" in texto[:reload] and "rm -f" in texto[:reload]

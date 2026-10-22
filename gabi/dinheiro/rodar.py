@@ -20,6 +20,7 @@ from gabi.db import conectar, migrar
 from gabi.dinheiro import repositorio, sugestoes_agenda, sugestoes_dono
 from gabi.dinheiro.captura import ResumoCaptura, capturar, capturar_saldos
 from gabi.dinheiro.classificar import ResumoClassificacao, classificar_pendentes
+from gabi.dinheiro.para_quem_fila import aplicar_fila_para_quem
 from gabi.dinheiro.conferencia import conferir, marcar_conferida
 from gabi.dinheiro.contas_pagar import ResumoCompromissos, atualizar_compromissos
 
@@ -64,6 +65,10 @@ def rodar_extratos(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: 
         conferida = marcar_conferida(con, captura.rodada_id)
         resultado = ResultadoExtratos(captura, conferida, classificar_pendentes(con), atualizar_compromissos(con, hoje, agora))
         propor_recebimentos(con)  # crédito em conta PJ x NFS-e autorizada: só PROPÕE (R1)
+        try:
+            aplicar_fila_para_quem(con, agora.astimezone(dt.timezone.utc).isoformat())  # sugestão de "para quem" que ficou certeira é aplicada (ADR-023)
+        except Exception:
+            log.exception("fila de para quem falhou")
         try:
             sugestoes_agenda.propor(con, hoje, agora.astimezone(dt.timezone.utc).isoformat())  # evento mensal "Pagar…" vira pergunta (R1)
         except Exception:  # acessório: a rodada de extratos nunca falha por isso

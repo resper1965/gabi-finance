@@ -10,7 +10,6 @@ import pytest
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro.agenda_financeira import montar
-from gabi.dinheiro.cobranca_atraso import rascunhos
 
 GOLDEN = Path(__file__).parent / "golden"
 MIGR = Path(__file__).parent.parent.parent / "migrations"
@@ -48,7 +47,6 @@ def conferir_golden(nome: str, texto: str) -> None:
 MENSAGENS = {
     "agenda_diaria": lambda con: "\n".join(montar(con, AGORA)),
     "agenda_semanal": lambda con: "\n".join(montar(con, AGORA, dias=30, semanal=True)),
-    "cobranca_rascunho": lambda con: "\n\n".join(f"{r['rascunho']}\n[{r['aviso']}]" for r in rascunhos(con, HOJE)),
 }
 
 
@@ -65,8 +63,3 @@ def test_regras_de_toda_mensagem(con, nome):
     assert not re.search(r"\bnan\b|\bNone\b|\binf\b|\{|\}|\btraceback\b", t, re.I), "vazamento de valor interno"
     assert not re.search(r"R\$ ?-?\d+\.\d{2}\b", t), "dinheiro fora do formato brasileiro (R$ 1.234,56)"
     assert not re.search(r"\b\d{9,}\b", t), "número longo (conta, CPF ou token) não pertence à mensagem"
-
-
-def test_cobranca_nunca_diz_que_enviou(con):
-    t = MENSAGENS["cobranca_rascunho"](con).lower()
-    assert "nada foi enviado" in t and "enviei" not in t and "enviado para" not in t

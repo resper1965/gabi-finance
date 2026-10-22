@@ -21,26 +21,13 @@ def _l(c, conta, ext, data, desc, v, nat, cat=None, empresa=None, parcela=None, 
               (conta, ext, data, v, desc, desc.split()[0], nat, cat, origem if cat else None, empresa, "voce" if empresa else None, parcela, parcelas, fatura))
 
 
-def _semear_trabalho(c) -> None:
-    """Dados sintéticos da Fase 3 (caixas, e-mails, agenda, tarefas, frente) só para a demonstração e as amostras do painel."""
-    from gabi.trabalho import email, frentes
-    c.execute("insert into caixa_email(id, endereco, provedor, papel, empresa_id, como_entra, estado) values (1,'ricardo@ness.exemplo','google','principal','e1','direta','sim')")
-    c.execute("insert into caixa_email(id, endereco, provedor, papel, estado) values (2,'ricardo@ionic.exemplo','graph','principal','a_decidir')")
-    c.execute("insert into parametro(chave, valor) values ('email_palavras_relevantes', ?)", (json.dumps(["contrato", "boleto"]),))
-    fid = frentes.abrir_frente(c, "Acme", "cliente", "e1", {"dominios": ["acme.exemplo"], "palavras": ["atlas"]})
-    msgs = [dict(message_id="<d1@x>", remetente="joao@acme.exemplo", assunto="Contrato Atlas para assinar", recebido_em="2026-10-08T09:10:00Z", corpo="Segue o contrato."),
-            dict(message_id="<d2@x>", remetente="newsletter@loja.exemplo", assunto="Ofertas da semana", recebido_em="2026-10-08T08:00:00Z", corpo="Promoção."),
-            dict(message_id="<d3@x>", remetente="cobranca@banco.exemplo", assunto="Boleto vence amanhã", recebido_em="2026-10-08T07:30:00Z", corpo="Vence 09/10.")]
-    email.ingerir_email(c, 1, lambda cx, cur: (msgs, None))
-    for i in c.execute("select * from item_email").fetchall():
-        frentes.sugerir(c, i)
+def _semear_agenda(c) -> None:
+    """Agenda sintética (dois compromissos que se sobrepõem) só para a demonstração e as amostras do painel."""
     c.execute("insert into agenda_fonte(id, conta, provedor, estado, nome) values (1,'ricardo@ness.exemplo','google','sim','Ricardo')")
     c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo, link_reuniao, participantes_qtd) values "
               "(1,'ev1','2026-10-08T19:00:00+00:00','2026-10-08T20:00:00+00:00','2026-10-08','2026-10-08','Revisão Atlas','https://meet.exemplo/a',1)")
     c.execute("insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, titulo) values "
               "(1,'ev2','2026-10-08T19:30:00+00:00','2026-10-08T20:30:00+00:00','2026-10-08','2026-10-08','Dentista')")
-    c.execute("insert into tarefa(origem, externo_id, titulo, prazo) values ('graph','L/t1','Enviar proposta à Acme','2026-10-09')")
-    c.execute("insert into tarefa(origem, externo_id, titulo, estado) values ('google','L/t2','Renovar domínio','concluida')")
 
 
 def semear(caminho: Path) -> None:
@@ -68,15 +55,12 @@ def semear(caminho: Path) -> None:
         c.execute("insert into saldo(conta_id, em, saldo_centavos) values (1,?,?)", (em, v))
     c.execute("insert into saldo(conta_id, em, saldo_centavos) values (2,'2026-10-08T14:00:00', -47590)")
     c.execute("insert into rodada(fonte, inicio, fim, status, conferida) values ('open-finance','2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok',1)")
-    for f in ('notas-nibo', 'comprovantes-paperless', 'trabalho', 'agenda', 'correio'):  # fontes que o envelope espera (trabalho: há caixa liberada; agenda e correio: há fonte liberada)
+    for f in ('notas-nibo', 'agenda', 'correio'):  # fontes que o envelope espera (agenda e correio: há fonte liberada)
         c.execute("insert into rodada(fonte, inicio, fim, status) values (?,'2026-10-08T17:00:00+00:00','2026-10-08T17:00:30+00:00','ok')", (f,))
     c.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values ('UBER','{\"categoria_id\": 2}',1,'2026-10-01T10:00:00','boss@x.com')")
     c.execute("insert into regra(padrao, acao, ativa, criado_em, criada_por) values ('PADARIA','{\"categoria_id\": 1}',0,'2026-10-02T10:00:00','boss@x.com')")
     c.execute("insert into sugestao(tipo, lancamento_id, payload, estado, motivo, criado_em) values ('categoria', 5, ?, 'pendente', 'estabelecimento parecido com Mercado', '2026-10-08T12:00:00')",
               (json.dumps({"categoria_id": 1}),))
-    for ext, ident, tit, proj, resp, prazo, est in (("l1", "ION-12", "Entregar laudo do cliente", "nCommand", "Ricardo", "2026-10-20", "In Progress"),
-                                                    ("l2", "ION-13", "Revisar proposta", "IARA", None, None, "Todo")):
-        c.execute("insert into entrega(externo_id, identificador, titulo, projeto, responsavel, prazo, estado) values (?,?,?,?,?,?,?)", (ext, ident, tit, proj, resp, prazo, est))
     for pid, nome in (("p-ric", "Ricardo"), ("p-hel", "Helena"), ("p-lia", "Lia"), ("p-bia", "Bia"), ("p-casa", "Casa")):
         c.execute("insert into pessoa(id, nome, origem) values (?,?, 'demo')", (pid, nome))
     for cid, nome, venc, valor, estado, dados in (
@@ -88,7 +72,7 @@ def semear(caminho: Path) -> None:
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados, atualizado_em) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'planilha', 'pix', ?, ?, '2026-10-08T12:00:00')",
                   (cid, cid.split(":")[0], nome, venc, venc, valor, estado, json.dumps(dados)))
-    _semear_trabalho(c)
+    _semear_agenda(c)
     c.close()
 
 

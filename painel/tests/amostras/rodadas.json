@@ -7,32 +7,6 @@
     "erro": null,
     "fim": "2026-10-08T17:00:30+00:00",
     "fonte": "correio",
-    "id": 6,
-    "inicio": "2026-10-08T17:00:00+00:00",
-    "lidos": 0,
-    "novos": 0,
-    "reprovadas": [],
-    "status": "ok"
-   },
-   {
-    "alterados": 0,
-    "conferida": false,
-    "erro": null,
-    "fim": "2026-10-08T17:00:30+00:00",
-    "fonte": "agenda",
-    "id": 5,
-    "inicio": "2026-10-08T17:00:00+00:00",
-    "lidos": 0,
-    "novos": 0,
-    "reprovadas": [],
-    "status": "ok"
-   },
-   {
-    "alterados": 0,
-    "conferida": false,
-    "erro": null,
-    "fim": "2026-10-08T17:00:30+00:00",
-    "fonte": "trabalho",
     "id": 4,
     "inicio": "2026-10-08T17:00:00+00:00",
     "lidos": 0,
@@ -45,7 +19,7 @@
     "conferida": false,
     "erro": null,
     "fim": "2026-10-08T17:00:30+00:00",
-    "fonte": "comprovantes-paperless",
+    "fonte": "agenda",
     "id": 3,
     "inicio": "2026-10-08T17:00:00+00:00",
     "lidos": 0,
@@ -91,22 +65,12 @@
   },
   {
    "estado": "ok",
-   "nome": "comprovantes-paperless",
-   "ultima": "2026-10-08T17:00:30Z"
-  },
-  {
-   "estado": "ok",
    "nome": "notas-nibo",
    "ultima": "2026-10-08T17:00:30Z"
   },
   {
    "estado": "ok",
    "nome": "open-finance",
-   "ultima": "2026-10-08T17:00:30Z"
-  },
-  {
-   "estado": "ok",
-   "nome": "trabalho",
    "ultima": "2026-10-08T17:00:30Z"
   }
  ],

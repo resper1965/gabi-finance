@@ -201,7 +201,7 @@
 - [ ] **Step 1: Teste do painel que falha** (padrão de `painel/tests` para CadastrosAgenda): lista as contas, cria, muda o estado.
 - [ ] **Step 2: Rodar** o teste do painel → falha.
 - [ ] **Step 3: Implementar** a tela e ligar na navegação; `npm run build` (o build vai para `gabi/static`/`painel/dist` como nas outras entregas).
-- [ ] **Step 4: Suíte completa** em shards (`scratchpad/suite_paralela.sh` ou o procedimento de `docs/PROGRESSO-GOAL.md`) e ler o resumo do pytest (não confiar no exit code do pipeline): esperado 0 falhas.
+- [ ] **Step 4: Suíte completa** em shards (`scratchpad/suite_paralela.sh` ou o procedimento de `docs/historico/PROGRESSO-GOAL.md`) e ler o resumo do pytest (não confiar no exit code do pipeline): esperado 0 falhas.
 - [ ] **Step 5: Commit** `feat(painel): cadastro das contas de Teams`.
 
 ---
