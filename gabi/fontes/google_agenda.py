@@ -1,8 +1,9 @@
-"""Google Agenda (Calendar API v3), SÓ leitura. Só o serviço `gabi-brain-fontes` tem rede e segredos (R5); o resto do brain chega aqui pela
-ponte (`PonteAgenda`). O refresh token da conta (escopo calendar.readonly) é o mesmo mecanismo de contatos (`google_oauth.TokenOAuth`).
+"""Google Agenda (Calendar API v3): leitura + criar evento aprovado (ADR-024). Só o serviço `gabi-brain-fontes` tem rede e segredos (R5); o resto do brain chega aqui pela
+ponte (`PonteAgenda`). O refresh token da conta (escopos calendar.readonly e calendar.events) é o mesmo mecanismo de contatos (`google_oauth.TokenOAuth`).
 Não extrai e-mail de participante nem local: só a contagem de participantes. `syncToken` e janela (`timeMin/timeMax`) não convivem na API do
 Google: a carga inicial usa a janela, as incrementais usam só o token; 410 (token expirado) refaz a janela completa. Cancelado é devolvido
-à parte para quem chama apagar. Segredo e corpo de resposta nunca entram em erro, log ou repr. Docs: docs/fontes/google.md."""
+à parte para quem chama apagar. Criar evento: POST com `id` = chave de idempotência (409 = já existia); título, descrição e e-mails nunca entram em erro. Segredo e corpo
+de resposta nunca entram em erro, log ou repr. Consome: google_oauth (token da conta). Docs: docs/fontes/google.md."""
 import re
 import urllib.parse
 from dataclasses import asdict, dataclass, field
@@ -13,6 +14,7 @@ from gabi.fontes.google_oauth import (ErroGoogleOAuth, TokenOAuth, _http_real, c
 ESCOPO = "https://www.googleapis.com/auth/calendar.readonly"
 BASE = "https://www.googleapis.com/calendar/v3"
 MAX_PAGINAS = 50
+_CHAVE = re.compile(r"^[0-9a-v]{5,1024}$")  # alfabeto base32hex que o Google aceita em `id` de evento
 _CALENDARIO = re.compile(r"^[A-Za-z0-9._@%+-]{1,200}$")  # "primary" ou id (e-mail, ...@group.calendar.google.com): nunca "/" nem espaço
 
 
@@ -31,6 +33,40 @@ def _pegar(http, token, conta: str, url: str):
         token.invalidar(conta)
         status, resp = chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
     return status, resp
+
+
+def _postar(http, token, conta: str, url: str, corpo: dict):
+    """POST JSON com o token da conta; um 401 invalida o access token em cache e repete UMA vez com token novo."""
+    def uma_vez():
+        return chamar(http, "POST", url, corpo, {"Authorization": f"Bearer {token(conta)}", "Content-Type": "application/json"})
+    status, resp = uma_vez()
+    if status == 401 and hasattr(token, "invalidar"):
+        token.invalidar(conta)
+        status, resp = uma_vez()
+    return status, resp
+
+
+def evento_criar(conta: str, chave: str, evento: dict, token: Callable[[str], str], http=_http_real) -> dict:
+    """Cria o evento no calendário principal com `id` = chave (idempotente: 409 -> ja_existia). Convida por e-mail (sendUpdates=all) e,
+    se `online`, pede sala do Meet. Nada do conteúdo entra em mensagem de erro."""
+    conta = conta_valida(conta)
+    if not isinstance(chave, str) or not _CHAVE.match(chave):
+        raise ErroGoogleOAuth("chave inválida")
+    fuso = evento["fuso"]
+    corpo = {"id": chave, "summary": evento["titulo"], "description": evento["descricao"],
+             "start": {"dateTime": evento["inicio_utc"], "timeZone": fuso},
+             "end": {"dateTime": evento["fim_utc"], "timeZone": fuso},
+             "attendees": [{"email": e} for e in evento["convidados"]]}
+    q = {"sendUpdates": "all"}
+    if evento.get("online") is True:
+        q["conferenceDataVersion"] = "1"
+        corpo["conferenceData"] = {"createRequest": {"requestId": chave, "conferenceSolutionKey": {"type": "hangoutsMeet"}}}
+    status, _ = _postar(http, token, conta, f"{BASE}/calendars/primary/events?" + urllib.parse.urlencode(q), corpo)
+    if status == 409:
+        return {"externo_id": chave, "ja_existia": True}
+    if status >= 400:
+        raise ErroGoogleOAuth(f"calendar.events.insert -> {status}")
+    return {"externo_id": chave, "ja_existia": False}
 
 
 def listar_calendarios(conta: str, token: Callable[[str], str], http=_http_real) -> list[dict]:
@@ -160,6 +196,9 @@ class GoogleAgenda:
 
     def listar_calendarios(self, conta: str) -> list[dict]:
         return listar_calendarios(conta, self._token, self._http)
+
+    def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
+        return evento_criar(conta, chave, evento, self._token, self._http)
 
     def listar_eventos(self, conta: str, calendario_id: str, sync_token: str | None, janela: dict) -> dict:
         return asdict(listar_eventos(conta, calendario_id, sync_token, janela, self._token, self._http))

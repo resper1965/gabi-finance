@@ -203,6 +203,13 @@ class _FalsaAgenda:
             return {"eventos": []}
         return {"eventos": [{"externo_id": "a"}], "cancelados": ["b"], "novo_sync_token": "S", "recarga_completa": False}
 
+    def evento_criar(self, conta, chave, evento):
+        if conta == "malformada@x.com":
+            return ["não", "dict"]
+        if conta == "faltando@x.com":
+            return {"externo_id": chave}
+        return {"externo_id": chave, "ja_existia": False}
+
     def segredo(self):
         return SEGREDO_AG
 
@@ -215,8 +222,8 @@ def sock_agenda(tmp_path):
     srv.shutdown(); srv.server_close()
 
 
-def test_ponte_permite_so_listar_calendarios_e_listar_eventos(sock_agenda):
-    assert PERMITIDOS["google_agenda"] == frozenset({"listar_calendarios", "listar_eventos"})
+def test_ponte_permite_so_listar_calendarios_listar_eventos_e_evento_criar(sock_agenda):
+    assert PERMITIDOS["google_agenda"] == frozenset({"listar_calendarios", "listar_eventos", "evento_criar"})
     assert ERROS["google_agenda"] is ErroGoogleOAuth
     with pytest.raises(ErroGoogleOAuth) as e:
         Ponte(sock_agenda, "google_agenda")._chamar("segredo")
@@ -591,3 +598,12 @@ def test_nibo_e_paperless_so_leitura_que_tem_uso():
     """ADR-023: lote do Nibo, comprovantes e reembolso saíram; a ponte não pode mais deixar ninguém escrever no Nibo nem no Paperless (R2)."""
     assert PERMITIDOS["nibo"] == frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"})
     assert PERMITIDOS["paperless"] == frozenset({"docs", "baixar"})
+
+
+def test_ponte_agenda_evento_criar_cruza_e_valida_a_forma(sock_agenda):
+    p = PonteAgenda(sock_agenda)
+    assert p.evento_criar("a@x.com", "0123456789abcdefghijklmnop", {"titulo": "t"}) == {"externo_id": "0123456789abcdefghijklmnop", "ja_existia": False}
+    for conta in ("malformada@x.com", "faltando@x.com"):
+        with pytest.raises(ErroGoogleOAuth) as e:
+            p.evento_criar(conta, "0123456789abcdefghijklmnop", {})
+        assert str(e.value) == "resposta inválida do serviço de fontes"

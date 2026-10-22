@@ -24,7 +24,7 @@ PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar"}),  # ADR-023: só a busca e o download do MCP; nada escreve no Paperless
     "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
-    "google_agenda": frozenset({"listar_calendarios", "listar_eventos"}),
+    "google_agenda": frozenset({"listar_calendarios", "listar_eventos", "evento_criar"}),  # ADR-024: criar só com proposta aprovada
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
                              "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
                              "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"}),
@@ -187,7 +187,7 @@ class PonteContatos:
 
 
 class PonteAgenda:
-    """Agenda do Google lida no serviço de fontes (único com rede e segredos), somente leitura."""
+    """Agenda do Google lida no serviço de fontes (único com rede e segredos), leitura + criar evento aprovado."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "google_agenda")
@@ -198,6 +198,12 @@ class PonteAgenda:
     def listar_calendarios(self, conta: str) -> list[dict]:
         r = self._ponte._chamar("listar_calendarios", (conta,))
         if not isinstance(r, list) or not all(isinstance(x, dict) for x in r):
+            raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
+        return r
+
+    def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
+        r = self._ponte._chamar("evento_criar", (conta, chave, evento))
+        if not isinstance(r, dict) or not isinstance(r.get("externo_id"), str) or not isinstance(r.get("ja_existia"), bool):
             raise ErroGoogleOAuth("resposta inválida do serviço de fontes")
         return r
 
