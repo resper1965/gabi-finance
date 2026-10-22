@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Bell, Building2, Calendar, CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, HeartPulse, LayoutDashboard, LayoutGrid, ListChecks, Mail, Menu, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Building2, Calendar, CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, HeartPulse, LayoutDashboard, LayoutGrid, ListChecks, Mail, Menu, Send, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
 import { AREAS, GRUPOS, type Area } from "../navegacao";
 import { useLocal, gravarLocal } from "../lib/local";
 import { IrContext, OcultarContext } from "../lib/ocultar";
@@ -7,7 +7,7 @@ import { FaixaSlot } from "./Faixa";
 import { CustoGabi } from "./CustoGabi";
 
 const ICONE: Record<string, LucideIcon> = {
-  hoje: CalendarDays, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
+  hoje: CalendarDays, envios: Send, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
   caixa: LayoutDashboard, gastos: Workflow, cobrar: Building2, regras: Tag,
   familia: HeartPulse, cadastros: Users, gabi: Activity,
 };
@@ -62,6 +62,9 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const aba = area.abas.some(([id]) => id === abaSalva) ? abaSalva : area.abas[0][0];
   const mini = recolhido === "1" && !celular;
   const pad = celular ? 14 : 28;
+
+  // #envios (ou outro id de área) na URL abre essa área na carga, p.ex. o link que o brain manda no WhatsApp
+  useEffect(() => { const id = window.location.hash.replace(/^#/, ""); if (AREAS.some((a) => a.id === id)) setAreaId(id); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ir = (id: string, aba?: string) => { if (aba) gravarLocal(`gabi.aba.${id}`, aba); setAreaId(id); setMais(false); };
 
