@@ -77,6 +77,13 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/envios` | Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada. |
 | POST | `/api/v1/envios/{envio_id}/enviar` | Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto). |
 | POST | `/api/v1/envios/{envio_id}/recusar` | Recusa a proposta pendente; nada é enviado. |
+| GET | `/api/v1/familia/fichas` | Quem está no cadastro, sem número de documento. |
+| GET | `/api/v1/familia/fichas/{pessoa_id}` | Ficha completa, com os números dos documentos, e a URL base do Paperless (ou null) para os links. |
+| GET | `/api/v1/familia/historico` | Mudanças de contato, da mais nova para a mais antiga; `pessoa` filtra pelo id. |
+| POST | `/api/v1/familia/historico/{historico_id}/desfazer` | Restaura o valor anterior se o contato ainda estiver como a mudança deixou (senão 409). |
+| GET | `/api/v1/familia/propostas` | Propostas de documento no estado dado, com o documento atual e o proposto. |
+| POST | `/api/v1/familia/propostas/{proposta_id}/decisao` | Aprova ou recusa a proposta pendente (`{"estado": "aprovada"|"recusada"}`). |
+| GET | `/api/v1/familia/vencimentos` | Documentos que vencem nos próximos `meses` (e os vencidos há até 30 dias), sem número. |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
 | GET | `/api/v1/gabi/qualidade` | A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias). |
 | GET | `/api/v1/hoje` | O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro. |

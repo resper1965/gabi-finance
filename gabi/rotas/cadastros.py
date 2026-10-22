@@ -17,6 +17,7 @@ from gabi.dinheiro.compromissos import _serie
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
+from gabi.mascara import mascarar_documento
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
 router = APIRouter(prefix="/api/v1/cadastros", dependencies=[Depends(exigir("boss"))])
@@ -501,7 +502,8 @@ def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("b
         p = con.execute("select dados from pessoa where id=? and excluido_em is null", (pid,)).fetchone()
         if p is None:
             raise erro(404, "nao_encontrado", f"pessoa {pid} não existe")
-        docs = json.loads(p["dados"] or "{}").get("documentos", [])
+        docs = [{"tipo": d["tipo"].upper(), "numero": mascarar_documento(d["numero"])} for d in con.execute(
+            "select tipo, numero from pessoa_documento where pessoa_id=? and excluido_em is null order by id", (pid,))]
         _tx(con, lambda: _auditar(con, ident.login, "pessoas", pid, "documento consultado"))
         return envelope(con, {"id": pid, "documentos": docs, "mascarado": True}, agora=_agora(request))
     finally:

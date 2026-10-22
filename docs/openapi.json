@@ -2198,6 +2198,260 @@
     "summary": "Recusar Envio"
    }
   },
+  "/api/v1/familia/fichas": {
+   "get": {
+    "description": "Quem está no cadastro, sem número de documento.",
+    "operationId": "listar_fichas_api_v1_familia_fichas_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar Fichas"
+   }
+  },
+  "/api/v1/familia/fichas/{pessoa_id}": {
+   "get": {
+    "description": "Ficha completa, com os números dos documentos, e a URL base do Paperless (ou null) para os links.",
+    "operationId": "ficha_da_pessoa_api_v1_familia_fichas__pessoa_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pessoa_id",
+      "required": true,
+      "schema": {
+       "title": "Pessoa Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ficha Da Pessoa"
+   }
+  },
+  "/api/v1/familia/historico": {
+   "get": {
+    "description": "Mudanças de contato, da mais nova para a mais antiga; `pessoa` filtra pelo id.",
+    "operationId": "historico_de_contato_api_v1_familia_historico_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "pessoa",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Pessoa"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Historico De Contato"
+   }
+  },
+  "/api/v1/familia/historico/{historico_id}/desfazer": {
+   "post": {
+    "description": "Restaura o valor anterior se o contato ainda estiver como a mudança deixou (senão 409).",
+    "operationId": "desfazer_mudanca_api_v1_familia_historico__historico_id__desfazer_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "historico_id",
+      "required": true,
+      "schema": {
+       "title": "Historico Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Desfazer Mudanca"
+   }
+  },
+  "/api/v1/familia/propostas": {
+   "get": {
+    "description": "Propostas de documento no estado dado, com o documento atual e o proposto.",
+    "operationId": "listar_propostas_api_v1_familia_propostas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Propostas"
+   }
+  },
+  "/api/v1/familia/propostas/{proposta_id}/decisao": {
+   "post": {
+    "description": "Aprova ou recusa a proposta pendente (`{\"estado\": \"aprovada\"|\"recusada\"}`).",
+    "operationId": "decidir_proposta_api_v1_familia_propostas__proposta_id__decisao_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposta_id",
+      "required": true,
+      "schema": {
+       "title": "Proposta Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Proposta"
+   }
+  },
+  "/api/v1/familia/vencimentos": {
+   "get": {
+    "description": "Documentos que vencem nos próximos `meses` (e os vencidos há até 30 dias), sem número.",
+    "operationId": "listar_vencimentos_api_v1_familia_vencimentos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "meses",
+      "required": false,
+      "schema": {
+       "default": 12,
+       "title": "Meses",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Vencimentos"
+   }
+  },
   "/api/v1/fontes": {
    "get": {
     "description": "Estado de cada fonte: ok, nao_conferida, erro ou parada.",
