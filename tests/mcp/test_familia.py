@@ -80,8 +80,8 @@ def test_sem_escopo_familia(clif, tokf, bancof, nome, args):
 def test_listar_sem_numero(clif, tokf):
     r = chamar(clif, tokf["familia"], "familia_listar")
     d = r["dados"]
-    assert [p["nome"] for p in d["pessoas"]] == ["Ana", "Ana Paula", "Beatriz"]
-    assert d["pessoas"][0]["documentos_qtd"] == 2
+    assert [p["nome"] for p in d["itens"]] == ["Ana", "Ana Paula", "Beatriz"]
+    assert d["itens"][0]["documentos_qtd"] == 2
     assert CPF not in _texto(r) and PASSAPORTE not in _texto(r)
 
 
@@ -152,3 +152,9 @@ def test_propor_documento_identico_ja_existe(clif, tokf):
 def test_propor_documento_tipo_invalido_sem_numero_na_mensagem(clif, tokf):
     r = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="titulo", numero="987654")
     assert r["erro"] == "campo_invalido" and "987654" not in r["mensagem"]
+
+
+def test_propor_documento_numero_inteiro_vira_valor_invalido_sem_eco(clif, tokf, bancof):
+    r = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="cpf", numero=1234567890)
+    assert r["erro"] == "valor_invalido" and "1234567890" not in _texto(r)
+    assert conectar(bancof).execute("select count(*) from pessoa_proposta").fetchone()[0] == 0

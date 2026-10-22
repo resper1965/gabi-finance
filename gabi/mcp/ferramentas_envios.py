@@ -37,8 +37,8 @@ def _erro(e: ErroEnvio) -> ErroFerramenta:
     return ErroFerramenta(e.codigo, msg)
 
 
-def _com_link(con, r: dict) -> dict:
-    """Acrescenta `link` = painel.url + "#envios" quando o parâmetro existe; sem ele, o agente cita só o id."""
+def _com_link(con, r: dict, ancora: str = "#envios") -> dict:
+    """Acrescenta `link` = painel.url + `ancora` quando o parâmetro existe; sem ele, o agente cita só o id."""
     l = con.execute("select valor from parametro where chave='painel.url'").fetchone()
     if l is None:
         return r
@@ -46,7 +46,7 @@ def _com_link(con, r: dict) -> dict:
         url = json.loads(l[0])
     except (ValueError, TypeError):
         url = l[0]  # texto cru também vale
-    return {**r, "link": url.rstrip("#") + "#envios"} if isinstance(url, str) and url.strip() else r
+    return {**r, "link": url.rstrip("#") + ancora} if isinstance(url, str) and url.strip() else r
 
 
 def _unico(itens: list[dict], nome: str) -> dict:

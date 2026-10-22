@@ -46,7 +46,7 @@ def _reais(v, chave: str = ""):
     return v
 
 
-ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes", "envios", "familia")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
+ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes", "envios", "familia")  # sem 'sensivel'; documento completo só sai pelo escopo 'familia' (familia_consultar), por decisão do dono (ADR-025)
 
 
 def ferramentas_do_token(escopos) -> list[str]:
