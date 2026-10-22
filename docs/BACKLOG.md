@@ -14,7 +14,6 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 |---|---|---|---|---|
 | AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR de exceção à R2) | C | 🔧 desenho | ADR aprovada, implementado e instalado |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
-| A6 | Teto de custo do modelo: com a escuta fora, o teto global agora é só do correio. Conferir se `email_sem_modelo` voltou (não aparece desde 19/10) e se o modelo de reserva (`email-falha`, US$ 6,18 em 11 dias contra US$ 0,12 do normal) precisa de ajuste | R+C | ❓ | aviso some e custo de reserva explicado |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
 | H7 | 7 dias de Hermes estável + backup exportado | R+C | ⛔ depende de H5 (número dedicado, lista do Ricardo) | sem queda em 7 dias |
@@ -26,6 +25,8 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 - **Extratos:** continuam 2x por dia (06h e 14h).
 - **Marcação de agenda e resposta no Teams com anuência:** SIM. Item AT1 em "Aberto"; exige ADR de exceção à R2 (nada sai sem o OK explícito do Ricardo em cada envio).
 - **Tailscale da família (G13):** on hold; não alertar nem propor até o Ricardo liberar.
+- **A6 (custo do modelo de reserva do e-mail):** não importa por ora; não alertar.
+- **Resumo da manhã pós-ADR-023:** chegou pelo Hermes (conferido pelo Ricardo).
 - **SP2:** apagados ouvinte da escuta (`/opt` e `/var/lib/escuta-ouvinte`), cofre `saude.enc` e as chaves (`/etc/gabi/saude.key`, `~/saude.key.COPIE-E-APAGUE`). Aparelho do WhatsApp: o Ricardo desconecta.
 
 ## Depois (sugeridos na revisão de 21/10, não escolhidos ainda)
