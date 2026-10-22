@@ -466,6 +466,21 @@ class _FalsoGraph:
     def contato_adicionar_email(self, conta, graph_id, nome_antes, telefone_antes, emails):
         return {"resultado": "ok" if (nome_antes, telefone_antes, emails) == ("U", "1", ["a@x.com"]) else "alterado"}
 
+    def evento_criar(self, conta, chave, evento):
+        return {"externo_id": 7} if conta == "malformada@x.com" else {"externo_id": "AAMkEVT=", "eco": evento["titulo"] == "T"}
+
+    def teams_equipes(self, conta):
+        return [{"id": "e1"}] if conta == "malformada@x.com" else [{"id": "e1", "nome": "Comercial"}]
+
+    def teams_canais(self, conta, equipe_id):
+        return {"id": "c1"} if conta == "malformada@x.com" else [{"id": "c1", "nome": f"Geral de {equipe_id}"}]
+
+    def teams_chat_enviar(self, conta, chat_id, texto):
+        return {} if conta == "malformada@x.com" else {"externo_id": f"m-{chat_id}-{texto}"}
+
+    def teams_canal_enviar(self, conta, equipe_id, canal_id, texto):
+        return {"externo_id": None} if conta == "malformada@x.com" else {"externo_id": f"m-{equipe_id}-{canal_id}-{texto}"}
+
     def enviar(self):
         return "nunca"
 
@@ -481,7 +496,8 @@ def sock_graph(tmp_path):
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
                                                   "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
-                                                  "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email"})
+                                                  "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
+                                                  "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -511,6 +527,20 @@ def test_ponte_graph_contato_escrita_cruza_dicts_e_valida_forma(sock_graph):
         p.contato_criar("malformada@x.com", "A", "1")
     with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
         p.contato_corrigir("malformada@x.com", "AAMkAGI2TG93AAA=", {}, {})
+
+
+def test_ponte_graph_envios_cruzam_e_validam_forma(sock_graph):
+    p = PonteGraph(sock_graph)
+    assert p.evento_criar("resper@ness.com.br", "0123456789abcdefghijklmnop", {"titulo": "T"}) == {"externo_id": "AAMkEVT=", "eco": True}
+    assert p.teams_equipes("resper@ness.com.br") == [{"id": "e1", "nome": "Comercial"}]
+    assert p.teams_canais("resper@ness.com.br", "e1") == [{"id": "c1", "nome": "Geral de e1"}]
+    assert p.teams_chat_enviar("resper@ness.com.br", "19:a", "oi") == {"externo_id": "m-19:a-oi"}
+    assert p.teams_canal_enviar("resper@ness.com.br", "e1", "19:c", "oi") == {"externo_id": "m-e1-19:c-oi"}
+    for chamar in (lambda: p.evento_criar("malformada@x.com", "k", {"titulo": "T"}), lambda: p.teams_equipes("malformada@x.com"),
+                   lambda: p.teams_canais("malformada@x.com", "e1"), lambda: p.teams_chat_enviar("malformada@x.com", "19:a", "oi"),
+                   lambda: p.teams_canal_enviar("malformada@x.com", "e1", "19:c", "oi")):
+        with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+            chamar()
 
 
 def test_ponte_graph_nao_configurada(tmp_path):
@@ -561,9 +591,11 @@ def test_teams_metodos_estao_permitidos():
     assert {"teams_chats", "teams_mensagens"} <= PERMITIDOS["graph_ness"]
 
 
-def test_metodo_de_escrita_do_teams_nao_existe():
+def test_escrita_do_teams_e_so_a_dos_envios_aprovados():
     import re
-    assert not [m for m in PERMITIDOS["graph_ness"] if m.startswith("teams") and re.search(r"enviar|responder|apagar|reagir", m)]  # apagar de CONTATO é da ADR-021
+    # ADR-024: só escrever em chat existente e postar em canal, com proposta aprovada; responder, apagar e reagir continuam fora
+    assert {m for m in PERMITIDOS["graph_ness"] if m.startswith("teams") and re.search(r"enviar|responder|apagar|reagir", m)} == {
+        "teams_chat_enviar", "teams_canal_enviar"}  # apagar de CONTATO é da ADR-021
 
 
 def test_ponte_graph_teams_chats_valida_forma(sock_graph):
