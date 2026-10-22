@@ -6,7 +6,7 @@ import { CadastrosFamilia } from "../src/telas/CadastrosFamilia";
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
 interface Chamada { metodo: string; url: string; corpo: unknown }
 const iso = (meses: number) => { const d = new Date(); d.setMonth(d.getMonth() + meses); return d.toISOString().slice(0, 10); };
-const BREVE = iso(3), LONGE = iso(24);
+const BREVE = iso(3), LONGE = iso(24), PASSADO = iso(-2);
 const dd = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
 
 const FICHA = (o: Record<string, unknown> = {}) => ({
@@ -57,11 +57,25 @@ test("ficha mostra contato e documentos com número e validade; vence em 6 meses
   expect(screen.getByText(dd(BREVE)).closest("li")!.textContent).toContain("Vence em breve");
 });
 
+test("documento com validade passada mostra Vencido, não Vence em breve", async () => {
+  fake(FICHA({ documentos: [{ id: 3, tipo: "rg", pais: "BR", numero: "RG999", emissor: null, emissao: null, validade: PASSADO, paperless_id: null, origem: "carga", atualizado_em: null }] })); montar();
+  const li = (await screen.findByText("RG999")).closest("li")!;
+  expect(li.textContent).toContain("Vencido");
+  expect(li.textContent).not.toContain("Vence em breve");
+});
+
+test("Desfazer some na linha já desfeita", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => env(
+    /\/fichas\/p1/.test(url) ? FICHA() : /\/fichas/.test(url) ? { itens: [] } : /\/historico/.test(url) ? { itens: [{ ...HIST, desfeito_em: "2026-10-21T09:00:00" }] } : { itens: [] }) }) as Response));
+  montar();
+  expect(await screen.findByText(/desfeito em 21\/10\/2026/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Desfazer mudança/ })).toBeNull();
+});
+
 test("link do Paperless com paperless_url, senão só o id", async () => {
   fake(); montar();
   const a = await screen.findByRole("link", { name: /Paperless #77/ });
   expect(a.getAttribute("href")).toBe("https://paperless.exemplo/documents/77/details");
-  cleanup();
 });
 test("sem paperless_url mostra só o id", async () => {
   fake(FICHA({ paperless_url: null })); montar();
@@ -74,6 +88,7 @@ test("proposta mostra atual e proposto, etiqueta conferir, e Aprovar posta a dec
   const li = (await screen.findByText(/2031/)).closest("li")!;
   expect(li.textContent).toContain("01/01/2030");
   expect(li.textContent).toContain("03/02/2031");
+  expect(li.textContent).toMatch(/emissor.*emissão/);
   expect(li.textContent).toContain("conferir");
   fireEvent.click(screen.getByRole("button", { name: /Aprovar proposta 5/ }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
@@ -86,4 +101,3 @@ test("Desfazer chama /historico/{id}/desfazer", async () => {
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0].url).toBe("/api/v1/familia/historico/9/desfazer");
 });
-function cleanup() {}

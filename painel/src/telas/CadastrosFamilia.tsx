@@ -8,7 +8,6 @@ import { api } from "../lib/api";
 import { Aviso, useAcao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
-const ROTA = "/api/v1" + "/familia"; // base; as rotas completas existem em docs/openapi.json
 interface Resumo { id: string; nome: string; apelido: string | null; parentesco: string | null; nascimento: string | null; documentos_qtd: number }
 interface Doc { id: number; tipo: string; pais: string; numero: string; emissor: string | null; emissao: string | null; validade: string | null; paperless_id: number | null; origem: string; atualizado_em: string | null }
 interface Ficha {
@@ -26,10 +25,12 @@ const destaque = { color: "var(--danger)", fontWeight: 600 } as const;
 
 /** AAAA-MM-DD (ou ISO) para dd/mm/aaaa. */
 export const dataBR = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
-const venceEmBreve = (validade: string | null) => {
-  if (!validade) return false;
-  const limite = new Date(); limite.setMonth(limite.getMonth() + 6);
-  return validade <= limite.toISOString().slice(0, 10);
+const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** "vencido" (validade anterior a hoje), "breve" (até 6 meses) ou null; datas no fuso local. */
+const situacao = (validade: string | null): "vencido" | "breve" | null => {
+  if (!validade) return null;
+  const hoje = new Date(); const limite = new Date(); limite.setMonth(limite.getMonth() + 6);
+  return validade < isoLocal(hoje) ? "vencido" : validade <= isoLocal(limite) ? "breve" : null;
 };
 const textoItem = (v: unknown): string => {
   if (typeof v === "string") return v;
@@ -37,7 +38,7 @@ const textoItem = (v: unknown): string => {
   return String(v);
 };
 const valor = (v: unknown) => (Array.isArray(v) ? (v.length ? v.map(textoItem).join(", ") : "(vazio)") : v == null || v === "" ? "(vazio)" : textoItem(v));
-const docTexto = (d: DocProposto | null) => (d ? `${d.tipo.toUpperCase()} ${d.numero} · validade ${dataBR(d.validade)}` : "— (novo)");
+const docTexto = (d: DocProposto | null) => (d ? `${d.tipo.toUpperCase()} ${d.numero} · emissor ${d.emissor || "—"} · emissão ${dataBR(d.emissao)} · validade ${dataBR(d.validade)}` : "— (novo)");
 
 function Paperless({ id, base }: { id: number | null; base: string | null }) {
   if (id == null) return null;
@@ -47,7 +48,7 @@ function Paperless({ id, base }: { id: number | null; base: string | null }) {
 }
 
 function FichaPessoa({ id }: { id: string }) {
-  const leitura = useApi<Ficha>(`${ROTA}/fichas/${encodeURIComponent(id)}`);
+  const leitura = useApi<Ficha>(`/api/v1/familia/fichas/${encodeURIComponent(id)}`);
   return (
     <Painel leitura={leitura} arquivo="familia-ficha">
       {(f) => {
@@ -58,13 +59,13 @@ function FichaPessoa({ id }: { id: string }) {
             {f.documentos.length === 0 ? <Vazio frase="Nenhum documento cadastrado." /> : (
               <ul style={lista}>
                 {f.documentos.map((d) => {
-                  const breve = venceEmBreve(d.validade);
+                  const sit = situacao(d.validade);
                   return (
                     <li key={d.id} style={linha}>
                       <span><strong>{d.tipo.toUpperCase()}</strong> <span style={suave}>{d.pais}</span> <span>{d.numero}</span>{d.emissor && <span style={suave}> · {d.emissor}</span>}</span>
                       <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <span style={suave}>validade</span> <span style={breve ? destaque : undefined}>{dataBR(d.validade)}</span>
-                        {breve && <span style={destaque}>Vence em breve</span>}
+                        <span style={suave}>validade</span> <span style={sit ? destaque : undefined}>{dataBR(d.validade)}</span>
+                        {sit && <span style={destaque}>{sit === "vencido" ? "Vencido" : "Vence em breve"}</span>}
                         <Paperless id={d.paperless_id} base={f.paperless_url} />
                       </span>
                     </li>);
@@ -80,14 +81,14 @@ function FichaPessoa({ id }: { id: string }) {
 export function CadastrosFamilia() {
   const { ocupado, erros, agir } = useAcao();
   const [sel, setSel] = useState<string | null>(null);
-  const fichas = useApi<{ itens: Resumo[] }>(`${ROTA}/fichas`);
-  const propostas = useApi<{ itens: Proposta[] }>(`${ROTA}/propostas?estado=pendente`);
-  const historico = useApi<{ itens: Mudanca[] }>(`${ROTA}/historico`);
+  const fichas = useApi<{ itens: Resumo[] }>("/api/v1/familia/fichas");
+  const propostas = useApi<{ itens: Proposta[] }>("/api/v1/familia/propostas?estado=pendente");
+  const historico = useApi<{ itens: Mudanca[] }>("/api/v1/familia/historico");
   const nomes = new Map((fichas.env?.dados.itens ?? []).map((p) => [p.id, p.nome]));
   const recarregar = async () => { await Promise.all([propostas.recarregar(), historico.recarregar(), fichas.recarregar()]); };
   const agirEm = async (chave: string, fn: () => Promise<unknown>, ok: string) => { if (!(await agir(chave, fn, ok, recarregar))) await recarregar(); };
   const decidir = (p: Proposta, estado: "aprovada" | "recusada") =>
-    agirEm(`proposta${p.id}`, () => api.post(`${ROTA}/propostas/${p.id}/decisao`, { estado }), estado === "aprovada" ? "Proposta aprovada." : "Proposta recusada.");
+    agirEm(`proposta${p.id}`, () => api.post(`/api/v1/familia/propostas/${p.id}/decisao`, { estado }), estado === "aprovada" ? "Proposta aprovada." : "Proposta recusada.");
   return (
     <>
       <Painel leitura={fichas} arquivo="familia-fichas">
@@ -142,7 +143,7 @@ export function CadastrosFamilia() {
                     </span>
                     {h.desfeito_em
                       ? <span style={suave}>desfeito em {dataBR(h.desfeito_em)}</span>
-                      : <button className="btn btn-secondary" disabled={ocupado} aria-label={`Desfazer mudança ${h.id}`} onClick={() => agirEm(`hist${h.id}`, () => api.post(`${ROTA}/historico/${h.id}/desfazer`, {}), "Mudança desfeita.")}>Desfazer</button>}
+                      : <button className="btn btn-secondary" disabled={ocupado} aria-label={`Desfazer mudança ${h.id}`} onClick={() => agirEm(`hist${h.id}`, () => api.post(`/api/v1/familia/historico/${h.id}/desfazer`, {}), "Mudança desfeita.")}>Desfazer</button>}
                     <Aviso erro={erros[`hist${h.id}`]} />
                   </li>))}
               </ul>)}
