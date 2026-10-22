@@ -42,7 +42,7 @@ O brain roda numa VPS própria: Python/FastAPI, SQLite, arquivos brutos imutáve
 5. Segurança, privacidade, rastreabilidade e auditabilidade.
 6. **Regra de entrada (ADR-023):** pergunta vai para o Hermes (MCP). O painel só ganha tela quando há decisão ou lista para revisar. **Nada vira sistema (tabela, timer, ADR) antes de um mês de uso manual que mostre a necessidade.** Use esta régua para julgar cada proposta.
 
-**Fonte de referência:** repositório `resper1965/gabi-brain`, branch `main`. Leia primeiro `docs/STATUS.md`, `docs/ARQUITETURA.md`, `docs/BACKLOG.md` e `docs/adr/023-simplificacao.md`. O dossiê da branch `docs/dossie-revisao-externa` é de 21/10 e descreve o sistema **antes** dos cortes: use só como histórico.
+**Fonte de referência:** repositório `resper1965/gabi-brain`, branch `main`. Leia primeiro `docs/STATUS.md`, `docs/ARQUITETURA.md`, `docs/BACKLOG.md` e `docs/adr/023-simplificacao.md`. O dossiê atualizado (22/10) está em `docs/DOSSIE-REVISAO-EXTERNA.md` na `main`; o da branch `docs/dossie-revisao-externa` é de 21/10 (antes dos cortes): só histórico.
 
 **Acesso:** [ESCOLHA UMA] você tem acesso ao código da `main` e deve verificar nele antes de afirmar que algo falta | você NÃO tem acesso ao código; marque como "a confirmar" tudo o que depender dele.
 
