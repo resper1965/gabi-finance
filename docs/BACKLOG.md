@@ -13,6 +13,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR-024) | R | 🔧 mergeado (PR #2) e instalado em 22/10, migração 0076 aplicada, `envios.escrita` desligado; faltam os passos do dono no runbook `#envios` | passos do dono feitos e um envio real conferido |
+| FA1 | Cadastro familiar (issue #1) e confiabilidade do Hermes (issue #3): rodar a carga, aprovar as propostas, token do Hermes com `familia` e instalar o SOUL | R | 🔧 pronto na branch `feat/cadastro-familiar`, falta merge e instalação; passos em `docs/runbook.md#familia` | carga aplicada, propostas aprovadas, Hermes consulta uma ficha e o SOUL novo está instalado |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |

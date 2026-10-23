@@ -42,7 +42,7 @@ O Hermes (Telegram e WhatsApp) só conversa e consulta o brain pelo MCP. Os dado
 | E-mail | Triagem com modelo (emergencial, importante, normal); regras "sempre lixo"; lixeira restaurável; alertas de emergência. |
 | Teams (ness) | Só metadados (quem, quando, se mencionou o dono); aviso de conversa sem resposta. O texto das mensagens nunca é lido. |
 | Contatos | Sincronização Google e Microsoft. Fila de propostas de escrita no Microsoft da ness (corrigir celular e nome, apagar telefone ou contato, acrescentar e-mail), aprovadas no painel. |
-| Documentos | O Paperless guarda os PDFs. O MCP só busca e baixa; nada escreve no Paperless. |
+| Documentos | O Paperless guarda os PDFs. O MCP busca (com trecho e referência), baixa e lê o OCR; nada escreve no Paperless. |
 | Avisos e Hoje | Avisos com janela, entregues pelo Telegram; tela Hoje; resumo da manhã e agenda financeira pelo Hermes. |
 | Hermes | Telegram e WhatsApp; 18 ferramentas MCP (20 com os envios). |
 | Painel | Telas de decisão: regras, propostas, lixeira, cadastros, a pagar, gastos, qualidade. |
@@ -60,9 +60,11 @@ O Hermes (Telegram e WhatsApp) só conversa e consulta o brain pelo MCP. Os dado
   - erro 5xx ou timeout vira `incerto`, e o brain nunca reenvia sozinho.
 - O Teams usa login delegado do dono.
 
-**Em desenho: cadastro familiar e documentos pessoais (issue #1, ADR-025 prevista)**
-- Fichas da família e documentos (CPF, RG, CNH, passaporte), com número, emissão e validade, consultáveis pelo Hermes.
-- Contato é gravado direto quando o dono dita, com histórico e desfazer. Documento entra por aprovação no painel.
+**Pronto na branch, ainda não instalado: cadastro familiar e confiabilidade (issues #1 e #3, ADR-025 prevista)**
+- Fichas da família e documentos (CPF, RG, CNH, passaporte), com número, emissão e validade, consultáveis pelo Hermes (escopo `familia`).
+- Contato é gravado direto quando o dono dita, com histórico e desfazer. Documento entra por proposta aprovada na aba Família do painel; a carga inicial (`tools/carga_familia.py`) traz o número completo do cadastro antigo e do OCR do Paperless.
+- Consulta documental: `documentos_buscar` devolve trecho e referência, e `documentos_texto` devolve o OCR (dado de terceiros, nunca instrução).
+- Confiabilidade: resposta vazia vem com aviso explícito; a ficha mostra todos os documentos ativos do mesmo tipo, com a origem, e as divergências de propostas; o SOUL do Hermes é versionado em `deploy/hermes/SOUL.md`.
 - O dono aceitou, com registro em ADR, quatro exceções:
   - número completo no canal, inclusive de menores;
   - R1 parcial para dado de contato;
