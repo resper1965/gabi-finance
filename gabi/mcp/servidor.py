@@ -26,6 +26,7 @@ from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
 log = logging.getLogger("gabi.mcp")
+AVISO_VAZIO = "Nenhum resultado para esta consulta. Diga ao Ricardo que não encontrou; não suponha nem estime."
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
@@ -126,6 +127,8 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
                 _registrar(banco, t, ferramenta, escopo, "erro", ms())
                 return {"erro": "erro_interno", "mensagem": "falha ao consultar; tente de novo"}
             _registrar(banco, t, ferramenta, escopo, "ok", ms())
+            if isinstance(dados, dict) and dados.get("itens") == []:
+                dados = {**dados, "vazio": True, "aviso": AVISO_VAZIO}  # vazio explícito, sem apagar as outras chaves
             return envelope(con, dados, agora=agora_fn())
         finally:
             con.close()
