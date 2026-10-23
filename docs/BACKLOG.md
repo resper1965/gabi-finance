@@ -13,7 +13,6 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR-024) | R | 🔧 mergeado (PR #2) e instalado em 22/10, migração 0076 aplicada, `envios.escrita` desligado; faltam os passos do dono no runbook `#envios` | passos do dono feitos e um envio real conferido |
-| CA1 | Instalar a conciliação achatada (ADR-026) | R | 🔧 branch `feat/conciliacao-achatada` pronta; comparação em produção em 23/10 deu 0 diferenças; falta autorizar merge e instalação | instalado, rodada de extratos seguinte com `conferida=True`, tela A pagar abrindo, e `tools/_conciliacao_antiga/`, `tools/comparar_conciliacao.py`, `tests/test_comparar_conciliacao.py` e `~/comparar-conciliacao.sh` apagados |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
