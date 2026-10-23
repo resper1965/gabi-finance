@@ -21,7 +21,7 @@ from gabi.fontes.paperless import ErroPaperless
 
 MAX_BYTES = 64 * 1024 * 1024
 PERMITIDOS = {
-    "paperless": frozenset({"docs", "baixar", "texto"}),  # ADR-023: só a busca, o download e o OCR do MCP; nada escreve no Paperless
+    "paperless": frozenset({"docs", "baixar", "texto", "documento"}),  # ADR-023: só a busca, o download e o OCR do MCP; nada escreve no Paperless
     "openrouter": frozenset({"completar", "completar_pdf"}),
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos", "evento_criar"}),  # ADR-024: criar só com proposta aprovada

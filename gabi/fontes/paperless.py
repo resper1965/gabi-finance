@@ -76,9 +76,13 @@ class Paperless:
             return []
         return [d for d in self.docs(tags__id__all=achada["id"]) if achada["id"] in (d.get("tags") or [])]
 
+    def documento(self, id: int) -> dict:
+        """Documento completo (metadados e OCR em `content`); só leitura. Id inexistente = ErroPaperless com status 404."""
+        return self._pedir("GET", f"/api/documents/{int(id)}/")
+
     def texto(self, id: int) -> str:
         """Texto (OCR) do documento."""
-        return self._pedir("GET", f"/api/documents/{int(id)}/").get("content") or ""
+        return self.documento(id).get("content") or ""
 
     def baixar(self, id: int) -> bytes:
         return self._pedir("GET", f"/api/documents/{int(id)}/download/")

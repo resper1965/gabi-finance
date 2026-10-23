@@ -4,6 +4,7 @@ from starlette.testclient import TestClient
 
 from gabi.db import conectar
 from gabi.fontes.paperless import ErroPaperless, Paperless
+from gabi.mcp.ferramentas_prop import _trecho
 from gabi.mcp.servidor import criar_mcp
 from gabi.mcp.tokens import emitir
 from tests.cobrar.paperless_falso import PaperlessFalso
@@ -55,6 +56,26 @@ def test_documentos_texto_corta_e_marca_cortado(cli, token):
     assert d["referencia"] == {"paperless_id": 5, "titulo": "Doc longo", "criado_em": "2026-10-01"}
     inteiro = chamar(cli, token, "documentos_texto", id=6)["dados"]
     assert inteiro["texto"] == "ENEL conta de luz" and inteiro["cortado"] is False
+
+
+def test_documentos_texto_referencia_vem_do_proprio_documento(cli, token):
+    d = chamar(cli, token, "documentos_texto", id=6)["dados"]
+    assert d["referencia"] == {"paperless_id": 6, "titulo": "Doc curto", "criado_em": "2026-10-02"}
+
+
+def test_documentos_texto_id_inexistente_e_nao_encontrado(cli, token):
+    assert chamar(cli, token, "documentos_texto", id=999)["erro"] == "nao_encontrado"
+
+
+def test_trecho_com_termo_no_fim_do_texto():
+    t = "a" * 500 + "FIM"
+    r = _trecho(t, "fim")
+    assert len(r) == 300 and r.endswith("FIM")
+
+
+def test_trecho_com_termo_maior_que_o_limite():
+    termo = "z" * 350
+    assert _trecho("ab" + termo + "cd", termo) == "z" * 300  # começa no termo, nunca passa de 300
 
 
 def test_documentos_texto_limite_fora_da_faixa(cli, token):
