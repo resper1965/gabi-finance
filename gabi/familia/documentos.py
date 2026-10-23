@@ -80,8 +80,9 @@ def _mascarado(con, pessoa_id, tipo, pais, numero):
 def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao=None, validade=None, pais: str = "BR",
            paperless_id=None, origem: str, conferir: bool = False, agora: dt.datetime) -> int | None:
     """Cria a proposta e devolve o id. None se o documento ativo já tem esses valores; se já há proposta aberta para a
-    mesma pessoa, tipo e número, devolve o id dela. CPF sem dígito verificador válido entra com conferir=1. Sem documento
-    igual, aponta para o mascarado do mesmo tipo e país; dígitos visíveis que não batem com o fim do número dão conferir=1."""
+    mesma pessoa, tipo e número, devolve o id dela; da carga, None se o mesmo número já foi recusado. CPF sem dígito
+    verificador válido entra com conferir=1. Sem documento igual, aponta para o mascarado do mesmo tipo e país; dígitos
+    visíveis que não batem com o fim do número dão conferir=1."""
     if tipo not in TIPOS:
         raise ErroFamilia("campo_invalido")
     if origem not in ORIGENS:
@@ -103,6 +104,10 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
                              (pessoa_id, tipo)):
             if normalizar_numero(p["numero"]) == alvo:
                 return p["id"]
+        # A carga não repropõe o que o Ricardo já recusou (rodar de novo não desfaz a decisão); o Hermes pode.
+        if origem == "carga" and any(normalizar_numero(p["numero"]) == alvo for p in con.execute(
+                "select numero from pessoa_proposta where pessoa_id=? and tipo=? and estado='recusada'", (pessoa_id, tipo))):
+            return None
         ativo = _ativo(con, pessoa_id, tipo, pais, numero)
         if ativo is not None:
             novos = {"emissor": emissor, "emissao": emissao, "validade": validade, "paperless_id": paperless_id}
@@ -147,6 +152,7 @@ def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime) -
                 novos = {c: p[c] for c in OPCIONAIS if p[c] is not None}
                 if mascarado(ativo["numero"]):
                     novos["numero"] = p["numero"]
+                    novos["origem"] = ORIGEM_DOC[p["origem"]]  # o número completo veio da proposta, não é mais o legado
                 sets = "".join(f"{c}=?, " for c in novos)
                 con.execute(f"update pessoa_documento set {sets}atualizado_em=? where id=?", (*novos.values(), ts, ativo["id"]))
                 documento_id = ativo["id"]

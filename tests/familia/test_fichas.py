@@ -93,3 +93,11 @@ def test_auditar_leitura_sem_numero(con):
     r = con.execute("select quando, quem, o_que, origem from decisao").fetchone()
     assert r["o_que"] == "Hermes consultou a ficha de ana (documentos: cpf, passaporte)" and r["origem"] == "familia"
     assert r["quando"] == "2026-10-22T09:00:00Z"
+
+
+def test_resolver_ignora_nome_completo_e_apelido_que_nao_sao_texto(con):
+    _pessoa(con, "ana", "Ana", nome_completo=123, apelido=["x"])
+    _pessoa(con, "bia", "Bia", apelido=None)
+    assert fichas.resolver_pessoa(con, "Ana") == "ana"
+    with pytest.raises(ErroFamilia):
+        fichas.resolver_pessoa(con, "Zé")

@@ -1,5 +1,5 @@
 """Família (/api/v1/familia): fichas, propostas de documento, histórico de contato e vencimentos. Só o boss.
-Os números dos documentos saem apenas em `GET /fichas/{id}` (a tela Família); o resto nunca os leva.
+Os números dos documentos saem apenas em `GET /fichas/{id}` e `GET /propostas` (atual e proposto, a tela Família); o resto nunca os leva.
 Consome: familia.fichas, familia.contato, familia.documentos, parametro `paperless.url`."""
 import json
 

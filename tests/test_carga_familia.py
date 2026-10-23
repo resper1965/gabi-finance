@@ -455,3 +455,22 @@ def test_main_erro_na_etapa_yaml_so_texto_fixo(tmp_path, con, capsys, monkeypatc
     assert carga.main(["--yaml", str(y), "--banco", str(banco), "--sem-ocr"]) == 1
     saida = capsys.readouterr()
     assert "RuntimeError" in saida.err and "AB123456" not in saida.out + saida.err
+
+
+# ---- revisão final: rodar de novo respeita as decisões do dono -------------------------------------------------
+
+def test_rodar_de_novo_nao_repropoe_documento_recusado(con):
+    carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
+    for (pid,) in con.execute("select id from pessoa_proposta where pessoa_id='ana' and tipo='cpf'").fetchall():
+        documentos.decidir(con, pid, "recusada", "ricardo", AGORA)
+    carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
+    assert con.execute("select count(*) from pessoa_proposta where pessoa_id='ana' and tipo='cpf'").fetchone()[0] == 1
+
+
+def test_rodar_de_novo_nao_regrava_contato_desfeito(con):
+    carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
+    [h] = [x for x in contato.historico(con, "ana") if x["campo"] == "apelido"]
+    contato.desfazer(con, h["id"], "ricardo", AGORA)
+    r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
+    assert "apelido" not in json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])
+    assert r["contatos_gravados"] == 0 and r["divergencias"] == 1

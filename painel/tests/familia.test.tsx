@@ -101,3 +101,10 @@ test("Desfazer chama /historico/{id}/desfazer", async () => {
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0].url).toBe("/api/v1/familia/historico/9/desfazer");
 });
+
+test("endereço em dict (forma do yaml) aparece como texto, não JSON", async () => {
+  fake(FICHA({ enderecos: [{ tipo: "residencial", logradouro: "Rua Exemplo, 10", bairro: "Centro", cidade: "São Paulo", uf: "SP", cep: "", observacao: "portaria" }] }));
+  montar();
+  expect(await screen.findByText("Rua Exemplo, 10, Centro, São Paulo/SP")).toBeTruthy();
+  expect(screen.queryByText(/logradouro/)).toBeNull();
+});

@@ -3,7 +3,8 @@ O brain já tem a base de 08/10 com números mascarados; a carga traz o número 
 proposta (`origem='carga'`) para o Ricardo aprovar; contato vazio ou nunca editado é gravado com histórico e desfazer; empresa
 é atualizada no lugar com auditoria sem valor; pets e obrigações só conferem. Leitura duvidosa entra com `conferir=1`.
 Sem `--aplicar` roda numa cópia do banco em memória e só conta. A saída são só contagens: nunca número, nome ou valor.
-Rodar de novo não duplica nada.
+Rodar de novo não duplica nada nem desfaz decisões: número recusado não volta como proposta e contato da carga que foi
+desfeito não é gravado de novo.
 Consome: gabi.familia (documentos.propor, contato.atualizar/substituir, fichas), pessoa, pet, empresa, compromisso_fixo,
 pessoa_documento/pessoa_historico/pessoa_proposta (migração 0077), gabi.fontes.ponte (Paperless: docs, texto); grava em decisao
 (origem 'familia'). Uso: python -m tools.carga_familia [--yaml CAMINHO] [--sem-ocr] [--aplicar] [--socket CAMINHO] [--banco CAMINHO]"""
@@ -212,6 +213,12 @@ def _editado(con, pessoa_id: str, campo: str) -> bool:
                        " and quem<>? limit 1", (pessoa_id, *campos, QUEM)).fetchone() is not None
 
 
+def _desfeito(con, pessoa_id: str, campo: str) -> bool:
+    """Gravação da carga neste campo que alguém desfez: decisão do dono, a carga não grava o campo de novo."""
+    return con.execute("select 1 from pessoa_historico where pessoa_id=? and campo=? and quem=? and desfeito_em is not null limit 1",
+                       (pessoa_id, campo, QUEM)).fetchone() is not None
+
+
 def _pessoa(con, rec: dict, agora, r: dict) -> None:
     pid = rec["id"]
     for item in rec.get("documentos") or []:
@@ -229,8 +236,8 @@ def _pessoa(con, rec: dict, agora, r: dict) -> None:
         atual = _atual_contato(_dados(linha["dados"]), campo)
         if atual == novo:
             continue
-        if atual is not None and _editado(con, pid, campo):
-            r["divergencias"] += 1  # já editado pelo Ricardo, painel ou Hermes: não sobrescreve
+        if (atual is not None and _editado(con, pid, campo)) or _desfeito(con, pid, campo):
+            r["divergencias"] += 1  # já editado (Ricardo, painel ou Hermes) ou gravação da carga desfeita: não sobrescreve
             continue
         try:
             if campo in contato.CARGA:

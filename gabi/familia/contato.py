@@ -45,13 +45,26 @@ def _normalizar(campo: str, valor):
     return _texto(valor)
 
 
+def _parte(v) -> str:
+    return str(v).strip() if v is not None and not isinstance(v, bool) else ""
+
+
+def formatar_endereco(item: dict) -> str:
+    """Endereço em dict (forma do yaml) como texto: "logradouro, bairro, cidade/uf, cep", pulando as partes vazias.
+    O mesmo formato do painel (`textoItem` em CadastrosFamilia.tsx)."""
+    cidade_uf = "/".join(x for x in (_parte(item.get("cidade")), _parte(item.get("uf"))) if x)
+    return ", ".join(x for x in (_parte(item.get("logradouro")), _parte(item.get("bairro")), cidade_uf, _parte(item.get("cep"))) if x)
+
+
 def _texto_item(item):
+    """Texto comparável de um item guardado (sem espaços nas pontas, como o valor recebido); None se não houver."""
     if isinstance(item, str):
-        return item
+        return item.strip()
     if isinstance(item, dict):
         for k in ("texto", "endereco"):
             if isinstance(item.get(k), str):
-                return item[k]
+                return item[k].strip()
+        return formatar_endereco(item) or None
     return None
 
 

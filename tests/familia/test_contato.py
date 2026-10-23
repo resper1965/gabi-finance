@@ -156,3 +156,31 @@ def test_atomicidade(con, monkeypatch):
         contato.atualizar(con, "ana", "apelido", "definir", "A", "boss", AGORA)
     assert con.execute("select dados from pessoa where id='ana'").fetchone()["dados"] == antes
     assert con.execute("select count(*) n from decisao where origem='familia'").fetchone()["n"] == 0
+
+
+# ---- endereço em dict (forma do yaml) ----------------------------------------------------------------------------
+
+END = {"tipo": "residencial", "logradouro": "Rua Exemplo, 10", "bairro": "Centro", "cidade": "São Paulo", "uf": "SP",
+       "cep": "01000-000", "observacao": "portaria"}
+
+
+def _com_endereco_dict(con):
+    d = _dados(con)
+    d["enderecos"] = [dict(END), "Rua B"]
+    con.execute("update pessoa set dados=? where id='ana'", (json.dumps(d, ensure_ascii=False),))
+
+
+def test_formatar_endereco_pula_partes_vazias():
+    assert contato.formatar_endereco(END) == "Rua Exemplo, 10, Centro, São Paulo/SP, 01000-000"
+    assert contato.formatar_endereco({"logradouro": "Rua X", "bairro": "", "cidade": None, "uf": "RJ"}) == "Rua X, RJ"
+
+
+def test_remover_endereco_dict_pelo_texto_formatado(con):
+    _com_endereco_dict(con)
+    r = contato.atualizar(con, "ana", "enderecos", "remover", " Rua Exemplo, 10, Centro, São Paulo/SP, 01000-000 ", "boss", AGORA)
+    assert r["depois"] == ["Rua B"] and _dados(con)["enderecos"] == ["Rua B"]
+
+
+def test_adicionar_endereco_igual_ao_dict_e_duplicado(con):
+    _com_endereco_dict(con)
+    assert _erro(con, "enderecos", "adicionar", "Rua Exemplo, 10, Centro, São Paulo/SP, 01000-000") == "valor_invalido"

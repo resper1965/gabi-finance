@@ -32,9 +32,13 @@ const situacao = (validade: string | null): "vencido" | "breve" | null => {
   const hoje = new Date(); const limite = new Date(); limite.setMonth(limite.getMonth() + 6);
   return validade < isoLocal(hoje) ? "vencido" : validade <= isoLocal(limite) ? "breve" : null;
 };
+// Endereço em dict (forma do yaml): "logradouro, bairro, cidade/uf, cep", sem as partes vazias (o mesmo de formatar_endereco no brain).
+const parte = (x: unknown) => (x == null || typeof x === "boolean" ? "" : String(x).trim());
+const formatarEndereco = (o: Record<string, unknown>) =>
+  [parte(o.logradouro), parte(o.bairro), [parte(o.cidade), parte(o.uf)].filter(Boolean).join("/"), parte(o.cep)].filter(Boolean).join(", ");
 const textoItem = (v: unknown): string => {
   if (typeof v === "string") return v;
-  if (v && typeof v === "object") { const o = v as Record<string, unknown>; const t = o.texto ?? o.endereco; return typeof t === "string" ? t : JSON.stringify(v); }
+  if (v && typeof v === "object") { const o = v as Record<string, unknown>; const t = o.texto ?? o.endereco; return typeof t === "string" ? t : formatarEndereco(o) || "—"; }
   return String(v);
 };
 const valor = (v: unknown) => (Array.isArray(v) ? (v.length ? v.map(textoItem).join(", ") : "(vazio)") : v == null || v === "" ? "(vazio)" : textoItem(v));

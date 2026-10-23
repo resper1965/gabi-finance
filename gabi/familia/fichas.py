@@ -103,16 +103,16 @@ def resolver_pessoa(con, texto: str) -> str:
     """Casa por igualdade (sem caixa e acento) do texto com o nome, o nome completo ou o apelido.
     Exatamente 1 pessoa: o id. Senão `pessoa_ambigua`, com os nomes candidatos (vazio se ninguém casar)."""
     alvo = normalizar_nome(texto)
-    linhas = [(r["id"], r["nome"], _dados(r)) for r in con.execute("select id, nome, dados from pessoa where excluido_em is null")]
+    # Só valores texto casam (nome_completo/apelido de outro tipo no JSON são ignorados).
+    linhas = [(r["id"], r["nome"], [normalizar_nome(v) for v in (r["nome"], d.get("nome_completo"), d.get("apelido")) if isinstance(v, str)])
+              for r in con.execute("select id, nome, dados from pessoa where excluido_em is null") for d in (_dados(r),)]
     if alvo:
-        exatos = [(i, n) for i, n, d in linhas
-                  if alvo in {normalizar_nome(n), normalizar_nome(d.get("nome_completo") or ""), normalizar_nome(d.get("apelido") or "")}]
+        exatos = [(i, n) for i, n, chaves in linhas if alvo in chaves]
         if len(exatos) == 1:
             return exatos[0][0]
         if exatos:
             raise ErroFamilia("pessoa_ambigua", candidatos=[n for _, n in exatos])
-        parciais = [n for _, n, d in linhas
-                    if any(alvo in normalizar_nome(v or "") for v in (n, d.get("nome_completo"), d.get("apelido")))]
+        parciais = [n for _, n, chaves in linhas if any(alvo in c for c in chaves)]
         raise ErroFamilia("pessoa_ambigua", candidatos=parciais)
     raise ErroFamilia("pessoa_ambigua", candidatos=[])
 

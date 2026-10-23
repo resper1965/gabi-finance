@@ -194,3 +194,17 @@ def test_duas_propostas_no_mesmo_mascarado_nao_sobrescrevem_uma_a_outra(con):
     docs = {d["numero"]: dict(d) for d in con.execute("select * from pessoa_documento where pessoa_id='ana' and excluido_em is null")}
     assert docs["AB123456"]["validade"] == "2031-05-01" and docs["AB123456"]["id"] == m
     assert docs["CD999956"]["validade"] == "2029-01-01" and r2["documento_id"] != m
+
+
+def test_aprovar_sobre_mascarado_troca_a_origem(con):
+    _ativo(con, numero="AA****56", validade=None)
+    pid = _propor(con, numero="AB123456", origem="carga")
+    documentos.decidir(con, pid, "aprovada", "ricardo", AGORA)
+    assert con.execute("select origem from pessoa_documento where pessoa_id='ana'").fetchone()[0] == "carga"
+
+
+def test_carga_nao_repropoe_numero_recusado_e_hermes_sim(con):
+    pid = _propor(con, numero="AB123456", origem="carga")
+    documentos.decidir(con, pid, "recusada", "ricardo", AGORA)
+    assert _propor(con, numero="ab 123456", origem="carga") is None
+    assert _propor(con, numero="AB123456", origem="hermes") is not None
