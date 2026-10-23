@@ -55,4 +55,6 @@ def test_main_le_o_banco_so_leitura(tmp_path, capsys):
     assert main(["--banco", str(p), "--hoje", "2026-10-08"]) == 0
     assert "0 diferença(s)" in capsys.readouterr().out
     assert p.read_bytes() == antes and p.stat().st_mtime_ns == mtime
-    assert not sqlite3.connect(f"file:{p}?mode=ro", uri=True).execute("select count(*) from compromisso").fetchone()[0]
+    ro = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+    assert ro.execute("select count(*) from compromisso").fetchone()[0] == 0
+    ro.close()

@@ -24,7 +24,8 @@ def _rodar_novo(con, hoje: date, agora: datetime) -> dict:
 
 
 def comparar(con, hoje: date, agora: datetime) -> list[dict]:
-    """Compromissos cujo estado mudou entre o antigo e o novo (ausente de um lado conta como None)."""
+    """Compromissos cujo estado mudou entre o antigo e o novo (ausente de um lado conta como None).
+    Documentos avulsos não entram na comparação (docs=() dos dois lados, como na rodada de produção)."""
     antigo, novo = rodar_antigo(con, hoje, agora), _rodar_novo(con, hoje, agora)
     saida = []
     for cid in sorted(set(antigo) | set(novo)):
@@ -50,6 +51,7 @@ def main(argv=None) -> int:
     origem.close()
     con.row_factory = sqlite3.Row
     difs = comparar(con, hoje, agora)
+    print("(documentos avulsos não são comparados)")
     for d in difs:
         print(f"{d['id']} | {d['nome']} | {d['vencimento']} | {d['antes']} → {d['depois']} | {d['motivo'] or ''}")
     print(f"{len(difs)} diferença(s)")
