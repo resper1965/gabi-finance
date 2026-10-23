@@ -128,3 +128,45 @@ def test_auditoria_sem_numero(con):
     o = con.execute("select o_que, origem from decisao where origem='familia'").fetchone()
     assert "AB987654" not in o["o_que"] and str(pid) in o["o_que"] and "ana" in o["o_que"]
     assert "passaporte" in o["o_que"] and "aprovada" in o["o_que"]
+
+
+# Documento mascarado (legado de 08/10, com "*"): a proposta aponta para ele e aprovar troca o número.
+
+def test_proposta_aponta_para_o_mascarado_do_mesmo_tipo_e_pais(con):
+    m = _ativo(con, numero="AA****56", validade=None)
+    _ativo(con, numero="ZZ****99", validade=None, pais="PT")
+    pid = _propor(con, numero="AB123456", validade="2031-05-01", origem="carga")
+    p = con.execute("select * from pessoa_proposta where id=?", (pid,)).fetchone()
+    assert p["documento_id"] == m and p["conferir"] == 0
+
+
+def test_aprovar_sobre_mascarado_troca_o_numero_sem_segundo_documento(con):
+    m = _ativo(con, numero="AA****56", validade=None)
+    pid = _propor(con, numero="AB123456", validade="2031-05-01", origem="carga")
+    r = documentos.decidir(con, pid, "aprovada", "ricardo", AGORA)
+    docs = con.execute("select * from pessoa_documento where pessoa_id='ana' and excluido_em is null").fetchall()
+    assert r["documento_id"] == m and len(docs) == 1
+    assert docs[0]["numero"] == "AB123456" and docs[0]["validade"] == "2031-05-01"
+
+
+def test_digitos_visiveis_que_nao_batem_dao_conferir(con):
+    m = _ativo(con, numero="AA****99", validade=None)
+    pid = _propor(con, numero="AB123456", origem="carga")
+    p = con.execute("select * from pessoa_proposta where id=?", (pid,)).fetchone()
+    assert p["documento_id"] == m and p["conferir"] == 1
+
+
+def test_cpf_mascarado_com_digitos_que_batem(con):
+    m = con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, origem) values ('ana','cpf','***.***.***-25','legado')").lastrowid
+    pid = _propor(con, tipo="cpf", numero=CPF_OK, origem="carga")
+    p = con.execute("select * from pessoa_proposta where id=?", (pid,)).fetchone()
+    assert p["documento_id"] == m and p["conferir"] == 0
+    documentos.decidir(con, pid, "aprovada", "ricardo", AGORA)
+    assert [d["numero"] for d in con.execute("select numero from pessoa_documento where pessoa_id='ana'")] == [CPF_OK]
+
+
+def test_mascarado_escolhe_o_primeiro_por_id(con):
+    m1 = _ativo(con, numero="AA****56", validade=None)
+    _ativo(con, numero="BB****56", validade=None)
+    pid = _propor(con, numero="AB123456", origem="carga")
+    assert con.execute("select documento_id from pessoa_proposta where id=?", (pid,)).fetchone()[0] == m1

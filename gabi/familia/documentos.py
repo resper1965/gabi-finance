@@ -1,7 +1,8 @@
 """Propostas de documento da família: o Hermes e a carga propõem, o Ricardo aprova no painel.
 Consome: pessoa, pessoa_documento e pessoa_proposta (migração 0077), gabi.mascara (dígito do CPF); grava em decisao (origem 'familia').
 Proposta com campo opcional vazio não apaga o valor do documento ativo ao ser aprovada. A auditoria leva só ids, tipo e
-estado, nunca o número; os erros têm código fixo."""
+estado, nunca o número; os erros têm código fixo. Documento ativo com "*" no número é "mascarado" (cópia de 08/10): a proposta
+sem documento igual aponta para ele e aprovar grava também o número completo."""
 import datetime as dt
 import re
 
@@ -55,10 +56,30 @@ def _ativo(con, pessoa_id, tipo, pais, numero):
     return None
 
 
+def mascarado(numero) -> bool:
+    return "*" in str(numero or "")
+
+
+def _mascarado(con, pessoa_id, tipo, pais):
+    """Primeiro documento ativo (por id) mascarado do mesmo tipo e país, ou None."""
+    for d in con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null order by id",
+                         (pessoa_id, tipo, pais)):
+        if mascarado(d["numero"]):
+            return d
+    return None
+
+
+def _visiveis_batem(mascarado_numero, numero) -> bool:
+    """Os dígitos visíveis do mascarado são o fim dos dígitos do número novo."""
+    visiveis = re.sub(r"\D", "", str(mascarado_numero))
+    return re.sub(r"\D", "", numero).endswith(visiveis)
+
+
 def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao=None, validade=None, pais: str = "BR",
            paperless_id=None, origem: str, conferir: bool = False, agora: dt.datetime) -> int | None:
     """Cria a proposta e devolve o id. None se o documento ativo já tem esses valores; se já há proposta aberta para a
-    mesma pessoa, tipo e número, devolve o id dela. CPF sem dígito verificador válido entra com conferir=1."""
+    mesma pessoa, tipo e número, devolve o id dela. CPF sem dígito verificador válido entra com conferir=1. Sem documento
+    igual, aponta para o mascarado do mesmo tipo e país; dígitos visíveis que não batem com o fim do número dão conferir=1."""
     if tipo not in TIPOS:
         raise ErroFamilia("campo_invalido")
     if origem not in ORIGENS:
@@ -85,6 +106,10 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
             novos = {"emissor": emissor, "emissao": emissao, "validade": validade, "paperless_id": paperless_id}
             if all(v is None or v == ativo[c] for c, v in novos.items()):
                 return None
+        else:
+            ativo = _mascarado(con, pessoa_id, tipo, pais)
+            if ativo is not None and not _visiveis_batem(ativo["numero"], numero):
+                conferir = True
         return con.execute(
             "insert into pessoa_proposta(pessoa_id, documento_id, tipo, pais, numero, emissor, emissao, validade, paperless_id,"
             " origem, conferir, criada_em) values (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -111,8 +136,11 @@ def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime) -
             if ativo is None:
                 ativo = _ativo(con, p["pessoa_id"], p["tipo"], p["pais"], p["numero"])
             if ativo is not None:
-                # Campo vazio na proposta mantém o valor atual; o número fica como está (só muda a formatação).
+                # Campo vazio na proposta mantém o valor atual; o número fica como está (só muda a formatação), salvo
+                # sobre o mascarado, que ganha o número completo.
                 novos = {c: p[c] for c in OPCIONAIS if p[c] is not None}
+                if mascarado(ativo["numero"]):
+                    novos["numero"] = p["numero"]
                 sets = "".join(f"{c}=?, " for c in novos)
                 con.execute(f"update pessoa_documento set {sets}atualizado_em=? where id=?", (*novos.values(), ts, ativo["id"]))
                 documento_id = ativo["id"]

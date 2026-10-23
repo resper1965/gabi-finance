@@ -155,6 +155,30 @@ def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agor
     return {"antes": antes, "depois": depois, "historico_id": hid}
 
 
+CARGA = ("telefone", "enderecos")
+
+
+def substituir(con, pessoa_id: str, campo: str, valor, quem: str, agora: dt.datetime) -> dict:
+    """Só para a carga (`tools/carga_familia.py`, fora do MCP): troca o valor inteiro de `telefone` (texto legado) ou de
+    `enderecos` (lista), com a mesma linha de histórico, desfazer e auditoria de `atualizar`."""
+    if campo not in CARGA:
+        raise ErroFamilia("campo_invalido")
+    if campo == "telefone":
+        depois = _normalizar("telefones", valor)
+    else:
+        if not isinstance(valor, list) or not 1 <= len(valor) <= MAX_ITENS:
+            raise ErroFamilia("valor_invalido")
+        depois = [_texto(v) for v in valor]
+    with transacao(con, imediata=True):
+        dados = _dados_da(con, pessoa_id)
+        antes = dados.get(campo)
+        _colocar(dados, campo, depois)
+        _gravar(con, pessoa_id, dados)
+        hid = _historico(con, pessoa_id, campo, antes, depois, quem, agora)
+        _auditar(con, quem, agora, pessoa_id, campo, "definir")
+    return {"antes": antes, "depois": depois, "historico_id": hid}
+
+
 def desfazer(con, historico_id: int, quem: str, agora: dt.datetime) -> dict:
     """Restaura o `antes` de uma linha de histórico. Só se o valor atual ainda for o `depois` (senão `conflito`, sem sobrescrever)."""
     with transacao(con, imediata=True):
