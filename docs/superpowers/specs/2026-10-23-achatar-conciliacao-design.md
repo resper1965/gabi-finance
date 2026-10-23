@@ -69,7 +69,7 @@ A lista exata sai de `grep -rn "previsto\|debito_automatico\|juros"` no plano.
 - `tests/test_comparar_conciliacao.py` é temporário e sai junto com `tools/comparar_conciliacao.py` (§5).
 
 ## Pronto quando
-1. `conciliacao.py` + `compromissos.py` menores que os 585 de antes: ficaram em 413 linhas (-29%); a meta de ~320 foi abandonada porque cortar mais prejudicava a leitura (revisado e aceito).
+1. `conciliacao.py` + `compromissos.py` menores que os 585 de antes: ficaram em 423 linhas (-28%); a meta de ~320 foi abandonada porque cortar mais prejudicava a leitura (revisado e aceito).
 2. Suíte verde.
 3. Lista da comparação conferida pelo Ricardo (feito em 23/10: 0 diferenças), sem compromisso pago virando atrasado no mês corrente sem motivo aceito.
 4. Instalado, e a rodada de extratos seguinte com `conferida=True` e a tela A pagar abrindo.
