@@ -84,7 +84,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/familia/propostas` | Propostas de documento no estado dado, com o documento atual e o proposto, e a URL base do Paperless (ou null) para os links. |
 | POST | `/api/v1/familia/propostas/{proposta_id}/decisao` | Aprova ou recusa a proposta pendente (`{"estado": "aprovada"|"recusada"}`). |
 | GET | `/api/v1/familia/vencimentos` | Documentos que vencem nos próximos `meses` (e os vencidos há até 30 dias), sem número. |
-| GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |
+| GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro, parada ou em_espera (parâmetro `fontes.em_espera`: aparece, mas não conta no dados_ate). |
 | GET | `/api/v1/gabi/qualidade` | A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias). |
 | GET | `/api/v1/hoje` | O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro. |
 | GET | `/api/v1/lancamentos` | Lançamentos paginados, com filtros e a origem de cada classificação. |

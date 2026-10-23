@@ -385,7 +385,7 @@ async def regra_patch(rid: int, request: Request, ident: Identidade = Depends(ex
 # ---------------- fontes e rodadas ----------------
 @router.get("/fontes")
 def fontes(request: Request):
-    """Estado de cada fonte: ok, nao_conferida, erro ou parada."""
+    """Estado de cada fonte: ok, nao_conferida, erro, parada ou em_espera (parâmetro `fontes.em_espera`: aparece, mas não conta no dados_ate)."""
     con = _con(request)
     try:
         e = envelope(con, None, agora=_agora(request))

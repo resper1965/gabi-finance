@@ -100,8 +100,9 @@ def ficha(con, pessoa_id: str) -> dict:
 
 
 def resolver_pessoa(con, texto: str) -> str:
-    """Casa por igualdade (sem caixa e acento) do texto com o nome, o nome completo ou o apelido.
-    Exatamente 1 pessoa: o id. Senão `pessoa_ambigua`, com os nomes candidatos (vazio se ninguém casar)."""
+    """Casa por igualdade (sem caixa e acento) do texto com o nome, o nome completo ou o apelido; sem igual, pelo começo em
+    palavras inteiras ("Louise" casa "Louise Lavrik Esper"). Exatamente 1 pessoa: o id. Senão `pessoa_ambigua`, com os nomes
+    candidatos (vazio se ninguém casar)."""
     alvo = normalizar_nome(texto)
     # Só valores texto casam (nome_completo/apelido de outro tipo no JSON são ignorados).
     linhas = [(r["id"], r["nome"], [normalizar_nome(v) for v in (r["nome"], d.get("nome_completo"), d.get("apelido")) if isinstance(v, str)])
@@ -112,6 +113,9 @@ def resolver_pessoa(con, texto: str) -> str:
             return exatos[0][0]
         if exatos:
             raise ErroFamilia("pessoa_ambigua", candidatos=[n for _, n in exatos])
+        comeco = [(i, n) for i, n, chaves in linhas if any(c.startswith(alvo + " ") for c in chaves)]
+        if len(comeco) == 1:
+            return comeco[0][0]
         parciais = [n for _, n, chaves in linhas if any(alvo in c for c in chaves)]
         raise ErroFamilia("pessoa_ambigua", candidatos=parciais)
     raise ErroFamilia("pessoa_ambigua", candidatos=[])

@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import pathlib
 import sqlite3
 import re
@@ -242,3 +243,20 @@ def test_rodadas_antigas_de_fontes_cortadas_nao_aparecem_na_lista(con):
         _r(con, f, 200, status="erro")
     nomes = set(_estados(envelope(con, None, AGORA)))
     assert nomes == {"open-finance", "notas-nibo"}
+
+
+def test_fonte_em_espera_aparece_mas_nao_deixa_desatualizado(con):
+    _r(con, "open-finance", 2, conferida=1)
+    _r(con, "notas-nibo", 200, status="erro")
+    assert envelope(con, None, AGORA)["desatualizado"] is True
+    con.execute("insert into parametro(chave, valor) values ('fontes.em_espera', ?)", (json.dumps(["notas-nibo"]),))
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is False and _estados(e)["notas-nibo"] == "em_espera"
+    assert e["dados_ate"] == (AGORA - dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_fonte_em_espera_com_valor_estranho_e_ignorado(con):
+    _r(con, "open-finance", 2, conferida=1)
+    _r(con, "notas-nibo", 200, status="erro")
+    con.execute("insert into parametro(chave, valor) values ('fontes.em_espera', ?)", ("nao é json",))
+    assert envelope(con, None, AGORA)["desatualizado"] is True

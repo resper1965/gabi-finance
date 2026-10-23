@@ -101,3 +101,14 @@ def test_resolver_ignora_nome_completo_e_apelido_que_nao_sao_texto(con):
     assert fichas.resolver_pessoa(con, "Ana") == "ana"
     with pytest.raises(ErroFamilia):
         fichas.resolver_pessoa(con, "Zé")
+
+
+def test_resolver_pelo_primeiro_nome_quando_so_uma_pessoa_comeca_assim(con):
+    _pessoa(con, "lou", "Louise Lavrik Esper", apelido="Lou")
+    _pessoa(con, "gio", "Giovanna Esper")
+    _pessoa(con, "gia", "Giovanna Lima")
+    assert fichas.resolver_pessoa(con, "louise") == "lou"
+    assert fichas.resolver_pessoa(con, "Louise Lavrik") == "lou"
+    with pytest.raises(ErroFamilia) as e:
+        fichas.resolver_pessoa(con, "Giovanna")
+    assert e.value.candidatos == ["Giovanna Esper", "Giovanna Lima"]

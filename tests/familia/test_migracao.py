@@ -12,7 +12,7 @@ from gabi.db import migrar
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 
 
-def _banco(tmp_path, pessoas):
+def _banco(tmp_path, pessoas, todas=False):
     """Aplica as migrações até a 0076, grava as pessoas e só então aplica a 0077 (banco de produção antes da virada)."""
     pasta = tmp_path / "antes"
     pasta.mkdir()
@@ -27,7 +27,8 @@ def _banco(tmp_path, pessoas):
                     (pid, nome, dados if isinstance(dados, str) or dados is None else json.dumps(dados), excluido))
     nova = tmp_path / "depois"
     nova.mkdir()
-    shutil.copy(next(MIGRACOES.glob("0077_*.sql")), nova / "0077_familia.sql")
+    for arq in MIGRACOES.glob("[0-9][0-9][0-9][0-9]_*.sql") if todas else [next(MIGRACOES.glob("0077_*.sql"))]:
+        shutil.copy(arq, nova / arq.name)
     for arq in pasta.iterdir():
         shutil.copy(arq, nova / arq.name)
     migrar(con, nova)
@@ -89,3 +90,10 @@ def test_indice_unico_das_propostas_abertas(tmp_path):
     con.execute(ins, ("recusada",))
     con.execute(ins, ("recusada",))
 
+
+
+def test_numero_null_ou_none_nao_vira_documento(tmp_path):
+    con = _banco(tmp_path, [("p1", "Ana", {"documentos": [{"tipo": "rg", "numero": "null"}, {"tipo": "passaporte", "numero": "None"},
+                                                          {"tipo": "cpf", "numero": "123"}]}, None)], todas=True)
+    # 0077 já rodou em produção copiando o texto "null"; a 0079 tira esses do cadastro (excluido_em, dá para desfazer)
+    assert [r[0] for r in con.execute("select tipo from pessoa_documento where excluido_em is null")] == ["cpf"]

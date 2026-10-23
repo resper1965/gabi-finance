@@ -59,6 +59,17 @@ def _em_uso(con, tabela: str) -> bool:
         return False
 
 
+def _em_espera(con) -> set[str]:
+    """Fontes que o Ricardo pôs em espera (parâmetro `fontes.em_espera`, lista JSON; p.ex. Nibo aguardando chave): aparecem como
+    `em_espera` e não contam em dados_ate/desatualizado. Valor ausente ou estranho = nenhuma."""
+    r = con.execute("select valor from parametro where chave='fontes.em_espera'").fetchone()
+    try:
+        v = json.loads(r[0]) if r else []
+    except (TypeError, ValueError):
+        return set()
+    return {x for x in v if isinstance(x, str)} if isinstance(v, list) else set()
+
+
 def _agenda_em_uso(con) -> bool:
     """`agenda` só vale como fonte com alguma fonte de agenda liberada."""
     return _em_uso(con, "agenda_fonte")
@@ -96,7 +107,12 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
     nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
     nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
     nomes = sorted(n for n in nomes if n not in CORTADAS and not (n in FONTES and FONTES[n] is None))
+    espera = _em_espera(con)
     for nome in nomes:
+        if nome in espera:
+            ok = con.execute("select max(fim) from rodada where fonte=? and status='ok'", (nome,)).fetchone()[0]
+            fontes.append({"nome": nome, "estado": "em_espera", "ultima": _z(_utc(ok)) if ok else None})
+            continue
         conta = FONTES.get(nome) is not None
         tent = con.execute("select status, conferida from rodada where fonte=? order by id desc limit 1", (nome,)).fetchone()
         if nome in COM_CONFERENCIA:
