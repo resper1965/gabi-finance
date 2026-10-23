@@ -1,6 +1,6 @@
 # Achatar compromissos e conciliação
 
-Data: 23/10/2026 · ADR: `docs/adr/026-conciliacao-achatada.md` (a escrever junto com o código) · Item: primeiro do "Depois" no `docs/BACKLOG.md`
+Data: 23/10/2026 · ADR: `docs/adr/026-conciliacao-achatada.md` · Item: BACKLOG CA1
 
 ## Objetivo
 Reduzir o código que mantemos. Hoje a tela A pagar funciona; o motivo é só manutenção (decisão do Ricardo, 23/10). `compromissos.py` (225 linhas) e `conciliacao.py` (360) foram portados do gabi-fin sem alterar a lógica: 6 estados, 8 regras de casamento, valores em float, para cerca de 27 linhas por mês. A paridade com o gabi-fin não tem mais valor (o gabi-fin saiu).
@@ -27,11 +27,11 @@ Reduzir o código que mantemos. Hoje a tela A pagar funciona; o motivo é só ma
 Saem `previsto` (vira `aberto`; o valor estimado continua visível por `valor_fonte` em `padrao`/`ultimo`/nulo) e `debito_automatico` (vira `aberto`; reconhecido por `forma == "debito_automatico"`).
 
 ## 2. Casamento (`gabi/dinheiro/conciliacao.py`, reescrito)
-Assinatura mantida: `conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, donos=None) -> (resultado, novos)`. Valores em centavos (int) em toda a função.
+Assinatura mantida: `conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, donos=None) -> (resultado, novos)`. Valores em centavos (int) em toda a função; os `pagos` da baixa manual chegam já em centavos (`compromissos.valores_em_centavos`), `conciliar` não converte nada.
 
 1. **Vínculo gravado** (`conciliacao`, menos `manual:`): o compromisso fica `pago` com aquele lançamento; o lançamento sai do jogo.
 2. **Lançamentos candidatos:** débito (`valor < 0`) de conta BANK não PJ, data até hoje, sem natureza `neutro` (transferência própria, como hoje), não vinculado.
-3. **Por favorecido:** compromissos em ordem de (`vencimento_util`, `id`). Cada um pega, entre os candidatos livres na janela (`vencimento_util - janela_antes_dias` até hoje) cuja descrição contém alguma `extrato_chaves` ou, se é fatura, o nome do cartão num pagamento de fatura (`_casa_emissor`, mantido), o de data mais próxima do `vencimento_util`; empate, o de id menor. A ordem por vencimento faz o Pix atrasado ficar com o mês vencido.
+3. **Por favorecido:** compromissos em ordem de (`vencimento_util`, `id`). Cada um pega, entre os candidatos livres na janela (`vencimento_util - janela_antes_dias` até hoje) cuja descrição contém alguma `extrato_chaves` ou, se é fatura, o nome do cartão num pagamento de fatura (`_casa_emissor`, mantido), escolhe primeiro o que encaixa no valor (seria `pago`), depois o de data mais próxima do `vencimento_util`, depois o de id menor. A ordem por vencimento faz o Pix atrasado ficar com o mês vencido.
 4. **Por valor**, para quem sobrou com valor: candidato livre na janela, que não contém chave de nenhum compromisso, com `|valor - pago| <= tolerancia_valor`; pagamento de fatura (`caixa.FATURA_RE`) só paga fatura. Mesma ordem e mesmo critério de proximidade.
 5. **Valor do casamento:** fixo ou confirmado (`valor_fonte` em `valores_do_mes`/`documento`/`fatura`): `|dif| <= tolerancia_fixo * valor` = `pago`; fora = `a_conferir` com motivo ("pago a menor: R$ x de R$ y"; fatura: "pago a menor (mínimo?)"; acima: "pago acima: ..."), e o vínculo não é gravado. Variável estimado ou sem valor: `pago` com qualquer valor.
 6. **Sem lançamento**, na ordem: fatura `PAID` = `pago` (método `banco`); baixa manual (Valor tipo `pago` da linha no mês) = `pago` (`manual:<id>`, como hoje); `forma == "debito_automatico"` = `aberto`; venceu e extrato parado (`_parada`, mantida) = `a_conferir`; venceu = `atrasado`; senão `aberto`.
@@ -67,7 +67,7 @@ A lista exata sai de `grep -rn "previsto\|debito_automatico\|juros"` no plano.
 - Suíte inteira verde (pytest e vitest), lendo o resumo do pytest.
 
 ## Pronto quando
-1. `conciliacao.py` + `compromissos.py` com cerca de 320 linhas no total (hoje 585).
+1. `conciliacao.py` + `compromissos.py` menores que os 585 de antes: ficaram em 394 linhas (-33%); a meta de ~320 foi abandonada porque cortar mais prejudicava a leitura (revisado e aceito).
 2. Suíte verde.
-3. Lista da comparação conferida pelo Ricardo, sem compromisso pago virando atrasado no mês corrente sem motivo aceito.
+3. Lista da comparação conferida pelo Ricardo (feito em 23/10: 0 diferenças), sem compromisso pago virando atrasado no mês corrente sem motivo aceito.
 4. Instalado, e a rodada de extratos seguinte com `conferida=True` e a tela A pagar abrindo.
