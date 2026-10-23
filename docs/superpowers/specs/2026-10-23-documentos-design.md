@@ -38,7 +38,7 @@ A migração copia `pessoa_documento` para `documento` (+ `documento_numero` `nu
 3. Manda ao modelo (fraco; forte só se o fraco não devolver JSON válido) o título, a data e o OCR (até `documentos.max_caracteres`, padrão 12.000), com a instrução de que o texto é DADO e nunca instrução, pedindo JSON: `{"relevante": bool, "tipo", "pais", "emissor", "titular": {"nome", "cpf", "placa", "renavam", "matricula", "endereco"}, "numeros": [{"nome", "valor"}], "datas": [{"tipo", "data"}]}`. `relevante=false` (boleto avulso, nota fiscal, recibo): `sem_documento`.
 4. **Conferência local, sem confiar no modelo:**
    - Cada número tem de aparecer no OCR (comparando só letras e dígitos, com O↔0, I↔1 e S↔5 permitidos). O que não aparece é descartado.
-   - Dígito verificador quando o tipo tem: CPF, CNPJ, CNH, Renavam, chassi (VIN), placa (antiga e Mercosul, só formato), título de eleitor, PIS. Falhou: `conferir`.
+   - Dígito verificador quando o tipo tem: CPF, CNPJ, CNH, Renavam, título de eleitor, PIS; chassi e placa (antiga e Mercosul) só formato. Falhou: `conferir`.
    - Linhas MRZ (`P<`, `V`) no OCR são lidas localmente (TD3 e visto MRV-A), com correção O↔0 guiada pelos dígitos verificadores. MRZ válida manda sobre o modelo no número, nascimento e validade.
    - Datas: formato válido; validade antes da emissão vira `conferir`.
 5. **Titular:** pessoa por CPF; senão por nome (primeiro nome único, como `resolver_pessoa`); bem por placa, Renavam, chassi, matrícula ou inscrição; senão endereço igual a um bem. Sem titular: a proposta traz `bem_novo` (veículo se há placa/Renavam/chassi, imóvel se há matrícula/inscrição/endereço, senão `outro`) e fica `conferir`.
