@@ -176,116 +176,6 @@ def _comprovante():
             "Instituicao: Itau\nAgencia: 1234\nConta: 56789-0\n")
 
 
-# ---------------- cenários completos: gerar compromissos + conciliar com o extrato ----------------
-def _L(id_, nome, extrato, venc, tipo="fixo", padrao=None, forma="", apelidos=(), cartao="", conta="", ajuste="adia", n=2, **kw):
-    return {"id": id_, "nome": nome, "extrato": extrato, "apelidos": list(apelidos), "vencimento": venc, "ajuste_dia_util": ajuste,
-            "valor_tipo": tipo, "valor_padrao": padrao, "forma": forma, "conta": conta, "cartao": cartao, "documento": "", "pix": "",
-            "ativo": True, "valido_de": None, "valido_ate": None, "linha_planilha": n, **kw}
-
-
-def _entrada_base():
-    return {
-        "hoje": "2026-10-08", "agora": "2026-10-08T15:00:00-03:00",
-        "params": {"janela_antes_dias": 10, "tolerancia_fixo": 0.01, "tolerancia_juros": 0.10, "tolerancia_valor": 1.0, "horas_conta_parada": 24},
-        "linhas": [
-            _L("aluguel", "Aluguel", "IMOBILIARIA SUL", "dia:5", padrao=2000.0, forma="pix", n=2),
-            _L("energia", "Energia", "ENEL", "dia:15", tipo="variavel", forma="boleto", apelidos=["ENEL DISTRIB"], n=3),
-            _L("netflix", "Netflix", "NETFLIX", "dia:10", padrao=55.9, forma="debito_automatico", n=4),
-            _L("cartao-itau", "Cartão Itaú", "ITAU CARTAO", "dia:20", tipo="variavel", forma="fatura", cartao="Cartao Itau", n=5),
-            _L("condominio", "Condomínio", "CONDOMINIO BELA VISTA", "dia:8", padrao=800.0, forma="boleto", n=6),
-            _L("escola", "Escola", "COLEGIO HORIZONTE", "5du", padrao=3000.0, forma="boleto", n=7),
-            _L("iptu", "IPTU", "PREFEITURA IPTU", "dia:1", padrao=500.0, forma="boleto", n=8),
-        ],
-        "valores": [{"mes": "2026-10", "compromisso": "energia", "tipo": "valor", "valor": 230.5, "vencimento": "2026-10-15",
-                     "data_pagamento": None, "origem": "boleto", "linha_planilha": 2}],
-        "docs": [{"id": 11, "titulo": "ENEL DISTRIBUICAO SP", "tipo_documento": None, "cnpj": None, "valor": 231.0,
-                  "vencimento": "2026-10-15", "texto": "conta de luz"},
-                 {"id": 12, "titulo": "DENTISTA SORRISO LTDA", "tipo_documento": None, "cnpj": None, "valor": 150.0,
-                  "vencimento": "2026-10-20", "texto": "boleto avulso"}],
-        "tx": [
-            _TX("t1", "a1234", "BANK", "2026-10-05", "PIX ENVIADO IMOBILIARIA SUL", -2000.0),
-            _TX("t2", "a1234", "BANK", "2026-10-07", "BOLETO COLEGIO HORIZONTE", -3010.0),
-            _TX("t3", "a1234", "BANK", "2026-09-05", "PIX ENVIADO IMOBILIARIA SUL", -2000.0),
-            _TX("t4", "a1234", "BANK", "2026-09-14", "BOLETO ENEL DISTRIBUICAO", -215.4),
-            _TX("t5", "a1234", "BANK", "2026-09-10", "DEBITO AUTOMATICO NETFLIX", -55.9),
-            _TX("t6", "a1234", "BANK", "2026-09-22", "PAGAMENTO FATURA ITAU CARTAO", -742.1),
-            _TX("t7", "a1234", "BANK", "2026-10-02", "SUPERMERCADO DO BAIRRO", -180.0),
-        ],
-        "contas": [{"account_id": "a1234", "tipo": "BANK", "nome": "Conta C6", "banco": "C6 Bank", "vencimento": None},
-                   {"account_id": "c9999", "tipo": "CREDIT", "nome": "Cartao Itau", "banco": "Itau", "vencimento": "2026-10-20"}],
-        "faturas": [{"id": "f1", "account_id": "c9999", "vencimento": "2026-10-20", "total": 800.25, "payment_status": "OPEN"}],
-        "conta_estado": [{"account_id": "a1234", "banco": "C6 Bank", "nome": "Conta C6", "tipo": "BANK", "pj": 0,
-                          "ult_tx_real": "2026-10-07", "ult_sync_ok": "2026-10-08T14:00:00-03:00"}],
-        "anterior": [], "vinculos": {}, "donos": [],
-    }
-
-
-def _TX(i, aid, tipo, data, desc, valor, cat=None, natureza="caixa+custo"):
-    return {"id": i, "account_id": aid, "tipo_conta": tipo, "data": data, "descricao": desc, "valor": valor, "categoria": cat, "natureza": natureza}
-
-
-def _variar(nome, e):
-    if nome == "juros_e_a_menor":
-        e["tx"] += [_TX("t8", "a1234", "BANK", "2026-10-08", "BOLETO CONDOMINIO BELA VISTA", -840.0),  # +5%: pago com juros
-                    ]
-        e["tx"][1]["valor"] = -1500.0                                                                  # escola paga a menor
-    elif nome == "atrasado_e_conta_parada":
-        e["conta_estado"][0]["ult_sync_ok"] = "2026-10-05T10:00:00-03:00"                              # extrato parado há dias
-    elif nome == "fatura_paga_pelo_emissor":
-        e["linhas"][3]["vencimento"] = "dia:12"            # o pagamento precisa estar na janela de 10 dias do vencimento
-        e["linhas"][3]["extrato"] = "FATURA 9999"          # o extrato não casa pelo favorecido: só pelo nome do cartão (emissor)
-        e["faturas"][0]["vencimento"] = "2026-10-12"
-        e["tx"].append(_TX("t9", "a1234", "BANK", "2026-10-07", "PAGAMENTO FATURA CARTAO ITAU", -800.0))
-    elif nome == "baixa_manual":
-        e["valores"].append({"mes": "2026-10", "compromisso": "iptu", "tipo": "pago", "valor": None, "vencimento": None,
-                             "data_pagamento": "2026-10-03", "origem": "manual", "linha_planilha": 9})
-    elif nome == "vinculo_persistido":
-        e["vinculos"] = {"t7": "condominio:2026-10"}
-    elif nome == "valor_ja_confirmado_nao_volta":
-        e["anterior"] = [{"id": "energia:2026-10", "valor": 229.9, "valor_fonte": "documento"}]
-        e["valores"] = []
-        e["docs"] = []
-    elif nome == "conta_pj_e_transferencia_propria":
-        e["conta_estado"].append({"account_id": "pj77", "banco": "C6 PJ", "nome": "Conta PJ", "tipo": "BANK", "pj": 1,
-                                  "ult_tx_real": "2026-10-07", "ult_sync_ok": "2026-10-08T14:00:00-03:00"})
-        e["tx"].append(_TX("t10", "pj77", "BANK", "2026-10-06", "PIX ENVIADO IMOBILIARIA SUL", -2000.0))  # PJ não paga conta pessoal
-        e["tx"].append(_TX("t11", "a1234", "BANK", "2026-10-06", "PIX ENVIADO RICARDO TESTE", -500.0, natureza="neutro"))
-    return e
-
-
-CENARIOS = ["base", "juros_e_a_menor", "atrasado_e_conta_parada", "fatura_paga_pelo_emissor", "baixa_manual",
-            "vinculo_persistido", "valor_ja_confirmado_nao_volta", "conta_pj_e_transferencia_propria"]
-
-
-def _w_cenario(nome):
-    f, comp, conc = _mod("finlib"), _mod("compromissos"), _mod("conciliacao")
-    e = _variar(nome, _entrada_base())
-    c = sqlite3.connect(":memory:")
-    c.row_factory = sqlite3.Row
-    c.executescript(f.SCHEMA)
-    for t in e["tx"]:
-        c.execute("insert into tx(id,account_id,tipo_conta,data,descricao,valor,categoria,natureza,raw) values (?,?,?,?,?,?,?,?,?)",
-                  (t["id"], t["account_id"], t["tipo_conta"], t["data"], t["descricao"], t["valor"], t["categoria"], t["natureza"], "{}"))
-    for k in e["contas"]:
-        c.execute("insert into contas(ts,account_id,tipo,nome,banco,saldo,limite,disponivel,vencimento) values ('2026-10-08T07:00',?,?,?,?,0,NULL,NULL,?)",
-                  (k["account_id"], k["tipo"], k["nome"], k["banco"], k["vencimento"]))
-    for x in e["faturas"]:
-        c.execute("insert into faturas(id,account_id,vencimento,total,minimo,raw) values (?,?,?,?,?,?)",
-                  (x["id"], x["account_id"], x["vencimento"], x["total"], None, json.dumps({"payment_status": x["payment_status"]})))
-    for k in e["conta_estado"]:
-        c.execute("insert into conta_estado(account_id,banco,nome,tipo,pj,ult_tx_real,ult_sync_ok,status_conexao,saldo,atualizado_em) values (?,?,?,?,?,?,?,?,?,?)",
-                  (k["account_id"], k["banco"], k["nome"], k["tipo"], k["pj"], k["ult_tx_real"], k["ult_sync_ok"], "OK", 0, "2026-10-08"))
-    for a in e["anterior"]:
-        c.execute("insert into compromissos(id,valor,valor_fonte) values (?,?,?)", (a["id"], a["valor"], a["valor_fonte"]))
-    hoje, agora = _data(e["hoje"]), dt.datetime.fromisoformat(e["agora"])
-    invalidas = []
-    comps = comp.gerar(c, {"linhas": e["linhas"], "valores": e["valores"], "params": e["params"]}, e["docs"], hoje, invalidas)
-    estado = {k["account_id"]: {kk: k[kk] for kk in ("tipo", "pj", "banco", "nome", "ult_sync_ok", "ult_tx_real")} for k in e["conta_estado"]}
-    donos = f.dono_tokens(e["donos"]) if e["donos"] else None
-    res, novos = conc.conciliar(comps, e["tx"], e["vinculos"], estado, e["valores"], e["params"], hoje, agora, donos)
-    return {"entrada": e, "invalidas": invalidas, "comps": comps, "conciliacao": {"res": res, "novos": novos}}
-
-
 def _bruto_planilha():
     cab = ["id", "nome", "extrato", "apelidos", "vencimento", "ajuste_dia_util", "valor_tipo", "valor_padrao", "forma", "conta", "cartao",
            "documento", "pix", "ativo", "valido_de", "valido_ate", "obs"]
@@ -393,7 +283,6 @@ def casos():
             {"fn": "ler_comprovante_pix", "args": [""]},
         ],
         "planilha": [{"fn": "_w_validar", "args": [v]} for v in ("completa", "sem_colunas", "vazia")],
-        "cenarios": [{"fn": "_w_cenario", "args": [n]} for n in CENARIOS],
         "emissores": [
             *[{"fn": "chave_extrato", "args": [s]} for s in ["Padaria São João Ltda", None, "", "ENEL DISTRIBUIÇÃO", "PIX ENVIADO JOAO"]],
             *[{"fn": "generica", "args": [s]} for s in ["BOLETO", "FATURA 2026", "11222333000181", "CONTA DE LUZ", None, "ENEL DISTRIBUICAO SP"]],

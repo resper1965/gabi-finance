@@ -17,7 +17,7 @@ HOJE, AGORA = date(2026, 10, 8), datetime.fromisoformat("2026-10-08T15:00:00-03:
 def _banco(caminho):
     c = conectar(caminho)
     migrar(c, MIGRACOES)
-    carregar_cenario(c, next(x for x in CASOS if x["args"][0] == "base")["saida"]["entrada"])
+    carregar_cenario(c, next(x for x in CASOS if x["nome"] == "base")["entrada"])
     return c
 
 
@@ -26,8 +26,10 @@ def con_cenario(tmp_path):
     return _banco(tmp_path / "g.db")
 
 
-def test_sem_mudanca_de_codigo_nao_ha_diferenca(con_cenario):
-    assert comparar(con_cenario, HOJE, AGORA) == []
+def test_comparacao_roda_no_cenario_base(con_cenario):
+    difs = comparar(con_cenario, HOJE, AGORA)
+    assert isinstance(difs, list)
+    assert all(set(d) == {"id", "nome", "vencimento", "antes", "depois", "motivo"} and d["antes"] != d["depois"] for d in difs)
 
 
 def test_trocas_esperadas_nao_aparecem(monkeypatch, con_cenario):

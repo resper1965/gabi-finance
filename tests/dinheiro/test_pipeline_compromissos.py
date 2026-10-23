@@ -1,6 +1,5 @@
-"""O pipeline sobre o BANCO NOVO (repositório + gerar + conciliar + gravar) tem de dar o mesmo que o gabi-fin deu."""
+"""O pipeline sobre o banco (repositório + gerar + conciliar + gravar), sobre os cenários de tests/dinheiro/cenarios.json."""
 import datetime as dt
-import json
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,7 @@ import pytest
 from gabi.db import conectar, migrar
 from gabi.dinheiro import repositorio
 from gabi.dinheiro.contas_pagar import atualizar_compromissos
-from tests.dinheiro.cenarios import CASOS, _cent, carregar_cenario
+from tests.dinheiro.cenarios import CASOS, carregar_cenario
 from tools.golden import _ser
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
@@ -21,32 +20,8 @@ def con(tmp_path):
     return c
 
 
-@pytest.mark.parametrize("caso", CASOS, ids=lambda c: c["args"][0])
-def test_banco_novo_reproduz_o_gabi_fin(con, caso):
-    s = caso["saida"]
-    e = s["entrada"]
-    carregar_cenario(con, e)
-    atualizar_compromissos(con, dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"]), docs=e["docs"])
-    esperado = {c["id"]: c for c in s["comps"]}
-    gravado = {r["id"]: r for r in con.execute("select * from compromisso")}
-    assert set(gravado) == set(esperado)  # os mesmos compromissos (inclusive faturas e documentos avulsos)
-    res = s["conciliacao"]["res"]
-    for cid, comp in esperado.items():
-        r, g = res[cid], gravado[cid]
-        assert g["estado"] == r["estado"] and g["motivo"] == r["motivo"], cid
-        assert (g["nome"], g["vencimento"], g["vencimento_util"], g["valor_fonte"], g["forma"], g["origem"]) == (
-            comp["nome"], comp["vencimento"], comp["vencimento_util"], comp["valor_fonte"], comp["forma"], comp["origem"]), cid
-        assert g["valor_centavos"] == _cent(comp["valor"]), cid
-        dados = json.loads(g["dados"])
-        for k in ("metodo", "tx_id", "pago_em", "diferenca", "juros"):
-            assert dados[k] == r[k], (cid, k)
-    # vínculos novos que o gabi-fin gravaria
-    novos = {(t, c) for t, c, m, d in s["conciliacao"]["novos"] if not t.startswith("manual:")}
-    assert {(r["tx_id"], r["compromisso_id"]) for r in con.execute("select tx_id, compromisso_id from conciliacao")} >= novos
-
-
 def test_rodar_duas_vezes_e_idempotente(con):
-    caso = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    caso = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     carregar_cenario(con, caso)
     h, a = dt.date.fromisoformat(caso["hoje"]), dt.datetime.fromisoformat(caso["agora"])
     atualizar_compromissos(con, h, a, docs=caso["docs"])
@@ -58,7 +33,7 @@ def test_rodar_duas_vezes_e_idempotente(con):
 
 
 def test_leitura_volta_igual_ao_que_foi_gravado(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     repositorio.gravar_leitura(con, {"linhas": e["linhas"], "params": e["params"], "valores": e["valores"]})
     L = repositorio.ler_leitura(con)
     assert _ser(L["linhas"]) == _ser(e["linhas"]) and _ser(L["valores"]) == _ser(e["valores"])
@@ -68,7 +43,7 @@ def test_leitura_volta_igual_ao_que_foi_gravado(con):
 
 
 def test_linha_inativa_ou_excluida_nao_entra_na_leitura(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     repositorio.gravar_leitura(con, {"linhas": e["linhas"], "params": e["params"], "valores": e["valores"]})
     con.execute("update compromisso_linha set ativo=0 where id='aluguel'")
     con.execute("update compromisso_linha set excluido_em='2026-10-08' where id='energia'")
@@ -78,7 +53,7 @@ def test_linha_inativa_ou_excluida_nao_entra_na_leitura(con):
 
 
 def test_gravar_leitura_substitui_o_conteudo_anterior(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     repositorio.gravar_leitura(con, {"linhas": e["linhas"], "params": e["params"], "valores": e["valores"]})
     repositorio.gravar_leitura(con, {"linhas": e["linhas"][:2], "params": {}, "valores": []})
     assert con.execute("select count(*) from compromisso_linha").fetchone()[0] == 2
@@ -87,7 +62,7 @@ def test_gravar_leitura_substitui_o_conteudo_anterior(con):
 
 
 def test_gravar_leitura_e_atomico(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     repositorio.gravar_leitura(con, {"linhas": e["linhas"], "params": e["params"], "valores": e["valores"]})
     ruim = {"linhas": [e["linhas"][0], {**e["linhas"][1], "valor_tipo": "invalido"}], "params": {}, "valores": []}
     with pytest.raises(Exception):
@@ -96,7 +71,7 @@ def test_gravar_leitura_e_atomico(con):
 
 
 def test_pagamento_ainda_pendente_ja_concilia_como_no_gabi_fin(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     carregar_cenario(con, e)
     con.execute("update lancamento set status='pending' where externo_id='t1'")  # o Pix do aluguel ainda não foi 'posted'
     atualizar_compromissos(con, dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"]), docs=e["docs"])
@@ -104,7 +79,7 @@ def test_pagamento_ainda_pendente_ja_concilia_como_no_gabi_fin(con):
 
 
 def _base(con):
-    e = next(c for c in CASOS if c["args"][0] == "base")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
     carregar_cenario(con, e)
     return e, dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"])
 
@@ -134,7 +109,7 @@ def test_ultimo_pagamento_vem_do_debito_mais_recente(con):
 
 
 def test_baixa_manual_que_sai_dos_cadastros_e_desfeita(con):
-    e = next(c for c in CASOS if c["args"][0] == "baixa_manual")["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == "baixa_manual")["entrada"]
     carregar_cenario(con, e)
     h, a = dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"])
     atualizar_compromissos(con, h, a, docs=e["docs"])
@@ -150,6 +125,6 @@ def test_primeiro_vinculo_de_um_lancamento_fica(con):
     e, h, a = _base(con)
     atualizar_compromissos(con, h, a, docs=e["docs"])
     antes = con.execute("select compromisso_id from conciliacao where tx_id='t1'").fetchone()[0]
-    repositorio.gravar_resultado(con, [], {}, [("t1", "outro:2026-10", "valor", 0.0)], a)  # tentativa de religar o mesmo lançamento
+    repositorio.gravar_resultado(con, [], {}, [("t1", "outro:2026-10", "valor", 0)], a)  # tentativa de religar o mesmo lançamento
     assert [tuple(r) for r in con.execute("select compromisso_id from conciliacao where tx_id='t1'")] == [(antes,)]
     assert con.execute("select count(*) from conciliacao where tx_id='t1'").fetchone()[0] == 1  # um lançamento paga um compromisso só

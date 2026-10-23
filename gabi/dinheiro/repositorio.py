@@ -1,6 +1,7 @@
-"""Ponte entre o banco e a lógica portada do gabi-fin (gerar/conciliar). TODO o SQL da conciliação vive aqui.
+"""Ponte entre o banco e gerar/conciliar. TODO o SQL da conciliação vive aqui.
 
-A lógica portada trabalha em reais (float) como no gabi-fin; o banco guarda centavos (R7). A conversão acontece só nesta fronteira.
+O banco guarda centavos (R7) e gerar/conciliar trabalham em centavos: FontesBanco, txs_para_conciliar e gravar_resultado
+não convertem. Os Cadastros (gravar_leitura/ler_leitura) e a FonteAnalise ainda falam reais; a conversão fica nelas.
 Consome: db (compromisso_linha, parametro, valor_do_mes, lancamento, conta, fatura, conta_estado, compromisso, conciliacao).
 """
 import datetime as dt
@@ -83,21 +84,21 @@ class FontesBanco:
         self.con = con
 
     def debitos(self, hoje: dt.date):
-        """Débitos de conta BANK não-PJ até hoje (inclui pendentes, como o gabi-fin), mais recentes primeiro: (descricao, valor, data, account_id, id)."""
+        """Débitos de conta BANK não-PJ até hoje (inclui pendentes), mais recentes primeiro: (descricao, valor_centavos, data, account_id, id)."""
         rows = self.con.execute(
             "select l.descricao_original, l.valor_centavos, l.data, c.externo_id, l.externo_id from lancamento l join conta c on c.id=l.conta_id "
             "where c.tipo='BANK' and l.valor_centavos<0 and substr(l.data,1,10)<=? and c.pj=0 "
             "order by l.data desc, l.externo_id", (hoje.isoformat(),)).fetchall()
-        return [(r[0], _real(r[1]), r[2], r[3], r[4]) for r in rows]
+        return [tuple(r) for r in rows]
 
     def faturas(self):
         return [{"account_id": r["account_id"], "nome": r["nome"] or "", "vencimento": r["vencimento"][:10],
-                 "total": _real(r["total_centavos"]), "status": r["pagamento_status"]}
+                 "total_centavos": r["total_centavos"], "status": r["pagamento_status"]}
                 for r in self.con.execute("select f.account_id, c.apelido as nome, f.vencimento, f.total_centavos, f.pagamento_status "
                                           "from fatura f left join conta c on c.id=f.conta_id where f.vencimento is not null and f.vencimento<>''")]
 
     def anterior(self):
-        return {r["id"]: (_real(r["valor_centavos"]), r["valor_fonte"]) for r in self.con.execute("select id, valor_centavos, valor_fonte from compromisso")}
+        return {r["id"]: (r["valor_centavos"], r["valor_fonte"]) for r in self.con.execute("select id, valor_centavos, valor_fonte from compromisso")}
 
 
 # ---------------- o que o `conciliar` lê do banco ----------------
@@ -109,7 +110,7 @@ def txs_para_conciliar(con, hoje: dt.date) -> list[dict]:
                          "from lancamento l join conta c on c.id=l.conta_id order by l.data, l.externo_id"):
         if r["data"] >= desde or r["externo_id"] in ligados:
             saida.append({"id": r["externo_id"], "account_id": r["conta"], "tipo_conta": r["tipo"], "data": r["data"],
-                          "descricao": r["descricao_original"], "valor": _real(r["valor_centavos"]), "categoria": r["categoria_banco"],
+                          "descricao": r["descricao_original"], "valor_centavos": r["valor_centavos"], "categoria": r["categoria_banco"],
                           "natureza": r["natureza"]})
     return saida
 
@@ -146,13 +147,13 @@ def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime) 
                 "insert or replace into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, "
                 "account_id, estado, motivo, dados, atualizado_em) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (comp["id"], comp.get("origem"), comp.get("linha_id"), comp.get("nome"), comp.get("vencimento"), comp.get("vencimento_util"),
-                 _cent(comp.get("valor")), comp.get("valor_fonte"), comp.get("forma"), comp.get("account_id"), r["estado"], r.get("motivo"),
+                 comp.get("valor_centavos"), comp.get("valor_fonte"), comp.get("forma"), comp.get("account_id"), r["estado"], r.get("motivo"),
                  json.dumps(dados, ensure_ascii=False), ts))
             if f"manual:{comp['id']}" not in manuais:
                 con.execute("delete from conciliacao where tx_id=?", (f"manual:{comp['id']}",))
         for tx_id, comp_id, metodo, dif in novos_vinculos:
             con.execute("insert or ignore into conciliacao(tx_id, compromisso_id, metodo, diferenca_centavos, criado_em) values (?,?,?,?,?)",
-                        (tx_id, comp_id, metodo, _cent(dif), ts))
+                        (tx_id, comp_id, metodo, dif, ts))
         con.execute("commit")
     except BaseException:
         con.execute("rollback")

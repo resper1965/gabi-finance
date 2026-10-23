@@ -174,7 +174,7 @@ def test_caixa_unico_sem_contas(con):
 
 # ---------------- baixa manual ----------------
 def _base(con, nome="base"):
-    e = next(c for c in CASOS if c["args"][0] == nome)["saida"]["entrada"]
+    e = next(c for c in CASOS if c["nome"] == nome)["entrada"]
     carregar_cenario(con, e)
     return e, dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"])
 

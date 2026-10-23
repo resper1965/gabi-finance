@@ -1,11 +1,11 @@
-"""Cenários golden (tests/golden/cenarios.json) e o carregador que os põe nas tabelas novas."""
+"""Cenários (tests/dinheiro/cenarios.json: [{"nome", "entrada"}]) e o carregador que os põe nas tabelas novas."""
 import json
 from pathlib import Path
 
 from gabi.dinheiro import repositorio
 from gabi.dinheiro.valor import para_centavos
 
-CASOS = json.loads((Path(__file__).parent.parent / "golden" / "cenarios.json").read_text(encoding="utf-8"))
+CASOS = json.loads((Path(__file__).parent / "cenarios.json").read_text(encoding="utf-8"))
 
 
 def _cent(v):
