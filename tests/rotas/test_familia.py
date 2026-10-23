@@ -11,6 +11,7 @@ from gabi.api import criar_app
 from gabi.db import conectar, migrar
 from gabi.familia import contato as ct
 from gabi.familia import documentos as dc
+from tests.familia.apoio import doc_pessoa
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 BOSS = {"Tailscale-User-Login": "boss@x.com"}
@@ -28,8 +29,7 @@ def banco(tmp_path):
     adicionar(c, "boss@x.com", "p1", "boss", por="t")
     adicionar(c, "vip@x.com", "p2", "familia_vip", por="t")
     c.execute("insert into pessoa(id, nome, papel, dados) values ('lia','Lia','filha', ?)", (json.dumps({"apelido": "Lilica"}),))
-    c.execute("insert into pessoa_documento(pessoa_id, tipo, pais, numero, validade, paperless_id, origem, criado_em, atualizado_em)"
-              " values ('lia','cpf','BR',?,'2026-12-01',7,'carga','2026-10-01','2026-10-01')", (NUM,))
+    doc_pessoa(c, "lia", "cpf", NUM, validade="2026-12-01", paperless_id=7, origem="carga", criado_em="2026-10-01", atualizado_em="2026-10-01")
     c.close()
     return b
 
@@ -82,7 +82,7 @@ def test_propostas_listar_e_decidir(cli, banco):
     assert r.status_code == 200 and r.json()["dados"]["estado"] == "aprovada"
     assert _post(cli, f"/api/v1/familia/propostas/{pid}/decisao", {"estado": "recusada"}).status_code == 409
     assert _post(cli, "/api/v1/familia/propostas/999/decisao", {"estado": "recusada"}).status_code == 404
-    assert conectar(banco).execute("select quem from decisao where origem='familia' order by id desc limit 1").fetchone()[0] == "boss@x.com"
+    assert conectar(banco).execute("select quem from decisao where origem='documentos' order by id desc limit 1").fetchone()[0] == "boss@x.com"
 
 
 def test_historico_e_desfazer(cli, banco):

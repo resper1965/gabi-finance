@@ -8,6 +8,7 @@ from starlette.testclient import TestClient
 from gabi.db import conectar
 from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, ESCOPOS_HERMES, criar_mcp, ferramentas_do_token
 from gabi.mcp.tokens import emitir
+from tests.familia.apoio import doc_pessoa
 from tests.mcp.test_servidor import AGORA, HOST, banco, chamar, rpc  # noqa: F401  (fixtures e helpers)
 
 CPF = "52998224725"
@@ -22,10 +23,8 @@ def bancof(banco):
     c.execute("insert into pessoa(id, nome, dados) values ('ana','Ana',?)", (json.dumps({"apelido": "Aninha", "telefone": "+5511999990000"}),))
     c.execute("insert into pessoa(id, nome, dados) values ('anap','Ana Paula',?)", (json.dumps({"parentesco": "filha"}),))
     c.execute("insert into pessoa(id, nome, dados) values ('bia','Beatriz',?)", (json.dumps({}),))
-    c.execute("insert into pessoa_documento(pessoa_id, tipo, pais, numero, validade, origem, atualizado_em) values"
-              " ('ana','cpf','BR',?,null,'ricardo','2026-10-01T00:00:00Z')", (CPF,))
-    c.execute("insert into pessoa_documento(pessoa_id, tipo, pais, numero, validade, origem, atualizado_em) values"
-              " ('ana','passaporte','BR',?,'2027-03-10','ricardo','2026-10-01T00:00:00Z')", (PASSAPORTE,))
+    doc_pessoa(c, "ana", "cpf", CPF, origem="ricardo")
+    doc_pessoa(c, "ana", "passaporte", PASSAPORTE, validade="2027-03-10", origem="ricardo")
     c.close()
     return banco
 
@@ -72,7 +71,7 @@ def test_docstrings_avisam_dado_de_terceiros_e_nunca_em_resumos(clif, tokf):
 def test_sem_escopo_familia(clif, tokf, bancof, nome, args):
     assert chamar(clif, tokf["fin"], nome, **args)["erro"] == "sem_escopo"
     c = conectar(bancof)
-    assert c.execute("select count(*) from pessoa_proposta").fetchone()[0] == 0
+    assert c.execute("select count(*) from familia_proposta").fetchone()[0] == 0
     assert c.execute("select count(*) from pessoa_historico").fetchone()[0] == 0
     assert c.execute("select count(*) from decisao where origem='familia'").fetchone()[0] == 0
 
@@ -134,9 +133,9 @@ def test_propor_documento_pendente_com_link(clif, tokf, bancof):
     c.execute("insert into parametro(chave, valor) values ('painel.url', ?)", (json.dumps("https://painel.x/"),))
     d = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="rg", numero="123456", emissor="", validade="")["dados"]
     assert d["estado"] == "pendente" and d["proposta_id"] and d["conferir"] is False and d["link"] == "https://painel.x/#cadastros/familia"
-    p = c.execute("select origem, emissor, validade, paperless_id from pessoa_proposta").fetchone()
+    p = c.execute("select origem, emissor, validade, paperless_id from familia_proposta").fetchone()
     assert (p["origem"], p["emissor"], p["validade"], p["paperless_id"]) == ("hermes", None, None, None)
-    assert c.execute("select count(*) from pessoa_documento where pessoa_id='bia'").fetchone()[0] == 0  # só propõe
+    assert c.execute("select count(*) from familia_documento where pessoa_id='bia'").fetchone()[0] == 0  # só propõe
 
 
 def test_propor_documento_cpf_invalido_conferir_sem_link_sem_parametro(clif, tokf):
@@ -157,4 +156,4 @@ def test_propor_documento_tipo_invalido_sem_numero_na_mensagem(clif, tokf):
 def test_propor_documento_numero_inteiro_vira_valor_invalido_sem_eco(clif, tokf, bancof):
     r = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="cpf", numero=1234567890)
     assert r["erro"] == "valor_invalido" and "1234567890" not in _texto(r)
-    assert conectar(bancof).execute("select count(*) from pessoa_proposta").fetchone()[0] == 0
+    assert conectar(bancof).execute("select count(*) from familia_proposta").fetchone()[0] == 0

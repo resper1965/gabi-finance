@@ -10,6 +10,7 @@ import yaml
 from gabi.db import conectar, migrar
 from gabi.familia import contato, documentos
 from tools import carga_familia as carga
+from tests.familia.apoio import doc_pessoa
 
 MIGRACOES = Path(__file__).parent.parent / "migrations"
 AGORA = dt.datetime(2026, 10, 23, 12, 0, tzinfo=dt.timezone.utc)
@@ -65,7 +66,7 @@ def con(tmp_path):
     c.execute("insert into pessoa(id, nome, dados) values ('bia','Bia Paula',?)", (json.dumps({"apelido": "Bia"}),))
     c.execute("insert into pessoa(id, nome, dados) values ('anap','Ana Clara',?)", (json.dumps({}),))
     for tipo, numero in (("cpf", "***.***.***-25"), ("passaporte", "AA****56")):
-        c.execute("insert into pessoa_documento(pessoa_id, tipo, numero, origem) values ('ana',?,?,'legado')", (tipo, numero))
+        doc_pessoa(c, "ana", tipo, numero)
     c.execute("insert into pet(id, nome, especie, dados) values ('rex','Rex','cachorro',?)",
               (json.dumps({"id": "rex", "nome": "Rex", "especie": "cachorro", "origem": "x"}),))
     c.execute("insert into pet(id, nome, especie, dados) values ('tom','Tom','cachorro',?)",
@@ -82,7 +83,7 @@ def _dados():
 
 
 def _props(con, pessoa="ana"):
-    return {r["tipo"]: dict(r) for r in con.execute("select * from pessoa_proposta where pessoa_id=? order by id", (pessoa,))}
+    return {r["tipo"]: dict(r) for r in con.execute("select * from familia_proposta where pessoa_id=? order by id", (pessoa,))}
 
 
 def _contar(con, tabela):
@@ -95,7 +96,7 @@ def test_yaml_liga_por_id_e_conta_sem_cadastro(con):
     r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
     assert r["pessoas_lidas"] == 3 and r["sem_cadastro"] == 1 and r["empresas_lidas"] == 1
     assert con.execute("select count(*) from pessoa where id='fantasma'").fetchone()[0] == 0
-    assert all(p["origem"] == "carga" for p in con.execute("select origem from pessoa_proposta"))
+    assert all(p["origem"] == "carga" for p in con.execute("select origem from familia_proposta"))
 
 
 def test_yaml_documentos_normaliza_tipo_e_campos(con):
@@ -111,13 +112,13 @@ def test_yaml_documentos_normaliza_tipo_e_campos(con):
 def test_yaml_substitui_mascarado(con):
     r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
     p = _props(con)
-    mascarados = {d["tipo"]: d["id"] for d in con.execute("select id, tipo from pessoa_documento where pessoa_id='ana'")}
+    mascarados = {d["tipo"]: d["id"] for d in con.execute("select id, tipo from familia_documento where pessoa_id='ana'")}
     assert p["cpf"]["documento_id"] == mascarados["cpf"] and p["cpf"]["conferir"] == 0
     assert p["passaporte"]["documento_id"] == mascarados["passaporte"]
     assert r["substituem_mascarado"] == 2
     documentos.decidir(con, p["cpf"]["id"], "aprovada", "ricardo", AGORA)
-    assert _contar(con, "pessoa_documento") == 2
-    assert con.execute("select numero from pessoa_documento where id=?", (mascarados["cpf"],)).fetchone()[0] == CPF_OK
+    assert _contar(con, "familia_documento") == 2
+    assert con.execute("select numero from familia_documento where id=?", (mascarados["cpf"],)).fetchone()[0] == CPF_OK
 
 
 def test_yaml_cpf_sem_dv_e_passaporte_sem_validade_conferir(con):
@@ -138,7 +139,7 @@ def test_yaml_data_iso_em_texto_e_invalida(con):
 
 
 def test_yaml_documento_igual_ao_ativo_nao_gera_proposta(con):
-    con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, emissor, origem) values ('bia','passaporte','CD654321','PF','ricardo')")
+    doc_pessoa(con, "bia", "passaporte", "CD654321", emissor="PF", origem="ricardo")
     carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
     assert "passaporte" not in _props(con, "bia")
 
@@ -204,14 +205,14 @@ def test_pets_e_obrigacoes_so_conferem(con):
 
 def test_rodar_duas_vezes_nao_duplica(con):
     carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
-    n = (_contar(con, "pessoa_proposta"), _contar(con, "pessoa_historico"), _contar(con, "decisao"))
+    n = (_contar(con, "familia_proposta"), _contar(con, "pessoa_historico"), _contar(con, "decisao"))
     r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
-    assert (_contar(con, "pessoa_proposta"), _contar(con, "pessoa_historico"), _contar(con, "decisao")) == n
+    assert (_contar(con, "familia_proposta"), _contar(con, "pessoa_historico"), _contar(con, "decisao")) == n
     assert r["propostas"] == 0 and r["contatos_gravados"] == 0 and r["empresa_campos"] == 0
 
 
 def test_sem_aplicar_nada_e_gravado(con):
-    antes = {t: _contar(con, t) for t in ("pessoa_proposta", "pessoa_historico", "decisao")}
+    antes = {t: _contar(con, t) for t in ("familia_proposta", "pessoa_historico", "decisao")}
     dados_antes = [tuple(x) for x in con.execute("select id, dados from pessoa union all select id, dados from empresa")]
     r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=False)
     assert r["propostas"] == 5 and r["contatos_gravados"] == 3
@@ -231,10 +232,10 @@ def test_main_simula_e_aplica_sem_mostrar_numero(tmp_path, con, capsys):
     assert carga.main(["--yaml", str(y), "--banco", str(banco), "--sem-ocr"]) == 0
     saida = capsys.readouterr()
     c = conectar(banco)
-    assert c.execute("select count(*) from pessoa_proposta").fetchone()[0] == 0
+    assert c.execute("select count(*) from familia_proposta").fetchone()[0] == 0
     assert carga.main(["--yaml", str(y), "--banco", str(banco), "--sem-ocr", "--aplicar"]) == 0
     saida2 = capsys.readouterr()
-    assert {r[0] for r in c.execute("select origem from pessoa_proposta")} == {"carga"}
+    assert {r[0] for r in c.execute("select origem from familia_proposta")} == {"carga"}
     tudo = saida.out + saida.err + saida2.out + saida2.err
     assert "propostas: 5" in tudo
     for segredo in ("529", "AB123456", "CD654321", "12345678901", "PT50", "Aninha", "Rua Exemplo", "98888"):
@@ -310,17 +311,17 @@ def test_ocr_completa_campo_vazio_e_diverge(con):
     r = carga.carregar_ocr(con, papel, AGORA, aplicar=True)
     p = _props(con, "bia")
     assert p["passaporte"]["validade"] == "2032-03-10" and p["passaporte"]["paperless_id"] == 11
-    yaml_cpf = con.execute("select * from pessoa_proposta where pessoa_id='bia' and tipo='cpf' and numero=?", (CPF_RUIM,)).fetchone()
+    yaml_cpf = con.execute("select * from familia_proposta where pessoa_id='bia' and tipo='cpf' and numero=?", (CPF_RUIM,)).fetchone()
     assert yaml_cpf["estado"] == "pendente"  # a proposta do yaml fica; a do OCR, diferente, sai conferir=1
-    ocr_cpf = con.execute("select * from pessoa_proposta where pessoa_id='bia' and tipo='cpf' and numero=?", (CPF_OK2,)).fetchone()
+    ocr_cpf = con.execute("select * from familia_proposta where pessoa_id='bia' and tipo='cpf' and numero=?", (CPF_OK2,)).fetchone()
     assert ocr_cpf["conferir"] == 1 and ocr_cpf["paperless_id"] == 12 and ocr_cpf["origem"] == "carga"
     assert r["paperless_lidos"] == 3 and r["ocr_sem_pessoa"] == 1
     assert {c["query"] for c in papel.chamadas} == set(carga.TERMOS)
 
 
 def test_ocr_divergente_do_ativo_conferir_e_igual_nao_propoe(con):
-    con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, validade, origem) values ('bia','passaporte','CD654321','2032-03-10','ricardo')")
-    con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, validade, paperless_id, origem) values ('bia','cnh','12345678901','2030-01-01',9,'ricardo')")
+    doc_pessoa(con, "bia", "passaporte", "CD654321", validade="2032-03-10", origem="ricardo")
+    doc_pessoa(con, "bia", "cnh", "12345678901", validade="2030-01-01", paperless_id=9, origem="ricardo")
     papel = PaperlessFalso([
         {"id": 21, "title": "Passaporte Bia Paula", "content": "PASSAPORTE CD654321 validade 11/04/2033"},
         {"id": 22, "title": "CNH Bia Paula", "content": "registro 12345678901 validade 01/01/2030"},
@@ -334,10 +335,10 @@ def test_ocr_divergente_do_ativo_conferir_e_igual_nao_propoe(con):
 def test_ocr_sem_aplicar_nao_grava_e_duas_vezes_nao_duplica(con):
     papel = PaperlessFalso([{"id": 31, "title": "Passaporte Bia Paula", "content": "PASSAPORTE EF111222 validade 25/03/2031"}])
     r = carga.carregar_ocr(con, papel, AGORA, aplicar=False)
-    assert r["propostas"] == 1 and _contar(con, "pessoa_proposta") == 0
+    assert r["propostas"] == 1 and _contar(con, "familia_proposta") == 0
     carga.carregar_ocr(con, papel, AGORA, aplicar=True)
     r = carga.carregar_ocr(con, papel, AGORA, aplicar=True)
-    assert _contar(con, "pessoa_proposta") == 1 and r["propostas"] == 0
+    assert _contar(con, "familia_proposta") == 1 and r["propostas"] == 0
 
 
 def test_main_com_ocr_falso_so_contagens(tmp_path, con, capsys):
@@ -431,7 +432,7 @@ def test_ocr_ligado_so_pelo_corpo_sai_conferir(con):
         {"id": 52, "title": "Passaporte Bia Paula", "content": "PASSAPORTE GH333444 validade 25/03/2031"},
     ])
     carga.carregar_ocr(con, papel, AGORA, aplicar=True)
-    c = {r["numero"]: r["conferir"] for r in con.execute("select numero, conferir from pessoa_proposta where pessoa_id='bia'")}
+    c = {r["numero"]: r["conferir"] for r in con.execute("select numero, conferir from familia_proposta where pessoa_id='bia'")}
     assert c["EF111222"] == 1
     assert c["GH333444"] == 1  # outra proposta aberta do mesmo tipo: diverge
 
@@ -439,11 +440,11 @@ def test_ocr_ligado_so_pelo_corpo_sai_conferir(con):
 def test_ocr_ligado_so_pelo_corpo_sozinho(con):
     papel = PaperlessFalso([{"id": 53, "title": "Scan", "content": "PASSAPORTE EF111222 Bia Paula validade 25/03/2031"}])
     carga.carregar_ocr(con, papel, AGORA, aplicar=True)
-    assert con.execute("select conferir from pessoa_proposta where numero='EF111222'").fetchone()[0] == 1
+    assert con.execute("select conferir from familia_proposta where numero='EF111222'").fetchone()[0] == 1
     papel = PaperlessFalso([{"id": 54, "title": "Passaporte Bia Paula", "content": "PASSAPORTE JK555666 validade 25/03/2031"}])
-    con.execute("delete from pessoa_proposta")
+    con.execute("delete from documento_proposta")
     carga.carregar_ocr(con, papel, AGORA, aplicar=True)
-    assert con.execute("select conferir from pessoa_proposta where numero='JK555666'").fetchone()[0] == 0
+    assert con.execute("select conferir from familia_proposta where numero='JK555666'").fetchone()[0] == 0
 
 
 def test_main_erro_na_etapa_yaml_so_texto_fixo(tmp_path, con, capsys, monkeypatch):
@@ -461,10 +462,10 @@ def test_main_erro_na_etapa_yaml_so_texto_fixo(tmp_path, con, capsys, monkeypatc
 
 def test_rodar_de_novo_nao_repropoe_documento_recusado(con):
     carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
-    for (pid,) in con.execute("select id from pessoa_proposta where pessoa_id='ana' and tipo='cpf'").fetchall():
+    for (pid,) in con.execute("select id from familia_proposta where pessoa_id='ana' and tipo='cpf'").fetchall():
         documentos.decidir(con, pid, "recusada", "ricardo", AGORA)
     carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
-    assert con.execute("select count(*) from pessoa_proposta where pessoa_id='ana' and tipo='cpf'").fetchone()[0] == 1
+    assert con.execute("select count(*) from familia_proposta where pessoa_id='ana' and tipo='cpf'").fetchone()[0] == 1
 
 
 def test_rodar_de_novo_nao_regrava_contato_desfeito(con):
@@ -489,6 +490,6 @@ def test_ocr_proposta_aberta_de_outro_pais_nao_e_completada(con):
     documentos.propor(con, "bia", tipo="passaporte", numero="CD654321", pais="PT", origem="hermes", agora=AGORA)
     papel = PaperlessFalso([{"id": 11, "title": "Passaporte Bia Paula", "content": "PASSAPORTE CD654321 Date of expiry 10 MAR 2032"}])
     carga.carregar_ocr(con, papel, AGORA, aplicar=True)
-    pt = con.execute("select paperless_id from pessoa_proposta where pais='PT'").fetchone()
+    pt = con.execute("select paperless_id from familia_proposta where pais='PT'").fetchone()
     assert pt["paperless_id"] is None
-    assert con.execute("select count(*) from pessoa_proposta where pais='BR' and numero='CD654321' and paperless_id=11").fetchone()[0] == 1
+    assert con.execute("select count(*) from familia_proposta where pais='BR' and numero='CD654321' and paperless_id=11").fetchone()[0] == 1

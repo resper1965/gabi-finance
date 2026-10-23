@@ -9,6 +9,7 @@ import pytest
 from gabi.db import conectar, migrar
 from gabi.familia import fichas
 from gabi.familia.fichas import ErroFamilia
+from tests.familia.apoio import doc_pessoa, prop_pessoa
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 HOJE = dt.date(2026, 10, 22)
@@ -26,8 +27,7 @@ def _pessoa(con, pid, nome, **dados):
 
 
 def _doc(con, pid, tipo, numero, pais="BR", validade=None, emissao=None, emissor=None, origem="ricardo"):
-    return con.execute("insert into pessoa_documento(pessoa_id, tipo, pais, numero, emissor, emissao, validade, origem)"
-                       " values (?,?,?,?,?,?,?,?)", (pid, tipo, pais, numero, emissor, emissao, validade, origem)).lastrowid
+    return doc_pessoa(con, pid, tipo, numero, pais=pais, emissor=emissor, emissao=emissao, validade=validade, origem=origem)
 
 
 def test_listar_nao_traz_numero(con):
@@ -35,7 +35,7 @@ def test_listar_nao_traz_numero(con):
     _doc(con, "ana", "cpf", "11122233344")
     _doc(con, "ana", "rg", "999")
     gone = _doc(con, "ana", "cnh", "555")
-    con.execute("update pessoa_documento set excluido_em='2026-01-01' where id=?", (gone,))
+    con.execute("update documento set excluido_em='2026-01-01' where id=?", (gone,))
     r = fichas.listar(con)
     assert r == [{"id": "ana", "nome": "Ana", "apelido": "Aninha", "parentesco": None, "nascimento": "2000-01-02", "documentos_qtd": 2}]
     assert "11122233344" not in json.dumps(r)
@@ -58,8 +58,8 @@ def test_ficha_dois_passaportes_e_contatos(con):
 def test_divergencia_por_validade(con):
     _pessoa(con, "ana", "Ana")
     d = _doc(con, "ana", "passaporte", "BR1", validade="2027-01-01")
-    con.execute("insert into pessoa_proposta(pessoa_id, documento_id, tipo, numero, validade, origem) values ('ana',?,'passaporte','BR1','2031-01-01','hermes')", (d,))
-    con.execute("insert into pessoa_proposta(pessoa_id, documento_id, tipo, numero, validade, origem, estado) values ('ana',?,'passaporte','BR1','2035-01-01','hermes','recusada')", (d,))
+    prop_pessoa(con, "ana", "passaporte", "BR1", documento_id=d, validade="2031-01-01")
+    prop_pessoa(con, "ana", "passaporte", "BR1", documento_id=d, validade="2035-01-01", estado="recusada")
     assert fichas.ficha(con, "ana")["divergencias"] == [{"documento_id": d, "tipo": "passaporte", "campos": ["validade"]}]
 
 

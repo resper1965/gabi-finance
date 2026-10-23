@@ -164,3 +164,33 @@ def test_0080_normaliza_estados_antigos(tmp_path):
         c.execute("insert into compromisso(id, origem, nome, vencimento, estado) values (?,?,?,?,?)", (f"c{i}", "linha", f"c{i}", "2026-10-10", e))
     migrar(c, MIGRACOES)
     assert [r[0] for r in c.execute("select estado from compromisso order by id")] == ["aberto", "aberto", "aberto", "pago", "atrasado", "a_conferir"]
+
+
+def test_documentos_0081_tabelas_e_checks(con):
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert {"bem", "documento", "documento_numero", "documento_data", "documento_proposta", "documento_leitura"} <= nomes
+    con.execute("insert into bem(id, tipo, nome) values ('carro','veiculo','Carro')")
+    assert con.execute("select dados from bem").fetchone()[0] == "{}"
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into bem(id, tipo, nome) values ('x','barco','X')")
+    d = con.execute("insert into documento(titular_tipo, titular_id, tipo, origem) values ('bem','carro','crlv','leitura')").lastrowid
+    assert con.execute("select pais from documento where id=?", (d,)).fetchone()[0] == "BR"
+    for titular, origem in (("pet", "leitura"), ("bem", "email")):
+        with pytest.raises(sqlite3.IntegrityError):
+            con.execute("insert into documento(titular_tipo, titular_id, tipo, origem) values (?, 'carro', 'crlv', ?)", (titular, origem))
+    con.execute("insert into documento_data(documento_id, tipo, data) values (?, 'validade', '2030-01-01')", (d,))
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into documento_data(documento_id, tipo, data) values (?, 'validade', '2031-01-01')", (d,))  # uma por tipo
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into documento_data(documento_id, tipo, data) values (?, 'prazo', '2031-01-01')", (d,))
+    doc = '{"titular_tipo":"bem","titular_id":"carro"}'
+    con.execute("insert into documento_proposta(doc, origem) values (?, 'leitura')", (doc,))
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into documento_proposta(doc, origem) values ('nao json', 'leitura')")
+    for col, val in (("estado", "talvez"), ("origem", "email"), ("conferir", 2)):
+        cols = {"doc": doc, "origem": "leitura", col: val}
+        with pytest.raises(sqlite3.IntegrityError):
+            con.execute(f"insert into documento_proposta({','.join(cols)}) values ({','.join('?' * len(cols))})", tuple(cols.values()))
+    con.execute("insert into documento_leitura(paperless_id, estado, lido_em) values (1, 'lido', '2026-10-23T05:00:00Z')")
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("insert into documento_leitura(paperless_id, estado, lido_em) values (2, 'quebrado', '2026-10-23T05:00:00Z')")

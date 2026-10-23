@@ -1,5 +1,5 @@
 """Fichas da família: lista, ficha completa, resolução de nome, vencimentos e auditoria de leitura.
-Consome: pessoa (dados JSON), pessoa_documento e pessoa_proposta (migração 0077); grava em decisao (origem 'familia').
+Consome: pessoa (dados JSON), as visões familia_documento e familia_proposta (documentos de pessoa, migração 0081); grava em decisao (origem 'familia').
 O número do documento só sai por `ficha`; listas, vencimentos, erros e a auditoria nunca o levam."""
 import calendar
 import datetime as dt
@@ -54,7 +54,7 @@ def _nome_completo(r, d: dict) -> str | None:
 def listar(con) -> list[dict]:
     """Quem está no cadastro, sem número de documento."""
     qtd = {r["pessoa_id"]: r["n"] for r in con.execute(
-        "select pessoa_id, count(*) n from pessoa_documento where excluido_em is null group by pessoa_id")}
+        "select pessoa_id, count(*) n from familia_documento where excluido_em is null group by pessoa_id")}
     saida = []
     for r in con.execute("select id, nome, dados from pessoa where excluido_em is null order by nome collate nocase, id"):
         d = _dados(r)
@@ -69,7 +69,7 @@ def divergencias(con, pessoa_id: str) -> list[dict]:
     for p in con.execute(
             "select p.documento_id, p.tipo, p.emissao pe, p.validade pv, p.emissor pm, p.numero pn,"
             " d.emissao de, d.validade dv, d.emissor dm, d.numero dn"
-            " from pessoa_proposta p join pessoa_documento d on d.id=p.documento_id"
+            " from familia_proposta p join familia_documento d on d.id=p.documento_id"
             " where p.pessoa_id=? and p.estado='pendente' and d.excluido_em is null order by p.id", (pessoa_id,)):
         pares = {"emissao": (p["pe"], p["de"]), "validade": (p["pv"], p["dv"]),
                  "emissor": (p["pm"], p["dm"]), "numero": (p["pn"], p["dn"])}
@@ -90,7 +90,7 @@ def ficha(con, pessoa_id: str) -> dict:
     d = _dados(r)
     docs = [dict(x) for x in con.execute(
         "select id, tipo, pais, numero, emissor, emissao, validade, paperless_id, origem, atualizado_em"
-        " from pessoa_documento where pessoa_id=? and excluido_em is null order by id", (pessoa_id,))]
+        " from familia_documento where pessoa_id=? and excluido_em is null order by id", (pessoa_id,))]
     enderecos = d.get("enderecos")
     return {"id": r["id"], "nome": r["nome"], "nome_completo": _nome_completo(r, d), "apelido": d.get("apelido"),
             "parentesco": d.get("parentesco"), "nascimento": d.get("nascimento"),
@@ -133,7 +133,7 @@ def vencimentos(con, hoje: dt.date, meses: int) -> list[dict]:
     return [{"pessoa_id": r["pessoa_id"], "nome": r["nome"], "tipo": r["tipo"], "pais": r["pais"],
              "validade": r["validade"], "vencido": r["validade"] < hoje.isoformat()}
             for r in con.execute(
-                "select d.pessoa_id, p.nome, d.tipo, d.pais, d.validade from pessoa_documento d join pessoa p on p.id=d.pessoa_id"
+                "select d.pessoa_id, p.nome, d.tipo, d.pais, d.validade from familia_documento d join pessoa p on p.id=d.pessoa_id"
                 " where d.excluido_em is null and p.excluido_em is null and d.validade between ? and ?"
                 " order by d.validade, d.id", (ini, fim))]
 

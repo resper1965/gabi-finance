@@ -106,6 +106,6 @@ def registrar(srv, executar) -> None:
                 raise _erro(e) from None
             if prop is None:
                 return {"proposta_id": None, "estado": "ja_existe"}
-            l = con.execute("select estado, conferir from pessoa_proposta where id=?", (prop,)).fetchone()
+            l = con.execute("select estado, conferir from documento_proposta where id=?", (prop,)).fetchone()
             return _com_link(con, {"proposta_id": prop, "estado": l["estado"], "conferir": bool(l["conferir"])}, "#cadastros/familia")
         return executar("familia_propor_documento", f)

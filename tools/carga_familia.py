@@ -6,7 +6,7 @@ Sem `--aplicar` roda numa cópia do banco em memória e só conta. A saída são
 Rodar de novo não duplica nada nem desfaz decisões: número recusado não volta como proposta e contato da carga que foi
 desfeito não é gravado de novo.
 Consome: gabi.familia (documentos.propor, contato.atualizar/substituir, fichas), pessoa, pet, empresa, compromisso_fixo,
-pessoa_documento/pessoa_historico/pessoa_proposta (migração 0077), gabi.fontes.ponte (Paperless: docs, texto); grava em decisao
+familia_documento/familia_proposta (migração 0081), pessoa_historico (0077), gabi.fontes.ponte (Paperless: docs, texto); grava em decisao
 (origem 'familia'). Uso: python -m tools.carga_familia [--yaml CAMINHO] [--sem-ocr] [--aplicar] [--socket CAMINHO] [--banco CAMINHO]"""
 import argparse
 import datetime as dt
@@ -122,11 +122,11 @@ def _copia(con) -> sqlite3.Connection:
 
 
 def _max_proposta(con) -> int:
-    return con.execute("select coalesce(max(id), 0) from pessoa_proposta").fetchone()[0]
+    return con.execute("select coalesce(max(id), 0) from documento_proposta").fetchone()[0]
 
 
 def _contar_novas(con, desde: int, r: dict) -> None:
-    for p in con.execute("select p.conferir, d.numero dn from pessoa_proposta p left join pessoa_documento d on d.id=p.documento_id"
+    for p in con.execute("select p.conferir, d.numero dn from familia_proposta p left join familia_documento d on d.id=p.documento_id"
                          " where p.id>?", (desde,)):
         r["propostas"] += 1
         r["conferir"] += p["conferir"]
@@ -461,16 +461,15 @@ def _completar(con, prop, item: dict, paperless_id: int) -> bool:
     if not mudancas:
         return False
     with transacao(con, imediata=True):
-        con.execute(f"update pessoa_proposta set {', '.join(f'{c}=?' for c in mudancas)} where id=? and estado='pendente'",
-                    (*mudancas.values(), prop["id"]))
+        documentos.completar_proposta(con, prop["id"], **mudancas)
     return True
 
 
 def _item_ocr(con, pid: str, item: dict, paperless_id: int, agora, r: dict) -> None:
     tipo, numero, alvo = item["tipo"], item["numero"], normalizar_numero(item["numero"])
-    ativos = list(con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais='BR' and excluido_em is null"
+    ativos = list(con.execute("select * from familia_documento where pessoa_id=? and tipo=? and pais='BR' and excluido_em is null"
                               " order by id", (pid, tipo)))
-    abertas = list(con.execute("select * from pessoa_proposta where pessoa_id=? and tipo=? and pais='BR' and estado='pendente'"
+    abertas = list(con.execute("select * from familia_proposta where pessoa_id=? and tipo=? and pais='BR' and estado='pendente'"
                                " order by id", (pid, tipo)))
     igual = next((a for a in ativos if normalizar_numero(a["numero"]) == alvo), None)
     aberta = next((p for p in abertas if normalizar_numero(p["numero"]) == alvo), None)
@@ -567,8 +566,8 @@ def main(argv=None, paperless=None) -> int:
         return 2
     con, alvo = conectar(Path(a.banco)), None
     try:
-        if con.execute("select 1 from sqlite_master where name='pessoa_proposta'").fetchone() is None:
-            print("ERRO: migração 0077 não aplicada neste banco", file=sys.stderr)
+        if con.execute("select 1 from sqlite_master where name='familia_proposta'").fetchone() is None:
+            print("ERRO: migração 0081 não aplicada neste banco", file=sys.stderr)
             return 2
         alvo = con if a.aplicar else _copia(con)
         agora = dt.datetime.now(dt.timezone.utc)

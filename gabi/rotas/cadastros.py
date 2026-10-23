@@ -503,7 +503,7 @@ def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("b
         if p is None:
             raise erro(404, "nao_encontrado", f"pessoa {pid} não existe")
         docs = [{"tipo": d["tipo"].upper(), "numero": mascarar_documento(d["numero"])} for d in con.execute(
-            "select tipo, numero from pessoa_documento where pessoa_id=? and excluido_em is null order by id", (pid,))]
+            "select tipo, numero from familia_documento where pessoa_id=? and excluido_em is null order by id", (pid,))]
         _tx(con, lambda: _auditar(con, ident.login, "pessoas", pid, "documento consultado"))
         return envelope(con, {"id": pid, "documentos": docs, "mascarado": True}, agora=_agora(request))
     finally:
