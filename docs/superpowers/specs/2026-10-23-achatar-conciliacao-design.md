@@ -32,13 +32,14 @@ Assinatura mantida: `conciliar(comps, txs, vinculos, estado_contas, pagos, param
 1. **Vínculo gravado** (`conciliacao`, menos `manual:`): o compromisso fica `pago` com aquele lançamento; o lançamento sai do jogo.
 2. **Lançamentos candidatos:** débito (`valor < 0`) de conta BANK não PJ, data até hoje, sem natureza `neutro` (transferência própria, como hoje), não vinculado.
 3. **Por favorecido:** compromissos em ordem de (`vencimento_util`, `id`). Cada um pega, entre os candidatos livres na janela (`vencimento_util - janela_antes_dias` até hoje) cuja descrição contém alguma `extrato_chaves` ou, se é fatura, o nome do cartão num pagamento de fatura (`_casa_emissor`, mantido), escolhe primeiro o que encaixa no valor (seria `pago`), depois o de data mais próxima do `vencimento_util`, depois o de id menor. "Encaixa" é o teste de valor do passo 5 dar `pago` (para variável estimado ou sem valor todo candidato encaixa, e a data mais próxima decide). A ordem por vencimento faz o Pix atrasado ficar com o mês vencido.
-4. **Por valor**, para quem sobrou com valor: candidato livre na janela, que não contém chave de nenhum compromisso, com `|valor - pago| <= tolerancia_valor`; pagamento de fatura (`caixa.FATURA_RE`) só paga fatura. Mesma ordem e mesmo critério de proximidade.
+4. **Por valor**, para quem sobrou com valor: candidato livre na janela, que não contém chave de nenhum compromisso, com `|valor - pago| <= tolerancia_valor`; pagamento de fatura (`caixa.FATURA_RE`) só paga fatura. Mesma ordem e mesmo critério de proximidade. Casamento por valor é `pago` (sem o teste do passo 5).
+   **Duas passadas** nos passos 3-4: primeiro só compromissos de valor conhecido (fixo ou confirmado) e só com lançamento que encaixa; depois o resto (estimativa, sem valor, e o que vira `a_conferir`), para que estimativa ou valor que não encaixa não roube o lançamento certo.
 5. **Valor do casamento:** fixo ou confirmado (`valor_fonte` em `valores_do_mes`/`documento`/`fatura`): `|dif| <= tolerancia_fixo * valor` = `pago`; fora = `a_conferir` com motivo ("pago a menor: R$ x de R$ y"; fatura: "pago a menor (mínimo?)"; acima: "pago acima: ..."), e o vínculo não é gravado. Variável estimado ou sem valor: `pago` com qualquer valor.
-6. **Sem lançamento**, na ordem: fatura `PAID` = `pago` (método `banco`); baixa manual (Valor tipo `pago` da linha no mês) = `pago` (`manual:<id>`, como hoje); `forma == "debito_automatico"` = `aberto`; venceu e extrato parado (`_parada`, mantida) = `a_conferir`; venceu = `atrasado`; senão `aberto`.
+6. **Sem lançamento pago**, na ordem (fatura `PAID` e baixa manual valem também sobre o `a_conferir` do casamento): fatura `PAID` = `pago` (método `banco`); baixa manual (Valor tipo `pago` da linha no mês) = `pago` (`manual:<id>`, como hoje); `forma == "debito_automatico"` = `aberto`; venceu e extrato parado (`_parada`, mantida) = `a_conferir`; venceu = `atrasado`; senão `aberto`.
 
 Saem: atribuição gulosa global com ordenação por certeza da série (`_ordenar`, `_atribui`, `_certeza`), faixa de juros e o campo `juros`, regra do nome de cartão ambíguo, regra "perdeu no empate", prioridade "já vencido" da baixa manual. O resultado por compromisso mantém `estado, metodo, tx_id, pago_em, diferenca, motivo` (diferença em centavos).
 
-Resultado: 195 linhas (ver "Pronto quando").
+Resultado: 214 linhas (ver "Pronto quando").
 
 ## 3. Compromissos (`gabi/dinheiro/compromissos.py`)
 - Valores em centavos (`valor`, totais de fatura, valor de documento, último pagamento).
@@ -68,7 +69,7 @@ A lista exata sai de `grep -rn "previsto\|debito_automatico\|juros"` no plano.
 - `tests/test_comparar_conciliacao.py` é temporário e sai junto com `tools/comparar_conciliacao.py` (§5).
 
 ## Pronto quando
-1. `conciliacao.py` + `compromissos.py` menores que os 585 de antes: ficaram em 394 linhas (-33%); a meta de ~320 foi abandonada porque cortar mais prejudicava a leitura (revisado e aceito).
+1. `conciliacao.py` + `compromissos.py` menores que os 585 de antes: ficaram em 413 linhas (-29%); a meta de ~320 foi abandonada porque cortar mais prejudicava a leitura (revisado e aceito).
 2. Suíte verde.
 3. Lista da comparação conferida pelo Ricardo (feito em 23/10: 0 diferenças), sem compromisso pago virando atrasado no mês corrente sem motivo aceito.
 4. Instalado, e a rodada de extratos seguinte com `conferida=True` e a tela A pagar abrindo.

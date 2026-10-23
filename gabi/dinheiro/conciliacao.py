@@ -2,10 +2,11 @@
 
 Função pura `conciliar`, em centavos (int); a gravação vive em dinheiro/repositorio.py. Números vêm dos Parâmetros.
 Ordem: 1. vínculo gravado; 2. candidatos: débito BANK não PJ até hoje, sem transferência própria, não vinculado;
-3. por (vencimento_util, id), cada compromisso pega um candidato livre na janela, por favorecido/emissor, senão por
-valor (só lançamento sem chave de ninguém; pagamento de fatura só paga fatura): o valor que encaixa, depois a data
-mais próxima do vencimento, depois o id; 4. fixo ou confirmado fora da tolerancia_fixo = a_conferir, sem vínculo;
-5. sem lançamento: fatura PAID, baixa manual, débito automático (aberto), extrato parado (a_conferir), atrasado, aberto.
+3. casamento por favorecido/emissor, senão por valor (|dif| <= tolerancia_valor = pago; só lançamento sem chave de
+ninguém; pagamento de fatura só paga fatura), em duas passadas por (vencimento_util, id): primeiro só valor conhecido
+(fixo ou confirmado) com lançamento que encaixa, depois o resto; o que encaixa, depois a data mais próxima, depois o id;
+4. fixo ou confirmado fora da tolerancia_fixo = a_conferir, sem vínculo; 5. fatura PAID e baixa manual = pago, também
+sobre o a_conferir; senão débito automático (aberto), extrato parado (a_conferir), atrasado, aberto.
 """
 import datetime as dt
 import re
@@ -64,14 +65,19 @@ def _metodo_chave(comp, tx):
     return None
 
 
+def _conhecido(comp):
+    """Valor fixo, ou confirmado por Valores do mês/documento/fatura."""
+    return comp.get("valor_centavos") is not None \
+        and (comp.get("valor_tipo") == "fixo" or comp.get("valor_fonte") in CONFIRMADO)
+
+
 def _avalia(comp, pago, p):
     """(estado, diferenca_centavos, motivo) do casamento de `pago` centavos com o compromisso."""
     v = comp.get("valor_centavos")
     if v is None:
         return "pago", None, None
     d = pago - v
-    confirmado = comp.get("valor_tipo") == "fixo" or comp.get("valor_fonte") in CONFIRMADO
-    if not confirmado or abs(d) <= round(p["tolerancia_fixo"] * v):
+    if not _conhecido(comp) or abs(d) <= round(p["tolerancia_fixo"] * v):
         return "pago", d, None
     if d > 0:
         return "a_conferir", d, f"pago acima: {_brl(pago)} de {_brl(v)}"
@@ -145,45 +151,58 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
     def na_janela(comp, tx):
         return _dia(comp["vencimento_util"]) - dt.timedelta(days=p["janela_antes_dias"]) <= _dia(tx["data"]) <= hoje
 
-    # 3-4. casamento
     usados = set()
-    for comp in sorted((c for c in comps if res[c["id"]]["estado"] is None),
-                       key=lambda c: (c["vencimento_util"], c["id"])):
-        livres = [t for t in pool if t["id"] not in usados and na_janela(comp, t)]
-        cands = [(t, m) for t in livres for m in [_metodo_chave(comp, t)] if m]
-        if not cands and comp.get("valor_centavos") is not None:
-            cands = [(t, "valor") for t in livres if t["id"] not in com_chave
-                     and abs(abs(t["valor_centavos"]) - comp["valor_centavos"]) <= tol_valor
-                     and (_eh_fatura(comp) or not caixa.FATURA_RE.search(t.get("descricao") or ""))]
-        if not cands:
-            continue
-        venc = _dia(comp["vencimento_util"])
-        aval = {t["id"]: _avalia(comp, abs(t["valor_centavos"]), p) for t, _ in cands}
-        tx, metodo = min(cands, key=lambda x: (aval[x[0]["id"]][0] != "pago",  # o valor que encaixa ganha da data
-                                               abs((_dia(x[0]["data"]) - venc).days), x[0]["id"]))
-        usados.add(tx["id"])
-        estado, d, motivo = aval[tx["id"]]
-        res[comp["id"]].update(estado=estado, metodo=metodo, tx_id=tx["id"], pago_em=tx["data"][:10],
-                               diferenca_centavos=d, motivo=motivo)
-        if estado == "pago":
-            novos.append((tx["id"], comp["id"], metodo, d))
 
-    # 5. sem lançamento
+    def candidatos(comp):
+        """[(tx, metodo, (estado, dif, motivo))]: por favorecido/emissor; sem nenhum, por valor (pago, sem conferência)."""
+        livres = [t for t in pool if t["id"] not in usados and na_janela(comp, t)]
+        cands = [(t, m, _avalia(comp, abs(t["valor_centavos"]), p))
+                 for t in livres for m in [_metodo_chave(comp, t)] if m]
+        if cands or comp.get("valor_centavos") is None:
+            return cands
+        v = comp["valor_centavos"]
+        return [(t, "valor", ("pago", abs(t["valor_centavos"]) - v, None)) for t in livres
+                if t["id"] not in com_chave and abs(abs(t["valor_centavos"]) - v) <= tol_valor
+                and (_eh_fatura(comp) or not caixa.FATURA_RE.search(t.get("descricao") or ""))]
+
+    # 3-4. casamento em duas passadas, cada uma por (vencimento_util, id): primeiro só valor conhecido com lançamento
+    # que encaixa (a estimativa e o valor que não encaixa não roubam o lançamento certo); depois o resto
+    for passada in (1, 2):
+        for comp in sorted((c for c in comps if res[c["id"]]["estado"] is None),
+                           key=lambda c: (c["vencimento_util"], c["id"])):
+            if passada == 1 and not _conhecido(comp):
+                continue
+            venc = _dia(comp["vencimento_util"])
+            cands = [c for c in candidatos(comp) if passada == 2 or c[2][0] == "pago"]
+            if not cands:
+                continue
+            # o que encaixa ganha da data mais próxima; empate, o id menor
+            tx, metodo, (estado, d, motivo) = min(
+                cands, key=lambda c: (c[2][0] != "pago", abs((_dia(c[0]["data"]) - venc).days), c[0]["id"]))
+            usados.add(tx["id"])
+            res[comp["id"]].update(estado=estado, metodo=metodo, tx_id=tx["id"], pago_em=tx["data"][:10],
+                                   diferenca_centavos=d, motivo=motivo)
+            if estado == "pago":
+                novos.append((tx["id"], comp["id"], metodo, d))
+
+    # 5. sem lançamento pago: fatura PAID e baixa manual valem também sobre o a_conferir; senão pelo vencimento
     manuais = {(v["compromisso"], v["mes"]): v for v in pagos if v.get("tipo") == "pago"}
     for comp in comps:
         r, cid = res[comp["id"]], comp["id"]
-        if r["estado"] is not None:
+        if r["estado"] not in (None, "a_conferir"):
             continue
         # compromisso de linha tem id `linha:AAAA-MM`
         v = manuais.get((comp.get("linha_id"), cid[-7:])) if comp.get("linha_id") else None
         if _eh_fatura(comp) and str(comp.get("payment_status") or "").upper() == "PAID":
-            r.update(estado="pago", metodo="banco")
+            r.update(estado="pago", metodo="banco", motivo=None)  # mantém o lançamento do casamento, sem vínculo
         elif v:
             pago, valor = v.get("valor_centavos"), comp.get("valor_centavos")
             d = pago - valor if pago is not None and valor is not None else None
             r.update(estado="pago", metodo="manual", tx_id=f"manual:{cid}", pago_em=v.get("data_pagamento"),
-                     diferenca_centavos=d)
+                     diferenca_centavos=d, motivo=None)
             novos.append((f"manual:{cid}", cid, "manual", d))
+        elif r["estado"]:
+            continue  # a_conferir do casamento
         elif hoje > _dia(comp["vencimento_util"]) and comp.get("forma") != "debito_automatico":
             mot = _parada(comp, estado_contas, p, agora)
             if mot:

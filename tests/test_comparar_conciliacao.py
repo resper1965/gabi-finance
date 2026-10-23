@@ -31,23 +31,34 @@ def test_comparacao_mostra_o_que_mudou(tmp_path):
     migrar(c, MIGRACOES)
     carregar_cenario(c, next(x for x in CASOS if x["nome"] == "juros_e_a_menor")["entrada"])
     assert comparar(c, HOJE, AGORA) == [{"id": "condominio:2026-10", "nome": "Condomínio", "vencimento": "2026-10-08",
-                                         "antes": "pago", "depois": "a_conferir",
+                                         "antes": "pago", "depois": "a_conferir", "tx_antes": "t8", "tx_depois": "t8",
                                          "motivo": "pago acima: R$ 840,00 de R$ 800,00"}]
 
 
 def test_trocas_esperadas_nao_aparecem(monkeypatch, con_cenario):
     antigo = rodar_antigo(con_cenario, HOJE, AGORA)
     assert {v[2] for v in antigo.values()} & {"previsto", "debito_automatico"}  # o cenário base tem os dois
-    novo = {k: (n, v, "aberto" if e in ("previsto", "debito_automatico") else e, m) for k, (n, v, e, m) in antigo.items()}
+    novo = {k: (n, v, "aberto" if e in ("previsto", "debito_automatico") else e, m, t) for k, (n, v, e, m, t) in antigo.items()}
     monkeypatch.setattr(comparar_conciliacao, "_rodar_novo", lambda *a: novo)
     assert comparar(con_cenario, HOJE, AGORA) == []
 
 
 def test_estado_que_muda_aparece(monkeypatch, con_cenario):
     antigo = rodar_antigo(con_cenario, HOJE, AGORA)
-    cid, (n, v, e, m) = next((k, x) for k, x in antigo.items() if x[2] == "pago")
-    monkeypatch.setattr(comparar_conciliacao, "_rodar_novo", lambda *a: {**antigo, cid: (n, v, "atrasado", None)})
-    assert comparar(con_cenario, HOJE, AGORA) == [{"id": cid, "nome": n, "vencimento": v, "antes": "pago", "depois": "atrasado", "motivo": None}]
+    cid, (n, v, e, m, t) = next((k, x) for k, x in antigo.items() if x[2] == "pago")
+    monkeypatch.setattr(comparar_conciliacao, "_rodar_novo", lambda *a: {**antigo, cid: (n, v, "atrasado", None, None)})
+    assert comparar(con_cenario, HOJE, AGORA) == [{"id": cid, "nome": n, "vencimento": v, "antes": "pago", "depois": "atrasado",
+                                                   "tx_antes": t, "tx_depois": None, "motivo": None}]
+
+
+def test_lancamento_que_muda_aparece(monkeypatch, con_cenario, capsys):
+    antigo = rodar_antigo(con_cenario, HOJE, AGORA)
+    cid, (n, v, e, m, t) = next((k, x) for k, x in antigo.items() if x[2] == "pago" and x[4])
+    monkeypatch.setattr(comparar_conciliacao, "_rodar_novo", lambda *a: {**antigo, cid: (n, v, "pago", None, "outro")})
+    assert comparar(con_cenario, HOJE, AGORA) == [{"id": cid, "nome": n, "vencimento": v, "antes": "pago", "depois": "pago",
+                                                   "tx_antes": t, "tx_depois": "outro", "motivo": None}]
+    comparar_conciliacao.imprimir(comparar(con_cenario, HOJE, AGORA))
+    assert f"{cid} | {n} | {v} | pago({t}) → pago(outro) | " in capsys.readouterr().out
 
 
 def test_main_le_o_banco_so_leitura(tmp_path, capsys):

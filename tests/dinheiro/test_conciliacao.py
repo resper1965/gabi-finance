@@ -128,6 +128,15 @@ def test_fatura_casa_pelo_nome_do_cartao():
     assert (res["cartao:2026-10"]["estado"], res["cartao:2026-10"]["metodo"]) == ("pago", "emissor")
 
 
+def test_por_valor_e_pago_dentro_da_tolerancia_de_valor():
+    """Por valor (|dif| <= tolerancia_valor) é pago, sem a conferência da tolerancia_fixo (R$ 0,80 > 1% de R$ 50)."""
+    res, novos = _rodar([_comp("a:2026-10", "2026-10-05", 5000, chaves=("ALUGUEL",))],
+                        [_tx("t1", "2026-10-05", -5080, "BOLETO 123456")])
+    r = res["a:2026-10"]
+    assert (r["estado"], r["metodo"], r["diferenca_centavos"], r["motivo"]) == ("pago", "valor", 80, None)
+    assert novos == [("t1", "a:2026-10", "valor", 80)]
+
+
 # ---------- valor do casamento ----------
 def test_fixo_dentro_da_tolerancia_paga():
     res, _ = _rodar([_comp("a:2026-10", "2026-10-05", 200000)], [_tx("t1", "2026-10-05", -198000, "PIX FAVORECIDO")])
@@ -142,9 +151,35 @@ def test_fixo_a_menor_vai_a_conferir():
 
 
 def test_a_conferir_tira_o_lancamento_do_jogo():
-    a, b = _comp("a:2026-10", "2026-10-05", 200000), _comp("b:2026-10", "2026-10-06", 190000)
+    a = _comp("a:2026-10", "2026-10-05", 200000)
+    b = _comp("b:2026-10", "2026-10-06", 190000, valor_tipo="variavel", valor_fonte="ultimo")
     res, _ = _rodar([a, b], [_tx("t1", "2026-10-05", -190000, "PIX FAVORECIDO")])
     assert res["a:2026-10"]["estado"] == "a_conferir" and res["b:2026-10"]["estado"] == "atrasado"
+
+
+def _dia_23(hoje="2026-10-23"):
+    estado = {"c1": {**ESTADO["c1"], "ult_sync_ok": f"{hoje}T14:00:00-03:00"}}
+    return {"estado": estado, "hoje": dt.date.fromisoformat(hoje), "agora": dt.datetime.fromisoformat(f"{hoje}T15:00:00-03:00")}
+
+
+def test_valor_conhecido_casa_antes_da_estimativa():
+    """Pensão (fixo) e reembolso (sem valor) ao mesmo favorecido: o reembolso vence antes, mas não leva o Pix da pensão."""
+    pensao = _comp("pensao:2026-10", "2026-10-10", 200000)
+    reembolso = _comp("reembolso:2026-10", "2026-10-05", None, valor_tipo="variavel")
+    txs = [_tx("t1", "2026-10-06", -200000, "PIX FAVORECIDO"), _tx("t2", "2026-10-15", -30000, "PIX FAVORECIDO")]
+    res, novos = _rodar([pensao, reembolso], txs, **_dia_23("2026-10-16"))
+    assert (res["pensao:2026-10"]["estado"], res["pensao:2026-10"]["tx_id"]) == ("pago", "t1")
+    assert (res["reembolso:2026-10"]["estado"], res["reembolso:2026-10"]["tx_id"]) == ("pago", "t2")
+    assert {(t, c) for t, c, _, _ in novos} == {("t1", "pensao:2026-10"), ("t2", "reembolso:2026-10")}
+
+
+def test_valor_que_nao_encaixa_nao_rouba_o_de_quem_encaixa():
+    """Pensão R$ 2.000 (05/10) e reembolso R$ 300 (12/10), um Pix de R$ 300 em 04/10: é do reembolso."""
+    pensao = _comp("pensao:2026-10", "2026-10-05", 200000)
+    reembolso = _comp("reembolso:2026-10", "2026-10-12", 30000)
+    res, _ = _rodar([pensao, reembolso], [_tx("t1", "2026-10-04", -30000, "PIX FAVORECIDO")], **_dia_23())
+    assert (res["reembolso:2026-10"]["estado"], res["reembolso:2026-10"]["tx_id"]) == ("pago", "t1")
+    assert res["pensao:2026-10"]["estado"] == "atrasado"
 
 
 def test_fatura_a_menor_diz_minimo():
@@ -201,6 +236,22 @@ def test_baixa_manual_com_lancamento_vale_o_extrato():
     res, novos = _rodar([_iptu()], [_tx("t1", "2026-10-01", -50000, "BOLETO PREFEITURA IPTU")], pagos=[_BAIXA])
     assert (res["iptu:2026-10"]["estado"], res["iptu:2026-10"]["tx_id"]) == ("pago", "t1")
     assert novos == [("t1", "iptu:2026-10", "favorecido", 0)]
+
+
+def test_fatura_paid_vale_sobre_pagamento_em_partes():
+    txs = [_tx("t1", "2026-10-05", -60000, "PAGAMENTO FATURA CARTAO ITAU"),
+           _tx("t2", "2026-10-04", -40000, "PAGAMENTO FATURA CARTAO ITAU")]
+    res, novos = _rodar([_fatura(valor=100000, payment_status="PAID")], txs)
+    r = res["cartao:2026-10"]
+    assert (r["estado"], r["metodo"], r["tx_id"], r["pago_em"], r["motivo"]) == ("pago", "banco", "t1", "2026-10-05", None)
+    assert novos == []
+
+
+def test_baixa_manual_vale_sobre_pagamento_a_menor():
+    res, novos = _rodar([_iptu()], [_tx("t1", "2026-10-01", -30000, "BOLETO PREFEITURA IPTU")], pagos=[_BAIXA])
+    r = res["iptu:2026-10"]
+    assert (r["estado"], r["metodo"], r["tx_id"], r["motivo"]) == ("pago", "manual", "manual:iptu:2026-10", None)
+    assert novos == [("manual:iptu:2026-10", "iptu:2026-10", "manual", None)]
 
 
 def test_debito_automatico_vencido_sem_lancamento_fica_aberto():

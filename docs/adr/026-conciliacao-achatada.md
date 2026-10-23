@@ -13,7 +13,10 @@ Data: 23/10/2026 · Estado: aceito · Spec: `docs/superpowers/specs/2026-10-23-a
 
 **Consequências.**
 - Sem faixa de juros: `tolerancia_juros` continua aceito na planilha, mas é ignorado. Pagamento acima do valor, mesmo dentro da antiga faixa, vai para `a_conferir` ("pago acima: ..."), por exemplo condomínio R$ 840 de R$ 800.
+- Duas passadas: valor conhecido que encaixa casa antes da estimativa, para que o Pix de outro compromisso do mesmo favorecido não seja levado.
+- Fatura `PAID` e baixa manual valem sobre um casamento `a_conferir`.
+- Casamento por valor (dentro de `tolerancia_valor`) é `pago`, sem conferência de tolerância.
 - Sem paridade com o gabi-fin; a comparação em produção (23/10) deu 0 diferenças, fora as trocas esperadas para `aberto`.
 - Fica de fora a atribuição global por certeza da série, o campo `juros` e as regras de cartão ambíguo e de "perdeu no empate".
-- Tamanho: `compromissos.py` + `conciliacao.py` de 585 para 394 linhas (-33%), medido com `wc -l`. A meta de cerca de 320 não foi alcançada; cortar mais prejudicava a leitura, e o tamanho foi aceito.
+- Tamanho: `compromissos.py` + `conciliacao.py` de 585 para 413 linhas (-29%), medido com `wc -l`. A meta de cerca de 320 não foi alcançada; cortar mais prejudicava a leitura, e o tamanho foi aceito.
 - Ferramentas temporárias saem depois da instalação (BACKLOG CA1): `tools/_conciliacao_antiga/`, `tools/comparar_conciliacao.py`, `tests/test_comparar_conciliacao.py` e, fora do repositório, `~/comparar-conciliacao.sh`.

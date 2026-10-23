@@ -1,5 +1,7 @@
 """O pipeline sobre o banco (repositório + gerar + conciliar + gravar), sobre os cenários de tests/dinheiro/cenarios.json."""
+import copy
 import datetime as dt
+import json
 from pathlib import Path
 
 import pytest
@@ -79,7 +81,7 @@ def test_pagamento_ainda_pendente_ja_concilia_como_no_gabi_fin(con):
 
 
 def _base(con):
-    e = next(c for c in CASOS if c["nome"] == "base")["entrada"]
+    e = copy.deepcopy(next(c for c in CASOS if c["nome"] == "base")["entrada"])  # o teste pode alterar a entrada
     carregar_cenario(con, e)
     return e, dt.date.fromisoformat(e["hoje"]), dt.datetime.fromisoformat(e["agora"])
 
@@ -128,3 +130,16 @@ def test_primeiro_vinculo_de_um_lancamento_fica(con):
     repositorio.gravar_resultado(con, [], {}, [("t1", "outro:2026-10", "valor", 0)], a)  # tentativa de religar o mesmo lançamento
     assert [tuple(r) for r in con.execute("select compromisso_id from conciliacao where tx_id='t1'")] == [(antes,)]
     assert con.execute("select count(*) from conciliacao where tx_id='t1'").fetchone()[0] == 1  # um lançamento paga um compromisso só
+
+
+def test_estados_do_cenario_base(con):
+    """Leitor permanente de cenarios.json: o estado e o lançamento de cada compromisso do cenário base."""
+    e, h, a = _base(con)
+    atualizar_compromissos(con, h, a, docs=e["docs"])
+    pagos = {"aluguel:2026-10": "t1", "escola:2026-10": "t2"}  # escola: R$ 3.010 de R$ 3.000, dentro de 1%
+    esperado = {cid: "aberto" for cid in [
+        "aluguel:2026-11", "cartao-itau:2026-10", "cartao-itau:2026-11", "condominio:2026-10", "condominio:2026-11",
+        "doc:12:2026-10", "energia:2026-10", "energia:2026-11", "escola:2026-11", "iptu:2026-11", "netflix:2026-10",
+        "netflix:2026-11"]} | {cid: "pago" for cid in pagos} | {"iptu:2026-10": "atrasado"}
+    gravado = {r["id"]: (r["estado"], json.loads(r["dados"])["tx_id"]) for r in con.execute("select id, estado, dados from compromisso")}
+    assert gravado == {cid: (est, pagos.get(cid)) for cid, est in esperado.items()}

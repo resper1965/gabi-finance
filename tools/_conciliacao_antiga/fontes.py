@@ -52,10 +52,11 @@ def txs_para_conciliar(con, hoje: dt.date) -> list[dict]:
 
 
 def rodar_antigo(con, hoje: dt.date, agora: dt.datetime, docs=()) -> dict:
-    """O mesmo que `contas_pagar.atualizar_compromissos`, sem gravar: {comp_id: (nome, vencimento, estado, motivo)}."""
+    """O mesmo que `contas_pagar.atualizar_compromissos`, sem gravar: {comp_id: (nome, vencimento, estado, motivo, tx_id)}."""
     leitura = repositorio.ler_leitura(con)
     comps = compromissos.gerar(FontesBanco(con), leitura, list(docs), hoje, [])
     donos = caixa.dono_tokens(repositorio.titulares(con)) or None
     res, _ = conciliacao.conciliar(comps, txs_para_conciliar(con, hoje), repositorio.vinculos(con),
                                    repositorio.estado_contas(con), leitura["valores"], leitura["params"], hoje, agora, donos)
-    return {c["id"]: (c["nome"], c["vencimento"], res[c["id"]]["estado"], res[c["id"]].get("motivo")) for c in comps if c["id"] in res}
+    return {c["id"]: (c["nome"], c["vencimento"], res[c["id"]]["estado"], res[c["id"]].get("motivo"), res[c["id"]].get("tx_id"))
+            for c in comps if c["id"] in res}
