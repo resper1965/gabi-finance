@@ -348,3 +348,110 @@ def test_main_com_ocr_falso_so_contagens(tmp_path, con, capsys):
     assert "paperless_lidos: 1" in saida.out and "propostas_completadas: 1" in saida.out
     for segredo in ("CD654321", "2031", "Bia"):
         assert segredo not in saida.out + saida.err
+
+
+# ---- fix round 1: formas reais -----------------------------------------------------------------------------------
+
+END_A = {"tipo": "residencial", "logradouro": "Rua Exemplo, 10, apto 2", "bairro": "Centro", "cidade": "São Paulo", "uf": "SP",
+         "cep": None}
+END_LONGO = {"tipo": "residencial", "logradouro": "Avenida de Exemplo Comprida, 1234, bloco B, apartamento 56",
+             "bairro": "Jardim Exemplo", "cidade": "Rio de Janeiro", "uf": "RJ", "cep": "20000-000",
+             "observacao": "Portaria 24h; entregas com o zelador. " * 8}
+
+
+def _com_enderecos(con, pid, enderecos):
+    d = json.loads(con.execute("select dados from pessoa where id=?", (pid,)).fetchone()[0])
+    d["enderecos"] = enderecos
+    con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), pid))
+
+
+def test_endereco_dict_igual_nao_grava(con):
+    _com_enderecos(con, "ana", [END_A])
+    d = _dados()
+    d["pessoas"][0]["enderecos"] = [dict(END_A)]
+    r = carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    assert not [h for h in contato.historico(con, "ana") if h["campo"] == "enderecos"]
+    assert r["contatos_gravados"] == 2  # só apelido e nascimento
+
+
+def test_endereco_dict_mudado_grava_inteiro_com_observacao_longa(con):
+    _com_enderecos(con, "ana", [END_A])
+    d = _dados()
+    d["pessoas"][0]["enderecos"] = [dict(END_LONGO)]
+    carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    atual = json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])["enderecos"]
+    assert atual == [END_LONGO] and len(END_LONGO["observacao"]) > 200
+    [h] = [h for h in contato.historico(con, "ana") if h["campo"] == "enderecos"]
+    assert h["antes"] == [END_A] and h["depois"] == [END_LONGO] and h["quem"] == "carga"
+    contato.desfazer(con, h["id"], "ricardo", AGORA)
+    assert json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])["enderecos"] == [END_A]
+
+
+
+def test_endereco_campo_grande_demais_e_descartado(con):
+    d = _dados()
+    d["pessoas"][0]["enderecos"] = [{**END_A, "observacao": "x" * 2001}]
+    r = carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    assert r["contatos_descartados"] == 1
+    assert "enderecos" not in json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])
+
+
+def test_historico_da_propria_carga_nao_conta_como_editado(con):
+    carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
+    d = _dados()
+    d["pessoas"][0]["apelido"] = "Ana Corrigida"
+    r = carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    assert json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])["apelido"] == "Ana Corrigida"
+    assert r["divergencias"] == 0 and r["contatos_gravados"] == 1
+
+
+def test_telefone_com_historico_em_telefones_conta_divergencia(con):
+    contato.atualizar(con, "ana", "telefones", "adicionar", "+55 11 97777-6666", "hermes", AGORA)
+    d = _dados()
+    d["pessoas"][0]["telefone"] = "+55 11 98888-7777"
+    r = carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    assert json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])["telefone"] == "+5511900000001"
+    assert r["divergencias"] == 1
+
+
+def test_pets_e_obrigacoes_comparam_so_chaves_comuns_e_sem_cadastro_separado(con):
+    d = _dados()
+    d["pets"].append({"id": "nina", "nome": "Nina"})
+    d["pets"][0]["vacinas"] = ["v8"]  # chave que o brain não tem: não é divergência
+    d["obrigacoes"].append({"id": "o9", "descricao": "Outra"})
+    d["empresas"].append({"id": "emp9", "nome": "Outra"})
+    r = carga.carregar_yaml(con, d, AGORA, aplicar=True)
+    assert r["pets_divergentes"] == 1 and r["obrigacoes_divergentes"] == 0
+    assert (r["sem_cadastro"], r["pets_sem_cadastro"], r["obrigacoes_sem_cadastro"], r["empresas_sem_cadastro"]) == (1, 1, 1, 1)
+
+
+def test_ocr_ligado_so_pelo_corpo_sai_conferir(con):
+    papel = PaperlessFalso([
+        {"id": 51, "title": "Digitalização 51", "content": "PASSAPORTE EF111222 Bia Paula validade 25/03/2031"},
+        {"id": 52, "title": "Passaporte Bia Paula", "content": "PASSAPORTE GH333444 validade 25/03/2031"},
+    ])
+    carga.carregar_ocr(con, papel, AGORA, aplicar=True)
+    c = {r["numero"]: r["conferir"] for r in con.execute("select numero, conferir from pessoa_proposta where pessoa_id='bia'")}
+    assert c["EF111222"] == 1
+    assert c["GH333444"] == 1  # outra proposta aberta do mesmo tipo: diverge
+
+
+def test_ocr_ligado_so_pelo_corpo_sozinho(con):
+    papel = PaperlessFalso([{"id": 53, "title": "Scan", "content": "PASSAPORTE EF111222 Bia Paula validade 25/03/2031"}])
+    carga.carregar_ocr(con, papel, AGORA, aplicar=True)
+    assert con.execute("select conferir from pessoa_proposta where numero='EF111222'").fetchone()[0] == 1
+    papel = PaperlessFalso([{"id": 54, "title": "Passaporte Bia Paula", "content": "PASSAPORTE JK555666 validade 25/03/2031"}])
+    con.execute("delete from pessoa_proposta")
+    carga.carregar_ocr(con, papel, AGORA, aplicar=True)
+    assert con.execute("select conferir from pessoa_proposta where numero='JK555666'").fetchone()[0] == 0
+
+
+def test_main_erro_na_etapa_yaml_so_texto_fixo(tmp_path, con, capsys, monkeypatch):
+    y, banco = _arquivos(tmp_path, con)
+
+    def explode(*a, **k):
+        raise RuntimeError("AB123456 vazou")
+    monkeypatch.setattr(carga, "_carregar_yaml", explode)
+    assert carga.main(["--yaml", str(y), "--banco", str(banco), "--sem-ocr"]) == 1
+    saida = capsys.readouterr()
+    assert "RuntimeError" in saida.err and "AB123456" not in saida.out + saida.err

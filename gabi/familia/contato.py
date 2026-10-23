@@ -156,11 +156,27 @@ def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agor
 
 
 CARGA = ("telefone", "enderecos")
+MAX_CAMPO_ENDERECO = 1000
+MAX_CHAVES_ENDERECO = 20
+
+
+def _endereco_carga(item):
+    """Endereço da carga na forma nativa: texto (até 200) ou dict de valores simples (cada texto até 1000, até 20 chaves)."""
+    if isinstance(item, str):
+        return _texto(item)
+    if not isinstance(item, dict) or not item or len(item) > MAX_CHAVES_ENDERECO:
+        raise ErroFamilia("valor_invalido")
+    for k, v in item.items():
+        if not isinstance(k, str) or len(k) > 40 or not (v is None or isinstance(v, (str, int, float, bool))):
+            raise ErroFamilia("valor_invalido")
+        if isinstance(v, str) and len(v) > MAX_CAMPO_ENDERECO:
+            raise ErroFamilia("valor_invalido")
+    return dict(item)
 
 
 def substituir(con, pessoa_id: str, campo: str, valor, quem: str, agora: dt.datetime) -> dict:
     """Só para a carga (`tools/carga_familia.py`, fora do MCP): troca o valor inteiro de `telefone` (texto legado) ou de
-    `enderecos` (lista), com a mesma linha de histórico, desfazer e auditoria de `atualizar`."""
+    `enderecos` (lista, itens texto ou dict como no yaml), com a mesma linha de histórico, desfazer e auditoria de `atualizar`."""
     if campo not in CARGA:
         raise ErroFamilia("campo_invalido")
     if campo == "telefone":
@@ -168,7 +184,7 @@ def substituir(con, pessoa_id: str, campo: str, valor, quem: str, agora: dt.date
     else:
         if not isinstance(valor, list) or not 1 <= len(valor) <= MAX_ITENS:
             raise ErroFamilia("valor_invalido")
-        depois = [_texto(v) for v in valor]
+        depois = [_endereco_carga(v) for v in valor]
     with transacao(con, imediata=True):
         dados = _dados_da(con, pessoa_id)
         antes = dados.get(campo)

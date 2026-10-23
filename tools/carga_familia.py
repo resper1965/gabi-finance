@@ -161,14 +161,11 @@ def _doc_yaml(item: dict, r: dict) -> dict | None:
 
 
 def _endereco(item):
+    """Item de endereço na forma nativa: texto ou o dict do yaml (tipo, logradouro, bairro, cidade, uf, cep, observacao)."""
     if isinstance(item, str):
         return item.strip() or None
     if isinstance(item, dict):
-        for k in ("texto", "endereco"):
-            if isinstance(item.get(k), str) and item[k].strip():
-                return item[k].strip()
-        partes = [str(v).strip() for v in item.values() if isinstance(v, (str, int)) and not _vazio(v)]
-        return ", ".join(partes) or None
+        return _puro(item) or None
     return None
 
 
@@ -203,12 +200,16 @@ def _atual_contato(dados: dict, campo: str):
     if campo == "telefone":
         return (normalizar_telefone(v) or v) if isinstance(v, str) and v.strip() else None
     if campo == "enderecos":
-        return [contato._texto_item(i) or i for i in v] if isinstance(v, list) and v else None
+        return v if isinstance(v, list) and v else None
     return v if not _vazio(v) else None
 
 
 def _editado(con, pessoa_id: str, campo: str) -> bool:
-    return con.execute("select 1 from pessoa_historico where pessoa_id=? and campo=? limit 1", (pessoa_id, campo)).fetchone() is not None
+    """Editado depois de 08/10 por alguém que não a própria carga (a carga pode corrigir o que ela mesma gravou).
+    O `telefone` legado conta também a lista `telefones`."""
+    campos = ("telefone", "telefones") if campo == "telefone" else (campo,)
+    return con.execute(f"select 1 from pessoa_historico where pessoa_id=? and campo in ({','.join('?' * len(campos))})"
+                       " and quem<>? limit 1", (pessoa_id, *campos, QUEM)).fetchone() is not None
 
 
 def _pessoa(con, rec: dict, agora, r: dict) -> None:
@@ -258,18 +259,19 @@ def _empresa(con, rec: dict, agora, r: dict) -> None:
 
 
 def _confere(con, tabela: str, rec: dict) -> bool | None:
-    """None sem cadastro; True se algum campo do yaml (fora `origem`) difere do `dados` do brain."""
+    """None sem cadastro; True se alguma chave presente nos dois (fora `origem`) difere entre o yaml e o `dados` do brain."""
     linha = con.execute(f"select dados from {tabela} where id=?", (rec["id"],)).fetchone()
     if linha is None:
         return None
     dados = _dados(linha["dados"])
-    return any(_puro(v) != dados.get(k) for k, v in rec.items() if k != "origem")
+    return any(_puro(v) != dados[k] for k, v in rec.items() if k != "origem" and k in dados)
 
 
 def _carregar_yaml(con, dados: dict, agora) -> dict:
     r = dict.fromkeys(("pessoas_lidas", "empresas_lidas", "pets_lidos", "obrigacoes_lidas", "sem_cadastro", "propostas",
                        "substituem_mascarado", "conferir", "documentos_descartados", "datas_descartadas", "contatos_gravados",
-                       "contatos_descartados", "divergencias", "empresa_campos", "pets_divergentes", "obrigacoes_divergentes"), 0)
+                       "contatos_descartados", "divergencias", "empresa_campos", "empresas_sem_cadastro", "pets_divergentes", "pets_sem_cadastro",
+                       "obrigacoes_divergentes", "obrigacoes_sem_cadastro"), 0)
     desde = _max_proposta(con)
     for rec in dados.get("pessoas") or []:
         if not isinstance(rec, dict) or not isinstance(rec.get("id"), str):
@@ -284,18 +286,19 @@ def _carregar_yaml(con, dados: dict, agora) -> dict:
             continue
         r["empresas_lidas"] += 1
         if con.execute("select 1 from empresa where id=? and excluido_em is null", (rec["id"],)).fetchone() is None:
-            r["sem_cadastro"] += 1
+            r["empresas_sem_cadastro"] += 1
             continue
         _empresa(con, rec, agora, r)
-    for chave, tabela, lidos, div in (("pets", "pet", "pets_lidos", "pets_divergentes"),
-                                      ("obrigacoes", "compromisso_fixo", "obrigacoes_lidas", "obrigacoes_divergentes")):
+    for chave, tabela, lidos, div, sem in (("pets", "pet", "pets_lidos", "pets_divergentes", "pets_sem_cadastro"),
+                                           ("obrigacoes", "compromisso_fixo", "obrigacoes_lidas", "obrigacoes_divergentes",
+                                            "obrigacoes_sem_cadastro")):
         for rec in dados.get(chave) or (dados.get("compromissos_fixos") if chave == "obrigacoes" else None) or []:
             if not isinstance(rec, dict) or not isinstance(rec.get("id"), str):
                 continue
             r[lidos] += 1
             c = _confere(con, tabela, rec)
             if c is None:
-                r["sem_cadastro"] += 1
+                r[sem] += 1
             elif c:
                 r[div] += 1
     # matriz_de_acesso, assistente e documento (configuração da época do OpenClaw) ficam de fora.
@@ -417,14 +420,22 @@ def _achar(con, texto: str) -> str | None:
     return ficam[0] if len(ficam) == 1 else None
 
 
+def _ligar(con, titulo: str, ocr: str) -> tuple[str | None, bool]:
+    """(pessoa, ligada pelo título?)."""
+    try:
+        return resolver_pessoa(con, titulo or ""), True
+    except ErroFamilia:
+        pass
+    pelo_titulo = _achar(con, titulo or "")
+    if pelo_titulo:
+        return pelo_titulo, True
+    return _achar(con, ocr or ""), False
+
+
 def ligar(con, titulo: str, ocr: str) -> str | None:
     """Pessoa do documento pelo nome no título (primeiro, via `resolver_pessoa` ou pelo nome dentro dele) ou no OCR.
     Sem pessoa única: None."""
-    try:
-        return resolver_pessoa(con, titulo or "")
-    except ErroFamilia:
-        pass
-    return _achar(con, titulo or "") or _achar(con, ocr or "")
+    return _ligar(con, titulo, ocr)[0]
 
 
 def _completar(con, prop, item: dict, paperless_id: int) -> bool:
@@ -495,12 +506,13 @@ def _carregar_ocr(con, paperless, agora) -> dict:
         if not itens:
             r["ocr_sem_documento"] += 1
             continue
-        pessoa = ligar(con, d.get("title") or "", ocr)
+        pessoa, pelo_titulo = _ligar(con, d.get("title") or "", ocr)
         if pessoa is None:
             r["ocr_sem_pessoa"] += 1
             continue
         for item in itens:
-            _item_ocr(con, pessoa, item, pid_doc, agora, r)
+            # Ligado só pelo corpo do OCR (o nome pode ser de outra pessoa citada no documento): conferir.
+            _item_ocr(con, pessoa, {**item, "conferir": item["conferir"] or not pelo_titulo}, pid_doc, agora, r)
     _contar_novas(con, desde, r)
     return r
 
@@ -550,7 +562,11 @@ def main(argv=None, paperless=None) -> int:
         alvo = con if a.aplicar else _copia(con)
         agora = dt.datetime.now(dt.timezone.utc)
         print("modo: " + ("aplicado" if a.aplicar else "simulação (nada gravado; use --aplicar)"))
-        _imprimir("familia.yaml:", carregar_yaml(alvo, dados, agora, aplicar=True))
+        try:
+            _imprimir("familia.yaml:", carregar_yaml(alvo, dados, agora, aplicar=True))
+        except Exception as e:  # noqa: BLE001 — só o tipo do erro; a mensagem pode trazer dado
+            print(f"familia.yaml interrompido: {type(e).__name__}", file=sys.stderr)
+            return 1
         if a.sem_ocr:
             return 0
         if paperless is None:

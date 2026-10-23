@@ -170,3 +170,27 @@ def test_mascarado_escolhe_o_primeiro_por_id(con):
     _ativo(con, numero="BB****56", validade=None)
     pid = _propor(con, numero="AB123456", origem="carga")
     assert con.execute("select documento_id from pessoa_proposta where id=?", (pid,)).fetchone()[0] == m1
+
+
+def test_mascarado_prefere_o_que_tem_digitos_visiveis_batendo(con):
+    m1 = con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, origem) values ('ana','outro','****11','legado')").lastrowid
+    m2 = con.execute("insert into pessoa_documento(pessoa_id, tipo, numero, origem) values ('ana','outro','****22','legado')").lastrowid
+    a = _propor(con, tipo="outro", numero="998822", origem="carga")
+    b = _propor(con, tipo="outro", numero="557711", origem="carga")
+    c = _propor(con, tipo="outro", numero="440033", origem="carga")
+    linhas = {r["id"]: r for r in con.execute("select id, documento_id, conferir from pessoa_proposta")}
+    assert (linhas[a]["documento_id"], linhas[a]["conferir"]) == (m2, 0)
+    assert (linhas[b]["documento_id"], linhas[b]["conferir"]) == (m1, 0)
+    assert (linhas[c]["documento_id"], linhas[c]["conferir"]) == (m1, 1)  # nenhum bate: primeiro por id, conferir
+
+
+def test_duas_propostas_no_mesmo_mascarado_nao_sobrescrevem_uma_a_outra(con):
+    m = _ativo(con, numero="AA****56", validade=None)
+    p1 = _propor(con, numero="AB123456", validade="2031-05-01", origem="carga")
+    p2 = _propor(con, numero="CD999956", validade="2029-01-01", origem="carga")
+    assert {r[0] for r in con.execute("select documento_id from pessoa_proposta")} == {m}
+    documentos.decidir(con, p1, "aprovada", "ricardo", AGORA)
+    r2 = documentos.decidir(con, p2, "aprovada", "ricardo", AGORA)
+    docs = {d["numero"]: dict(d) for d in con.execute("select * from pessoa_documento where pessoa_id='ana' and excluido_em is null")}
+    assert docs["AB123456"]["validade"] == "2031-05-01" and docs["AB123456"]["id"] == m
+    assert docs["CD999956"]["validade"] == "2029-01-01" and r2["documento_id"] != m

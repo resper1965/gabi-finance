@@ -60,19 +60,21 @@ def mascarado(numero) -> bool:
     return "*" in str(numero or "")
 
 
-def _mascarado(con, pessoa_id, tipo, pais):
-    """Primeiro documento ativo (por id) mascarado do mesmo tipo e país, ou None."""
-    for d in con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null order by id",
-                         (pessoa_id, tipo, pais)):
-        if mascarado(d["numero"]):
-            return d
-    return None
-
-
 def _visiveis_batem(mascarado_numero, numero) -> bool:
     """Os dígitos visíveis do mascarado são o fim dos dígitos do número novo."""
     visiveis = re.sub(r"\D", "", str(mascarado_numero))
     return re.sub(r"\D", "", numero).endswith(visiveis)
+
+
+def _mascarado(con, pessoa_id, tipo, pais, numero):
+    """(mascarado ativo do mesmo tipo e país, dígitos visíveis batem?). Prefere o primeiro (por id) cujos dígitos visíveis
+    são o fim do número novo; sem nenhum assim, o primeiro por id, com bate=False. (None, True) se não há mascarado."""
+    mascarados = [d for d in con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null"
+                                         " order by id", (pessoa_id, tipo, pais)) if mascarado(d["numero"])]
+    for d in mascarados:
+        if _visiveis_batem(d["numero"], numero):
+            return d, True
+    return (mascarados[0], False) if mascarados else (None, True)
 
 
 def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao=None, validade=None, pais: str = "BR",
@@ -107,8 +109,8 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
             if all(v is None or v == ativo[c] for c, v in novos.items()):
                 return None
         else:
-            ativo = _mascarado(con, pessoa_id, tipo, pais)
-            if ativo is not None and not _visiveis_batem(ativo["numero"], numero):
+            ativo, bate = _mascarado(con, pessoa_id, tipo, pais, numero)
+            if not bate:
                 conferir = True
         return con.execute(
             "insert into pessoa_proposta(pessoa_id, documento_id, tipo, pais, numero, emissor, emissao, validade, paperless_id,"
@@ -133,6 +135,10 @@ def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime) -
             ativo = None
             if p["documento_id"] is not None:
                 ativo = con.execute("select * from pessoa_documento where id=? and excluido_em is null", (p["documento_id"],)).fetchone()
+                # O alvo só vale se ainda for mascarado ou tiver o mesmo número (outra proposta pode já ter trocado o
+                # mascarado): senão um documento receberia os dados de outro.
+                if ativo is not None and not (mascarado(ativo["numero"]) or normalizar_numero(ativo["numero"]) == normalizar_numero(p["numero"])):
+                    ativo = None
             if ativo is None:
                 ativo = _ativo(con, p["pessoa_id"], p["tipo"], p["pais"], p["numero"])
             if ativo is not None:
