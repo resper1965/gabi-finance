@@ -12,7 +12,7 @@ import datetime as dt
 import re
 
 from gabi.dinheiro import caixa
-from gabi.dinheiro.compromissos import _norm, contem_chave
+from gabi.dinheiro.compromissos import _norm, _serie, contem_chave
 
 CONFIRMADO = {"valores_do_mes", "documento", "fatura"}
 _VAZIO = {"estado": None, "metodo": None, "tx_id": None, "pago_em": None, "diferenca_centavos": None, "motivo": None}
@@ -165,15 +165,24 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
                 if t["id"] not in com_chave and abs(abs(t["valor_centavos"]) - v) <= tol_valor
                 and (_eh_fatura(comp) or not caixa.FATURA_RE.search(t.get("descricao") or ""))]
 
+    def de_mes_anterior(comp, tx):
+        """O lançamento está na janela de um mês anterior ainda sem casamento da mesma linha (Pix atrasado)."""
+        serie = comp.get("linha_id") and _serie(comp["linha_id"])
+        return bool(serie) and any(
+            res[c["id"]]["estado"] is None and c.get("linha_id") and _serie(c["linha_id"]) == serie
+            and c["vencimento_util"] < comp["vencimento_util"] and na_janela(c, tx) for c in comps)
+
     # 3-4. casamento em duas passadas, cada uma por (vencimento_util, id): primeiro só valor conhecido com lançamento
-    # que encaixa (a estimativa e o valor que não encaixa não roubam o lançamento certo); depois o resto
+    # que encaixa e não é Pix atrasado de mês anterior da mesma linha (a estimativa e o valor que não encaixa não
+    # roubam o lançamento certo); depois o resto
     for passada in (1, 2):
         for comp in sorted((c for c in comps if res[c["id"]]["estado"] is None),
                            key=lambda c: (c["vencimento_util"], c["id"])):
             if passada == 1 and not _conhecido(comp):
                 continue
             venc = _dia(comp["vencimento_util"])
-            cands = [c for c in candidatos(comp) if passada == 2 or c[2][0] == "pago"]
+            cands = [c for c in candidatos(comp)
+                     if passada == 2 or (c[2][0] == "pago" and not de_mes_anterior(comp, c[0]))]
             if not cands:
                 continue
             # o que encaixa ganha da data mais próxima; empate, o id menor
@@ -194,7 +203,8 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
         # compromisso de linha tem id `linha:AAAA-MM`
         v = manuais.get((comp.get("linha_id"), cid[-7:])) if comp.get("linha_id") else None
         if _eh_fatura(comp) and str(comp.get("payment_status") or "").upper() == "PAID":
-            r.update(estado="pago", metodo="banco", motivo=None)  # mantém o lançamento do casamento, sem vínculo
+            # o banco diz que está paga: mantém o lançamento do casamento, sem vínculo nem diferença
+            r.update(estado="pago", metodo="banco", motivo=None, diferenca_centavos=None)
         elif v:
             pago, valor = v.get("valor_centavos"), comp.get("valor_centavos")
             d = pago - valor if pago is not None and valor is not None else None

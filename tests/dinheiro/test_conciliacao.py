@@ -82,6 +82,14 @@ def test_pix_atrasado_fica_com_o_mes_vencido():
     assert res["a:2026-11"]["estado"] == "aberto"
 
 
+def test_pix_atrasado_da_estimativa_nao_vai_para_o_mes_seguinte_conhecido():
+    out = _comp("a:2026-10", "2026-10-05", 200000, valor_tipo="variavel", valor_fonte="ultimo", linha_id="a")
+    nov = _comp("a:2026-11", "2026-11-05", 200000, valor_tipo="variavel", valor_fonte="documento", linha_id="a")
+    res, _ = _rodar([nov, out], [_tx("t1", "2026-10-28", -200000, "PIX FAVORECIDO")], **_dia_23("2026-10-30"))
+    assert (res["a:2026-10"]["estado"], res["a:2026-10"]["tx_id"]) == ("pago", "t1")
+    assert res["a:2026-11"]["estado"] == "aberto"
+
+
 def test_mais_proximo_do_vencimento_ganha():
     a = _comp("a:2026-10", "2026-10-05", 200000)
     res, _ = _rodar([a], [_tx("t2", "2026-10-01", -200000, "PIX FAVORECIDO"), _tx("t1", "2026-10-04", -200000, "PIX FAVORECIDO")])
@@ -243,7 +251,8 @@ def test_fatura_paid_vale_sobre_pagamento_em_partes():
            _tx("t2", "2026-10-04", -40000, "PAGAMENTO FATURA CARTAO ITAU")]
     res, novos = _rodar([_fatura(valor=100000, payment_status="PAID")], txs)
     r = res["cartao:2026-10"]
-    assert (r["estado"], r["metodo"], r["tx_id"], r["pago_em"], r["motivo"]) == ("pago", "banco", "t1", "2026-10-05", None)
+    assert (r["estado"], r["metodo"], r["tx_id"], r["pago_em"], r["motivo"], r["diferenca_centavos"]) == (
+        "pago", "banco", "t1", "2026-10-05", None, None)
     assert novos == []
 
 
