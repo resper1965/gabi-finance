@@ -195,3 +195,19 @@ def test_resolver_titular(con):
     assert rep.resolver_titular(con, {"nome": "An"}) is None  # ambígua
     assert rep.resolver_titular(con, {"placa": "ZZZ9Z99"}) is None
     assert rep.resolver_titular(con, {}) is None
+
+
+def test_tipo_normalizado_e_sem_numero(con):
+    pid = _propor(con, _doc(tipo="Apólice Seguro", numero="X1"))
+    assert rep.listar_propostas(con)[0]["doc"]["tipo"] == "apolice_seguro"
+    assert _erro(rep.decidir, con, pid, "aprovada", "ricardo", AGORA, correcao={"tipo": "apolice 123456"}) == "valor_invalido"
+    assert _erro(_propor, con, _doc(tipo="cnh2")) == "valor_invalido"
+    assert _erro(_propor, con, _doc(tipo="_x")) == "valor_invalido"
+    assert "123456" not in " ".join(r[0] for r in con.execute("select o_que from decisao"))
+
+
+def test_bens_novos_de_documentos_diferentes_sao_propostas_diferentes(con):
+    doc = _doc("bem", None, "apolice", "SEM-NUMERO")
+    a = _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa A"})
+    b = _propor(con, doc, paperless_id=42, bem_novo={"tipo": "outro", "nome": "Coisa B"})
+    assert a != b and _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa A"}) == a

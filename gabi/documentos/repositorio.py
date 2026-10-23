@@ -22,6 +22,7 @@ CAMPOS = ("titular_tipo", "titular_id", "tipo", "pais", "emissor", "numeros", "d
 ESTADOS = ("pendente", "aprovada", "recusada")
 _PAIS = re.compile(r"^[A-Z]{2}$")
 _DATA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIPO = re.compile(r"^[a-z][a-z_]{0,39}$")
 
 
 class ErroDocumentos(Exception):
@@ -75,6 +76,15 @@ def _data(v) -> str:
     return v.strip()
 
 
+def _tipo(v) -> str:
+    """Tipo normalizado (sem acento, minúsculas, espaços viram `_`); só letras e `_`: o tipo vai para `decisao.o_que`, que
+    nunca leva número."""
+    t = "_".join(normalizar_nome(_str(v, 40)).split())
+    if not _TIPO.match(t):
+        raise _invalido()
+    return t
+
+
 def validar(doc) -> dict:
     """Documento proposto no formato canônico (chaves em ordem, datas na ordem de TIPOS_DATA); `valor_invalido` se não serve."""
     if not isinstance(doc, dict) or set(doc) - set(CAMPOS):
@@ -99,7 +109,7 @@ def validar(doc) -> dict:
             raise _invalido()
         porti[d["tipo"]] = _data(d.get("data"))
     return {"titular_tipo": doc["titular_tipo"], "titular_id": _str(doc.get("titular_id"), 80, obrigatorio=False),
-            "tipo": _str(doc.get("tipo"), 40).lower(), "pais": pais, "emissor": _str(doc.get("emissor"), 200, obrigatorio=False),
+            "tipo": _tipo(doc.get("tipo")), "pais": pais, "emissor": _str(doc.get("emissor"), 200, obrigatorio=False),
             "numeros": nums, "datas": [{"tipo": t, "data": porti[t]} for t in TIPOS_DATA if t in porti]}
 
 
@@ -165,12 +175,14 @@ def _igual(atual: dict, doc: dict, paperless_id) -> bool:
             and all(any(m["nome"] == n["nome"] and chave(m["valor"]) == chave(n["valor"]) for m in atual["numeros"]) for n in doc["numeros"]))
 
 
-def pendente_igual(con, doc: dict) -> int | None:
-    """Id da proposta pendente para o mesmo titular, tipo, país e número principal."""
-    alvo = (doc["titular_tipo"], doc["titular_id"], doc["tipo"], doc["pais"], _principal(doc))
-    for p in con.execute("select id, doc from documento_proposta where estado='pendente' order by id"):
-        o = json.loads(p["doc"])
-        if (o["titular_tipo"], o["titular_id"], o["tipo"], o["pais"], _principal(o)) == alvo:
+def pendente_igual(con, doc: dict, paperless_id=None) -> int | None:
+    """Id da proposta pendente para o mesmo titular, tipo, país e número principal. Sem titular (bem novo), também o mesmo
+    documento do Paperless: bens novos de documentos diferentes não se juntam."""
+    def k(o, pl):
+        return (o["titular_tipo"], o["titular_id"], o["tipo"], o["pais"], _principal(o), pl if o["titular_id"] is None else None)
+    alvo = k(doc, paperless_id)
+    for p in con.execute("select id, doc, paperless_id from documento_proposta where estado='pendente' order by id"):
+        if k(json.loads(p["doc"]), p["paperless_id"]) == alvo:
             return p["id"]
     return None
 
@@ -206,7 +218,7 @@ def propor(con, doc: dict, *, origem: str, paperless_id: int | None, conferir: b
                 raise ErroDocumentos("titular_invalido")
         elif not _titular_existe(con, doc):
             raise ErroDocumentos("titular_invalido")
-        aberta = pendente_igual(con, doc)
+        aberta = pendente_igual(con, doc, paperless_id)
         if aberta is not None:
             return aberta
         atual = ativo(con, doc) if doc["titular_id"] is not None else None

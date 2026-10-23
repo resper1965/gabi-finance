@@ -145,6 +145,10 @@ def _familia_antes(con):
 def test_0081_copia_a_familia(tmp_path):
     con = _ate_0080(tmp_path)
     _familia_antes(con)
+    # Mascarado (cópia de 08/10) e um tirado do cadastro pela 0079: copiados como estão.
+    con.execute(_INS_DOC, ("ana", "cpf", "BR", "***.***.***-66", None, None, None, None, "legado"))
+    x = con.execute(_INS_DOC, ("ana", "rg", "BR", "null", None, None, None, None, "legado")).lastrowid
+    con.execute("update pessoa_documento set excluido_em='2026-10-22T00:00:00Z' where id=?", (x,))
     _aplicar_0081(con, tmp_path)
     nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
     assert {"pessoa_documento_legado", "pessoa_proposta_legado", "bem", "documento", "documento_numero", "documento_data",
@@ -154,9 +158,14 @@ def test_0081_copia_a_familia(tmp_path):
     assert docs == [
         {"id": 1, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "cpf", "pais": "BR", "emissor": None, "paperless_id": None, "origem": "legado"},
         {"id": 2, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "passaporte", "pais": "BR", "emissor": "PF", "paperless_id": 12, "origem": "carga"},
-        {"id": 3, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "passaporte", "pais": "PT", "emissor": "SEF", "paperless_id": None, "origem": "ricardo"}]
+        {"id": 3, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "passaporte", "pais": "PT", "emissor": "SEF", "paperless_id": None, "origem": "ricardo"},
+        {"id": 4, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "cpf", "pais": "BR", "emissor": None, "paperless_id": None, "origem": "legado"},
+        {"id": 5, "titular_tipo": "pessoa", "titular_id": "ana", "tipo": "rg", "pais": "BR", "emissor": None, "paperless_id": None, "origem": "legado"}]
+    assert [tuple(r) for r in con.execute("select id, excluido_em from documento order by id")] == [
+        (1, None), (2, None), (3, None), (4, None), (5, "2026-10-22T00:00:00Z")]
     assert [tuple(r) for r in con.execute("select documento_id, nome, valor from documento_numero order by documento_id")] == [
-        (1, "numero", "529.982.247-25"), (2, "numero", "FK077009"), (3, "numero", "CB123456")]
+        (1, "numero", "529.982.247-25"), (2, "numero", "FK077009"), (3, "numero", "CB123456"), (4, "numero", "***.***.***-66"),
+        (5, "numero", "null")]
     assert [tuple(r) for r in con.execute("select documento_id, tipo, data from documento_data order by documento_id, tipo")] == [
         (2, "emissao", "2021-11-03"), (2, "validade", "2026-11-02"), (3, "validade", "2026-10-01")]
     p = con.execute("select * from documento_proposta where estado='pendente'").fetchone()
