@@ -30,10 +30,10 @@ def agenda(con):
     _comp(con, "luz:2026-09", "Luz antiga", "2026-09-20", "atrasado", 20000)
     _comp(con, "condominio:2026-10", "Condomínio", "2026-10-08", "aberto", 80000)
     _comp(con, "energia:2026-10", "Energia", "2026-10-15", "aberto", 23050, fonte="valores_do_mes")
-    _comp(con, "agua:2026-10", "Água", "2026-10-09", "previsto", 9000)
-    _comp(con, "cartao:2026-10", "Cartão", "2026-10-20", "previsto", 80025, forma="fatura")
-    _comp(con, "escola:2026-11", "Escola", "2026-11-06", "previsto", 300000)
-    _comp(con, "netflix:2026-10", "Netflix", "2026-10-10", "debito_automatico", 5590, forma="debito_automatico")
+    _comp(con, "agua:2026-10", "Água", "2026-10-09", "aberto", 9000)
+    _comp(con, "cartao:2026-10", "Cartão", "2026-10-20", "aberto", 80025, forma="fatura")
+    _comp(con, "escola:2026-11", "Escola", "2026-11-06", "aberto", 300000)
+    _comp(con, "netflix:2026-10", "Netflix", "2026-10-10", "aberto", 5590, forma="debito_automatico")
     _comp(con, "mensal:2026-10", "Mensalidade", "2026-10-07", "a_conferir", 150000, motivo="pago a menor: R$ 1.500,00 de R$ 3.000,00")
     _comp(con, "aluguel:2026-10", "Aluguel", "2026-10-05", "pago", 200000, forma="pix",
           metodo="favorecido", tx_id="t1", pago_em="2026-10-05", diferenca=0.0)
@@ -69,6 +69,14 @@ def test_item_tem_valor_em_centavos_e_origem_do_valor(agenda):
 def test_paga_mostra_a_conciliacao_com_o_extrato(agenda):
     p = contas_a_pagar(agenda, HOJE)["pagas"][0]
     assert (p["metodo"], p["tx_id"], p["pago_em"], p["diferenca_centavos"]) == ("favorecido", "t1", "2026-10-05", 0)
+
+
+def test_diferenca_antiga_em_reais_e_nova_em_centavos(con):
+    _comp(con, "a:2026-10", "A", "2026-10-05", "pago", diferenca=-1.0)
+    _comp(con, "b:2026-10", "B", "2026-10-05", "pago", diferenca_centavos=-100)
+    _comp(con, "c:2026-10", "C", "2026-10-05", "pago")
+    d = {i["id"]: i["diferenca_centavos"] for i in contas_a_pagar(con, HOJE)["pagas"]}
+    assert d == {"a:2026-10": -100, "b:2026-10": -100, "c:2026-10": None}
 
 
 def test_a_conferir_traz_o_motivo(agenda):

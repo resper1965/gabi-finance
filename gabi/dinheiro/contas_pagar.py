@@ -49,9 +49,9 @@ def contas_a_pagar(con, hoje: dt.date, ate: dt.date | None = None) -> dict:
                 "motivo": r["motivo"], "forma": r["forma"]}
         e = r["estado"]
         if e == "pago":
-            item.update(pago_em=d.get("pago_em"), tx_id=d.get("tx_id"), metodo=d.get("metodo"), diferenca_centavos=_cent(d.get("diferenca")))
+            item.update(pago_em=d.get("pago_em"), tx_id=d.get("tx_id"), metodo=d.get("metodo"), diferenca_centavos=d.get("diferenca_centavos", _cent(d.get("diferenca"))))
             saida["pagas"].append(item)
-        elif e == "debito_automatico":
+        elif e == "aberto" and r["forma"] == "debito_automatico":
             saida["debito_automatico"].append(item)
         elif e == "a_conferir":
             saida["a_conferir"].append(item)

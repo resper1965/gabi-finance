@@ -140,12 +140,21 @@ def test_cobranca_anterior_ao_cancelamento_nao_avisa(con):
 
 def test_vence_hoje_agrupa_em_um_aviso(con):
     _comp(con, "a:2026-10", "Thiago", "2026-10-16", "aberto", 350000)
-    _comp(con, "b:2026-10", "Suzana", "2026-10-16", "previsto", 72000)
+    _comp(con, "b:2026-10", "Suzana", "2026-10-16", "aberto", 72000)
     _comp(con, "c:2026-10", "Pago", "2026-10-16", "pago")
     gerar_avisos(con, AGORA)
     p = json.loads(con.execute("select payload from aviso where tipo='vence_hoje'").fetchone()[0])
     assert [i["id"] for i in p["itens"]] == ["b:2026-10", "a:2026-10"]  # o produtor grava o id do compromisso em cada item
     assert [i["nome"] for i in p["itens"]] == ["Suzana", "Thiago"] and p["itens"][1]["valor"] == "3500.00"
+
+
+def test_vence_hoje_nao_traz_debito_automatico(con):
+    _comp(con, "a:2026-10", "Thiago", "2026-10-16", "aberto", 350000)
+    _comp(con, "d:2026-10", "Vivo", "2026-10-16", "aberto", 6400)
+    con.execute("update compromisso set forma='debito_automatico' where id='d:2026-10'")
+    gerar_avisos(con, AGORA)
+    p = json.loads(con.execute("select payload from aviso where tipo='vence_hoje'").fetchone()[0])
+    assert [i["id"] for i in p["itens"]] == ["a:2026-10"]
 
 
 def test_payload_nao_tem_dado_sensivel(con):

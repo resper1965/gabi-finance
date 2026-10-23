@@ -1,7 +1,7 @@
 """Saldo projetado do caixa, dia a dia: saldo de hoje (contas BANK liberadas) + entradas previstas − saídas previstas. Consome:
 contas_pagar (caixa_unico, faturas_abertas), cobrar.previsao, db (compromisso, fatura).
 
-Saídas: compromissos aberto/atrasado/previsto (atrasados saem hoje) e débito automático no dia; fatura de cartão aberta só se ainda não
+Saídas: compromissos aberto/atrasado (atrasados saem hoje) e débito automático (`forma`) no dia; fatura de cartão aberta só se ainda não
 for um compromisso (não conta duas vezes). Entradas: SÓ o `a_vencer` e o `projetado` da previsão de NFS-e (valor líquido); nota vencida
 e não baixada fica na fila de conferência e nunca entra aqui (o Nibo é defasado). Tudo em centavos inteiros (R7)."""
 import datetime as dt
@@ -10,8 +10,7 @@ import json
 from gabi.cobrar.previsao import previsao
 from gabi.dinheiro import contas_pagar
 
-SAIDA_COM_ATRASO = {"aberto", "atrasado", "previsto"}   # vencidos viram saída de hoje
-SAIDA_NO_DIA = {"debito_automatico"}                      # já debitado se a data passou
+SAIDA_COM_ATRASO = {"aberto", "atrasado"}   # vencidos viram saída de hoje; débito automático (`forma`) só no dia, já debitado se a data passou
 
 
 def projetar(con, hoje: dt.date, dias: int = 30) -> list[dict]:
@@ -24,7 +23,7 @@ def projetar(con, hoje: dt.date, dias: int = 30) -> list[dict]:
             d[dia] = d.get(dia, 0) + v
 
     ids = set()  # faturas que já estão contadas como compromisso (id `fatura:...` ou linha da planilha que reivindicou o cartão)
-    for c in con.execute("select id, vencimento, valor_centavos, estado, dados from compromisso"):
+    for c in con.execute("select id, vencimento, valor_centavos, estado, forma, dados from compromisso"):
         if c["valor_centavos"] is None:
             continue
         ids.add(c["id"])
@@ -36,9 +35,11 @@ def projetar(con, hoje: dt.date, dias: int = 30) -> list[dict]:
             ids.add(f"fatura:{cartao}:{c['vencimento'][:7]}")
         venc = dt.date.fromisoformat(c["vencimento"][:10])
         if c["estado"] in SAIDA_COM_ATRASO:
-            somar(saidas, max(venc, hoje), c["valor_centavos"])
-        elif c["estado"] in SAIDA_NO_DIA and venc >= hoje:
-            somar(saidas, venc, c["valor_centavos"])
+            if c["forma"] == "debito_automatico":
+                if venc >= hoje:
+                    somar(saidas, venc, c["valor_centavos"])
+            else:
+                somar(saidas, max(venc, hoje), c["valor_centavos"])
     for f in contas_pagar.faturas_abertas(con, hoje):
         conta = con.execute("select account_id from fatura where id=?", (f["id"],)).fetchone()
         if conta and f"fatura:{conta['account_id']}:{f['vencimento'][:7]}" in ids:

@@ -26,10 +26,10 @@ def con(tmp_path_factory):
     c.execute("insert into saldo(conta_id, em, saldo_centavos) values (1, '2026-10-20T06:05:00', 2500000)")
     c.execute("insert into saldo(conta_id, em, saldo_centavos) values (2, '2026-10-20T06:05:00', 180000)")
     for id_, venc, estado, valor, fonte in [("escola", "2026-10-19", "aberto", 320000, "valores_do_mes"), ("condominio", "2026-10-20", "aberto", 118050, "valores_do_mes"),
-                                            ("internet", "2026-10-21", "previsto", 19900, "ultimo"), ("vivo", "2026-10-22", "debito_automatico", 6400, "padrao"),
+                                            ("internet", "2026-10-21", "aberto", 19900, "ultimo"), ("vivo", "2026-10-22", "aberto", 6400, "padrao"),
                                             ("seguro", "2026-10-28", "aberto", 450000, "valores_do_mes"), ("iptu", "2026-11-05", "aberto", 900000, "valores_do_mes")]:
         c.execute("insert into compromisso(id, origem, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, estado, forma) values (?,?,?,?,?,?,?,?,?)",
-                  (id_, "linha", id_.title(), venc, venc, valor, fonte, estado, ""))
+                  (id_, "linha", id_.title(), venc, venc, valor, fonte, estado, "debito_automatico" if id_ == "vivo" else ""))
     for i, m in enumerate(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09"]):  # cliente que paga todo dia 7 e não pagou em outubro
         c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
                   "values (1,?,?,1020800,'Pix recebido de CLIENTE EXEMPLO LTDA','caixa','posted')", (f"e{i}", f"{m}-07"))

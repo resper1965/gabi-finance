@@ -20,7 +20,7 @@ def con(tmp_path):
     return c
 
 
-def _comp(con, id_, nome, dias, valor=100000, fonte="ultimo", estado="previsto", hoje=dt.date(2026, 10, 12)):
+def _comp(con, id_, nome, dias, valor=100000, fonte="ultimo", estado="aberto", hoje=dt.date(2026, 10, 12)):
     con.execute("insert into compromisso(id, nome, vencimento, valor_centavos, valor_fonte, estado) values (?,?,?,?,?,?)",
                 (id_, nome, (hoje + dt.timedelta(days=dias)).isoformat(), valor, fonte, estado))
 
@@ -30,9 +30,9 @@ def _avisos(con, tipo="vence_em_breve"):
 
 
 def test_avisa_o_que_vence_nos_proximos_3_dias_com_a_marca_de_estimado(con):
-    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "previsto")
+    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "aberto")
     _comp(con, "b", "Seguro de vida", 2, 33043, "fatura", "aberto")
-    _comp(con, "c", "Enel", 1, 62888, "ultimo", "debito_automatico")
+    _comp(con, "c", "Enel", 1, 62888, "ultimo", "aberto"); con.execute("update compromisso set forma='debito_automatico' where id='c'")
     _comp(con, "d", "Fora da janela", 4); _comp(con, "e", "Hoje", 0); _comp(con, "f", "Já paga", 2, estado="pago"); _comp(con, "g", "Atrasada", -2, estado="atrasado")
     gerar_avisos(con, AGORA)
     av = _avisos(con)
@@ -42,7 +42,7 @@ def test_avisa_o_que_vence_nos_proximos_3_dias_com_a_marca_de_estimado(con):
 
 
 def test_item_sem_valor_aparece_marcado_como_estimado_sem_valor(con):
-    _comp(con, "a", "Carla (reembolso)", 2, None, None, "previsto")
+    _comp(con, "a", "Carla (reembolso)", 2, None, None, "aberto")
     gerar_avisos(con, AGORA)
     i = _avisos(con)[0]["itens"][0]
     assert i["valor"] is None and i["estimado"] is True
@@ -78,7 +78,7 @@ def test_antecedencia_vem_do_parametro_e_invalido_cai_no_padrao(con):
 
 
 def test_revalida_na_entrega_item_pago_sai_e_valor_confirmado_substitui_o_estimado(con):
-    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "previsto"); _comp(con, "b", "Seguro", 2, 33043, "ultimo", "previsto")
+    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "aberto"); _comp(con, "b", "Seguro", 2, 33043, "ultimo", "aberto")
     gerar_avisos(con, AGORA)
     payload = _avisos(con)[0]
     con.execute("update compromisso set estado='pago' where id='b'")
@@ -99,9 +99,9 @@ def test_aviso_cuja_conta_foi_paga_antes_de_sair_fecha_sozinho_sem_enviar(con):
 
 
 def test_valor_diferente_so_acima_de_10_por_cento_e_uma_vez_so(con):
-    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "previsto")      # chega 11,8% maior
-    _comp(con, "b", "Seguro", 3, 33043, "ultimo", "previsto")           # chega 3% maior
-    _comp(con, "c", "Sirlene", 2, 176602, "ultimo", "previsto")         # paga direto, 20% menor
+    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "aberto")      # chega 11,8% maior
+    _comp(con, "b", "Seguro", 3, 33043, "ultimo", "aberto")           # chega 3% maior
+    _comp(con, "c", "Sirlene", 2, 176602, "ultimo", "aberto")         # paga direto, 20% menor
     gerar_avisos(con, AGORA)
     con.execute("update compromisso set estado='aberto', valor_fonte='fatura', valor_centavos=394000 where id='a'")
     con.execute("update compromisso set estado='aberto', valor_fonte='fatura', valor_centavos=34000 where id='b'")
@@ -113,7 +113,7 @@ def test_valor_diferente_so_acima_de_10_por_cento_e_uma_vez_so(con):
 
 
 def test_valor_diferente_nao_dispara_se_o_valor_ainda_e_estimado(con):
-    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "previsto")
+    _comp(con, "a", "Condomínio", 3, 352264, "ultimo", "aberto")
     gerar_avisos(con, AGORA)
     con.execute("update compromisso set valor_centavos=500000, valor_fonte='padrao' where id='a'")  # outra estimativa, não o valor real
     gerar_avisos(con, AGORA + dt.timedelta(hours=2))

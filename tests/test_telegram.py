@@ -141,7 +141,7 @@ def test_incerto_vencido_pela_janela_de_2_dias_expira_sem_enviar(con):
 
 def test_debito_automatico_e_resolvido(con):
     _aviso(con)
-    con.execute("update compromisso set estado='debito_automatico'")
+    con.execute("update compromisso set estado='aberto', forma='debito_automatico'")
     assert enviar_avisos_contagem(con, ENV, AGORA, Http()) == (0, 1, 0)
 
 
