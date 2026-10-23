@@ -13,8 +13,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR-024) | R | 🔧 mergeado (PR #2) e instalado em 22/10, migração 0076 aplicada, `envios.escrita` desligado; faltam os passos do dono no runbook `#envios` | passos do dono feitos e um envio real conferido |
-| FA1 | Cadastro familiar (issue #1) e confiabilidade do Hermes (issue #3) | R | 🔧 mergeado (34b0aff) e instalado em 23/10; carga aplicada (10 do YAML + 65 do OCR, todas `conferir`); SOUL novo instalado em 23/10. Token `familia` gravado no `.env` em 23/10. Faltam: `sudo systemctl restart hermes-gateway` e aprovar as propostas na aba Família | propostas aprovadas e o Hermes consulta uma ficha |
-| FA3 | Instalar os ajustes do FA2 (migração 0078: proposta única também por país; link `#cadastros/familia`; link do Paperless no cartão da proposta) | R | código na `main`, não instalado | `sudo ~/instalar-brain.sh` sem unit em `failed` |
+| FA1 | Cadastro familiar (issue #1) e confiabilidade do Hermes (issue #3) | R | 🔧 mergeado (34b0aff) e instalado em 23/10; carga aplicada (10 do YAML + 65 do OCR, todas `conferir`); SOUL novo instalado em 23/10. Token `familia` gravado e Hermes reiniciado em 23/10 (16:59). Falta: aprovar as propostas na aba Família | propostas aprovadas e o Hermes consulta uma ficha |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
