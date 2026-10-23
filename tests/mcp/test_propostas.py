@@ -48,7 +48,7 @@ def test_lista_tem_as_ferramentas_novas_e_nenhuma_destrutiva(cli2, tokens2):
     nomes = {t["name"] for t in rpc(cli2, tokens2["fin"], "tools/list").json()["result"]["tools"]}
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar", "decidir"}
-    for n in nomes:
+    for n in nomes - {"familia_atualizar_contato"}:  # contato com histórico e Desfazer (spec do cadastro familiar)
         assert not (set(n.replace("contas_a_pagar", "contas").split("_")) & proibidas), n
     assert set(ESCOPOS_FERRAMENTAS) == nomes  # toda ferramenta tem escopo declarado
 
@@ -76,9 +76,10 @@ def test_documentos_baixar_exige_escopo_docs(cli2, tokens2):
     assert d["id"] == 5 and d["pdf_base64"]
 
 
-def test_documentos_buscar_devolve_so_metadados(cli2, tokens2):
+def test_documentos_buscar_devolve_metadados_trecho_e_referencia(cli2, tokens2):
     itens = chamar(cli2, tokens2["docs"], "documentos_buscar", texto="luz")["dados"]["itens"]
-    assert itens == [{"id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01"}]
+    assert itens == [{"id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01", "trecho": "ENEL",
+                      "referencia": {"paperless_id": 5, "titulo": "Boleto luz", "criado_em": "2026-10-01"}}]
 
 
 def test_documentos_sem_paperless_configurado_devolve_fonte_indisponivel(banco2, tokens2):

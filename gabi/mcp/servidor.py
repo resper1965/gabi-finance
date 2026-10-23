@@ -2,7 +2,7 @@
 
 R1/R2/R13: só leitura; não existe ferramenta de enviar, pagar, apagar, aprovar ou ligar regra.
 R4: toda chamada vira `chamada_mcp`. R14: texto de terceiros chega como dado, e não há ferramenta capaz de obedecê-lo.
-Auth por Bearer (token com escopos, tokens.py). Anti DNS-rebinding: só os hosts listados. Consome: dinheiro.*, envelope, tokens.
+Auth por Bearer (token com escopos, tokens.py). Anti DNS-rebinding: só os hosts listados. Consome: dinheiro.*, envelope, tokens, ferramentas_* (prop, dia, dec, envios, familia).
 """
 import contextvars
 import datetime as dt
@@ -21,17 +21,19 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_emp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_dec, ferramentas_envios, ferramentas_prop, ferramentas_dia
+from gabi.mcp import ferramentas_dec, ferramentas_envios, ferramentas_familia, ferramentas_prop, ferramentas_dia
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
 log = logging.getLogger("gabi.mcp")
+AVISO_VAZIO = "Nenhum resultado para esta consulta. Diga ao Ricardo que não encontrou; não suponha nem estime."
 _token: contextvars.ContextVar[Token | None] = contextvars.ContextVar("token_mcp", default=None)
 MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 # escopo exigido por ferramenta (única fonte: usada na execução e na documentação gerada)
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin",
-                       **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS}
+                       **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS,
+                       **ferramentas_familia.ESCOPOS}
 
 
 def _reais(v, chave: str = ""):
@@ -45,7 +47,7 @@ def _reais(v, chave: str = ""):
     return v
 
 
-ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes", "envios")  # sem 'sensivel': CPF e afins nunca saem para o canal sem liberação do painel
+ESCOPOS_HERMES = ("fin", "docs", "trabalho", "propostas", "pedidos", "decisoes", "envios", "familia")  # sem 'sensivel'; documento completo só sai pelo escopo 'familia' (familia_consultar), por decisão do dono (ADR-025)
 
 
 def ferramentas_do_token(escopos) -> list[str]:
@@ -125,6 +127,8 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
                 _registrar(banco, t, ferramenta, escopo, "erro", ms())
                 return {"erro": "erro_interno", "mensagem": "falha ao consultar; tente de novo"}
             _registrar(banco, t, ferramenta, escopo, "ok", ms())
+            if isinstance(dados, dict) and dados.get("itens") == []:
+                dados = {**dados, "vazio": True, "aviso": AVISO_VAZIO}  # vazio explícito, sem apagar as outras chaves
             return envelope(con, dados, agora=agora_fn())
         finally:
             con.close()
@@ -217,6 +221,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
     ferramentas_dia.registrar(srv, executar)
     ferramentas_dec.registrar(srv, executar)
     ferramentas_envios.registrar(srv, executar, graph)  # só propõem; o envio é do botão Enviar do painel
+    ferramentas_familia.registrar(srv, executar)  # documento só é proposto; aprovação no painel
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada

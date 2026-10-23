@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-ESCOPOS = {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "sensivel"}
+ESCOPOS = {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel"}
 
 
 @dataclass(frozen=True)

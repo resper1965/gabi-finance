@@ -10,7 +10,7 @@ fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
                                      │
               ┌──────────────────────┼───────────────────┐
               ▼                      ▼                   ▼
-        API /api/*              MCP /mcp (18 ferramentas)    rodadas (timers)
+        API /api/*              MCP /mcp (26 ferramentas)    rodadas (timers)
               │                      │
               ▼                      ▼
    painel (estático, servido pela API)   Hermes (Telegram, WhatsApp)
@@ -24,7 +24,7 @@ fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
 - Conteúdo de terceiros (e-mail, Teams, PDF) é dado, nunca instrução.
 - A Gabi sugere; o Ricardo decide (exceção: "para quem" certeiro, ADR-023). Nada paga, envia ou apaga automaticamente.
 
-**Módulos (após a ADR-023):** `gabi/dinheiro` (extratos, saldos, regras, conferência informativa, agenda financeira, despesas por empresa) · `gabi/cobrar` (notas e "a receber") · `gabi/agenda` · `gabi/correio` (triagem com modelo e lixeira) · `gabi/teams` · `gabi/contatos` (sincronização e propostas de escrita no Graph da ness) · `gabi/envios` (propostas de evento e mensagem do Teams que só saem no Enviar do painel, ADR-024) · `gabi/dia.py` (tela Hoje e resumo da manhã) · `gabi/avisos.py` + `telegram.py` · `gabi/mcp` · `gabi/rotas` (API do painel) · `gabi/fontes` (clientes externos, só no serviço de fontes) · base: `db.py`, `identidade.py`/`acesso.py`, `envelope.py`, `rodada.py`, `bruto.py`, `backup.py`, `exportacao.py`.
+**Módulos (após a ADR-023):** `gabi/dinheiro` (extratos, saldos, regras, conferência informativa, agenda financeira, despesas por empresa) · `gabi/cobrar` (notas e "a receber") · `gabi/agenda` · `gabi/correio` (triagem com modelo e lixeira) · `gabi/teams` · `gabi/contatos` (sincronização e propostas de escrita no Graph da ness) · `gabi/envios` (propostas de evento e mensagem do Teams que só saem no Enviar do painel, ADR-024) · `gabi/familia` (fichas da família, documentos por proposta aprovada, contato com histórico e desfazer; escopo MCP `familia`) · `gabi/dia.py` (tela Hoje e resumo da manhã) · `gabi/avisos.py` + `telegram.py` · `gabi/mcp` · `gabi/rotas` (API do painel) · `gabi/fontes` (clientes externos, só no serviço de fontes) · base: `db.py`, `identidade.py`/`acesso.py`, `envelope.py`, `rodada.py`, `bruto.py`, `backup.py`, `exportacao.py`.
 
 **Tabelas legadas** (com dado, sem código que as use; ADR-023): `escuta_remetente`, `caixa_email`, `memoria`, `agenda_estado`, `agenda_eventos`. Coluna sem uso: `regra.condicao` só é lida pelas regras com condição (nenhuma hoje).
 

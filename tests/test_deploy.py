@@ -29,7 +29,7 @@ def test_servicos_sem_rede_alem_de_socket_unix():
 
 
 def test_nenhum_arquivo_de_deploy_escuta_em_todas_as_interfaces():
-    for p in DEPLOY.iterdir():
+    for p in (f for f in DEPLOY.rglob("*") if f.is_file()):
         assert "0.0.0.0" not in p.read_text(), p.name
 
 
@@ -205,7 +205,7 @@ def test_instalar_cria_pastas_do_bruto_e_dos_locks_privadas():
 
 
 def test_nenhuma_unidade_traz_segredo():
-    for p in DEPLOY.iterdir():
+    for p in (f for f in DEPLOY.rglob("*") if f.is_file()):
         assert not re.search(r"sk_live|sk-[a-z0-9]{10}|Bearer |gb_[A-Za-z0-9_-]{20}", p.read_text()), p.name
 
 
@@ -370,7 +370,7 @@ def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
 
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
     linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
-    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "$AQUI/tools/carga_familia.py" in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
 
 
 # ---------------- correio ----------------
