@@ -16,4 +16,4 @@ Data: 23/10/2026 · Estado: aceito · Spec: `docs/superpowers/specs/2026-10-23-a
 - Sem paridade com o gabi-fin; a comparação em produção (23/10) deu 0 diferenças, fora as trocas esperadas para `aberto`.
 - Fica de fora a atribuição global por certeza da série, o campo `juros` e as regras de cartão ambíguo e de "perdeu no empate".
 - Tamanho: `compromissos.py` + `conciliacao.py` de 585 para 394 linhas (-33%), medido com `wc -l`. A meta de cerca de 320 não foi alcançada; cortar mais prejudicava a leitura, e o tamanho foi aceito.
-- Ferramentas temporárias (`tools/_conciliacao_antiga/`, `tools/comparar_conciliacao.py`) saem depois da instalação (BACKLOG CA1).
+- Ferramentas temporárias saem depois da instalação (BACKLOG CA1): `tools/_conciliacao_antiga/`, `tools/comparar_conciliacao.py`, `tests/test_comparar_conciliacao.py` e, fora do repositório, `~/comparar-conciliacao.sh`.
