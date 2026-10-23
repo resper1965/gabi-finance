@@ -150,3 +150,17 @@ def test_correio_respondido_tem_chave_composta_e_exige_a_fonte(con):
     con.execute("pragma foreign_keys=on")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into email_respondido(fonte_id, endereco, em) values (999, 'z@x.com', '2026-10-12T10:00:00+00:00')")
+
+
+def test_0080_normaliza_estados_antigos(tmp_path):
+    antigas = tmp_path / "migracoes"
+    antigas.mkdir()
+    for f in MIGRACOES.glob("*.sql"):
+        if f.name < "0080":
+            (antigas / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    c = conectar(tmp_path / "g.db")
+    migrar(c, antigas)
+    for i, e in enumerate(("previsto", "debito_automatico", "aberto", "pago", "atrasado", "a_conferir")):
+        c.execute("insert into compromisso(id, origem, nome, vencimento, estado) values (?,?,?,?,?)", (f"c{i}", "linha", f"c{i}", "2026-10-10", e))
+    migrar(c, MIGRACOES)
+    assert [r[0] for r in c.execute("select estado from compromisso order by id")] == ["aberto", "aberto", "aberto", "pago", "atrasado", "a_conferir"]

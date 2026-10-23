@@ -62,15 +62,15 @@ def _item_estado(con, i: dict):
     if i.get("id") is not None:
         r = con.execute("select estado from compromisso where id=?", (str(i["id"]),)).fetchone()
     else:  # payload anterior à gravação do id: casa por nome+vencimento
-        r = con.execute("select estado from compromisso where nome=? and vencimento=? order by estado in ('aberto','previsto') desc", (i.get("nome"), i.get("vencimento"))).fetchone()
+        r = con.execute("select estado from compromisso where nome=? and vencimento=? order by estado='aberto' desc", (i.get("nome"), i.get("vencimento"))).fetchone()
     return r[0] if r else None
 
 
 def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     """Releitura (só leitura) da condição do aviso NO MOMENTO da entrega: o gabi.brain nunca anuncia o que deixou de ser verdade.
     -> (estado, payload_atual). Estados: "vale" (pode enviar), "resolvido" (condição acabou: fechar SEM enviar), "incerto" (não enviar e NÃO fechar: reavalia na próxima rodada).
-    conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, debito_automatico, aberto/previsto por vencimento movido) = resolvido.
-    vence_hoje: o payload atual traz só os itens ainda 'aberto'/'previsto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
+    conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, aberto por vencimento movido) = resolvido.
+    vence_hoje: o payload atual traz só os itens ainda 'aberto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
     `atrasado` sai (resolvido): quem assume é o conta_atrasada. cobrada_apos_cancelar: vale se a assinatura segue em `cancelar`. Demais tipos: sempre valem."""
     if tipo == "conta_atrasada":
         r = con.execute("select estado from compromisso where id=?", (str(payload.get("chave")),)).fetchone()
@@ -79,20 +79,20 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
         return (VALE if r[0] == "atrasado" else RESOLVIDO), payload
     if tipo == "vence_hoje":
         estados = [(i, _item_estado(con, i)) for i in payload.get("itens") or []]
-        itens = [i for i, e in estados if e in ("aberto", "previsto")]
+        itens = [i for i, e in estados if e == "aberto"]
         if itens:
             return VALE, {**payload, "itens": itens}
         return (INCERTO if any(e == "a_conferir" for _, e in estados) else RESOLVIDO), payload
     if tipo == "vence_em_breve":
         itens, a_conferir = [], False
         for i in payload.get("itens") or []:
-            r = con.execute("select estado, valor_centavos, valor_fonte from compromisso where id=?", (str(i.get("id")),)).fetchone()
+            r = con.execute("select estado, forma, valor_centavos, valor_fonte from compromisso where id=?", (str(i.get("id")),)).fetchone()
             if r is None:
                 continue
             a_conferir = a_conferir or r["estado"] == "a_conferir"
             if r["estado"] in ABERTOS_A_VENCER:  # valor e marca de estimado são os de AGORA: o real que chegou substitui o estimado
                 itens.append({**i, "valor": _valor(r["valor_centavos"]), "valor_centavos": r["valor_centavos"], "estimado": _estimado(r["valor_centavos"], r["valor_fonte"]),
-                              "debito_automatico": r["estado"] == "debito_automatico"})
+                              "debito_automatico": r["forma"] == "debito_automatico"})
         if itens:
             return VALE, {**payload, "itens": itens}
         return (INCERTO if a_conferir else RESOLVIDO), payload
@@ -127,7 +127,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
 
 
 TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta")
-ABERTOS_A_VENCER = ("aberto", "previsto", "debito_automatico")
+ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
 
@@ -259,9 +259,9 @@ def _vence_em_breve(con, agora: dt.datetime, hoje: dt.date, novo) -> None:
     for r in con.execute("select payload from aviso where tipo='vence_em_breve' and criado_em>=?", ((agora - dt.timedelta(days=60)).astimezone(dt.timezone.utc).isoformat(),)):
         ja |= {str(i.get("id")) for i in json.loads(r["payload"]).get("itens") or []}
     itens = [{"id": c["id"], "nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"]), "valor_centavos": c["valor_centavos"],
-              "estimado": _estimado(c["valor_centavos"], c["valor_fonte"]), "debito_automatico": c["estado"] == "debito_automatico"}
+              "estimado": _estimado(c["valor_centavos"], c["valor_fonte"]), "debito_automatico": c["forma"] == "debito_automatico"}
              for c in con.execute(
-                 f"select id, nome, vencimento, valor_centavos, valor_fonte, estado from compromisso where vencimento>? and vencimento<=? and estado in ({','.join('?' * len(ABERTOS_A_VENCER))}) "
+                 f"select id, nome, vencimento, valor_centavos, valor_fonte, forma from compromisso where vencimento>? and vencimento<=? and estado in ({','.join('?' * len(ABERTOS_A_VENCER))}) "
                  "order by vencimento, nome", (hoje.isoformat(), (hoje + dt.timedelta(days=dias)).isoformat(), *ABERTOS_A_VENCER)) if c["id"] not in ja]
     if itens:
         novo("vence_em_breve", hoje.isoformat(), {"itens": itens})
@@ -281,7 +281,7 @@ def _valor_diferente(con, agora: dt.datetime, novo) -> None:
             if c["estado"] == "pago":  # o valor pago de verdade (lançamento conciliado), se houver; senão o do compromisso
                 p = con.execute("select abs(l.valor_centavos) from conciliacao k join lancamento l on l.externo_id=k.tx_id where k.compromisso_id=? limit 1", (str(i["id"]),)).fetchone()
                 real = p[0] if p else c["valor_centavos"]
-            elif c["estado"] in ("aberto", "debito_automatico") and not _estimado(c["valor_centavos"], c["valor_fonte"]):
+            elif c["estado"] == "aberto" and not _estimado(c["valor_centavos"], c["valor_fonte"]):
                 real = c["valor_centavos"]
             else:
                 continue
@@ -349,7 +349,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
             novo("cobrada_apos_cancelar", a["id"], {"nome": a["estabelecimento"], "ultimo_debito": d["data"], "valor": formatar(d["v"])})
 
     itens = [{"id": c["id"], "nome": c["nome"], "valor": _valor(c["valor_centavos"]), "vencimento": c["vencimento"]} for c in con.execute(
-        "select id, nome, vencimento, valor_centavos from compromisso where vencimento=? and estado in ('aberto','previsto') order by nome", (hoje.isoformat(),))]
+        "select id, nome, vencimento, valor_centavos from compromisso where vencimento=? and estado='aberto' and coalesce(forma,'')<>'debito_automatico' order by nome", (hoje.isoformat(),))]
     if itens:
         novo("vence_hoje", hoje.isoformat(), {"itens": itens})
     _vence_em_breve(con, agora, hoje, novo)

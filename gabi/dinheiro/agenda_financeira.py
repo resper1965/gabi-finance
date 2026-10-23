@@ -37,7 +37,7 @@ def _valor(i: dict) -> str:
 
 
 def _marca(i: dict) -> str:
-    return " (déb. auto)" if i["estado"] == "debito_automatico" else ""
+    return " (déb. auto)" if i["forma"] == "debito_automatico" else ""
 
 
 def _linha_saldo(caixa, agora: dt.datetime) -> str:

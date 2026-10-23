@@ -39,8 +39,8 @@ def test_diaria_mostra_saldo_com_hora_e_proximos_dias_em_ordem(con):
 
 
 def test_valor_estimado_vai_com_til_e_debito_automatico_marcado(con):
-    comp(con, "e", "2026-10-17", "previsto", 30000, fonte="ultimo", nome="Sem Parar")
-    comp(con, "d", "2026-10-18", "debito_automatico", 6400, fonte="padrao", nome="Vivo")
+    comp(con, "e", "2026-10-17", "aberto", 30000, fonte="ultimo", nome="Sem Parar")
+    comp(con, "d", "2026-10-18", "aberto", 6400, fonte="padrao", nome="Vivo", forma="debito_automatico")
     t = texto(con)
     assert "• 17/10 Sem Parar ~R$ 300,00" in t and "• 18/10 Vivo ~R$ 64,00 (déb. auto)" in t
 
@@ -75,7 +75,7 @@ def test_sem_falta_mostra_o_saldo_previsto(con):
 
 
 def test_valor_a_confirmar_nao_entra_na_soma_e_e_dito(con):
-    comp(con, "v", "2026-10-17", "previsto", None, nome="Carla (reembolso)")
+    comp(con, "v", "2026-10-17", "aberto", None, nome="Carla (reembolso)")
     t = texto(con)
     assert "• 17/10 Carla (reembolso) valor a confirmar" in t and "Previsão: R$ 10.000,00" in t
 

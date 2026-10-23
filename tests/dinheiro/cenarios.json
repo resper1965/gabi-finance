@@ -1,0 +1,2391 @@
+[
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "base"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -1500.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-08",
+     "descricao": "BOLETO CONDOMINIO BELA VISTA",
+     "id": "t8",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -840.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "juros_e_a_menor"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-05T10:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "atrasado_e_conta_parada"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-12"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "FATURA 9999",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:12"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "PAGAMENTO FATURA CARTAO ITAU",
+     "id": "t9",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -800.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "fatura_paga_pelo_emissor"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "compromisso": "iptu",
+     "data_pagamento": "2026-10-03",
+     "linha_planilha": 9,
+     "mes": "2026-10",
+     "origem": "manual",
+     "tipo": "pago",
+     "valor": null,
+     "vencimento": null
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "baixa_manual"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {
+    "t7": "condominio:2026-10"
+   }
+  },
+  "nome": "vinculo_persistido"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [
+    {
+     "id": "energia:2026-10",
+     "valor": 229.9,
+     "valor_fonte": "documento"
+    }
+   ],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    }
+   ],
+   "valores": [],
+   "vinculos": {}
+  },
+  "nome": "valor_ja_confirmado_nao_volta"
+ },
+ {
+  "entrada": {
+   "agora": "2026-10-08T15:00:00-03:00",
+   "anterior": [],
+   "conta_estado": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "pj": 0,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    },
+    {
+     "account_id": "pj77",
+     "banco": "C6 PJ",
+     "nome": "Conta PJ",
+     "pj": 1,
+     "tipo": "BANK",
+     "ult_sync_ok": "2026-10-08T14:00:00-03:00",
+     "ult_tx_real": "2026-10-07"
+    }
+   ],
+   "contas": [
+    {
+     "account_id": "a1234",
+     "banco": "C6 Bank",
+     "nome": "Conta C6",
+     "tipo": "BANK",
+     "vencimento": null
+    },
+    {
+     "account_id": "c9999",
+     "banco": "Itau",
+     "nome": "Cartao Itau",
+     "tipo": "CREDIT",
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "docs": [
+    {
+     "cnpj": null,
+     "id": 11,
+     "texto": "conta de luz",
+     "tipo_documento": null,
+     "titulo": "ENEL DISTRIBUICAO SP",
+     "valor": 231.0,
+     "vencimento": "2026-10-15"
+    },
+    {
+     "cnpj": null,
+     "id": 12,
+     "texto": "boleto avulso",
+     "tipo_documento": null,
+     "titulo": "DENTISTA SORRISO LTDA",
+     "valor": 150.0,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "donos": [],
+   "faturas": [
+    {
+     "account_id": "c9999",
+     "id": "f1",
+     "payment_status": "OPEN",
+     "total": 800.25,
+     "vencimento": "2026-10-20"
+    }
+   ],
+   "hoje": "2026-10-08",
+   "linhas": [
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "IMOBILIARIA SUL",
+     "forma": "pix",
+     "id": "aluguel",
+     "linha_planilha": 2,
+     "nome": "Aluguel",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 2000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:5"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [
+      "ENEL DISTRIB"
+     ],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "ENEL",
+     "forma": "boleto",
+     "id": "energia",
+     "linha_planilha": 3,
+     "nome": "Energia",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:15"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "NETFLIX",
+     "forma": "debito_automatico",
+     "id": "netflix",
+     "linha_planilha": 4,
+     "nome": "Netflix",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 55.9,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:10"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "Cartao Itau",
+     "conta": "",
+     "documento": "",
+     "extrato": "ITAU CARTAO",
+     "forma": "fatura",
+     "id": "cartao-itau",
+     "linha_planilha": 5,
+     "nome": "Cartão Itaú",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": null,
+     "valor_tipo": "variavel",
+     "vencimento": "dia:20"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "CONDOMINIO BELA VISTA",
+     "forma": "boleto",
+     "id": "condominio",
+     "linha_planilha": 6,
+     "nome": "Condomínio",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 800.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:8"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "COLEGIO HORIZONTE",
+     "forma": "boleto",
+     "id": "escola",
+     "linha_planilha": 7,
+     "nome": "Escola",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 3000.0,
+     "valor_tipo": "fixo",
+     "vencimento": "5du"
+    },
+    {
+     "ajuste_dia_util": "adia",
+     "apelidos": [],
+     "ativo": true,
+     "cartao": "",
+     "conta": "",
+     "documento": "",
+     "extrato": "PREFEITURA IPTU",
+     "forma": "boleto",
+     "id": "iptu",
+     "linha_planilha": 8,
+     "nome": "IPTU",
+     "pix": "",
+     "valido_ate": null,
+     "valido_de": null,
+     "valor_padrao": 500.0,
+     "valor_tipo": "fixo",
+     "vencimento": "dia:1"
+    }
+   ],
+   "params": {
+    "horas_conta_parada": 24,
+    "janela_antes_dias": 10,
+    "tolerancia_fixo": 0.01,
+    "tolerancia_juros": 0.1,
+    "tolerancia_valor": 1.0
+   },
+   "tx": [
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t1",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-07",
+     "descricao": "BOLETO COLEGIO HORIZONTE",
+     "id": "t2",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -3010.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-05",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t3",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-14",
+     "descricao": "BOLETO ENEL DISTRIBUICAO",
+     "id": "t4",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -215.4
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-10",
+     "descricao": "DEBITO AUTOMATICO NETFLIX",
+     "id": "t5",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -55.9
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-09-22",
+     "descricao": "PAGAMENTO FATURA ITAU CARTAO",
+     "id": "t6",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -742.1
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-02",
+     "descricao": "SUPERMERCADO DO BAIRRO",
+     "id": "t7",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -180.0
+    },
+    {
+     "account_id": "pj77",
+     "categoria": null,
+     "data": "2026-10-06",
+     "descricao": "PIX ENVIADO IMOBILIARIA SUL",
+     "id": "t10",
+     "natureza": "caixa+custo",
+     "tipo_conta": "BANK",
+     "valor": -2000.0
+    },
+    {
+     "account_id": "a1234",
+     "categoria": null,
+     "data": "2026-10-06",
+     "descricao": "PIX ENVIADO RICARDO TESTE",
+     "id": "t11",
+     "natureza": "neutro",
+     "tipo_conta": "BANK",
+     "valor": -500.0
+    }
+   ],
+   "valores": [
+    {
+     "compromisso": "energia",
+     "data_pagamento": null,
+     "linha_planilha": 2,
+     "mes": "2026-10",
+     "origem": "boleto",
+     "tipo": "valor",
+     "valor": 230.5,
+     "vencimento": "2026-10-15"
+    }
+   ],
+   "vinculos": {}
+  },
+  "nome": "conta_pj_e_transferencia_propria"
+ }
+]

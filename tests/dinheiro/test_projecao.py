@@ -21,8 +21,8 @@ def con(tmp_path):
     return c
 
 
-def comp(con, id_, venc, estado, valor, origem="linha"):
-    con.execute("insert into compromisso(id, origem, nome, vencimento, valor_centavos, estado) values (?,?,?,?,?,?)", (id_, origem, id_, venc, valor, estado))
+def comp(con, id_, venc, estado, valor, origem="linha", forma=""):
+    con.execute("insert into compromisso(id, origem, nome, vencimento, valor_centavos, estado, forma) values (?,?,?,?,?,?,?)", (id_, origem, id_, venc, valor, estado, forma))
 
 
 def nota(con, venc, liquido, status="autorizada", pago=0, tomador="X", doc="1"):
@@ -62,9 +62,21 @@ def test_compromisso_pago_nao_reduz_o_saldo(con):
 
 def test_compromisso_atrasado_sai_hoje_e_debito_automatico_sai_no_dia(con):
     comp(con, "a:2026-10", "2026-10-10", "atrasado", 40000)
-    comp(con, "d:2026-10", "2026-10-22", "debito_automatico", 62900)
+    comp(con, "d:2026-10", "2026-10-22", "aberto", 62900, forma="debito_automatico")
     r = projetar(con, HOJE, 10)
     assert dia(r, "2026-10-16")["saidas_centavos"] == 40000 and dia(r, "2026-10-22")["saidas_centavos"] == 62900
+
+
+def test_debito_automatico_vencido_nao_entra_e_aberto_comum_vencido_sai_hoje(con):
+    comp(con, "d:2026-10", "2026-10-10", "aberto", 62900, forma="debito_automatico")   # já debitado
+    comp(con, "o:2026-10", "2026-10-10", "aberto", 40000)
+    r = projetar(con, HOJE, 10)
+    assert sum(d["saidas_centavos"] for d in r) == 40000 and dia(r, "2026-10-16")["saidas_centavos"] == 40000
+
+
+def test_debito_automatico_no_proprio_dia_entra(con):
+    comp(con, "d:2026-10", "2026-10-16", "aberto", 62900, forma="debito_automatico")
+    assert dia(projetar(con, HOJE, 3), "2026-10-16")["saidas_centavos"] == 62900
 
 
 def test_compromisso_sem_valor_nao_inventa_saida(con):
