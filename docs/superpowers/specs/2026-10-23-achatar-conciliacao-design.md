@@ -11,7 +11,7 @@ Reduzir o código que mantemos. Hoje a tela A pagar funciona; o motivo é só ma
 3. Os testes golden do gabi-fin saem; entram testes próprios.
 
 ## Fora do escopo
-- Esquema do banco: `compromisso` e `conciliacao` ficam como estão (a coluna `estado` não tem restrição; a rodada regrava tudo). Sem migração.
+- Esquema do banco: `compromisso` e `conciliacao` ficam como estão (a coluna `estado` não tem restrição). Só uma migração de dados (0080) leva as linhas antigas, fora da janela da rodada, de `previsto`/`debito_automatico` para `aberto`.
 - Planilha: as colunas e os parâmetros continuam sendo lidos. `tolerancia_juros` passa a ser ignorado (continua aceito, para a planilha não quebrar).
 - Cálculo do vencimento (`vencimento_do_mes`, `vencimento_util`), regras de documento e de fatura em `compromissos.gerar`: só mudam para centavos.
 
