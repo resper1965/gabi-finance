@@ -90,6 +90,18 @@ def test_mais_proximo_do_vencimento_ganha():
     assert res["a:2026-10"]["tx_id"] == "t3"  # empate de distância: id menor
 
 
+def test_valor_que_encaixa_ganha_da_data_mais_proxima():
+    txs = [_tx("t1", "2026-10-05", -5000, "PIX FAVORECIDO"), _tx("t2", "2026-10-01", -200000, "PIX FAVORECIDO")]
+    res, novos = _rodar([_comp("a:2026-10", "2026-10-05", 200000)], txs)
+    assert (res["a:2026-10"]["estado"], res["a:2026-10"]["tx_id"]) == ("pago", "t2")
+    assert novos == [("t2", "a:2026-10", "favorecido", 0)]
+
+
+def test_baixa_manual_com_valor_da_a_diferenca_em_centavos():
+    res, novos = _rodar([_iptu()], [], pagos=[{**_BAIXA, "valor_centavos": 49000}])
+    assert res["iptu:2026-10"]["diferenca_centavos"] == -1000 and novos[0][3] == -1000
+
+
 # ---------- por valor ----------
 def test_por_valor_paga_quando_ninguem_tem_a_chave():
     res, novos = _rodar([_comp("a:2026-10", "2026-10-05", 200000, chaves=("ALUGUEL",))],
@@ -174,7 +186,7 @@ def _iptu():
     return _comp("iptu:2026-10", "2026-10-01", 50000, forma="boleto", chaves=("PREFEITURA IPTU",), linha_id="iptu")
 
 
-_BAIXA = {"mes": "2026-10", "compromisso": "iptu", "tipo": "pago", "valor": None, "vencimento": None,
+_BAIXA = {"mes": "2026-10", "compromisso": "iptu", "tipo": "pago", "valor_centavos": None, "vencimento": None,
           "data_pagamento": "2026-10-03", "origem": "manual"}
 
 

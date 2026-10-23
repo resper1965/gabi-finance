@@ -1,18 +1,17 @@
 """Conciliação: marca cada compromisso como pago, aberto, atrasado ou a_conferir casando com o extrato.
 
 Função pura `conciliar`, em centavos (int); a gravação vive em dinheiro/repositorio.py. Números vêm dos Parâmetros.
-Ordem: 1. vínculo gravado; 2. candidatos (débito BANK não PJ até hoje, sem transferência própria, não vinculado);
-3. por (vencimento_util, id), cada compromisso pega o candidato livre na janela mais próximo do vencimento, por
-favorecido/emissor do cartão, senão por valor (só lançamento sem chave de ninguém; pagamento de fatura só paga fatura);
-4. valor fixo ou confirmado fora da tolerancia_fixo = a_conferir, sem vínculo; 5. sem lançamento: fatura PAID, baixa
-manual, débito automático (aberto), extrato parado (a_conferir), atrasado, aberto.
+Ordem: 1. vínculo gravado; 2. candidatos: débito BANK não PJ até hoje, sem transferência própria, não vinculado;
+3. por (vencimento_util, id), cada compromisso pega um candidato livre na janela, por favorecido/emissor, senão por
+valor (só lançamento sem chave de ninguém; pagamento de fatura só paga fatura): o valor que encaixa, depois a data
+mais próxima do vencimento, depois o id; 4. fixo ou confirmado fora da tolerancia_fixo = a_conferir, sem vínculo;
+5. sem lançamento: fatura PAID, baixa manual, débito automático (aberto), extrato parado (a_conferir), atrasado, aberto.
 """
 import datetime as dt
 import re
 
 from gabi.dinheiro import caixa
 from gabi.dinheiro.compromissos import _norm, contem_chave
-from gabi.dinheiro.valor import para_centavos
 
 CONFIRMADO = {"valores_do_mes", "documento", "fatura"}
 _VAZIO = {"estado": None, "metodo": None, "tx_id": None, "pago_em": None, "diferenca_centavos": None, "motivo": None}
@@ -30,13 +29,9 @@ def _brl(centavos):
     return "R$ " + f"{centavos / 100:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
-def _ym(comp):
-    m = re.search(r":(\d{4}-\d{2})$", comp["id"])
-    return m.group(1) if m else comp["vencimento"][:7]
-
-
 def _eh_fatura(comp):
-    return comp.get("origem") == "fatura" or comp.get("forma") in ("fatura", "cartão") or bool(comp.get("cartao_account_id"))
+    return comp.get("origem") == "fatura" or comp.get("forma") in ("fatura", "cartão") \
+        or bool(comp.get("cartao_account_id"))
 
 
 def _nome_cartao(comp):
@@ -44,9 +39,8 @@ def _nome_cartao(comp):
 
 
 def _casa_emissor(nome, desc):
-    """Pagamento de fatura (caixa.FATURA_RE) cuja descrição traz o nome do cartão, aceitando o corte do banco:
-    a partir de um início de palavra, o texto coincide com o começo do nome por >= min(len(nome), 10) caracteres,
-    terminando em fim de palavra ou no fim da descrição."""
+    """Pagamento de fatura (caixa.FATURA_RE) com o nome do cartão, aceitando o corte do banco: de um início de palavra,
+    coincide com o começo do nome por >= min(len(nome), 10) caracteres e termina em fim de palavra ou da descrição."""
     k, n = _norm(nome), _norm(desc)
     if not k or not caixa.FATURA_RE.search(desc or ""):
         return False
@@ -90,10 +84,8 @@ def _corrente(e):
 
 
 def _neutro(tx, donos):
-    if tx.get("natureza") == "neutro":
-        return True
-    return bool(donos) and caixa.natureza(tx.get("tipo_conta"), tx.get("descricao"), tx.get("categoria"),
-                                           tx["valor_centavos"], donos) == "neutro"
+    return tx.get("natureza") == "neutro" or bool(donos) and caixa.natureza(
+        tx.get("tipo_conta"), tx.get("descricao"), tx.get("categoria"), tx["valor_centavos"], donos) == "neutro"
 
 
 def _ts(s, agora):
@@ -126,7 +118,7 @@ def _parada(comp, estado_contas, p, agora):
 def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, donos=None):
     """-> ({comp_id: {estado, metodo, tx_id, pago_em, diferenca_centavos, motivo}},
     [(tx_id, comp_id, metodo, diferenca_centavos)]). `vinculos`: {tx_id: comp_id} já gravados. `pagos`: Valores do
-    mês (reais, da leitura). `donos`: opcional, caixa.dono_tokens dos titulares."""
+    mês em centavos (compromissos.valores_em_centavos). `donos`: opcional, caixa.dono_tokens dos titulares."""
     p = params
     por_id = {t["id"]: t for t in txs}
     res = {c["id"]: dict(_VAZIO) for c in comps}
@@ -134,17 +126,14 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
 
     # 1. vínculo gravado
     ligados = {t for t in vinculos if not str(t).startswith("manual:")}
-    pago_vinculo = {}
-    for t in sorted(ligados):
-        pago_vinculo.setdefault(vinculos[t], t)
+    pago_vinculo = {vinculos[t]: t for t in sorted(ligados, reverse=True)}  # o de menor id, se houver mais de um
     for comp in comps:
-        t = pago_vinculo.get(comp["id"])
-        if t:
+        if t := pago_vinculo.get(comp["id"]):
             tx = por_id.get(t)
-            res[comp["id"]].update(estado="pago", tx_id=t, metodo="vinculo")
-            if tx:
-                _, d, _ = _avalia(comp, abs(tx["valor_centavos"]), p)
-                res[comp["id"]].update(metodo=_metodo_chave(comp, tx) or "valor", pago_em=tx["data"][:10], diferenca_centavos=d)
+            metodo = (_metodo_chave(comp, tx) or "valor") if tx else "vinculo"
+            d = _avalia(comp, abs(tx["valor_centavos"]), p)[1] if tx else None
+            res[comp["id"]].update(estado="pago", tx_id=t, metodo=metodo, pago_em=tx and tx["data"][:10],
+                                   diferenca_centavos=d)
 
     # 2. candidatos
     pool = [t for t in txs if t.get("tipo_conta") == "BANK" and t["valor_centavos"] < 0 and t["id"] not in ligados
@@ -156,9 +145,10 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
     def na_janela(comp, tx):
         return _dia(comp["vencimento_util"]) - dt.timedelta(days=p["janela_antes_dias"]) <= _dia(tx["data"]) <= hoje
 
-    # 3-4. casamento por favorecido, senão por valor
+    # 3-4. casamento
     usados = set()
-    for comp in sorted((c for c in comps if res[c["id"]]["estado"] is None), key=lambda c: (c["vencimento_util"], c["id"])):
+    for comp in sorted((c for c in comps if res[c["id"]]["estado"] is None),
+                       key=lambda c: (c["vencimento_util"], c["id"])):
         livres = [t for t in pool if t["id"] not in usados and na_janela(comp, t)]
         cands = [(t, m) for t in livres for m in [_metodo_chave(comp, t)] if m]
         if not cands and comp.get("valor_centavos") is not None:
@@ -167,9 +157,12 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
                      and (_eh_fatura(comp) or not caixa.FATURA_RE.search(t.get("descricao") or ""))]
         if not cands:
             continue
-        tx, metodo = min(cands, key=lambda x: (abs((_dia(x[0]["data"]) - _dia(comp["vencimento_util"])).days), x[0]["id"]))
+        venc = _dia(comp["vencimento_util"])
+        aval = {t["id"]: _avalia(comp, abs(t["valor_centavos"]), p) for t, _ in cands}
+        tx, metodo = min(cands, key=lambda x: (aval[x[0]["id"]][0] != "pago",  # o valor que encaixa ganha da data
+                                               abs((_dia(x[0]["data"]) - venc).days), x[0]["id"]))
         usados.add(tx["id"])
-        estado, d, motivo = _avalia(comp, abs(tx["valor_centavos"]), p)
+        estado, d, motivo = aval[tx["id"]]
         res[comp["id"]].update(estado=estado, metodo=metodo, tx_id=tx["id"], pago_em=tx["data"][:10],
                                diferenca_centavos=d, motivo=motivo)
         if estado == "pago":
@@ -181,19 +174,22 @@ def conciliar(comps, txs, vinculos, estado_contas, pagos, params, hoje, agora, d
         r, cid = res[comp["id"]], comp["id"]
         if r["estado"] is not None:
             continue
-        v = manuais.get((comp.get("linha_id"), _ym(comp))) if comp.get("linha_id") else None
+        # compromisso de linha tem id `linha:AAAA-MM`
+        v = manuais.get((comp.get("linha_id"), cid[-7:])) if comp.get("linha_id") else None
         if _eh_fatura(comp) and str(comp.get("payment_status") or "").upper() == "PAID":
             r.update(estado="pago", metodo="banco")
         elif v:
-            pago = para_centavos(v.get("valor"))  # Valores do mês chegam em reais (leitura)
-            d = pago - comp["valor_centavos"] if pago is not None and comp.get("valor_centavos") is not None else None
-            r.update(estado="pago", metodo="manual", tx_id=f"manual:{cid}", pago_em=v.get("data_pagamento"), diferenca_centavos=d)
+            pago, valor = v.get("valor_centavos"), comp.get("valor_centavos")
+            d = pago - valor if pago is not None and valor is not None else None
+            r.update(estado="pago", metodo="manual", tx_id=f"manual:{cid}", pago_em=v.get("data_pagamento"),
+                     diferenca_centavos=d)
             novos.append((f"manual:{cid}", cid, "manual", d))
-        elif comp.get("forma") == "debito_automatico":
-            r["estado"] = "aberto"
-        elif hoje > _dia(comp["vencimento_util"]):
+        elif hoje > _dia(comp["vencimento_util"]) and comp.get("forma") != "debito_automatico":
             mot = _parada(comp, estado_contas, p, agora)
-            r.update(estado="a_conferir", motivo=mot) if mot else r.update(estado="atrasado")
+            if mot:
+                r.update(estado="a_conferir", motivo=mot)
+            else:
+                r["estado"] = "atrasado"
         else:
-            r["estado"] = "aberto"
+            r["estado"] = "aberto"  # não venceu, ou débito automático ainda sem lançamento
     return res, novos

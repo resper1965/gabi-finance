@@ -22,8 +22,9 @@ def atualizar_compromissos(con, hoje: dt.date, agora: dt.datetime, docs=()) -> R
     invalidas: list = []
     comps = compromissos.gerar(repositorio.FontesBanco(con), leitura, list(docs), hoje, invalidas)
     donos = caixa.dono_tokens(repositorio.titulares(con)) or None
+    pagos = compromissos.valores_em_centavos(leitura["valores"])
     res, novos = conciliacao.conciliar(comps, repositorio.txs_para_conciliar(con, hoje), repositorio.vinculos(con),
-                                       repositorio.estado_contas(con), leitura["valores"], leitura["params"], hoje, agora, donos)
+                                       repositorio.estado_contas(con), pagos, leitura["params"], hoje, agora, donos)
     repositorio.gravar_resultado(con, comps, res, novos, agora)
     return ResumoCompromissos(len(comps), dict(Counter(r["estado"] for r in res.values())), invalidas)
 

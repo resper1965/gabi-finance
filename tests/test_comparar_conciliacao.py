@@ -26,10 +26,13 @@ def con_cenario(tmp_path):
     return _banco(tmp_path / "g.db")
 
 
-def test_comparacao_roda_no_cenario_base(con_cenario):
-    difs = comparar(con_cenario, HOJE, AGORA)
-    assert isinstance(difs, list)
-    assert all(set(d) == {"id", "nome", "vencimento", "antes", "depois", "motivo"} and d["antes"] != d["depois"] for d in difs)
+def test_comparacao_mostra_o_que_mudou(tmp_path):
+    c = conectar(tmp_path / "j.db")
+    migrar(c, MIGRACOES)
+    carregar_cenario(c, next(x for x in CASOS if x["nome"] == "juros_e_a_menor")["entrada"])
+    assert comparar(c, HOJE, AGORA) == [{"id": "condominio:2026-10", "nome": "Condomínio", "vencimento": "2026-10-08",
+                                         "antes": "pago", "depois": "a_conferir",
+                                         "motivo": "pago acima: R$ 840,00 de R$ 800,00"}]
 
 
 def test_trocas_esperadas_nao_aparecem(monkeypatch, con_cenario):

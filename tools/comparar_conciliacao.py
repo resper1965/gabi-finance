@@ -18,8 +18,9 @@ def _rodar_novo(con, hoje: date, agora: datetime) -> dict:
     leitura = repositorio.ler_leitura(con)
     comps = compromissos.gerar(repositorio.FontesBanco(con), leitura, [], hoje, [])
     donos = caixa.dono_tokens(repositorio.titulares(con)) or None
+    pagos = compromissos.valores_em_centavos(leitura["valores"])
     res, _ = conciliacao.conciliar(comps, repositorio.txs_para_conciliar(con, hoje), repositorio.vinculos(con),
-                                   repositorio.estado_contas(con), leitura["valores"], leitura["params"], hoje, agora, donos)
+                                   repositorio.estado_contas(con), pagos, leitura["params"], hoje, agora, donos)
     return {c["id"]: (c["nome"], c["vencimento"], res[c["id"]]["estado"], res[c["id"]].get("motivo")) for c in comps if c["id"] in res}
 
 
