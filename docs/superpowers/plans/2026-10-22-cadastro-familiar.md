@@ -143,28 +143,33 @@
   - O script não sobrescreve sem backup (teste com `HOME` temporário).
 - [ ] Rodar e ver falhar. [ ] Implementar. [ ] Rodar `tests/mcp tests/test_deploy.py -q`. [ ] Commit `feat(mcp): vazio explícito e SOUL do Hermes versionado`.
 
-### Task 10: Carga inicial sem modelo
-**Files:** Create `tools/carga_familia.py`; Test `tests/test_carga_familia.py`
-**Consumes:** Tasks 2 e 4; `Ponte(caminho, "paperless")` (`docs`, `texto`).
+### Task 10: Carga inicial: `familia.yaml` primeiro, OCR como complemento
+(Revisto em 23/10, spec seção "Carga inicial": o brain já tem a base de 08/10 com números **mascarados**; a carga traz o número completo e o que mudou, e o Ricardo pediu "trazer tudo".)
+**Files:** Create `tools/carga_familia.py`; Modify `gabi/familia/documentos.py` (mascarado), `pyproject.toml` e `requirements.lock` (PyYAML); Test `tests/test_carga_familia.py`, `tests/familia/` (mascarado)
+**Consumes:** Tasks 2, 3 e 4 (`propor`, `decidir`, `contato.atualizar`, `pessoa_historico`); `Ponte(caminho, "paperless")` (`docs`, `documento`, `texto`).
 **Produces:**
-- `extrair(ocr: str) -> list[dict]`: itens `{tipo, numero, emissao, validade, conferir}`.
-- `ligar(con, titulo, ocr) -> pessoa_id | None`.
-- `main(argv)` com `--aplicar` e `--socket` (padrão `GABI_FONTES_SOCKET`).
-- A busca no Paperless usa os termos da spec; a saída mostra só contagens: documentos lidos, propostas, `conferir`, sem pessoa.
-- Expressões:
+- Em `documentos.py`: documento ativo com `*` no número é "mascarado". `propor` sem documento igual aponta `documento_id` para o mascarado do mesmo `tipo`+`pais` (o primeiro por id); se os dígitos visíveis do mascarado não forem sufixo dos dígitos do número novo, `conferir=1`. `decidir` aprovando sobre mascarado grava também `numero`.
+- `carregar_yaml(con, dados: dict, agora, aplicar: bool) -> dict` (contagens) e `extrair(ocr: str) -> list[dict]` (`{tipo, numero, emissao, validade, conferir}`), `ligar(con, titulo, ocr) -> pessoa_id | None`.
+- `main(argv)` com `--yaml` (padrão `~/OP-Gabi-fechamento/familia.yaml`), `--sem-ocr`, `--aplicar` e `--socket` (padrão `GABI_FONTES_SOCKET`). Sem `--aplicar` nada é gravado (tudo numa transação desfeita, ou só contagem).
+- Etapa yaml, exatamente como na spec: ligação por `id`; documentos de pessoa viram propostas `origem='carga'` (emissor de `emissor`/`autoridade_emissora`, emissão de `emissao`/`expedicao`, data só `YYYY-MM-DD` válida, `conferir` para CPF sem DV e passaporte/cnh sem validade); contato (`telefone`, `nascimento`, `enderecos`, `apelido`) via `contato.atualizar` com `quem='carga'`, só quando vazio ou sem linha em `pessoa_historico` para o campo, senão conta divergência; empresa: `documentos` e `dados_bancarios` diferentes atualizam `empresa.dados` e gravam `decisao` "carga atualizou <campo> da empresa <id>" sem valor; pets e `obrigacoes` só conferem; `matriz_de_acesso`, `assistente`, `documento` ignorados.
+- Etapa OCR: busca pelos termos da spec; propõe só documento que não existe ou campo vazio (com `paperless_id`); OCR divergente do yaml/ativo sai `conferir=1`.
+- Expressões OCR:
   - CPF `\d{3}\.?\d{3}\.?\d{3}-?\d{2}`, com DV;
   - passaporte BR `[A-Z]{2}\d{6}`;
   - datas `dd/mm/aaaa` e `dd mmm aaaa` (em inglês e português) perto de "validade", "valid until", "date of expiry" ou "expira";
   - RG `\d{1,2}\.?\d{3}\.?\d{3}-?[\dxX]`;
   - CNH: 11 dígitos perto de "registro".
-- [ ] Testes que falham (OCR de exemplo, sem dado real):
-  - CPF válido vem com `conferir=False`, e DV inválido com `conferir=True`.
-  - Passaporte com validade.
-  - Data dd/mm lida como BR, e mais de uma data candidata dá `conferir=True` (Review Focus 4).
-  - Sem `--aplicar`, nenhuma linha é gravada.
-  - Com `--aplicar`, as propostas saem com `origem='carga'`.
+- A saída mostra só contagens (lista da spec), nunca número, nome de arquivo com dado ou valor.
+- [ ] Testes que falham (yaml e OCR de exemplo, sem dado real; nunca ler o `familia.yaml` real nos testes):
+  - Mascarado: proposta aponta para ele; aprovar troca o número e não cria segundo documento; dígitos visíveis que não batem dão `conferir=1`.
+  - yaml: ligação por id; id ausente conta "sem cadastro"; tipo normalizado; data inválida descartada; CPF com DV inválido `conferir=1`; passaporte sem validade `conferir=1`.
+  - Contato: grava em campo vazio e em campo nunca editado (com histórico `quem='carga'`); campo com linha em `pessoa_historico` não muda e conta divergência; valor igual não grava.
+  - Empresa: `dados_bancarios` diferente atualiza e grava `decisao` sem o valor.
+  - Rodar duas vezes com `--aplicar` não duplica propostas nem histórico.
+  - OCR: CPF válido `conferir=False`, DV inválido `True`; passaporte com validade; data dd/mm lida como BR, e mais de uma data candidata dá `conferir=True` (Review Focus 4); OCR divergente do ativo `conferir=1`.
+  - Sem `--aplicar`, nenhuma linha é gravada; com `--aplicar`, as propostas saem com `origem='carga'`.
   - A saída não contém número.
-- [ ] Rodar e ver falhar. [ ] Implementar. [ ] Rodar. [ ] Commit `feat(tools): carga inicial da família pelo OCR do Paperless`.
+- [ ] Rodar e ver falhar. [ ] Implementar. [ ] Rodar `tests/test_carga_familia.py tests/familia -q` e a suíte. [ ] Commit `feat(tools): carga da família pelo familia.yaml e pelo OCR do Paperless`.
 
 ### Task 11: Documentação
 **Files:**

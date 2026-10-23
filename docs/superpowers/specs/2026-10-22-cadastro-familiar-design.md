@@ -10,7 +10,7 @@ O Hermes responde a perguntas sobre a família e seus documentos, por exemplo "q
 2. **Como os dados mudam (opção C).** Contato (telefone, e-mail, endereço, apelido, parentesco, aniversário) o Hermes grava direto quando o Ricardo dita, com histórico e desfazer. Documento (número, emissão, validade) só por proposta aprovada no painel.
 3. **Quem entra:** todas as pessoas que já estão em `pessoa` (18 em 22/10). Ninguém é cadastrado em dobro.
 4. **Onde fica:** tabelas novas `pessoa_documento`, `pessoa_historico` e `pessoa_proposta`. O contato segue no `dados` da `pessoa`.
-5. **Carga inicial:** o assistente lê o OCR do Paperless e gera propostas; o Ricardo só aprova. Leitura duvidosa entra marcada "conferir", nunca como chute.
+5. **Carga inicial:** primeiro o `familia.yaml` da base cadastral antiga (OP-Gabi), depois o OCR do Paperless como complemento; tudo vira proposta e o Ricardo só aprova. Leitura duvidosa entra marcada "conferir", nunca como chute. (Revisto em 23/10 pelo Ricardo.)
 6. **Ordem** (issue #3): 1) cadastro familiar; 2) texto do OCR no MCP e correção de `docs/fontes/paperless.md`; 3) confiabilidade.
 7. **Exceções aceitas** (ADR-025): número de documento no canal; R1 parcial para contato; tabelas novas sem o mês de uso; a volta do dado sensível que a ADR-023 tinha cortado.
 
@@ -68,14 +68,33 @@ O Hermes responde a perguntas sobre a família e seus documentos, por exemplo "q
 - Histórico com Desfazer.
 
 ### Carga inicial: `tools/carga_familia.py`
+Revisto em 23/10: o `familia.yaml` (base cadastral antiga, conferida pelo Ricardo) é a fonte principal; o OCR completa.
+
+**Achado de 23/10:** o brain já foi carregado em 08/10 (`gabi/importar.py`) com uma cópia **mascarada** dessa base (`***.***.***-12`); a migração 0077 copiou esses números mascarados para `pessoa_documento` (`origem='legado'`). Pessoas, pets, empresas e a pensão já estão lá; o que falta é o número completo e o que mudou depois de 08/10. O Ricardo pediu "trazer tudo".
+
+**Etapa 1, `familia.yaml`** (`--yaml`, padrão `~/OP-Gabi-fechamento/familia.yaml`; lido no lugar, nunca copiado para o repositório; lido com `yaml.safe_load`):
+- **Ligação:** pelo `id` do yaml, que é o mesmo `pessoa.id`/`empresa.id` do brain (a importação de 08/10 usou esses ids). Id ausente no brain: nada é criado, entra na contagem "sem cadastro".
+- **Documentos de pessoa:** cada item de `documentos` com `numero` vira proposta com `origem='carga'`: `tipo` normalizado como na migração 0077 (desconhecido vira `outro`); `numero`; `emissor` (de `emissor` ou `autoridade_emissora`); `emissao` (de `emissao` ou `expedicao`) e `validade` só quando a data for `YYYY-MM-DD` válida.
+  - **Substitui o mascarado:** se a pessoa tem documento ativo do mesmo `tipo` e `pais` cujo número contém `*`, a proposta aponta para ele (`documento_id`); aprovar troca o número mascarado pelo completo (é uma atualização, não um segundo documento). Os dígitos visíveis do mascarado precisam bater com o fim do número novo; se não baterem, a proposta sai com `conferir=1`.
+  - Isso vale para toda proposta, não só para a carga: `propor` aponta para o documento mascarado do mesmo `tipo` e `pais`, e `decidir`, ao aprovar sobre documento mascarado, grava também o `numero`.
+  - Documento igual a um ativo (mesma regra de deduplicação das propostas) não gera proposta.
+  - `conferir=1` também quando o CPF não passa no DV, ou falta a `validade` num `passaporte` ou `cnh`.
+- **Contato de pessoa:** `telefone`, `nascimento`, `enderecos` e `apelido` do yaml são gravados direto, com histórico (`quem='carga'`) e desfazer, quando o campo está vazio ou nunca foi editado depois da importação de 08/10 (nenhuma linha em `pessoa_historico` para aquele campo). Campo já editado pelo Ricardo, pelo painel ou pelo Hermes, não é sobrescrito: conta como divergência. Valor igual não grava nada.
+- **Empresas:** os campos de `empresa.dados` que diferem do yaml (`documentos`, como o NIF completo, e `dados_bancarios`) são atualizados no lugar; cada troca grava em `decisao` "carga atualizou <campo> da empresa <id>" (sem valor). Empresa não tem proposta nem tela própria nesta fase.
+- **Pets e `obrigacoes`:** já estão iguais no brain; a carga só confere e conta divergência, sem gravar.
+- **Fora:** `matriz_de_acesso`, `assistente`, `documento` (configuração da época do OpenClaw).
+- **PyYAML** entra como dependência do brain (só a carga usa).
+
+**Etapa 2, OCR do Paperless (complemento):**
 - **Busca:** a ponte procura no Paperless pelos tipos (`cpf`, `rg`, `cnh`, `passaporte`, `identidade`, `carteira de motorista`), por título e OCR.
 - **Extração sem modelo, por expressões fixas sobre o OCR:**
   - CPF com DV;
   - número de passaporte (2 letras e 6 dígitos, para o BR) e as datas próximas a "validade", "expiry" ou "date of expiry";
   - RG e CNH (número e validade).
 - **Ligação com a pessoa:** pelo nome no título ou no OCR, via `resolver_pessoa`. Sem pessoa única, o documento fica de fora e só entra na contagem.
-- **Resultado:** cria propostas com `origem='carga'`. Fica `conferir=1` quando falta DV, a data está ambígua ou há mais de um candidato.
-- A saída mostra só contagens. Uso: `python -m tools.carga_familia [--aplicar]`; sem `--aplicar`, só conta.
+- **Resultado:** proposta com `origem='carga'` e `paperless_id` quando o documento não existe, ou quando completa um campo vazio (por exemplo, a `validade` que faltava no yaml). Quando o OCR diverge do que veio do yaml, a proposta sai com `conferir=1`, e a ficha mostra a divergência. Fica `conferir=1` também quando falta DV, a data está ambígua ou há mais de um candidato.
+
+**Saída e uso:** só contagens (pessoas e empresas lidas, sem cadastro, propostas, das quais substituem mascarado, `conferir`, contatos gravados, divergências, campos de empresa atualizados, documentos do Paperless lidos), nunca número. Uso: `python -m tools.carga_familia [--yaml CAMINHO] [--sem-ocr] [--aplicar]`; sem `--aplicar`, só conta. Rodar de novo não duplica nada.
 
 ## Parte B · Consulta documental (issue #3, item 2)
 - `PERMITIDOS["paperless"]` ganha `texto`, que já existe em `gabi/fontes/paperless.py`: é o OCR do documento.
@@ -114,7 +133,7 @@ Sem rede.
 - Auditoria sem número.
 - MCP: as 5 ferramentas, escopo, lista exata de 26.
 - API e boss; vitest da aba Família.
-- Carga: expressões de CPF, passaporte e datas sobre OCR de exemplo, `conferir`, sem `--aplicar` não grava.
+- Carga: yaml de exemplo (ligação por id, normalização de tipo, data inválida descartada, proposta que substitui o mascarado e aprovar atualiza em vez de duplicar, dígitos visíveis que não batem dão `conferir`, contato gravado em campo vazio ou nunca editado, campo editado pelo Ricardo não é sobrescrito, empresa atualizada com `decisao` sem valor, sem cadastro contado, rodar duas vezes não duplica); expressões de CPF, passaporte e datas sobre OCR de exemplo; OCR divergente do yaml sai `conferir=1`; sem `--aplicar` não grava.
 - Partes B e C como descrito acima.
 
 ## Fora desta fase
