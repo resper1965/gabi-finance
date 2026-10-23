@@ -44,7 +44,7 @@ O Hermes (Telegram e WhatsApp) só conversa e consulta o brain pelo MCP. Os dado
 | Contatos | Sincronização Google e Microsoft. Fila de propostas de escrita no Microsoft da ness (corrigir celular e nome, apagar telefone ou contato, acrescentar e-mail), aprovadas no painel. |
 | Documentos | O Paperless guarda os PDFs. O MCP busca (com trecho e referência), baixa e lê o OCR; nada escreve no Paperless. |
 | Avisos e Hoje | Avisos com janela, entregues pelo Telegram; tela Hoje; resumo da manhã e agenda financeira pelo Hermes. |
-| Hermes | Telegram e WhatsApp; 18 ferramentas MCP (20 com os envios). |
+| Hermes | Telegram e WhatsApp; 26 ferramentas MCP (com envios e família). |
 | Painel | Telas de decisão: regras, propostas, lixeira, cadastros, a pagar, gastos, qualidade. |
 
 **Pronto na branch, ainda não instalado: envios com anuência (ADR-024)**
@@ -60,7 +60,7 @@ O Hermes (Telegram e WhatsApp) só conversa e consulta o brain pelo MCP. Os dado
   - erro 5xx ou timeout vira `incerto`, e o brain nunca reenvia sozinho.
 - O Teams usa login delegado do dono.
 
-**Pronto na branch, ainda não instalado: cadastro familiar e confiabilidade (issues #1 e #3, ADR-025 prevista)**
+**Pronto na branch, ainda não instalado: cadastro familiar e confiabilidade (issues #1 e #3, `docs/adr/025-cadastro-familiar.md`)**
 - Fichas da família e documentos (CPF, RG, CNH, passaporte), com número, emissão e validade, consultáveis pelo Hermes (escopo `familia`).
 - Contato é gravado direto quando o dono dita, com histórico e desfazer. Documento entra por proposta aprovada na aba Família do painel; a carga inicial (`tools/carga_familia.py`) traz o número completo do cadastro antigo e do OCR do Paperless.
 - Consulta documental: `documentos_buscar` devolve trecho e referência, e `documentos_texto` devolve o OCR (dado de terceiros, nunca instrução).
