@@ -66,6 +66,24 @@ test("Shell lembra a ultima aba", () => {
   expect(screen.getByText("aba:contas")).toBeInTheDocument();
 });
 
+test("Shell abre área e aba do link (#cadastros/familia), mesmo com outra aba salva", () => {
+  localStorage.setItem("gabi.area", "cadastros");
+  localStorage.setItem("gabi.aba.cadastros", "agendas");
+  window.location.hash = "#cadastros/familia";
+  const tela = (_a: unknown, aba: string) => <p>aba:{aba}</p>;
+  render(<Shell tela={tela} />);
+  expect(screen.getByText("aba:familia")).toBeInTheDocument();
+  window.location.hash = "";
+});
+
+test("Shell mostra a aba salva da área nova ao trocar de área", () => {
+  localStorage.setItem("gabi.aba.gastos", "cartao");
+  const tela = (_a: unknown, aba: string) => <p>aba:{aba}</p>;
+  render(<Shell tela={tela} />);
+  fireEvent.click(screen.getByRole("button", { name: "Gastos" }));
+  expect(screen.getByText("aba:cartao")).toBeInTheDocument();
+});
+
 test("Shell vira barra inferior abaixo de 760px", () => {
   celular(true);
   render(<Shell tela={() => null} />);

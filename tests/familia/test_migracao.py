@@ -88,3 +88,4 @@ def test_indice_unico_das_propostas_abertas(tmp_path):
         con.execute(ins, ("pendente",))
     con.execute(ins, ("recusada",))
     con.execute(ins, ("recusada",))
+

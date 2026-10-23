@@ -66,14 +66,14 @@ def ficha_da_pessoa(pessoa_id: str, request: Request):
 
 @router.get("/propostas")
 def listar_propostas(request: Request, estado: str = "pendente"):
-    """Propostas de documento no estado dado, com o documento atual e o proposto."""
+    """Propostas de documento no estado dado, com o documento atual e o proposto, e a URL base do Paperless (ou null) para os links."""
     con = _con(request)
     try:
         try:
             itens = dc.listar_propostas(con, estado)
         except ErroFamilia as e:
             raise _erro(e) from None
-        return envelope(con, {"itens": itens}, agora=_agora(request))
+        return envelope(con, {"itens": itens, "paperless_url": _paperless_url(con)}, agora=_agora(request))
     finally:
         con.close()
 

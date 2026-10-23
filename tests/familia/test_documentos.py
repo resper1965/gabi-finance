@@ -208,3 +208,25 @@ def test_carga_nao_repropoe_numero_recusado_e_hermes_sim(con):
     documentos.decidir(con, pid, "recusada", "ricardo", AGORA)
     assert _propor(con, numero="ab 123456", origem="carga") is None
     assert _propor(con, numero="AB123456", origem="hermes") is not None
+
+
+def test_mesmo_numero_em_pais_diferente_e_outra_proposta(con):
+    br = _propor(con, numero="AB123456", pais="BR")
+    pt = _propor(con, numero="AB123456", pais="PT")
+    assert pt is not None and pt != br
+    assert _propor(con, numero="ab-123456", pais="PT") == pt
+
+
+def test_recusa_num_pais_nao_bloqueia_a_carga_no_outro(con):
+    pid = _propor(con, numero="AB123456", pais="BR", origem="carga")
+    documentos.decidir(con, pid, "recusada", "ricardo", AGORA)
+    assert _propor(con, numero="AB123456", pais="PT", origem="carga") is not None
+
+
+def test_indice_unico_das_propostas_abertas_separa_pais(con):
+    import sqlite3
+    ins = "insert into pessoa_proposta(pessoa_id,tipo,pais,numero,origem) values ('ana','passaporte',?,'1','hermes')"
+    con.execute(ins, ("BR",))
+    con.execute(ins, ("PT",))
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute(ins, ("PT",))

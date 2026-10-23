@@ -28,6 +28,7 @@ from gabi.mascara import _cpf_valido
 YAML_PADRAO = "~/OP-Gabi-fechamento/familia.yaml"
 TERMOS = ("cpf", "rg", "cnh", "passaporte", "identidade", "carteira de motorista")
 QUEM = "carga"
+LIMITE_POR_TERMO = 200
 _TIPOS = {"cpf": "cpf", "rg": "rg", "identidade": "rg", "carteira de identidade": "rg",
           "cnh": "cnh", "carteira de motorista": "cnh", "carteira nacional de habilitacao": "cnh", "habilitacao": "cnh",
           "passaporte": "passaporte"}  # o mesmo mapa da migração 0077
@@ -469,7 +470,8 @@ def _item_ocr(con, pid: str, item: dict, paperless_id: int, agora, r: dict) -> N
     tipo, numero, alvo = item["tipo"], item["numero"], normalizar_numero(item["numero"])
     ativos = list(con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais='BR' and excluido_em is null"
                               " order by id", (pid, tipo)))
-    abertas = list(con.execute("select * from pessoa_proposta where pessoa_id=? and tipo=? and estado='pendente' order by id", (pid, tipo)))
+    abertas = list(con.execute("select * from pessoa_proposta where pessoa_id=? and tipo=? and pais='BR' and estado='pendente'"
+                               " order by id", (pid, tipo)))
     igual = next((a for a in ativos if normalizar_numero(a["numero"]) == alvo), None)
     aberta = next((p for p in abertas if normalizar_numero(p["numero"]) == alvo), None)
     conferir = item["conferir"]
@@ -498,11 +500,13 @@ def _item_ocr(con, pid: str, item: dict, paperless_id: int, agora, r: dict) -> N
 
 def _carregar_ocr(con, paperless, agora) -> dict:
     r = dict.fromkeys(("paperless_lidos", "ocr_sem_pessoa", "ocr_sem_documento", "propostas", "substituem_mascarado",
-                       "conferir", "propostas_completadas", "documentos_descartados"), 0)
+                       "conferir", "propostas_completadas", "documentos_descartados", "termos_no_limite"), 0)
     desde = _max_proposta(con)
     vistos: dict[int, dict] = {}
     for termo in TERMOS:
-        for d in paperless.docs(query=termo, page_size=100, limite=200):
+        achados = paperless.docs(query=termo, page_size=100, limite=LIMITE_POR_TERMO)
+        r["termos_no_limite"] += len(achados) >= LIMITE_POR_TERMO  # a busca pode ter cortado documentos: conta em vez de sumir calado
+        for d in achados:
             vistos.setdefault(d["id"], d)
     for pid_doc, d in sorted(vistos.items()):
         r["paperless_lidos"] += 1

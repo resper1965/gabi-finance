@@ -100,13 +100,13 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
         if con.execute("select 1 from pessoa where id=? and excluido_em is null", (pessoa_id,)).fetchone() is None:
             raise ErroFamilia("nao_encontrado")
         alvo = normalizar_numero(numero)
-        for p in con.execute("select id, numero from pessoa_proposta where pessoa_id=? and tipo=? and estado='pendente' order by id",
-                             (pessoa_id, tipo)):
+        for p in con.execute("select id, numero from pessoa_proposta where pessoa_id=? and tipo=? and pais=? and estado='pendente'"
+                             " order by id", (pessoa_id, tipo, pais)):
             if normalizar_numero(p["numero"]) == alvo:
                 return p["id"]
         # A carga não repropõe o que o Ricardo já recusou (rodar de novo não desfaz a decisão); o Hermes pode.
         if origem == "carga" and any(normalizar_numero(p["numero"]) == alvo for p in con.execute(
-                "select numero from pessoa_proposta where pessoa_id=? and tipo=? and estado='recusada'", (pessoa_id, tipo))):
+                "select numero from pessoa_proposta where pessoa_id=? and tipo=? and pais=? and estado='recusada'", (pessoa_id, tipo, pais))):
             return None
         ativo = _ativo(con, pessoa_id, tipo, pais, numero)
         if ativo is not None:

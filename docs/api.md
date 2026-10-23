@@ -81,7 +81,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/familia/fichas/{pessoa_id}` | Ficha completa, com os números dos documentos, e a URL base do Paperless (ou null) para os links. |
 | GET | `/api/v1/familia/historico` | Mudanças de contato, da mais nova para a mais antiga; `pessoa` filtra pelo id. |
 | POST | `/api/v1/familia/historico/{historico_id}/desfazer` | Restaura o valor anterior se o contato ainda estiver como a mudança deixou (senão 409). |
-| GET | `/api/v1/familia/propostas` | Propostas de documento no estado dado, com o documento atual e o proposto. |
+| GET | `/api/v1/familia/propostas` | Propostas de documento no estado dado, com o documento atual e o proposto, e a URL base do Paperless (ou null) para os links. |
 | POST | `/api/v1/familia/propostas/{proposta_id}/decisao` | Aprova ou recusa a proposta pendente (`{"estado": "aprovada"|"recusada"}`). |
 | GET | `/api/v1/familia/vencimentos` | Documentos que vencem nos próximos `meses` (e os vencidos há até 30 dias), sem número. |
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro ou parada. |

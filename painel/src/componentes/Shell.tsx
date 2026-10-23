@@ -48,9 +48,20 @@ function Selo({ n }: { n?: number }) {
 
 const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
+/** #envios ou #cadastros/familia (área/aba) na URL abre essa tela na carga, p.ex. o link que o brain manda no WhatsApp. */
+function gravarLinkDaUrl(): null {
+  const [id, aba] = window.location.hash.replace(/^#/, "").split("/");
+  const alvo = AREAS.find((a) => a.id === id);
+  if (!alvo) return null;
+  gravarLocal("gabi.area", id);
+  if (alvo.abas.some(([x]) => x === aba)) gravarLocal(`gabi.aba.${id}`, aba);
+  return null;
+}
+
 export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const celular = useCelular();
   const [sinoAberto, setSinoAberto] = useState(false);
+  useState(gravarLinkDaUrl); // antes dos useLocal abaixo, que já leem o que o link gravou
   const [areaId, setAreaId] = useLocal("gabi.area", "hoje");
   const [recolhido, setRecolhido] = useLocal("gabi.menu", "0");
   const [tema, setTema] = useLocal("gabi.tema", "claro");
@@ -62,9 +73,6 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const aba = area.abas.some(([id]) => id === abaSalva) ? abaSalva : area.abas[0][0];
   const mini = recolhido === "1" && !celular;
   const pad = celular ? 14 : 28;
-
-  // #envios (ou outro id de área) na URL abre essa área na carga, p.ex. o link que o brain manda no WhatsApp
-  useEffect(() => { const id = window.location.hash.replace(/^#/, ""); if (AREAS.some((a) => a.id === id)) setAreaId(id); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ir = (id: string, aba?: string) => { if (aba) gravarLocal(`gabi.aba.${id}`, aba); setAreaId(id); setMais(false); };
 

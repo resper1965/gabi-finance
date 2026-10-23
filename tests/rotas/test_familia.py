@@ -74,6 +74,7 @@ def test_propostas_listar_e_decidir(cli, banco):
     pid = _proposta(banco)
     itens = _get(cli, "/api/v1/familia/propostas").json()["dados"]["itens"]
     assert [i["id"] for i in itens] == [pid] and itens[0]["proposto"]["tipo"] == "rg"
+    assert _get(cli, "/api/v1/familia/propostas").json()["dados"]["paperless_url"] is None  # base dos links "Paperless #id"
     assert _get(cli, "/api/v1/familia/propostas?estado=x").status_code == 400
     assert _post(cli, f"/api/v1/familia/propostas/{pid}/decisao", {"estado": "talvez"}).status_code == 400
     assert _post(cli, f"/api/v1/familia/propostas/{pid}/decisao", {}).status_code == 400

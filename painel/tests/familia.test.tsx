@@ -32,7 +32,7 @@ function fake(ficha = FICHA()) {
     if (metodo !== "GET") return ok({});
     if (/\/fichas\/p1/.test(url)) return ok(ficha);
     if (/\/fichas/.test(url)) return ok({ itens: [{ id: "p1", nome: "Ana", apelido: "Aninha", parentesco: "filha", nascimento: "2015-03-04", documentos_qtd: 2 }] });
-    if (/\/propostas/.test(url)) return ok({ itens: [PROPOSTA] });
+    if (/\/propostas/.test(url)) return ok({ itens: [PROPOSTA], paperless_url: ficha.paperless_url });
     if (/\/historico/.test(url)) return ok({ itens: [HIST] });
     return ok({ itens: [] });
   }));
@@ -93,6 +93,16 @@ test("proposta mostra atual e proposto, etiqueta conferir, e Aprovar posta a dec
   fireEvent.click(screen.getByRole("button", { name: /Aprovar proposta 5/ }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0]).toMatchObject({ metodo: "POST", url: "/api/v1/familia/propostas/5/decisao", corpo: { estado: "aprovada" } });
+});
+
+test("proposta lida do Paperless leva ao documento para conferir a data", async () => {
+  const P = { ...PROPOSTA, proposto: { ...PROPOSTA.proposto, paperless_id: 88 } };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true, status: 200, json: async () => env(
+    /\/propostas/.test(url) ? { itens: [P], paperless_url: "https://paperless.exemplo" } : /\/fichas$/.test(url) ? { itens: [] } : { itens: [] }) }) as Response));
+  montar();
+  const a = await screen.findByRole("link", { name: /Paperless #88/ });
+  expect(a.getAttribute("href")).toBe("https://paperless.exemplo/documents/88/details");
+  expect(a.closest("li")!.textContent).toContain("2031");
 });
 
 test("Desfazer chama /historico/{id}/desfazer", async () => {

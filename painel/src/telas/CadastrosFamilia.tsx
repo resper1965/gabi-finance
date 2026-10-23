@@ -86,7 +86,7 @@ export function CadastrosFamilia() {
   const { ocupado, erros, agir } = useAcao();
   const [sel, setSel] = useState<string | null>(null);
   const fichas = useApi<{ itens: Resumo[] }>("/api/v1/familia/fichas");
-  const propostas = useApi<{ itens: Proposta[] }>("/api/v1/familia/propostas?estado=pendente");
+  const propostas = useApi<{ itens: Proposta[]; paperless_url?: string | null }>("/api/v1/familia/propostas?estado=pendente");
   const historico = useApi<{ itens: Mudanca[] }>("/api/v1/familia/historico");
   const nomes = new Map((fichas.env?.dados.itens ?? []).map((p) => [p.id, p.nome]));
   const recarregar = async () => { await Promise.all([propostas.recarregar(), historico.recarregar(), fichas.recarregar()]); };
@@ -124,6 +124,7 @@ export function CadastrosFamilia() {
                       <strong>{nomes.get(p.pessoa_id) ?? p.pessoa_id}</strong> <span style={suave}>· {p.origem}</span>
                       {!!p.conferir && <span style={destaque}> conferir</span>}<br />
                       <span style={suave}>{docTexto(p.atual)}</span>{" → "}<span>{docTexto(p.proposto)}</span>
+                      {p.proposto.paperless_id != null && <> · <Paperless id={p.proposto.paperless_id} base={d.paperless_url ?? null} /></>}
                     </span>
                     <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button className="btn btn-primary" disabled={ocupado} aria-label={`Aprovar proposta ${p.id}`} onClick={() => decidir(p, "aprovada")}>Aprovar</button>
@@ -136,7 +137,7 @@ export function CadastrosFamilia() {
       </Painel>
       <Painel leitura={historico} arquivo="familia-historico">
         {(d) => (
-          <Bloco titulo="Histórico de contato" nota="Mudanças de contato feitas pelo Hermes. Desfazer só vale se o valor ainda for o da mudança.">
+          <Bloco titulo="Histórico de contato" nota="Mudanças de contato (pelo Hermes ou pela carga; cada linha diz quem). Desfazer só vale se o valor ainda for o da mudança.">
             {d.itens.length === 0 ? <Vazio frase="Nenhuma mudança registrada." /> : (
               <ul style={lista}>
                 {d.itens.map((h) => (

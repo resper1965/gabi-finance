@@ -2338,7 +2338,7 @@
   },
   "/api/v1/familia/propostas": {
    "get": {
-    "description": "Propostas de documento no estado dado, com o documento atual e o proposto.",
+    "description": "Propostas de documento no estado dado, com o documento atual e o proposto, e a URL base do Paperless (ou null) para os links.",
     "operationId": "listar_propostas_api_v1_familia_propostas_get",
     "parameters": [
      {

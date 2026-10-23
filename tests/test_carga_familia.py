@@ -474,3 +474,21 @@ def test_rodar_de_novo_nao_regrava_contato_desfeito(con):
     r = carga.carregar_yaml(con, _dados(), AGORA, aplicar=True)
     assert "apelido" not in json.loads(con.execute("select dados from pessoa where id='ana'").fetchone()[0])
     assert r["contatos_gravados"] == 0 and r["divergencias"] == 1
+
+
+def test_ocr_conta_termo_que_bateu_no_limite_da_busca(con):
+    class Cheio(PaperlessFalso):
+        def docs(self, **kw):
+            self.chamadas.append(kw)
+            return [{"id": i, "title": "Nada", "content": "nada"} for i in range(kw["limite"])] if kw["query"] == "cpf" else []
+    r = carga.carregar_ocr(con, Cheio([]), AGORA, aplicar=False)
+    assert r["termos_no_limite"] == 1  # a busca pode ter cortado documentos: aparece na contagem em vez de sumir calado
+
+
+def test_ocr_proposta_aberta_de_outro_pais_nao_e_completada(con):
+    documentos.propor(con, "bia", tipo="passaporte", numero="CD654321", pais="PT", origem="hermes", agora=AGORA)
+    papel = PaperlessFalso([{"id": 11, "title": "Passaporte Bia Paula", "content": "PASSAPORTE CD654321 Date of expiry 10 MAR 2032"}])
+    carga.carregar_ocr(con, papel, AGORA, aplicar=True)
+    pt = con.execute("select paperless_id from pessoa_proposta where pais='PT'").fetchone()
+    assert pt["paperless_id"] is None
+    assert con.execute("select count(*) from pessoa_proposta where pais='BR' and numero='CD654321' and paperless_id=11").fetchone()[0] == 1
