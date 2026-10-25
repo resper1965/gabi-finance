@@ -175,16 +175,43 @@ def _igual(atual: dict, doc: dict, paperless_id) -> bool:
             and all(any(m["nome"] == n["nome"] and chave(m["valor"]) == chave(n["valor"]) for m in atual["numeros"]) for n in doc["numeros"]))
 
 
-def pendente_igual(con, doc: dict, paperless_id=None) -> int | None:
-    """Id da proposta pendente para o mesmo titular, tipo, país e número principal. Sem titular (bem novo), também o mesmo
-    documento do Paperless: bens novos de documentos diferentes não se juntam."""
+def _pendentes_iguais(con, doc: dict, paperless_id=None) -> list:
+    """Propostas pendentes para o mesmo titular, tipo, país e número principal (as linhas, da mais antiga para a mais nova). Sem
+    titular (bem novo), também o mesmo documento do Paperless: bens novos de documentos diferentes não se juntam."""
     def k(o, pl):
         return (o["titular_tipo"], o["titular_id"], o["tipo"], o["pais"], _principal(o), pl if o["titular_id"] is None else None)
     alvo = k(doc, paperless_id)
-    for p in con.execute("select id, doc, paperless_id from documento_proposta where estado='pendente' order by id"):
-        if k(json.loads(p["doc"]), p["paperless_id"]) == alvo:
-            return p["id"]
-    return None
+    return [p for p in con.execute("select id, doc, paperless_id from documento_proposta where estado='pendente' order by id")
+            if k(json.loads(p["doc"]), p["paperless_id"]) == alvo]
+
+
+def _recusada(con, doc: dict, paperless_id) -> bool:
+    """O Ricardo já recusou isto: mesmo titular, tipo, país, número principal e datas; ou o mesmo documento do Paperless com o mesmo
+    número principal. Vale também para as recusas copiadas da família pela 0081."""
+    alvo = _principal(doc)
+    for p in con.execute("select doc, paperless_id from documento_proposta where estado='recusada'"):
+        try:
+            r = json.loads(p["doc"])
+            if _principal(r) != alvo:
+                continue
+            if paperless_id is not None and p["paperless_id"] == paperless_id:
+                return True
+            if ((r["titular_tipo"], r["titular_id"], r["tipo"], r["pais"]) == (doc["titular_tipo"], doc["titular_id"], doc["tipo"], doc["pais"])
+                    and {x["tipo"]: x["data"] for x in r.get("datas") or []} == {x["tipo"]: x["data"] for x in doc["datas"]}):
+                return True
+        except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+            continue  # proposta antiga com formato estranho não bloqueia nada
+    return False
+
+
+def _vence(doc: dict) -> list[str]:
+    return [x["data"] for x in doc["datas"] if x["tipo"] in DATAS_VENCE]
+
+
+def _mais_antiga(atual: dict, doc: dict) -> bool:
+    """Todas as datas de vencimento propostas são anteriores à última do documento ativo (scan antigo do mesmo documento)."""
+    novas, velhas = _vence(doc), _vence(atual)
+    return bool(novas) and bool(velhas) and max(novas) < max(velhas)
 
 
 def _titular_existe(con, doc: dict) -> bool:
@@ -203,9 +230,14 @@ def inserir_proposta(con, doc: dict, *, documento_id, paperless_id, conferir: bo
 
 def propor(con, doc: dict, *, origem: str, paperless_id: int | None, conferir: bool, motivos: list[str], agora: dt.datetime,
            bem_novo: dict | None = None) -> int | None:
-    """Cria a proposta e devolve o id. None se o documento ativo já tem esses valores; se já há pendente igual (titular, tipo,
-    país e número principal), o id dela. Com o mesmo número principal de um ativo, a proposta o substitui (`documento_id`).
-    Sem titular, só com `bem_novo` (o bem nasce na aprovação)."""
+    """Cria a proposta e devolve o id; None se não há o que propor. Na ordem:
+    - leitura e carga: None se o Ricardo já recusou isto (`_recusada`); pelo Hermes (o próprio Ricardo) pode propor de novo;
+    - None se o documento ativo já tem esses valores, ou se todas as datas de vencimento são mais antigas que as dele (scan antigo);
+    - pendente igual (titular, tipo, país e número principal) do mesmo documento do Paperless: atualizada no lugar (doc, motivos,
+      conferir, bem novo) e o id dela; de outro documento com as mesmas datas, o id dela; com datas diferentes, uma proposta nova
+      (as duas ficam visíveis ao Ricardo).
+    Com o mesmo número principal de um ativo, a proposta o substitui (`documento_id`). Sem titular, só com `bem_novo` (o bem nasce
+    na aprovação)."""
     if origem not in ORIGENS:
         raise ErroDocumentos("requisicao_invalida")
     doc, paperless_id = validar(doc), _paperless(paperless_id)
@@ -218,12 +250,23 @@ def propor(con, doc: dict, *, origem: str, paperless_id: int | None, conferir: b
                 raise ErroDocumentos("titular_invalido")
         elif not _titular_existe(con, doc):
             raise ErroDocumentos("titular_invalido")
-        aberta = pendente_igual(con, doc, paperless_id)
-        if aberta is not None:
-            return aberta
-        atual = ativo(con, doc) if doc["titular_id"] is not None else None
-        if atual is not None and _igual(atual, doc, paperless_id):
+        if origem in ("leitura", "carga") and _recusada(con, doc, paperless_id):
             return None
+        atual = ativo(con, doc) if doc["titular_id"] is not None else None
+        if atual is not None and (_igual(atual, doc, paperless_id) or _mais_antiga(atual, doc)):
+            return None
+        abertas = _pendentes_iguais(con, doc, paperless_id)
+        mesma = next((p for p in abertas if p["paperless_id"] == paperless_id), None)
+        if mesma is not None:
+            con.execute("update documento_proposta set doc=?, documento_id=?, bem_novo=?, conferir=?, motivos=? where id=?",
+                        (json.dumps(doc, ensure_ascii=False), atual["id"] if atual else None,
+                         json.dumps(bem_novo, ensure_ascii=False) if bem_novo else None, 1 if conferir else 0,
+                         json.dumps(list(motivos), ensure_ascii=False), mesma["id"]))
+            return mesma["id"]
+        datas = {x["tipo"]: x["data"] for x in doc["datas"]}
+        for p in abertas:
+            if {x["tipo"]: x["data"] for x in json.loads(p["doc"])["datas"]} == datas:
+                return p["id"]
         return inserir_proposta(con, doc, documento_id=atual["id"] if atual else None, paperless_id=paperless_id, conferir=conferir,
                                 motivos=motivos, origem=origem, criada_em=ts(agora), bem_novo=bem_novo)
 
@@ -286,6 +329,17 @@ def _alvo(con, p, doc: dict) -> dict | None:
     return ativo(con, doc)
 
 
+def _sem_vazios(campos: dict) -> dict:
+    """Correção: número ou data com valor vazio é removido da lista (o resto `validar` confere)."""
+    def vazio(v):
+        return v is None or (isinstance(v, str) and not v.strip())
+    saida = dict(campos)
+    for chave_lista, campo in (("numeros", "valor"), ("datas", "data")):
+        if isinstance(saida.get(chave_lista), list):
+            saida[chave_lista] = [x for x in saida[chave_lista] if not (isinstance(x, dict) and vazio(x.get(campo)))]
+    return saida
+
+
 def _quem(doc: dict) -> str:
     if doc["titular_tipo"] == "pessoa" and doc["titular_id"]:
         return f"da pessoa {doc['titular_id']}"
@@ -294,11 +348,14 @@ def _quem(doc: dict) -> str:
 
 def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime, correcao: dict | None = None) -> dict:
     """Aprova (cria ou atualiza o documento e, se for o caso, o bem novo, na mesma transação) ou recusa (nada muda).
-    `correcao` troca campos do documento proposto antes de aprovar; trocar o titular descarta o bem novo. Já decidida: `conflito`."""
+    `correcao` troca campos do documento proposto antes de aprovar (listas `numeros` e `datas` inteiras: item com valor vazio sai,
+    item novo entra); `bem_nome` dá o nome do bem novo; trocar o titular descarta o bem novo. Já decidida: `conflito`."""
     if estado not in ("aprovada", "recusada"):
         raise ErroDocumentos("requisicao_invalida")
-    if correcao is not None and (not isinstance(correcao, dict) or set(correcao) - set(CAMPOS)):
+    if correcao is not None and (not isinstance(correcao, dict) or set(correcao) - set(CAMPOS) - {"bem_nome"}):
         raise ErroDocumentos("requisicao_invalida")
+    bem_nome = _str((correcao or {}).get("bem_nome"), 120, obrigatorio=False)
+    campos = _sem_vazios({k: v for k, v in (correcao or {}).items() if k != "bem_nome"})
     with transacao(con, imediata=True):
         p = con.execute("select * from documento_proposta where id=?", (proposta_id,)).fetchone()
         if p is None:
@@ -308,13 +365,17 @@ def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime, c
         quando, doc = ts(agora), json.loads(p["doc"])
         documento_id = bem_id = None
         if estado == "aprovada":
-            if correcao:
-                doc = validar({**doc, **correcao})
-            trocou = bool(correcao) and ("titular_id" in correcao or "titular_tipo" in correcao)
+            if campos:
+                doc = validar({**doc, **campos})
+            trocou = "titular_id" in campos or "titular_tipo" in campos
             if doc["titular_id"] is None:
                 if not p["bem_novo"] or trocou or doc["titular_tipo"] != "bem":
                     raise ErroDocumentos("titular_invalido")
-                bem_id = _criar_bem(con, _validar_bem(json.loads(p["bem_novo"])), quando)
+                bem = _validar_bem(json.loads(p["bem_novo"]))
+                if bem_nome:
+                    bem["nome"] = bem_nome
+                    con.execute("update documento_proposta set bem_novo=? where id=?", (json.dumps(bem, ensure_ascii=False), proposta_id))
+                bem_id = _criar_bem(con, bem, quando)
                 doc["titular_id"] = bem_id
             elif not _titular_existe(con, doc):
                 raise ErroDocumentos("titular_invalido")

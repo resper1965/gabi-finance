@@ -150,3 +150,12 @@ def test_vencimentos(cli, banco):
 def test_nao_boss_403(cli, metodo, url):
     r = cli.request(metodo, url, headers={**VIP, **JSON}, content="{}" if metodo == "POST" else None)
     assert r.status_code == 403
+
+
+def test_vencimentos_usa_a_data_de_brasilia(banco):
+    """U5: 22h de 22/10 em Brasília já é 23/10 em UTC; o vencimento de 22/10 ainda não venceu."""
+    agora = dt.datetime(2026, 10, 23, 1, 0, tzinfo=dt.timezone.utc)
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: agora), client=("127.0.0.1", 50000))
+    _post(cli, f"/api/v1/documentos/propostas/{_propor(banco, _doc(validade='2026-10-22'))}/decisao", {"estado": "aprovada"})
+    itens = _get(cli, "/api/v1/documentos/vencimentos?meses=3").json()["dados"]["itens"]
+    assert [(i["data"], i["vencido"]) for i in itens] == [("2026-10-22", False)]

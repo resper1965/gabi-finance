@@ -211,3 +211,78 @@ def test_bens_novos_de_documentos_diferentes_sao_propostas_diferentes(con):
     a = _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa A"})
     b = _propor(con, doc, paperless_id=42, bem_novo={"tipo": "outro", "nome": "Coisa B"})
     assert a != b and _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa A"}) == a
+
+
+# ---------------- fix wave (revisão final) ----------------
+
+def test_recusada_nao_volta_pela_leitura_nem_pela_carga(con):
+    """I1: o que o Ricardo recusou (mesmo titular, tipo, país, número e datas; ou o mesmo documento do Paperless com o mesmo
+    número) não volta como proposta da leitura nem da carga; pelo Hermes (o próprio Ricardo) pode."""
+    a = _propor(con, paperless_id=7)
+    rep.decidir(con, a, "recusada", "ricardo", AGORA)
+    assert _propor(con) is None
+    assert _propor(con, origem="carga") is None
+    assert _propor(con, _doc(numero="FK 077.009"), paperless_id=8) is None  # só formatação
+    assert _propor(con, _doc(datas={"validade": "2019-01-01"}), paperless_id=7) is None  # mesmo Paperless e número
+    assert con.execute("select count(*) from documento_proposta where estado='pendente'").fetchone()[0] == 0
+    assert _propor(con, origem="hermes") is not None
+    assert _propor(con, _doc(datas={"validade": "2035-01-01"}), paperless_id=9) is not None  # data nova: é outro documento
+
+
+def test_bem_novo_recusado_nao_volta_do_mesmo_paperless(con):
+    doc = _doc("bem", None, "apolice", "AP-1")
+    a = _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa"})
+    rep.decidir(con, a, "recusada", "ricardo", AGORA)
+    assert _propor(con, doc, paperless_id=41, bem_novo={"tipo": "outro", "nome": "Coisa"}) is None
+
+
+def test_pendente_do_mesmo_paperless_e_atualizada_no_lugar(con):
+    """I3: releitura do mesmo documento do Paperless atualiza a proposta pendente (doc, motivos, conferir)."""
+    a = _propor(con, paperless_id=5, conferir=True, motivos=["numero_nao_confere"])
+    assert _propor(con, _doc(datas={"validade": "2031-01-01"}, emissor="PF"), paperless_id=5) == a
+    p = rep.listar_propostas(con)
+    assert len(p) == 1 and p[0]["doc"]["datas"] == [{"tipo": "validade", "data": "2031-01-01"}] and p[0]["doc"]["emissor"] == "PF"
+    assert p[0]["conferir"] is False and p[0]["motivos"] == []
+
+
+def test_dois_scans_do_mesmo_numero_com_datas_diferentes_sao_duas_propostas(con):
+    """I3: CNH 2019 e CNH 2029 (mesmo número, Paperless diferentes) ficam as duas visíveis; mesma data de outro Paperless junta."""
+    velha = _propor(con, _doc(tipo="cnh", numero="C1", datas={"validade": "2019-05-01"}), paperless_id=1)
+    nova = _propor(con, _doc(tipo="cnh", numero="C1", datas={"validade": "2029-05-01"}), paperless_id=2)
+    assert velha != nova and {p["id"] for p in rep.listar_propostas(con)} == {velha, nova}
+    assert rep.listar_propostas(con)[0]["doc"]["datas"] == [{"tipo": "validade", "data": "2019-05-01"}]
+    assert _propor(con, _doc(tipo="cnh", numero="C1", datas={"validade": "2029-05-01"}), paperless_id=3) == nova
+
+
+def test_scan_mais_antigo_que_o_ativo_nao_vira_proposta(con):
+    """I3 (Minor 1): substituição com todas as datas de vencimento mais antigas que as do ativo não é proposta."""
+    _aprovado(con, _doc(tipo="cnh", numero="C1", datas={"validade": "2029-05-01"}), paperless_id=2)
+    assert _propor(con, _doc(tipo="cnh", numero="C1", datas={"emissao": "2014-05-01", "validade": "2019-05-01"}), paperless_id=1) is None
+    assert _propor(con, _doc(tipo="cnh", numero="C1", datas={"emissao": "2024-05-01"}), paperless_id=3) is not None  # sem vencimento
+
+
+def test_correcao_acrescenta_e_remove_numero_e_data(con):
+    """U2: correção acrescenta data e número que faltavam e remove os errados (valor vazio = remover)."""
+    pid = _propor(con, _doc(numeros=[{"nome": "numero", "valor": "FK077009"}, {"nome": "lixo", "valor": "ZZ1"}]))
+    rep.decidir(con, pid, "aprovada", "ricardo", AGORA, correcao={
+        "numeros": [{"nome": "numero", "valor": "FK077009"}, {"nome": "lixo", "valor": ""}, {"nome": "mrz", "valor": "P<BRA"}],
+        "datas": [{"tipo": "validade", "data": ""}, {"tipo": "emissao", "data": "2020-01-01"}]})
+    d = rep.consultar(con, titular_id="ana")[0]
+    assert d["numeros"] == [{"nome": "numero", "valor": "FK077009"}, {"nome": "mrz", "valor": "P<BRA"}]
+    assert d["datas"] == [{"tipo": "emissao", "data": "2020-01-01"}]
+    p2 = _propor(con, _doc(tipo="rg", numero="R1"))
+    assert _erro(rep.decidir, con, p2, "aprovada", "ricardo", AGORA, correcao={"numeros": [{"nome": "", "valor": "X1"}]}) == "valor_invalido"
+    assert _erro(rep.decidir, con, p2, "aprovada", "ricardo", AGORA, correcao={"datas": [{"tipo": "prazo", "data": "2030-01-01"}]}) == "valor_invalido"
+
+
+def test_bem_novo_com_nome_dado_na_aprovacao(con):
+    """U3: `bem_nome` na correção vira o nome do bem novo."""
+    doc = _doc("bem", None, "crlv", "ABC1D23")
+    pid = _propor(con, doc, paperless_id=50, bem_novo={"tipo": "veiculo", "nome": "Veículo", "dados": {}})
+    assert _erro(rep.decidir, con, pid, "aprovada", "ricardo", AGORA, correcao={"bem_nome": "x" * 121}) == "valor_invalido"
+    r = rep.decidir(con, pid, "aprovada", "ricardo", AGORA, correcao={"bem_nome": "Onix da Ana"})
+    b = {x["id"]: x for x in rep.bens(con)}[r["bem_id"]]
+    assert b["nome"] == "Onix da Ana" and b["tipo"] == "veiculo"
+    p2 = _propor(con, _doc("bem", None, "crlv", "XYZ9Z99"), paperless_id=51, bem_novo={"tipo": "veiculo", "nome": "Veículo", "dados": {}})
+    r2 = rep.decidir(con, p2, "aprovada", "ricardo", AGORA, correcao={"bem_nome": "  "})  # vazio: fica o nome proposto
+    assert {x["id"]: x for x in rep.bens(con)}[r2["bem_id"]]["nome"] == "Veículo"

@@ -1,6 +1,8 @@
 """Documentos (/api/v1/documentos): propostas e decisão (com correção e troca de titular), titulares com documentos e contato,
 vencimentos. Só o boss; os números saem completos (decisão do dono), mas a auditoria (`decisao`) e os erros nunca os levam.
 Consome: documentos.repositorio, familia.fichas (contato da pessoa), parametro `paperless.url`."""
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, Request
 
 from gabi.documentos import repositorio as rp
@@ -11,6 +13,7 @@ from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 from gabi.rotas.familia import _paperless_url
 
+BRT = ZoneInfo("America/Sao_Paulo")
 router = APIRouter(prefix="/api/v1/documentos", dependencies=[Depends(exigir("boss"))])
 
 MENSAGENS = {
@@ -81,12 +84,13 @@ def listar_titulares(request: Request):
 
 @router.get("/vencimentos")
 def listar_vencimentos(request: Request, meses: int = 12):
-    """Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias."""
+    """Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias (hoje
+    em Brasília, como o MCP)."""
     if not 1 <= meses <= 120:
         raise erro(400, "requisicao_invalida", "meses deve ficar entre 1 e 120")
     con = _con(request)
     try:
         agora = _agora(request)
-        return envelope(con, {"itens": rp.vencimentos(con, agora.date(), meses)}, agora=agora)
+        return envelope(con, {"itens": rp.vencimentos(con, agora.astimezone(BRT).date(), meses)}, agora=agora)
     finally:
         con.close()

@@ -35,11 +35,14 @@ def aparece(valor: str, ocr: str) -> bool:
     return re.search(padrao, str(ocr or ""), re.IGNORECASE) is not None
 
 
-def _prompt(titulo: str, ocr: str, max_caracteres: int) -> str:
+def _prompt(titulo: str, ocr: str, max_caracteres: int, data=None) -> str:
+    """Título, data do documento no Paperless (`created`, só se for AAAA-MM-DD) e OCR, dentro do bloco de dados (spec §2.3)."""
     def limpo(t):  # sem corridas de `=`: o texto do documento não forja marcador
         return re.sub(r"={3,}", " ", str(t or ""))
     n = secrets.token_hex(8)  # marcador novo a cada chamada: o documento não pode adivinhá-lo
-    return (f"{PROMPT}\n\n=====INICIO_{n}=====\nTítulo: {limpo(titulo)[:300]}\n\n{limpo(ocr[:max_caracteres])}\n=====FIM_{n}=====\n")
+    dia = data[:10] if isinstance(data, str) and rep._DATA.match(data[:10]) else None
+    return (f"{PROMPT}\n\n=====INICIO_{n}=====\nTítulo: {limpo(titulo)[:300]}\n" + (f"Data: {dia}\n" if dia else "")
+            + f"\n{limpo(ocr[:max_caracteres])}\n=====FIM_{n}=====\n")
 
 
 def _json(texto: str):
@@ -62,9 +65,10 @@ def _json(texto: str):
     return v
 
 
-def extrair(cliente, orcamento, titulo: str, ocr: str, max_caracteres: int) -> "dict | Falha":
-    """Modelo fraco; o forte só se o fraco não devolver JSON válido. `Falha` do correio se o orçamento, o modelo ou os dois JSONs falham."""
-    prompt = _prompt(titulo, ocr, max_caracteres)
+def extrair(cliente, orcamento, titulo: str, ocr: str, max_caracteres: int, *, data=None) -> "dict | Falha":
+    """Modelo fraco; o forte só se o fraco não devolver JSON válido. `Falha` do correio se o orçamento, o modelo ou os dois JSONs falham.
+    `data`: o `created` do Paperless (vai no prompt)."""
+    prompt = _prompt(titulo, ocr, max_caracteres, data)
     for forte in (False, True):
         r = _chamar(cliente, prompt, forte, orcamento)
         if isinstance(r, Falha):

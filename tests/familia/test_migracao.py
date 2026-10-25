@@ -208,3 +208,16 @@ def test_familia_responde_igual(tmp_path):
                                    "documentos_qtd": 3}]
     # A carga continua sem repropor o RG recusado antes da migração.
     assert documentos.propor(con, "ana", tipo="rg", numero="12.345", origem="carga", agora=AGORA) is None
+
+
+def test_0081_recusada_copiada_nao_volta_pela_leitura_nem_pela_carga(tmp_path):
+    """Fix wave I1: a recusa feita antes da 0081 (pessoa_proposta recusada) bloqueia a mesma proposta no repositório novo."""
+    from gabi.documentos import repositorio as rep
+    con = _ate_0080(tmp_path)
+    _familia_antes(con)
+    _aplicar_0081(con, tmp_path)
+    doc = {"titular_tipo": "pessoa", "titular_id": "ana", "tipo": "rg", "pais": "BR", "emissor": None,
+           "numeros": [{"nome": "numero", "valor": "12345"}], "datas": []}
+    for origem, pl in (("carga", None), ("leitura", 99)):
+        assert rep.propor(con, doc, origem=origem, paperless_id=pl, conferir=False, motivos=[], agora=AGORA) is None
+    assert con.execute("select count(*) from documento_proposta where estado='pendente'").fetchone()[0] == 1

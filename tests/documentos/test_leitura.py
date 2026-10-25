@@ -159,7 +159,7 @@ def test_falha_temporaria_ate_3_tentativas(con, monkeypatch):
 
 def test_falha_definitiva_para_a_rodada_sem_marcar(con, monkeypatch):
     monkeypatch.setattr(leitura.extracao, "extrair", lambda *a, **k: Falha("sem modelo", False))
-    r = _ler(con, Paperless(_d(1), _d(2)), None)
+    r = _ler(con, Paperless(_d(1), _d(2)), Modelo(_resp()))
     assert r.parada == "sem modelo" and _estado(con, 1) is None and _estado(con, 2) is None and r.falhas == 0
 
 
@@ -196,3 +196,67 @@ def test_main_imprime_so_contagens(tmp_path, capsys):
     out = capsys.readouterr().out
     assert out.strip() == "documentos: lidos=1 propostas=1 sem_texto=0 sem_documento=0 falhas=0"
     assert "FK077009" not in out
+
+
+# ---------------- fix wave (revisão final) ----------------
+
+def test_sem_modelo_nao_gasta_tentativa_com_extrair_de_verdade(con):
+    """I2: cliente None com o `extrair` real (sem monkeypatch): para a rodada e não toca em documento_leitura."""
+    r = _ler(con, Paperless(_d(1), _d(2)), None)
+    assert r.parada == "modelo não configurado" and r.falhas == 0
+    assert con.execute("select count(*) from documento_leitura").fetchone()[0] == 0
+
+
+def test_main_sem_modelo_sai_0_com_parada(tmp_path, capsys):
+    from gabi.documentos.__main__ import main
+    banco = tmp_path / "g.db"
+    c = conectar(banco)
+    migrar(c, MIGRACOES)
+    c.close()
+    assert main(banco, paperless=Paperless(_d(1)), cliente=None, agora=AGORA) == 0
+    assert "parada=modelo não configurado" in capsys.readouterr().out
+    c = conectar(banco)
+    assert c.execute("select count(*) from documento_leitura").fetchone()[0] == 0
+    assert c.execute("select erro from rodada where fonte='documentos'").fetchone()[0] == "parada: modelo não configurado"
+
+
+class ForaDoAr:
+    def __init__(self):
+        self.n = 0
+
+    def completar(self, prompt, *, forte):
+        self.n += 1
+        raise TimeoutError("timeout")
+
+
+def test_modelo_fora_do_ar_para_a_rodada_sem_gastar_tentativa(con):
+    """I2b: 3 falhas temporárias seguidas do modelo param a rodada e não contam tentativa para esses 3."""
+    m = ForaDoAr()
+    r = _ler(con, Paperless(*(_d(i) for i in range(1, 6))), m)
+    assert r.parada == "modelo indisponível" and r.falhas == 0 and m.n == 3
+    assert con.execute("select count(*) from documento_leitura").fetchone()[0] == 0
+    for _ in range(4):  # rodadas seguidas fora do ar nunca esgotam as tentativas
+        assert _ler(con, Paperless(*(_d(i) for i in range(1, 6))), ForaDoAr()).parada == "modelo indisponível"
+    assert con.execute("select count(*) from documento_leitura").fetchone()[0] == 0
+
+
+def test_falha_temporaria_isolada_conta_tentativa(con, monkeypatch):
+    """I2b: uma ou duas falhas temporárias seguidas de um documento que dá certo contam tentativa normalmente."""
+    respostas = iter([Falha("falha temporária do modelo", True), json.loads(_resp())])
+    monkeypatch.setattr(leitura.extracao, "extrair", lambda *a, **k: next(respostas))
+    r = _ler(con, Paperless(_d(1), _d(2)), Modelo(_resp()))
+    assert r.parada is None and r.falhas == 1 and _estado(con, 1)["tentativas"] == 1 and _estado(con, 2)["estado"] == "lido"
+
+
+def test_prompt_leva_a_data_do_documento(con):
+    """U6: a data do Paperless (`created`) vai no prompt, dentro do bloco de dados."""
+    class Guarda(Modelo):
+        def completar(self, prompt, *, forte):
+            self.prompt = prompt
+            return super().completar(prompt, forte=forte)
+    m = Guarda(_resp())
+    d = _d(1)
+    d["created"] = "2024-03-05T00:00:00-03:00"
+    _ler(con, Paperless(d), m)
+    assert "Data: 2024-03-05" in m.prompt
+    assert m.prompt.index("=====INICIO_") < m.prompt.index("Data: 2024-03-05") < m.prompt.index("=====FIM_")

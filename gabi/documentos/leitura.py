@@ -12,6 +12,8 @@ from gabi.documentos.repositorio import ErroDocumentos
 log = logging.getLogger(__name__)
 MAX_TENTATIVAS = 3
 MIN_UTEIS = 40
+MAX_FORA_DO_AR = 3  # falhas temporárias seguidas do modelo que param a rodada sem contar tentativa
+FORA_DO_AR = "falha temporária do modelo"  # a do `_chamar` quando o cliente lança exceção (queda, timeout)
 
 
 @dataclass
@@ -51,7 +53,21 @@ def _gravar(con, pid: int, modificado, estado: str, motivo: str | None, tentativ
 
 
 def ler(con, paperless, cliente, orcamento, agora: dt.datetime, *, max_por_rodada: int, max_caracteres: int) -> ResumoLeitura:
+    """Sem cliente de modelo, para antes de tudo (`parada`, nada marcado). Falha temporária do modelo conta tentativa, mas
+    MAX_FORA_DO_AR seguidas param a rodada sem contar nenhuma das três (modelo fora do ar não esgota as tentativas)."""
     r = ResumoLeitura()
+    if cliente is None:
+        r.parada = "modelo não configurado"
+        log.info("documentos: parada (modelo não configurado)")
+        return r
+    seguidas: list[tuple] = []  # falhas temporárias seguidas ainda não gravadas
+
+    def gravar_seguidas():
+        for pid_, mod_, motivo_, tent_ in seguidas:
+            _gravar(con, pid_, mod_, "falhou", motivo_, tent_ + 1, agora)
+            r.falhas += 1
+        seguidas.clear()
+
     for d, tentativas in _pendentes(con, paperless.docs(), max_por_rodada):
         pid, mod = d["id"], d.get("modified")
         try:
@@ -67,14 +83,24 @@ def ler(con, paperless, cliente, orcamento, agora: dt.datetime, *, max_por_rodad
             _gravar(con, pid, mod, "sem_texto", "ocr_curto", 0, agora)
             r.sem_texto += 1
             continue
-        extraido = extracao.extrair(cliente, orcamento, d.get("title") or "", ocr, max_caracteres)
+        extraido = extracao.extrair(cliente, orcamento, d.get("title") or "", ocr, max_caracteres, data=d.get("created"))
         if isinstance(extraido, Falha):
             if not extraido.temporaria:  # sem modelo, teto ou limite: não marca, volta na próxima rodada
+                seguidas.clear()
                 r.parada = extraido.motivo
                 break
+            if extraido.motivo == FORA_DO_AR:
+                seguidas.append((pid, mod, extraido.motivo[:80], tentativas))
+                if len(seguidas) >= MAX_FORA_DO_AR:
+                    seguidas.clear()
+                    r.parada = "modelo indisponível"
+                    break
+                continue
+            gravar_seguidas()
             _gravar(con, pid, mod, "falhou", extraido.motivo[:80], tentativas + 1, agora)
             r.falhas += 1
             continue
+        gravar_seguidas()
         doc, bem, motivos = extracao.conferir(con, extraido, ocr)
         if doc is None:
             if motivos:
@@ -94,5 +120,6 @@ def ler(con, paperless, cliente, orcamento, agora: dt.datetime, *, max_por_rodad
         _gravar(con, pid, mod, "lido", None, 0, agora)
         r.lidos += 1
         r.propostas += prop is not None
+    gravar_seguidas()
     log.info("documentos: lidos=%d propostas=%d sem_texto=%d sem_documento=%d falhas=%d", r.lidos, r.propostas, r.sem_texto, r.sem_documento, r.falhas)
     return r
