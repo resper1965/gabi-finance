@@ -1,7 +1,7 @@
 """Ferramentas MCP do escopo `familia`: cadastro da família (lista, ficha, vencimentos), contato gravado direto e documento só PROPOSTO.
 
 Número de documento só sai por `familia_consultar` (que grava a auditoria); lista, vencimentos, erros e propostas nunca o devolvem.
-Documento nunca é gravado daqui: vira proposta pendente que o Ricardo aprova no painel (Casa › Cadastros).
+Documento nunca é gravado daqui: vira proposta pendente que o Ricardo aprova no painel (Cadastros › Documentos).
 Os candidatos de um nome ambíguo voltam ao agente na mensagem, para ele perguntar ao Ricardo.
 Consome: familia.fichas (listar, ficha, resolver_pessoa, vencimentos, auditar_leitura), familia.contato.atualizar,
 familia.documentos.propor (origem 'hermes'), gabi.db.transacao, ferramentas_envios._com_link (painel.url); recebe `executar` do servidor."""
@@ -107,5 +107,5 @@ def registrar(srv, executar) -> None:
             if prop is None:
                 return {"proposta_id": None, "estado": "ja_existe"}
             l = con.execute("select estado, conferir from documento_proposta where id=?", (prop,)).fetchone()
-            return _com_link(con, {"proposta_id": prop, "estado": l["estado"], "conferir": bool(l["conferir"])}, "#cadastros/familia")
+            return _com_link(con, {"proposta_id": prop, "estado": l["estado"], "conferir": bool(l["conferir"])}, "#cadastros/documentos")
         return executar("familia_propor_documento", f)

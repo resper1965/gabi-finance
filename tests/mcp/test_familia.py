@@ -13,7 +13,8 @@ from tests.mcp.test_servidor import AGORA, HOST, banco, chamar, rpc  # noqa: F40
 
 CPF = "52998224725"
 PASSAPORTE = "FZ123456"
-FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento"}
+FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
+           "documentos_consultar", "documentos_vencimentos", "bens_listar"}
 
 
 @pytest.fixture
@@ -53,7 +54,7 @@ def test_escopo_familia_no_hermes_e_nas_ferramentas():
     assert FAMILIA <= set(ferramentas_do_token(ESCOPOS_HERMES))
 
 
-def test_token_familia_ve_as_5_ferramentas(clif, tokf):
+def test_token_familia_ve_as_8_ferramentas(clif, tokf):
     nomes = {t["name"] for t in rpc(clif, tokf["familia"], "tools/list").json()["result"]["tools"]}
     assert FAMILIA <= nomes
 
@@ -132,7 +133,7 @@ def test_propor_documento_pendente_com_link(clif, tokf, bancof):
     c = conectar(bancof)
     c.execute("insert into parametro(chave, valor) values ('painel.url', ?)", (json.dumps("https://painel.x/"),))
     d = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="rg", numero="123456", emissor="", validade="")["dados"]
-    assert d["estado"] == "pendente" and d["proposta_id"] and d["conferir"] is False and d["link"] == "https://painel.x/#cadastros/familia"
+    assert d["estado"] == "pendente" and d["proposta_id"] and d["conferir"] is False and d["link"] == "https://painel.x/#cadastros/documentos"
     p = c.execute("select origem, emissor, validade, paperless_id from familia_proposta").fetchone()
     assert (p["origem"], p["emissor"], p["validade"], p["paperless_id"]) == ("hermes", None, None, None)
     assert c.execute("select count(*) from familia_documento where pessoa_id='bia'").fetchone()[0] == 0  # só propõe

@@ -95,3 +95,138 @@ def test_paperless_fora_do_ar_da_fonte_indisponivel(banco, token):
         raise ErroPaperless("Paperless indisponível: OSError")
     with _cliente(banco, fora) as c:
         assert chamar(c, token, "documentos_texto", id=5)["erro"] == "fonte_indisponivel"
+
+
+# ---------------- documentos aprovados (escopo `familia`): documentos_consultar, documentos_vencimentos, bens_listar ----------------
+import json  # noqa: E402
+
+from tests.mcp.test_servidor import rpc  # noqa: E402
+
+PASS_LOUISE = "YB654321"
+RENAVAM = "00987654321"
+PLACA = "ABC1D23"
+DOCS_FAMILIA = {"documentos_consultar", "documentos_vencimentos", "bens_listar"}
+
+
+def _doc(c, titular_tipo, titular_id, tipo, numeros, datas=(), paperless_id=None, excluido_em=None) -> int:
+    i = c.execute("insert into documento(titular_tipo, titular_id, tipo, pais, paperless_id, origem, criado_em, atualizado_em, excluido_em)"
+                  " values (?,?,?,'BR',?,'ricardo','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z',?)",
+                  (titular_tipo, titular_id, tipo, paperless_id, excluido_em)).lastrowid
+    for n, v in numeros:
+        c.execute("insert into documento_numero(documento_id, nome, valor) values (?,?,?)", (i, n, v))
+    for t, d in datas:
+        c.execute("insert into documento_data(documento_id, tipo, data) values (?,?,?)", (i, t, d))
+    return i
+
+
+@pytest.fixture
+def bancod(banco):
+    c = conectar(banco)
+    c.execute("insert into pessoa(id, nome, dados) values ('louise','Louise Lavrik Esper','{}')")
+    c.execute("insert into bem(id, tipo, nome, dados) values ('carro','veiculo','Carro Honda',?)", (json.dumps({"placa": PLACA}),))
+    _doc(c, "pessoa", "louise", "passaporte", [("numero", PASS_LOUISE)], [("validade", "2027-01-10")], paperless_id=42)
+    _doc(c, "bem", "carro", "crlv", [("renavam", RENAVAM), ("placa", PLACA)], [("vencimento", "2026-11-30")])
+    _doc(c, "pessoa", "louise", "rg", [("numero", "SAIU-123")], excluido_em="2026-10-02T00:00:00Z")
+    c.execute("insert into parametro(chave, valor) values ('painel.url', ?)", (json.dumps("https://painel.x/"),))
+    c.execute("insert into parametro(chave, valor) values ('paperless.url', ?)", (json.dumps("https://pl.x/"),))
+    c.close()
+    return banco
+
+
+@pytest.fixture
+def tokd(bancod):
+    c = conectar(bancod)
+    t = {k: emitir(c, k, [k]) for k in ("familia", "fin")}
+    c.close()
+    return t
+
+
+@pytest.fixture
+def clid(bancod):
+    with TestClient(criar_mcp(bancod, hosts=[HOST], relogio=lambda: AGORA), base_url=f"http://{HOST}") as c:
+        yield c
+
+
+def _auditoria(banco) -> list[str]:
+    return [r["o_que"] for r in conectar(banco).execute("select o_que from decisao where origem='documentos' order by id")]
+
+
+def test_consultar_por_titular_resolvido_como_a_familia_devolve_numeros_e_link(clid, tokd, bancod):
+    d = chamar(clid, tokd["familia"], "documentos_consultar", titular="Louise")["dados"]
+    [doc] = d["itens"]
+    assert (doc["titular_nome"], doc["tipo"], doc["numeros"]) == ("Louise Lavrik Esper", "passaporte", [{"nome": "numero", "valor": PASS_LOUISE}])
+    assert doc["datas"] == [{"tipo": "validade", "data": "2027-01-10"}]
+    assert doc["paperless_link"] == "https://pl.x/documents/42/details"
+    assert d["link"] == "https://painel.x/#cadastros/documentos"
+
+
+def test_consultar_por_bem_e_por_tipo(clid, tokd):
+    [doc] = chamar(clid, tokd["familia"], "documentos_consultar", titular="carro honda")["dados"]["itens"]
+    assert doc["tipo"] == "crlv" and doc["numeros"][0] == {"nome": "renavam", "valor": RENAVAM}
+    [doc] = chamar(clid, tokd["familia"], "documentos_consultar", tipo="CRLV")["dados"]["itens"]
+    assert doc["titular_id"] == "carro" and doc["paperless_link"] is None
+
+
+def test_consultar_por_texto_renavam(clid, tokd):
+    [doc] = chamar(clid, tokd["familia"], "documentos_consultar", texto="renavam")["dados"]["itens"]
+    assert doc["tipo"] == "crlv" and RENAVAM in json.dumps(doc)
+
+
+def test_consultar_sem_filtro_traz_os_ativos_e_nunca_o_excluido(clid, tokd):
+    r = chamar(clid, tokd["familia"], "documentos_consultar")
+    assert {d["tipo"] for d in r["dados"]["itens"]} == {"passaporte", "crlv"} and "SAIU-123" not in json.dumps(r)
+
+
+def test_consultar_titular_desconhecido_ou_ambiguo(clid, tokd, bancod):
+    r = chamar(clid, tokd["familia"], "documentos_consultar", titular="Zé")
+    assert r["erro"] == "titular_ambiguo" and "nenhum" in r["mensagem"]
+    c = conectar(bancod)
+    c.execute("insert into pessoa(id, nome, dados) values ('lu','Louise Maria','{}')")
+    r = chamar(clid, tokd["familia"], "documentos_consultar", titular="Louise")
+    assert r["erro"] == "titular_ambiguo" and "Louise Maria" in r["mensagem"] and "Louise Lavrik Esper" in r["mensagem"]
+    assert _auditoria(bancod) == []
+
+
+def test_consultar_tipo_invalido(clid, tokd):
+    assert chamar(clid, tokd["familia"], "documentos_consultar", tipo="12!")["erro"] == "valor_invalido"
+
+
+def test_consultar_audita_sem_numero_nem_texto_buscado(clid, tokd, bancod):
+    chamar(clid, tokd["familia"], "documentos_consultar", titular="Louise")
+    chamar(clid, tokd["familia"], "documentos_consultar", texto=RENAVAM)
+    a = _auditoria(bancod)
+    assert len(a) == 2 and "louise" in a[0] and "passaporte" in a[0] and "crlv" in a[1]
+    tudo = json.dumps(a) + json.dumps([dict(r) for r in conectar(bancod).execute("select * from chamada_mcp")])
+    assert PASS_LOUISE not in tudo and RENAVAM not in tudo and PLACA not in tudo
+    assert conectar(bancod).execute("select quem from decisao where origem='documentos'").fetchone()["quem"] == "hermes"
+
+
+def test_vencimentos_por_data_sem_numero(clid, tokd):
+    r = chamar(clid, tokd["familia"], "documentos_vencimentos", meses=6)
+    d = r["dados"]
+    assert d["meses"] == 6 and [(i["titular_nome"], i["tipo"], i["data_tipo"], i["data"]) for i in d["itens"]] == [
+        ("Carro Honda", "crlv", "vencimento", "2026-11-30"), ("Louise Lavrik Esper", "passaporte", "validade", "2027-01-10")]
+    assert RENAVAM not in json.dumps(r) and PASS_LOUISE not in json.dumps(r)
+    assert chamar(clid, tokd["familia"], "documentos_vencimentos", meses=1)["dados"]["itens"] == []
+
+
+@pytest.mark.parametrize("meses", [0, 121, -1])
+def test_vencimentos_meses_fora_da_faixa(clid, tokd, meses):
+    assert chamar(clid, tokd["familia"], "documentos_vencimentos", meses=meses)["erro"] == "requisicao_invalida"
+
+
+def test_bens_listar(clid, tokd):
+    [b] = chamar(clid, tokd["familia"], "bens_listar")["dados"]["itens"]
+    assert (b["id"], b["tipo"], b["nome"], b["dados"]) == ("carro", "veiculo", "Carro Honda", {"placa": PLACA})
+
+
+@pytest.mark.parametrize("nome,args", [("documentos_consultar", {"titular": "Louise"}), ("documentos_vencimentos", {}), ("bens_listar", {})])
+def test_sem_escopo_familia(clid, tokd, bancod, nome, args):
+    assert chamar(clid, tokd["fin"], nome, **args)["erro"] == "sem_escopo"
+    assert _auditoria(bancod) == []
+
+
+def test_docstrings_avisam_dado_de_terceiros(clid, tokd):
+    desc = {t["name"]: t["description"] for t in rpc(clid, tokd["familia"], "tools/list").json()["result"]["tools"]}
+    for n in DOCS_FAMILIA:
+        assert "dado de terceiros" in desc[n], n

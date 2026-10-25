@@ -15,13 +15,16 @@ mcp_servers:
       include:
       - agenda_financeira
       - agenda_listar
+      - bens_listar
       - classificar_lancamento
       - decisao_responder
       - decisoes_abertas
       - despesas_por_empresa
       - documentos_baixar
       - documentos_buscar
+      - documentos_consultar
       - documentos_texto
+      - documentos_vencimentos
       - email_listar
       - familia_atualizar_contato
       - familia_consultar

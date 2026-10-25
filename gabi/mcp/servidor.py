@@ -3,7 +3,7 @@
 R1/R2/R13: leitura e propostas; a única escrita direta é o contato da família (`familia_atualizar_contato`, a pedido do Ricardo,
 com histórico e Desfazer no painel). Não existe ferramenta de enviar, pagar, apagar, aprovar ou ligar regra.
 R4: toda chamada vira `chamada_mcp`. R14: texto de terceiros chega como dado, e não há ferramenta capaz de obedecê-lo.
-Auth por Bearer (token com escopos, tokens.py). Anti DNS-rebinding: só os hosts listados. Consome: dinheiro.*, envelope, tokens, ferramentas_* (prop, dia, dec, envios, familia).
+Auth por Bearer (token com escopos, tokens.py). Anti DNS-rebinding: só os hosts listados. Consome: dinheiro.*, envelope, tokens, ferramentas_* (prop, dia, dec, envios, familia, documentos).
 """
 import contextvars
 import datetime as dt
@@ -22,7 +22,7 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_emp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_dec, ferramentas_envios, ferramentas_familia, ferramentas_prop, ferramentas_dia
+from gabi.mcp import ferramentas_dec, ferramentas_documentos, ferramentas_envios, ferramentas_familia, ferramentas_prop, ferramentas_dia
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
@@ -34,7 +34,7 @@ MIGRACOES = Path(__file__).resolve().parent.parent.parent / "migrations"
 ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin", "financeiro_lancamentos": "fin", "financeiro_contas_a_pagar": "fin", "financeiro_para_onde_vai": "fin", "agenda_financeira": "fin", "fechamento_dia": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS,
-                       **ferramentas_familia.ESCOPOS}
+                       **ferramentas_familia.ESCOPOS, **ferramentas_documentos.ESCOPOS}
 
 
 def _reais(v, chave: str = ""):
@@ -224,6 +224,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
     ferramentas_dec.registrar(srv, executar)
     ferramentas_envios.registrar(srv, executar, graph)  # só propõem; o envio é do botão Enviar do painel
     ferramentas_familia.registrar(srv, executar)  # documento só é proposto; aprovação no painel
+    ferramentas_documentos.registrar(srv, executar)  # documentos aprovados (com número, escopo familia); só leitura + auditoria
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada
