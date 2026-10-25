@@ -134,7 +134,7 @@ Somente leitura (`calendar.readonly`). `python -m gabi.agenda` (unit `gabi-brain
 
 
 ## Ferramentas de análise no Hermes (MC1) {#analise-hermes}
-Somente leitura, escopo `fin`: `financeiro_recorrentes`, `financeiro_previsao`, `despesas_por_empresa` (ADR-023: `financeiro_vazamentos` e `financeiro_rumo` saíram). **Passo do dono:** em `~/.hermes/config.yaml`, em `mcp_servers › gabi_brain › tools › include`, deixe exatamente a lista oficial de `docs/fontes/hermes.md` (hoje 29 ferramentas) e `sudo systemctl restart hermes-gateway`; reinicie também o serviço do MCP do brain para ele expor as novas.
+Somente leitura, escopo `fin`: `financeiro_recorrentes`, `financeiro_previsao`, `despesas_por_empresa` (ADR-023: `financeiro_vazamentos` e `financeiro_rumo` saíram). **Passo do dono:** em `~/.hermes/config.yaml`, em `mcp_servers › gabi_brain › tools › include`, deixe exatamente a lista oficial de `docs/fontes/hermes.md` (hoje 31 ferramentas) e `sudo systemctl restart hermes-gateway`; reinicie também o serviço do MCP do brain para ele expor as novas.
 
 
 ## Canal de decisão (DC1) {#decisoes}
@@ -198,3 +198,13 @@ Decisão: `docs/adr/027-documentos.md`; spec: `docs/superpowers/specs/2026-10-23
 - **Número "as is":** o número só vira proposta se aparece no OCR; se o OCR errou uma letra, corrija na aprovação olhando o documento.
 - **Desfazer (rollback):** ⚠️ perde tudo o que foi aprovado, recusado ou lido depois da instalação (documentos novos, bens, propostas e leituras); a família volta ao estado de antes da 0081. 1. `sudo systemctl stop gabi-brain-documentos.timer gabi-brain-api gabi-brain-mcp`; 2. backup do banco (`sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db ".backup /var/lib/gabi-brain/gabi.db.antes-rollback-documentos"`); 3. no banco, numa transação: `drop view familia_proposta; drop view familia_documento; drop table documento_leitura; drop table documento_proposta; drop table documento_data; drop table documento_numero; drop table documento; drop table bem; alter table pessoa_documento_legado rename to pessoa_documento; alter table pessoa_proposta_legado rename to pessoa_proposta; delete from schema_versao where nome='0081_documentos.sql';` (o mesmo no cabeçalho de `migrations/0081_documentos.sql`); 4. voltar o código para a main de antes do merge (`git revert` do merge de `feat/documentos` em `~/gabi-brain`) e `sudo ~/instalar-brain.sh` — sem isso a API aplica a 0081 de novo ao subir; 5. Hermes: `cp -p ~/.hermes/config.yaml.bak-antes-documentos ~/.hermes/config.yaml`, `sudo systemctl restart hermes-gateway` e `/new`.
 - **Limite:** apólice, contrato e outro podem coexistir; um mais novo do mesmo titular e tipo fecha o aviso do outro.
+
+## Hermes Onda 1: gravar de verdade, pessoa e pet {#hermes-onda1}
+Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do Ricardo, depois do merge de `feat/hermes-onda1`.
+1. `sudo ~/instalar-brain.sh` (instala o brain; sem migração nova).
+2. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-onda1`; em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`) acrescentar `familia_registrar_pessoa` e `familia_registrar_pet` (lista oficial em `docs/fontes/hermes.md`, 31 ferramentas; o escopo `familia` do token já cobre as duas).
+3. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh` (como `ricardo`; copia `deploy/hermes/SOUL.md` para `~/.hermes/SOUL.md` com backup `SOUL.md.bak-<data>`).
+4. `sudo systemctl restart hermes-gateway`.
+5. `/new` no Telegram **e** no WhatsApp (a conversa velha não vê as ferramentas nem o SOUL novos).
+6. **Conferir:** `cd ~/gabi-brain && .venv/bin/python -m tools.auditar_promessas` (somente leitura; `--desde YYYY-MM-DD` troca os 7 dias padrão). Imprime uma linha por resposta que disse "anotado/registrei/salvei..." sem escrita ok no turno, e a contagem. Depois da instalação o esperado é 0 casos novos; os anteriores são o histórico. Peça ao Hermes uma pessoa ou pet de teste e veja "Pessoa criada: …" no histórico do painel (Desfazer ali).
+- **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda1 ~/.hermes/config.yaml`, restaurar o SOUL (`cp -p ~/.hermes/SOUL.md.bak-<data> ~/.hermes/SOUL.md`), `sudo systemctl restart hermes-gateway` e `/new`. O código novo pode ficar: sem as ferramentas no `include`, o Hermes não as vê. Pessoas e pets gravados se desfazem pelo Desfazer do painel.

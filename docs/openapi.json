@@ -2388,7 +2388,7 @@
   },
   "/api/v1/familia/historico": {
    "get": {
-    "description": "Mudanças de contato, da mais nova para a mais antiga; `pessoa` filtra pelo id.",
+    "description": "Mudanças de contato, da mais nova para a mais antiga (até 200); `pessoa` filtra pelo id.",
     "operationId": "historico_de_contato_api_v1_familia_historico_get",
     "parameters": [
      {

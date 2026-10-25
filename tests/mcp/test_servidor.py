@@ -22,7 +22,7 @@ NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura d
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
 NOVAS_ENVIOS = {"propor_evento", "propor_teams"}  # só propõem; o envio sai do botão Enviar do painel
 NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
-                 "documentos_consultar", "documentos_vencimentos", "bens_listar"}
+                 "documentos_consultar", "documentos_vencimentos", "bens_listar", "familia_registrar_pessoa", "familia_registrar_pet"}
 # contato grava direto a pedido do Ricardo (histórico e Desfazer no painel); documento só é proposto
 PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
@@ -112,10 +112,10 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_29_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
+def test_sobram_exatamente_as_31_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
     assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "bens_listar", "classificar_lancamento", "decisao_responder", "decisoes_abertas",
                                            "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_listar", "familia_atualizar_contato",
-                                           "familia_consultar", "familia_listar", "familia_propor_documento", "familia_vencimentos", "fechamento_dia",
+                                           "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
                                            "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
                                            "financeiro_recorrentes", "financeiro_saldo", "propor_evento", "propor_teams", "regras_sugerir", "resumo_manha"]
 
@@ -125,7 +125,7 @@ def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar"}
     for n in nomes:
-        if n == "familia_atualizar_contato":  # escrita de contato com histórico e Desfazer (spec do cadastro familiar), nunca documento
+        if n in ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet"):  # escrita de contato com histórico e Desfazer (spec do cadastro familiar), nunca documento
             continue
         palavras = set(n.replace("contas_a_pagar", "contas").split("_"))  # "contas a pagar" é consulta, não ação
         assert not (palavras & proibidas), n
@@ -329,3 +329,18 @@ def test_previsao_sem_saldo_avisa_em_vez_de_zero(cli, banco, tokens):
     c.close()
     p = chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
     assert p["saldo_indisponivel"] is True and "não valem" in p["aviso"]
+
+
+def test_toda_ferramenta_declara_fontes():
+    from gabi.mcp.servidor import FONTES_DA_FERRAMENTA
+    assert set(FONTES_DA_FERRAMENTA) == set(ESCOPOS_FERRAMENTAS)
+
+
+def test_familia_listar_sem_fontes(cli, banco):
+    c = conectar(banco)
+    tk = emitir(c, "fam", ["familia"])
+    c.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?)", (json.dumps({"Itau": "2026-09-01T00:00:00Z"}),))
+    c.commit()
+    c.close()
+    r = chamar(cli, tk, "familia_listar")
+    assert r["desatualizado"] is False and r["fontes"] == [] and "bancos_antigos" not in r

@@ -34,7 +34,7 @@ const BEM_NOVO = { ...PROPOSTA, id: 6, titular: null, doc: { ...DOC_PROPOSTO, ti
   bem_novo: { tipo: "imovel", nome: "Apartamento Rua das Flores", dados: {} }, motivos: ["titular não encontrado"], paperless_id: null };
 const HIST = { id: 9, pessoa_id: "lia", campo: "telefones", antes: [], depois: ["+5511999990000"], quem: "hermes", quando: "2026-10-20T10:00:00", desfeito_em: null };
 
-function fake(o: { propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[]; erroPost?: { status: number; erro: string; mensagem: string } } = {}) {
+function fake(o: { hist?: unknown[]; propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[]; erroPost?: { status: number; erro: string; mensagem: string } } = {}) {
   const chamadas: Chamada[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
@@ -45,7 +45,7 @@ function fake(o: { propostas?: unknown[]; titulares?: unknown; vencimentos?: unk
     if (/\/documentos\/propostas/.test(url)) return ok({ itens: o.propostas ?? [PROPOSTA], paperless_url: "https://paperless.exemplo" });
     if (/\/documentos\/titulares/.test(url)) return ok(o.titulares ?? TITULARES);
     if (/\/documentos\/vencimentos/.test(url)) return ok({ itens: o.vencimentos ?? [] });
-    if (/\/familia\/historico/.test(url)) return ok({ itens: [HIST] });
+    if (/\/familia\/historico/.test(url)) return ok({ itens: o.hist ?? [HIST] });
     return ok({ itens: [] });
   }));
   return chamadas;
@@ -232,4 +232,25 @@ test("bem novo: o nome do bem é editável e vai na correcao", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Aprovar proposta 6" }));
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0].corpo).toEqual({ estado: "aprovada", correcao: { bem_nome: "Apto da praia" } });
+});
+
+test("histórico rotula pessoa criada e pet, e Desfazer continua igual", async () => {
+  const c = fake({ hist: [
+    { ...HIST, id: 11, campo: "criada", antes: null, depois: { nome: "Chafic Esper" } },
+    { ...HIST, id: 12, campo: "pet:cookie", antes: null, depois: { id: "cookie", nome: "Cookie", especie: "cachorro" } },
+    { ...HIST, id: 13, campo: "pet:rex", antes: { id: "rex", nome: "Rex" }, depois: null }] });
+  montar();
+  expect(await screen.findByText(/Pessoa criada: Chafic Esper/)).toBeTruthy();
+  expect(screen.getByText(/Pet: Cookie/)).toBeTruthy();
+  expect(screen.getByText(/Pet: Rex/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Desfazer mudança 11" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].url).toBe("/api/v1/familia/historico/11/desfazer");
+});
+
+test("desfazer de pessoa criada aparece como Pessoa removida com o nome", async () => {
+  fake({ hist: [{ ...HIST, id: 14, campo: "criada", antes: { nome: "Chafic Esper" }, depois: null }] });
+  montar();
+  expect(await screen.findByText(/Pessoa removida: Chafic Esper/)).toBeTruthy();
+  expect(screen.queryByText(/Pessoa criada:/)).toBeNull();
 });

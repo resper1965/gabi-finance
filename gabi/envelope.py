@@ -100,14 +100,23 @@ def bancos_antigos(con, agora: dt.datetime) -> list[dict]:
     return [x for _, x in sorted(saida, key=lambda t: (t[0], t[1]["banco"]))]
 
 
-def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
+def envelope(con, dados, agora: dt.datetime | None = None, fontes: tuple[str, ...] | None = None) -> dict:
+    """`fontes=None`: todas as fontes (comportamento padrão). Tupla: só essas fontes entram na lista e no cálculo; `()` = ferramenta sem
+    dado que envelhece (nunca desatualizado, dados_ate None). `bancos_antigos` é frescor do open-finance: só vale com `None` ou com "open-finance" na tupla."""
     agora = agora or dt.datetime.now(dt.timezone.utc)
+    if fontes is not None:
+        fontes = tuple(fontes)
+        if not fontes:
+            return {"dados_ate": None, "desatualizado": False, "proxima_rodada": proxima_rodada(agora), "fontes": [], "dados": dados}
+    filtro, fontes = fontes, None  # `fontes` abaixo é a lista de saída
     fontes, ultimas, falta, atrasada = [], [], False, False
     nomes = {r[0] for r in con.execute("select distinct fonte from rodada")}
     nomes |= set(ESPERADAS)
     nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
     nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
     nomes = sorted(n for n in nomes if n not in CORTADAS and not (n in FONTES and FONTES[n] is None))
+    if filtro is not None:
+        nomes = [n for n in nomes if n in filtro]
     espera = _em_espera(con)
     for nome in nomes:
         if nome in espera:
@@ -148,7 +157,7 @@ def envelope(con, dados, agora: dt.datetime | None = None) -> dict:
             atrasada = atrasada or (nome in COM_CONFERENCIA and estado == "parada")
         fontes.append({"nome": nome, "estado": estado, "ultima": _z(ultima) if ultima else None})
     dados_ate = None if (falta or not ultimas) else min(ultimas)  # a fonte mais velha manda
-    antigos = bancos_antigos(con, agora)
+    antigos = bancos_antigos(con, agora) if filtro is None or "open-finance" in filtro else []
     saida = {"dados_ate": _z(dados_ate) if dados_ate else None,
              "desatualizado": dados_ate is None or atrasada or bool(antigos) or agora - dados_ate > LIMITE_DESATUALIZADO,
              "proxima_rodada": proxima_rodada(agora), "fontes": fontes, "dados": dados}

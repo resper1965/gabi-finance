@@ -37,8 +37,17 @@ def test_listar_nao_traz_numero(con):
     gone = _doc(con, "ana", "cnh", "555")
     con.execute("update documento set excluido_em='2026-01-01' where id=?", (gone,))
     r = fichas.listar(con)
-    assert r == [{"id": "ana", "nome": "Ana", "apelido": "Aninha", "parentesco": None, "nascimento": "2000-01-02", "documentos_qtd": 2}]
+    assert r == [{"id": "ana", "nome": "Ana", "nome_completo": None, "apelido": "Aninha", "parentesco": None,
+                  "nascimento": "2000-01-02", "falecido": False, "observacao": None, "documentos_qtd": 2}]
     assert "11122233344" not in json.dumps(r)
+
+
+def test_ficha_e_listar_trazem_falecido_observacao_e_nome_completo(con):
+    _pessoa(con, "salim", "Salim", nome_completo="Salim Esper", falecido=True, observacao="faleceu em 2010")
+    f = fichas.ficha(con, "salim")
+    assert (f["nome_completo"], f["falecido"], f["observacao"]) == ("Salim Esper", True, "faleceu em 2010")
+    item = fichas.listar(con)[0]
+    assert (item["nome_completo"], item["falecido"], item["observacao"]) == ("Salim Esper", True, "faleceu em 2010")
 
 
 def test_ficha_dois_passaportes_e_contatos(con):

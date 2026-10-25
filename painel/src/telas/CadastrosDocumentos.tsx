@@ -24,6 +24,13 @@ interface Pessoa { id: string; nome: string; nome_completo: string | null; apeli
 interface Bem { id: string; tipo: string; nome: string; dados: Record<string, unknown>; documentos: Doc[] }
 interface Titulares { pessoas: Pessoa[]; bens: Bem[]; paperless_url: string | null }
 interface Vencimento { documento_id: number; titular_nome: string; tipo: string; data_tipo: string; data: string; vencido: boolean }
+/** Rótulo da linha do histórico: pessoa criada (ou removida, no desfazer) e pet têm texto próprio; o resto mostra o campo. */
+function rotulo(h: Mudanca): string {
+  const nome = (v: unknown) => (v && typeof v === "object" ? String((v as { nome?: unknown }).nome ?? "") : "");
+  if (h.campo === "criada") return h.depois === null ? `Pessoa removida: ${nome(h.antes)}` : `Pessoa criada: ${nome(h.depois)}`;
+  if (h.campo.startsWith("pet:")) return `Pet: ${nome(h.depois ?? h.antes)}`;
+  return h.campo;
+}
 interface Mudanca { id: number; pessoa_id: string; campo: string; antes: unknown; depois: unknown; quem: string; quando: string; desfeito_em: string | null }
 
 const suave = { color: "var(--ink2)" } as const;
@@ -295,7 +302,7 @@ export function CadastrosDocumentos() {
                 {d.itens.map((h) => (
                   <li key={h.id} style={linha}>
                     <span>
-                      <strong>{nomes.get(h.pessoa_id) ?? h.pessoa_id}</strong> <span style={suave}>· {h.campo} · {h.quem} · {dataBR(h.quando)}</span><br />
+                      <strong>{nomes.get(h.pessoa_id) ?? h.pessoa_id}</strong> <span style={suave}>· {rotulo(h)} · {h.quem} · {dataBR(h.quando)}</span><br />
                       <span style={suave}>{valor(h.antes)}</span>{" → "}<span>{valor(h.depois)}</span>
                     </span>
                     {h.desfeito_em

@@ -188,6 +188,7 @@ def test_familia_responde_igual(tmp_path):
             "paperless_id": None, "origem": None, "atualizado_em": "2026-10-02T00:00:00Z"}
     assert fichas.ficha(con, "ana") == {
         "id": "ana", "nome": "Ana", "nome_completo": None, "apelido": "Aninha", "parentesco": None, "nascimento": None,
+        "falecido": False, "observacao": None,  # campos novos da Onda 1 (I4), fora do código antigo
         "telefones": [], "emails": [], "enderecos": [],
         "documentos": [{**base, "id": 1, "tipo": "cpf", "numero": "529.982.247-25", "origem": "legado"},
                        {**base, "id": 2, "numero": "FK077009", "emissor": "PF", "emissao": "2021-11-03", "validade": "2026-11-02",
@@ -204,7 +205,8 @@ def test_familia_responde_igual(tmp_path):
                   "validade": "2026-11-02", "paperless_id": 12},
         "proposto": {"tipo": "passaporte", "pais": "BR", "numero": "FK077009", "emissor": None, "emissao": "2026-10-20",
                      "validade": "2036-10-19", "paperless_id": 15}}]
-    assert fichas.listar(con) == [{"id": "ana", "nome": "Ana", "apelido": "Aninha", "parentesco": None, "nascimento": None,
+    assert fichas.listar(con) == [{"id": "ana", "nome": "Ana", "nome_completo": None, "apelido": "Aninha", "parentesco": None,
+                                   "nascimento": None, "falecido": False, "observacao": None,  # campos novos (I4)
                                    "documentos_qtd": 3}]
     # A carga continua sem repropor o RG recusado antes da migração.
     assert documentos.propor(con, "ana", tipo="rg", numero="12.345", origem="carga", agora=AGORA) is None
