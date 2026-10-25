@@ -16,6 +16,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
+| DOC1 | Documentos (ADR-027): instalar (`sudo ~/instalar-documentos.sh`), `/new` no Hermes, aprovar as primeiras propostas na aba Documentos | R | 🔧 pronto na branch `feat/documentos`, a instalar; passos em `docs/runbook.md#documentos` | primeira rodada lida, propostas aprovadas e o Hermes responde um número com o link |
 | H7 | 7 dias de Hermes estável + backup exportado | R+C | ⛔ depende de H5 (número dedicado, lista do Ricardo) | sem queda em 7 dias |
 
 ## Decisões do Ricardo sem resposta
@@ -36,6 +37,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 - Reduzir a frequência dos timers de Teams (5 min) e agenda (15 min).
 - Microsoft Graph da ionic (G11): parado pelo administrador do tenant (`docs/fontes/graph-ionic-passo-a-passo.md`).
 - Agenda financeira diária sem LLM (cron `no_agent` do Hermes, como a semanal).
+- Documentos que coexistem (apólice, contrato, outro): um mais novo do mesmo titular e tipo fecha o aviso de vencimento do outro (ADR-027).
 
 ## Cortado em 22/10 (ADR-023)
 Escuta do WhatsApp (E1–E4), saúde (S1–S3, D8), módulo Trabalho (Frentes, Tarefas, Entregas/Linear, contatos em aberto), cobrança e reembolso PJ (C1, C2, AR2, comprovantes, pedidos), Obsidian por pessoa, perfil de normalidade (PF1), tela Configuração, 7 abas vazias do menu Gabi, ferramentas MCP sem uso (o Hermes fica com 18), índice FTS da memória. D2 (conferência travando o `dados_ate`) resolvido: a conferência só informa.
