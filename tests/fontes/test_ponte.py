@@ -315,6 +315,11 @@ class _FalsaEmail:
             raise ErroGoogleOAuth("messages.list -> 500")
         return {a: a.startswith("bia") for a in enderecos}
 
+    def mensagem(self, conta, externo_id):
+        if conta == "malformada@x.com":
+            return {"corpo": 1, "cortado": "sim"}
+        return {"corpo": "texto", "cortado": False}
+
     def segredo(self):
         return SEGREDO_EM
 
@@ -327,8 +332,8 @@ def sock_email(tmp_path):
     srv.shutdown(); srv.server_close()
 
 
-def test_ponte_permite_so_os_cinco_metodos_do_email(sock_email):
-    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a"})
+def test_ponte_sem_escrita_nova(sock_email):
+    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem"})
     assert ERROS["google_email"] is ErroGoogleOAuth
     with pytest.raises(ErroGoogleOAuth) as e:
         Ponte(sock_email, "google_email")._chamar("segredo")
@@ -408,6 +413,14 @@ def test_ponte_email_respondeu_a_cruza_e_valida_a_forma(sock_email):
     with pytest.raises(ErroGoogleOAuth) as e:
         p.respondeu_a("ruim@x.com", ["bia@x.com"])
     assert str(e.value) == "messages.list -> 500"
+
+
+def test_ponte_permite_mensagem(sock_email):
+    assert "mensagem" in PERMITIDOS["google_email"] and "mensagem" in PERMITIDOS["graph_ness"]
+    p = PonteEmail(sock_email)
+    assert p.mensagem("a@x.com", "abc123") == {"corpo": "texto", "cortado": False}
+    with pytest.raises(ErroGoogleOAuth, match="resposta inválida"):
+        p.mensagem("malformada@x.com", "abc123")
 
 
 # ---- Graph da ness pela ponte ----
@@ -495,7 +508,7 @@ def sock_graph(tmp_path):
 
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
-                                                  "enviados_recentes", "respondeu_a", "teams_chats", "teams_mensagens",
+                                                  "enviados_recentes", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
                                                   "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
                                                   "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"})
     assert ERROS["graph_ness"] is ErroGraphNess

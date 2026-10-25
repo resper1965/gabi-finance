@@ -18,7 +18,7 @@ HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
                  "financeiro_recorrentes", "financeiro_previsao", "despesas_por_empresa", "fechamento_dia"}
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "documentos_texto", "classificar_lancamento", "regras_sugerir"}
-NOVAS_FASE3 = {"agenda_listar", "email_listar", "resumo_manha"}  # só leitura do dia
+NOVAS_FASE3 = {"agenda_listar", "email_ler", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
 NOVAS_ENVIOS = {"propor_evento", "propor_teams"}  # só propõem; o envio sai do botão Enviar do painel
 NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
@@ -113,9 +113,9 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_38_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
+def test_sobram_exatamente_as_39_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
     assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
-                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_listar", "empresas_listar", "familia_atualizar_contato",
+                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_ler", "email_listar", "empresas_listar", "familia_atualizar_contato",
                                            "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
                                            "financeiro_a_receber", "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
                                            "financeiro_recorrentes", "financeiro_saldo", "propor_evento", "propor_teams", "regras_listar", "regras_sugerir", "resumo_manha", "teams_pendentes"]

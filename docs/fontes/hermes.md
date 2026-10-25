@@ -28,6 +28,7 @@ mcp_servers:
       - documentos_consultar
       - documentos_texto
       - documentos_vencimentos
+      - email_ler
       - email_listar
       - empresas_listar
       - familia_atualizar_contato

@@ -40,7 +40,7 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin",
 FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
     **{n: None for n in ("financeiro_saldo", "despesas_por_empresa", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai",
                          "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha", "financeiro_a_receber")},
-    "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",),
+    "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",), "email_ler": ("correio",),
     **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                        "familia_registrar_pessoa", "familia_registrar_pet", "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
                        "bens_listar", "contatos_buscar", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
@@ -107,7 +107,7 @@ class _Auth:
             _token.reset(marca)
 
 
-def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph=None):
+def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph=None, correio=None):
     banco = Path(banco)
     agora_fn = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))
     srv = MCPServer("gabi-brain", instructions=(
@@ -231,7 +231,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
         return executar("financeiro_para_onde_vai", f)
 
     ferramentas_prop.registrar(srv, executar, paperless)
-    ferramentas_dia.registrar(srv, executar)
+    ferramentas_dia.registrar(srv, executar, correio)
     ferramentas_dec.registrar(srv, executar)
     ferramentas_envios.registrar(srv, executar, graph)  # só propõem; o envio é do botão Enviar do painel
     ferramentas_familia.registrar(srv, executar)  # documento só é proposto; aprovação no painel
@@ -242,6 +242,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
     resultado.servidor = srv  # exposto para a documentação gerada
     resultado.paperless = paperless  # idem, para o teste da fábrica
     resultado.graph = graph
+    resultado.correio = correio
     return resultado
 
 
@@ -255,9 +256,11 @@ def fabrica():
         con.close()
     hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8081,localhost:8081").split(",") if h.strip()]
     from gabi.fontes.ambiente import fontes_do_ambiente
-    from gabi.fontes.ponte import Ponte, PonteGraph
+    from gabi.fontes.graph_ness import ErroGraphNess
+    from gabi.fontes.ponte import Ponte, PonteEmail, PonteGraph
     caminho = os.environ.get("GABI_FONTES_SOCKET")
     # Pela ponte o objeto existe sempre (o serviço pode subir depois); "não configurado" chega como ErroPaperless a cada chamada.
     paperless = Ponte(caminho, "paperless") if caminho else fontes_do_ambiente()["paperless"]()
     graph = PonteGraph(caminho) if caminho else None  # lista viva de equipes/canais do Teams (só leitura) para propor_teams
-    return criar_mcp(banco, hosts, paperless=paperless, graph=graph)
+    correio = {"google": PonteEmail(caminho), "graph": PonteEmail(caminho, "graph_ness", ErroGraphNess)} if caminho else None  # corpo do e-mail (só leitura)
+    return criar_mcp(banco, hosts, paperless=paperless, graph=graph, correio=correio)

@@ -6,12 +6,14 @@ de que isso nunca acontece é este módulo: só `GET` (mensagens, histórico, pe
 token em `google_oauth`). Não existe método de enviar, rascunho, apagar de vez nem rótulo livre; um teste varre o código e o `http` falso
 recusa qualquer outra chamada. Não guarda corpo completo: só cabeçalhos úteis e o `snippet` curto. Segredo e corpo de resposta nunca entram em
 erro, log ou repr. Docs: docs/fontes/google.md."""
+import base64
 import datetime as dt
 import html
 import re
 import urllib.parse
 from dataclasses import asdict, dataclass, field
 from email.utils import parseaddr
+from html.parser import HTMLParser
 from typing import Callable
 
 from gabi.fontes.google_oauth import (ErroGoogleOAuth, TokenOAuth, _http_real, chamar, conta_valida, credenciais_do_ambiente)
@@ -26,6 +28,7 @@ MAX_ENDERECOS = 5000
 MAX_IDS_POR_CHAMADA = 100
 TAM_TRECHO = 280
 TAM_ASSUNTO = 300
+MAX_CORPO = 8000  # `email_ler` (MCP): o corpo sai em texto e cortado aqui
 _ID = re.compile(r"^[0-9a-f]{6,32}$")
 _ENDERECO = re.compile(r"^[a-z0-9._%+'-]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,}$")
 _CABECALHOS = ("From", "Subject", "List-Unsubscribe", "Precedence", "Auto-Submitted")
@@ -262,6 +265,84 @@ def respondeu_a(conta: str, enderecos, token: Callable[[str], str], http=_http_r
     return saida
 
 
+class _Texto(HTMLParser):
+    """HTML -> texto: descarta `script` e `style`, quebra linha em `br`, `p` e `div`."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.partes, self._fora = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self._fora += 1
+        elif tag in ("br", "p", "div"):
+            self.partes.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style"):
+            self._fora = max(0, self._fora - 1)
+        elif tag in ("p", "div"):
+            self.partes.append("\n")
+
+    def handle_data(self, data):
+        if not self._fora:
+            self.partes.append(data)
+
+
+def html_para_texto(conteudo: str) -> str:
+    p = _Texto()
+    p.feed(conteudo)
+    p.close()
+    return limpar_texto("".join(p.partes))
+
+
+def limpar_texto(texto: str) -> str:
+    """Junta brancos repetidos (espaços numa linha; linhas em branco em uma só)."""
+    linhas = [re.sub(r"[ \t\xa0]+", " ", l).strip() for l in texto.replace("\r", "").split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(linhas)).strip()
+
+
+def cortar_corpo(texto: str) -> dict:
+    return {"corpo": texto[:MAX_CORPO], "cortado": len(texto) > MAX_CORPO}
+
+
+def _partes(parte, mime: str, saida: list) -> None:
+    if not isinstance(parte, dict):
+        return
+    if parte.get("mimeType") == mime:
+        dados = (parte.get("body") or {}).get("data")
+        if isinstance(dados, str) and dados:
+            try:
+                saida.append(base64.urlsafe_b64decode(dados + "=" * (-len(dados) % 4)).decode("utf-8", "replace"))
+            except ValueError:
+                pass
+    for filha in parte.get("parts") or []:
+        _partes(filha, mime, saida)
+
+
+def mensagem(conta: str, externo_id: str, token: Callable[[str], str], http=_http_real) -> dict:
+    """Corpo em texto da mensagem (`format=full`, só GET): as partes `text/plain` juntas; sem elas, a `text/html` convertida. Corta em MAX_CORPO."""
+    conta = conta_valida(conta)
+    if not isinstance(externo_id, str) or not _ID.match(externo_id):
+        raise ErroGoogleOAuth("id de mensagem inválido")
+    status, resp = _pegar(http, token, conta, "GET", f"{BASE}/messages/{externo_id}?format=full")
+    if status == 404:
+        raise ErroGoogleOAuth("mensagem não encontrada")
+    if status >= 400:
+        raise ErroGoogleOAuth(f"messages.get -> {status}")
+    if not isinstance(resp, dict):
+        raise ErroGoogleOAuth("resposta inválida do Google")
+    planos: list[str] = []
+    _partes(resp.get("payload"), "text/plain", planos)
+    if planos:
+        texto = limpar_texto("".join(planos))
+    else:
+        htmls: list[str] = []
+        _partes(resp.get("payload"), "text/html", htmls)
+        texto = html_para_texto("".join(htmls))
+    return cortar_corpo(texto)
+
+
 class GoogleEmail:
     """Objeto da ponte (JSON puro). Sem o token provider nada sai."""
 
@@ -285,6 +366,9 @@ class GoogleEmail:
 
     def respondeu_a(self, conta: str, enderecos) -> dict:
         return respondeu_a(conta, enderecos, self._token, self._http)
+
+    def mensagem(self, conta: str, externo_id: str) -> dict:
+        return mensagem(conta, externo_id, self._token, self._http)
 
 
 def google_email_do_ambiente(env) -> GoogleEmail | None:
