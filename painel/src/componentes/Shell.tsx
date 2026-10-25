@@ -48,7 +48,7 @@ function Selo({ n }: { n?: number }) {
 
 const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-/** #envios ou #cadastros/familia (área/aba) na URL abre essa tela na carga, p.ex. o link que o brain manda no WhatsApp. */
+/** #envios ou #cadastros/documentos (área/aba) na URL abre essa tela na carga, p.ex. o link que o brain manda no WhatsApp. */
 function gravarLinkDaUrl(): null {
   const [id, aba] = window.location.hash.replace(/^#/, "").split("/");
   const alvo = AREAS.find((a) => a.id === id);

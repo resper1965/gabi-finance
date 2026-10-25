@@ -173,6 +173,8 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_envios)
     from gabi.rotas.familia import router as rotas_familia
     app.include_router(rotas_familia)
+    from gabi.rotas.documentos import router as rotas_documentos
+    app.include_router(rotas_documentos)
     from gabi.rotas.decisoes import router as rotas_decisoes
     app.include_router(rotas_decisoes)
     from gabi.rotas.qualidade import router as rotas_qualidade

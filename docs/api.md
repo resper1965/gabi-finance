@@ -74,6 +74,10 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/decisoes/perguntas` | Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem). |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
+| GET | `/api/v1/documentos/propostas` | Propostas de documento no estado dado (titular ou bem novo, motivos de conferir, documento atual) e a URL base do Paperless. |
+| POST | `/api/v1/documentos/propostas/{proposta_id}/decisao` | Aprova ou recusa a proposta pendente; `correcao` opcional troca campos (inclusive o titular) antes de aprovar; já decidida: 409. |
+| GET | `/api/v1/documentos/titulares` | Pessoas (com contato) e bens ativos, cada um com os documentos ativos (números completos), e a URL base do Paperless. |
+| GET | `/api/v1/documentos/vencimentos` | Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias. |
 | GET | `/api/v1/envios` | Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada. |
 | POST | `/api/v1/envios/{envio_id}/enviar` | Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto). |
 | POST | `/api/v1/envios/{envio_id}/recusar` | Recusa a proposta pendente; nada é enviado. |

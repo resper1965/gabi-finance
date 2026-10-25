@@ -2083,6 +2083,139 @@
     "summary": "Destino Agrupado"
    }
   },
+  "/api/v1/documentos/propostas": {
+   "get": {
+    "description": "Propostas de documento no estado dado (titular ou bem novo, motivos de conferir, documento atual) e a URL base do Paperless.\n\n`titular` é null quando o documento cria um bem novo (`bem_novo`); `paperless_url` é null se não configurada.",
+    "operationId": "listar_propostas_api_v1_documentos_propostas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "estado",
+      "required": false,
+      "schema": {
+       "default": "pendente",
+       "title": "Estado",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Propostas"
+   }
+  },
+  "/api/v1/documentos/propostas/{proposta_id}/decisao": {
+   "post": {
+    "description": "Aprova ou recusa a proposta pendente; `correcao` opcional troca campos (inclusive o titular) antes de aprovar; já decidida: 409.\n\nCorpo: `{\"estado\": \"aprovada\" ou \"recusada\", \"correcao\"?: {campo: valor}}`.",
+    "operationId": "decidir_proposta_api_v1_documentos_propostas__proposta_id__decisao_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "proposta_id",
+      "required": true,
+      "schema": {
+       "title": "Proposta Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decidir Proposta"
+   }
+  },
+  "/api/v1/documentos/titulares": {
+   "get": {
+    "description": "Pessoas (com contato) e bens ativos, cada um com os documentos ativos (números completos), e a URL base do Paperless.",
+    "operationId": "listar_titulares_api_v1_documentos_titulares_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar Titulares"
+   }
+  },
+  "/api/v1/documentos/vencimentos": {
+   "get": {
+    "description": "Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias.",
+    "operationId": "listar_vencimentos_api_v1_documentos_vencimentos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "meses",
+      "required": false,
+      "schema": {
+       "default": 12,
+       "title": "Meses",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar Vencimentos"
+   }
+  },
   "/api/v1/envios": {
    "get": {
     "description": "Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada.",
