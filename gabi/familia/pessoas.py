@@ -3,6 +3,7 @@ Consome: pessoa, pet, pessoa_historico (0077), gabi.familia.contato, gabi.famili
 (origem 'familia', só id, campo e ação). Pessoa nova: linha 'criada' no histórico; pet: linha 'pet:<id>' na pessoa 'pets'."""
 import datetime as dt
 import json
+import re
 
 from gabi.db import transacao
 from gabi.envios.propostas import normalizar_nome
@@ -14,17 +15,39 @@ DADOS_PET = ("raca", "nascimento", "dono")
 
 
 def _slug(texto: str) -> str:
-    return "-".join(normalizar_nome(texto).split())
+    """Só [a-z0-9-], sem hífen repetido nem nas pontas; vazio é `valor_invalido`."""
+    s = re.sub(r"[^a-z0-9]+", "-", normalizar_nome(texto)).strip("-")
+    if not s:
+        raise ErroFamilia("valor_invalido")
+    return s
+
+
+def _sem_nome_completo(d) -> bool:
+    return isinstance(d, dict) and not (isinstance(d.get("nome_completo"), str) and d["nome_completo"].strip())
+
+
+def _ler(dados) -> dict | None:
+    try:
+        return json.loads(dados) if dados else {}
+    except (TypeError, ValueError):
+        return None
 
 
 def _resolver(con, texto: str) -> str | None:
-    """Id da pessoa que casa; None se ninguém casar; `pessoa_ambigua` (com candidatos) propagado."""
+    """Id da pessoa que casa por igual ou começo de palavra; sem isso, quem não tem nome completo e cujo `nome` abre o texto
+    ("Chafic" para "Chafic Esper"). None se ninguém casar; `pessoa_ambigua` (com candidatos) propagado."""
     try:
         return resolver_pessoa(con, texto, parcial=False)
     except ErroFamilia as e:
-        if e.codigo == "pessoa_ambigua" and not e.candidatos:
-            return None
-        raise
+        if e.codigo != "pessoa_ambigua" or e.candidatos:
+            raise
+    alvo = normalizar_nome(texto)
+    achados = [(r["id"], r["nome"]) for r in con.execute(
+        "select id, nome, dados from pessoa where excluido_em is null and coalesce(papel,'')<>'pets'")
+        if normalizar_nome(r["nome"]) and alvo.startswith(normalizar_nome(r["nome"]) + " ") and _sem_nome_completo(_ler(r["dados"]))]
+    if len(achados) > 1:
+        raise ErroFamilia("pessoa_ambigua", candidatos=[n for _, n in achados])
+    return achados[0][0] if achados else None
 
 
 def _livre(con, tabela: str, *ids: str) -> str:
@@ -47,18 +70,28 @@ def registrar_pessoa(con, *, nome: str, parentesco: str, apelido: str = "", nasc
         raise ErroFamilia("valor_invalido")
     campos = [(c, contato.validar(c, "definir", v)) for c, v in zip(CAMPOS_PESSOA, (parentesco, apelido, nascimento, observacao))
               if not (isinstance(v, str) and not v.strip())] + ([("falecido", True)] if falecido else [])
+    ids = (_slug(nome.split()[0]), _slug(nome))
     with transacao(con, imediata=True):
         pid = _resolver(con, nome)
         if pid is None and isinstance(apelido, str) and apelido.strip():
             pid = _resolver(con, apelido)
         criada = pid is None
         if criada:
-            pid = _livre(con, "pessoa", _slug(nome.split()[0]), _slug(nome))
+            pid = _livre(con, "pessoa", *ids)
             con.execute("insert into pessoa(id, nome, papel, dados, origem) values (?,?, 'familia', ?, 'hermes')",
                         (pid, nome.split()[0], json.dumps({"nome_completo": nome}, ensure_ascii=False)))
             contato._historico(con, pid, "criada", None, {"nome": nome}, quem, agora)
             contato._auditar(con, quem, agora, pid, "criada", "criar")
         mudancas = []
+        dados = contato._dados_da(con, pid)
+        linha = con.execute("select nome from pessoa where id=?", (pid,)).fetchone()
+        if not criada and _sem_nome_completo(dados) and normalizar_nome(nome) != normalizar_nome(linha["nome"]):
+            antes = dados.get("nome_completo")  # sem campo próprio em contato: grava aqui, desfazível pelo desfazer comum
+            dados["nome_completo"] = nome
+            contato._gravar(con, pid, dados)
+            hid = contato._historico(con, pid, "nome_completo", antes, nome, quem, agora)
+            contato._auditar(con, quem, agora, pid, "nome_completo", "definir")
+            mudancas.append({"campo": "nome_completo", "antes": antes, "depois": nome, "historico_id": hid})
         for campo, valor in campos:
             if contato._atual(contato._dados_da(con, pid), campo) == valor:
                 continue
@@ -105,20 +138,23 @@ def registrar_pet(con, *, nome: str, especie: str, raca: str = "", nascimento: s
                   agora: dt.datetime) -> dict:
     """Cria ou atualiza o pet (mesmo nome, sem caixa e acento, é o mesmo pet); campo vazio fica como está. Uma transação."""
     nome = contato._texto(nome)
+    slug = _slug(nome)
     novos = {"especie": especie, "raca": raca}
     novos = {k: contato._texto(v) for k, v in novos.items() if not (isinstance(v, str) and not v.strip())}
     if not (isinstance(nascimento, str) and not nascimento.strip()):
         novos["nascimento"] = contato.data(nascimento)
     with transacao(con, imediata=True):
         if isinstance(dono, str) and dono.strip():
-            novos["dono"] = resolver_pessoa(con, dono, parcial=False)
+            novos["dono"] = _resolver(con, dono)
+            if novos["dono"] is None:
+                raise ErroFamilia("pessoa_ambigua", candidatos=[])
         alvo = normalizar_nome(nome)
         pet_id = next((r["id"] for r in con.execute("select id, nome from pet order by id") if normalizar_nome(r["nome"]) == alvo), None)
         antes = _pet(con, pet_id) if pet_id else None
         if antes is None:
             if "especie" not in novos:
                 raise ErroFamilia("valor_invalido")
-            pet_id = _livre(con, "pet", _slug(nome))
+            pet_id = _livre(con, "pet", slug)
         depois = {**(antes or {"id": pet_id, **{k: None for k in DADOS_PET}}), "nome": nome, **novos}
         hid = None
         if depois != antes:

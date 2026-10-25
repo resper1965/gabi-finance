@@ -84,8 +84,35 @@ def test_ambiguo_nao_grava(con):
 
 
 def test_id_colide_usa_nome_completo(con):
-    con.execute("insert into pessoa(id, nome) values ('sandra','Sandra')")
+    con.execute("insert into pessoa(id, nome, dados) values ('sandra','Sandra',?)", (json.dumps({"nome_completo": "Sandra Lima"}),))
     assert _pessoa(con, nome="Sandra Maria Esper", parentesco="tia")["pessoa_id"] == "sandra-maria-esper"
+
+
+def test_so_primeiro_nome_sem_completo_e_a_mesma(con):
+    con.execute("insert into pessoa(id, nome) values ('chafic','Chafic')")
+    n = _conta(con, "pessoa")
+    r = _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    assert r["criada"] is False and r["pessoa_id"] == "chafic" and _conta(con, "pessoa") == n
+    assert _dados(con, "chafic")["nome_completo"] == "Chafic Esper"
+    m = [x for x in r["mudancas"] if x["campo"] == "nome_completo"][0]
+    contato.desfazer(con, m["historico_id"], "boss", AGORA)
+    assert "nome_completo" not in _dados(con, "chafic")
+    assert _pet(con, nome="Rex", especie="cachorro", dono="Chafic Esper")["pet_id"] == "rex"
+    assert pessoas.listar_pets(con)[0]["dono"] == "chafic"
+
+
+def test_so_primeiro_nome_dois_casam_ambiguo(con):
+    con.execute("insert into pessoa(id, nome) values ('chafic','Chafic')")
+    con.execute("insert into pessoa(id, nome) values ('chafic2','Chafic')")
+    e = _erro(_pessoa, con, nome="Chafic Esper", parentesco="irmão")
+    assert e.codigo == "pessoa_ambigua" and e.candidatos == ["Chafic", "Chafic"]
+
+
+def test_slug(con):
+    assert pessoas._slug("Dr. João") == "dr-joao" and pessoas._slug("  Ana--Maria  d'Ávila ") == "ana-maria-d-avila"
+    assert _erro(pessoas._slug, "!!!").codigo == "valor_invalido"
+    assert _pet(con, nome="Dr. João", especie="gato")["pet_id"] == "dr-joao"
+    assert _erro(_pet, con, nome="???", especie="gato").codigo == "valor_invalido"
 
 
 def test_id_colide_duas_vezes_usa_sufixo(con):
