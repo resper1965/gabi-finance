@@ -30,6 +30,8 @@ mcp_servers:
       - familia_consultar
       - familia_listar
       - familia_propor_documento
+      - familia_registrar_pessoa
+      - familia_registrar_pet
       - familia_vencimentos
       - fechamento_dia
       - financeiro_contas_a_pagar

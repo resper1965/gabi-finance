@@ -42,7 +42,7 @@ FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
                          "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha")},
     "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",),
     **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
-                       "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
+                       "familia_registrar_pessoa", "familia_registrar_pet", "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
                        "bens_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
 }
 

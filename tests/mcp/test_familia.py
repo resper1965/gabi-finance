@@ -14,7 +14,7 @@ from tests.mcp.test_servidor import AGORA, HOST, banco, chamar, rpc  # noqa: F40
 CPF = "52998224725"
 PASSAPORTE = "FZ123456"
 FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
-           "documentos_consultar", "documentos_vencimentos", "bens_listar"}
+           "documentos_consultar", "documentos_vencimentos", "bens_listar", "familia_registrar_pessoa", "familia_registrar_pet"}
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_escopo_familia_no_hermes_e_nas_ferramentas():
     assert FAMILIA <= set(ferramentas_do_token(ESCOPOS_HERMES))
 
 
-def test_token_familia_ve_as_8_ferramentas(clif, tokf):
+def test_token_familia_ve_as_10_ferramentas(clif, tokf):
     nomes = {t["name"] for t in rpc(clif, tokf["familia"], "tools/list").json()["result"]["tools"]}
     assert FAMILIA <= nomes
 
@@ -158,3 +158,58 @@ def test_propor_documento_numero_inteiro_vira_valor_invalido_sem_eco(clif, tokf,
     r = chamar(clif, tokf["familia"], "familia_propor_documento", pessoa="Beatriz", tipo="cpf", numero=1234567890)
     assert r["erro"] == "valor_invalido" and "1234567890" not in _texto(r)
     assert conectar(bancof).execute("select count(*) from familia_proposta").fetchone()[0] == 0
+
+
+# ---------------- registrar pessoa e pet (Hermes Onda 1) ----------------
+def _reg(cli, token, ferramenta, nome, **args):  # `chamar` já usa `nome` como parâmetro
+    res = rpc(cli, token, "tools/call", {"name": ferramenta, "arguments": {"nome": nome, **args}}).json()["result"]
+    return json.loads(res["content"][0]["text"]) if res.get("content") else res
+
+
+NOVAS = {"familia_registrar_pessoa", "familia_registrar_pet"}
+
+
+def test_registrar_pessoa_nova_e_existente(clif, tokf, bancof):
+    c = conectar(bancof)
+    c.execute("insert into parametro(chave, valor) values ('painel.url', ?)", (json.dumps("https://painel.x/"),))
+    r = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Chafic Esper", parentesco="pai", apelido="Chafa")
+    d = r["dados"]
+    assert d["criada"] is True and d["pessoa_id"] and d["link"] == "https://painel.x/#cadastros/documentos"
+    assert r["desatualizado"] is False
+    r2 = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Beatriz", parentesco="amiga")["dados"]
+    assert r2["criada"] is False and r2["pessoa_id"] == "bia" and [m["campo"] for m in r2["mudancas"]] == ["parentesco"]
+    assert c.execute("select quem from pessoa_historico where campo='criada'").fetchone()["quem"] == "hermes"
+    assert c.execute("select status from chamada_mcp where ferramenta='familia_registrar_pessoa'").fetchone()["status"] == "ok"
+
+
+def test_registrar_pessoa_ambigua_traz_candidatos(clif, tokf, bancof):
+    c = conectar(bancof)
+    for i, n in (("bs", "Bruno Silva"), ("bc", "Bruno Costa")):
+        c.execute("insert into pessoa(id, nome, dados) values (?,?,?)", (i, n, json.dumps({})))
+    c.commit()
+    r = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Bruno", parentesco="tio")
+    assert r["erro"] == "pessoa_ambigua" and "candidatos" in r["mensagem"] and "Bruno Costa" in r["mensagem"]
+    assert c.execute("select count(*) from pessoa_historico").fetchone()[0] == 0
+
+
+def test_registrar_pet_e_listar(clif, tokf, bancof):
+    d = _reg(clif, tokf["familia"], "familia_registrar_pet", "Cookie", especie="cachorro", raca="vira-lata", dono="Beatriz")
+    assert d["dados"]["criado"] is True and d["dados"]["historico_id"] and d["desatualizado"] is False
+    pets = chamar(clif, tokf["familia"], "familia_listar")["dados"]["pets"]
+    assert [p["nome"] for p in pets] == ["Cookie"]
+    c = conectar(bancof)
+    assert c.execute("select status from chamada_mcp where ferramenta='familia_registrar_pet'").fetchone()["status"] == "ok"
+
+
+@pytest.mark.parametrize("nome,args", [("familia_registrar_pessoa", {"nome": "Zé", "parentesco": "tio"}),
+                                       ("familia_registrar_pet", {"nome": "Rex", "especie": "cachorro"})])
+def test_registrar_sem_escopo_familia(clif, tokf, bancof, nome, args):
+    assert _reg(clif, tokf["fin"], nome, args["nome"], **{k: v for k, v in args.items() if k != "nome"})["erro"] == "sem_escopo"
+    assert conectar(bancof).execute("select count(*) from pessoa_historico").fetchone()[0] == 0
+
+
+def test_docstrings_das_novas(clif, tokf):
+    desc = {t["name"]: t["description"] for t in rpc(clif, tokf["familia"], "tools/list").json()["result"]["tools"]}
+    for n in NOVAS:
+        assert "dado de terceiros" in desc[n] and "só diga que anotou depois do ok desta ferramenta" in desc[n], n
+    assert "Nome ambíguo volta com candidatos: pergunte qual" in desc["familia_registrar_pessoa"]

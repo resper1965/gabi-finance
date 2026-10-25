@@ -28,3 +28,9 @@ def test_toda_ferramenta_tem_escopo_conhecido():
 
 def test_token_sem_escopo_ve_lista_vazia():
     assert ferramentas_do_token([]) == []
+
+
+def test_soul_ensina_a_gravar_de_verdade():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    assert "Gravar de verdade" in soul and "familia_registrar_pessoa" in soul and "familia_registrar_pet" in soul
+    assert "Não tenho como gravar isso no brain; fica só nesta conversa." in soul
