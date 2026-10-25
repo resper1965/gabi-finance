@@ -15,11 +15,13 @@ mcp_servers:
       include:
       - agenda_financeira
       - agenda_listar
+      - avisos_abertos
       - bens_listar
       - classificar_lancamento
       - contatos_buscar
       - decisao_responder
       - decisoes_abertas
+      - decisoes_recentes
       - despesas_por_empresa
       - documentos_baixar
       - documentos_buscar
@@ -27,6 +29,7 @@ mcp_servers:
       - documentos_texto
       - documentos_vencimentos
       - email_listar
+      - empresas_listar
       - familia_atualizar_contato
       - familia_consultar
       - familia_listar
@@ -35,6 +38,7 @@ mcp_servers:
       - familia_registrar_pet
       - familia_vencimentos
       - fechamento_dia
+      - financeiro_a_receber
       - financeiro_contas_a_pagar
       - financeiro_lancamentos
       - financeiro_para_onde_vai
@@ -43,8 +47,10 @@ mcp_servers:
       - financeiro_saldo
       - propor_evento
       - propor_teams
+      - regras_listar
       - regras_sugerir
       - resumo_manha
+      - teams_pendentes
 ```
 A lista é a **explícita** (sem `*`) e é testada: `tests/mcp/test_hermes.py` falha se ela divergir das ferramentas dos escopos acima. Regerar: `python -m tools.gerar_hermes`.
 Se o Streamable HTTP falhar no Hermes, usar `transport: sse` e registrar aqui.

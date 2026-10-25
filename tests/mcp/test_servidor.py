@@ -23,7 +23,7 @@ NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita �
 NOVAS_ENVIOS = {"propor_evento", "propor_teams"}  # só propõem; o envio sai do botão Enviar do painel
 NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                  "documentos_consultar", "documentos_vencimentos", "bens_listar", "familia_registrar_pessoa", "familia_registrar_pet"}
-NOVAS_VER = {"contatos_buscar"}  # Onda 2: só leitura
+NOVAS_VER = {"contatos_buscar", "financeiro_a_receber", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
 # contato grava direto a pedido do Ricardo (histórico e Desfazer no painel); documento só é proposto
 PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA | NOVAS_VER  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
@@ -113,12 +113,12 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_32_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
-    assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas",
-                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_listar", "familia_atualizar_contato",
+def test_sobram_exatamente_as_38_ferramentas_da_simplificacao_dos_envios_da_familia_e_dos_documentos():
+    assert sorted(ESCOPOS_FERRAMENTAS) == ["agenda_financeira", "agenda_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
+                                           "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_listar", "empresas_listar", "familia_atualizar_contato",
                                            "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
-                                           "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
-                                           "financeiro_recorrentes", "financeiro_saldo", "propor_evento", "propor_teams", "regras_sugerir", "resumo_manha"]
+                                           "financeiro_a_receber", "financeiro_contas_a_pagar", "financeiro_lancamentos", "financeiro_para_onde_vai", "financeiro_previsao",
+                                           "financeiro_recorrentes", "financeiro_saldo", "propor_evento", "propor_teams", "regras_listar", "regras_sugerir", "resumo_manha", "teams_pendentes"]
 
 
 def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):

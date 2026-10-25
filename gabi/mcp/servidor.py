@@ -39,11 +39,11 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin",
 # fontes de frescor por ferramenta (nomes de `envelope.FONTES`): None = todas; () = sem dado que envelhece (nunca "desatualizado")
 FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
     **{n: None for n in ("financeiro_saldo", "despesas_por_empresa", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai",
-                         "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha")},
+                         "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha", "financeiro_a_receber")},
     "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",),
     **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                        "familia_registrar_pessoa", "familia_registrar_pet", "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
-                       "bens_listar", "contatos_buscar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
+                       "bens_listar", "contatos_buscar", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
 }
 
 
