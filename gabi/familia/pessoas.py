@@ -8,10 +8,11 @@ import re
 from gabi.db import transacao
 from gabi.envios.propostas import normalizar_nome
 from gabi.familia import contato
-from gabi.familia.fichas import ErroFamilia, resolver_pessoa
+from gabi.familia.fichas import ErroFamilia, resolver_pessoa, rotulo
 
 CAMPOS_PESSOA = ("parentesco", "apelido", "nascimento", "observacao")
 DADOS_PET = ("raca", "nascimento", "dono")
+LEGADO_PET = {"dono": "tutor", "nascimento": "aniversario"}  # chaves antigas da carga, lidas quando as novas faltam
 
 
 def _slug(texto: str) -> str:
@@ -33,21 +34,42 @@ def _ler(dados) -> dict | None:
         return None
 
 
+def _palavras(*textos) -> set[str]:
+    return {p for t in textos if isinstance(t, str) for p in normalizar_nome(t).split()}
+
+
 def _resolver(con, texto: str) -> str | None:
-    """Id da pessoa que casa por igual ou começo de palavra; sem isso, quem não tem nome completo e cujo `nome` abre o texto
-    ("Chafic" para "Chafic Esper"). None se ninguém casar; `pessoa_ambigua` (com candidatos) propagado."""
+    """Id da pessoa que casa por igual ou começo de palavra (`resolver_pessoa`); sem isso, quem tem a mesma primeira palavra
+    (no nome, nome completo ou apelido) e todas as palavras ditadas entre as suas ("Louise Esper" para "Louise Lavrik Esper",
+    "Gigi Esper" para a Giovanna de apelido Gigi), ou quem não tem nome completo e cujo `nome` abre o texto ("Chafic" para
+    "Chafic Esper"). None se ninguém casar; mais de um, `pessoa_ambigua` com os candidatos."""
     try:
         return resolver_pessoa(con, texto, parcial=False)
     except ErroFamilia as e:
         if e.codigo != "pessoa_ambigua" or e.candidatos:
             raise
     alvo = normalizar_nome(texto)
-    achados = [(r["id"], r["nome"]) for r in con.execute(
-        "select id, nome, dados from pessoa where excluido_em is null and coalesce(papel,'')<>'pets'")
-        if normalizar_nome(r["nome"]) and alvo.startswith(normalizar_nome(r["nome"]) + " ") and _sem_nome_completo(_ler(r["dados"]))]
+    ditas = alvo.split()
+    if not ditas:
+        return None
+    achados = []
+    for r in con.execute("select id, nome, dados from pessoa where excluido_em is null and coalesce(papel,'')<>'pets' order by id"):
+        d = _ler(r["dados"])
+        nomes = [v for v in (r["nome"], *((d.get("nome_completo"), d.get("apelido")) if isinstance(d, dict) else ()))
+                 if isinstance(v, str) and normalizar_nome(v)]
+        encurtado = ditas[0] in {normalizar_nome(v).split()[0] for v in nomes} and set(ditas) <= _palavras(*nomes)
+        estende = bool(normalizar_nome(r["nome"])) and alvo.startswith(normalizar_nome(r["nome"]) + " ") and _sem_nome_completo(d)
+        if encurtado or estende:
+            achados.append((r["id"], rotulo(r["nome"], d)))
     if len(achados) > 1:
         raise ErroFamilia("pessoa_ambigua", candidatos=[n for _, n in achados])
     return achados[0][0] if achados else None
+
+
+def _linha(con, pid: str):
+    r = con.execute("select nome, papel, dados from pessoa where id=?", (pid,)).fetchone()
+    d = _ler(r["dados"])
+    return r, (d if isinstance(d, dict) else {})
 
 
 def _livre(con, tabela: str, *ids: str) -> str:
@@ -75,6 +97,14 @@ def registrar_pessoa(con, *, nome: str, parentesco: str, apelido: str = "", nasc
         pid = _resolver(con, nome)
         if pid is None and isinstance(apelido, str) and apelido.strip():
             pid = _resolver(con, apelido)
+            if pid is not None:  # o apelido casou: o nome ditado não pode contradizer o cadastro
+                r, d = _linha(con, pid)
+                if normalizar_nome(nome).split()[0] not in _palavras(r["nome"], d.get("nome_completo"), d.get("apelido")):
+                    raise ErroFamilia("pessoa_ambigua", candidatos=[rotulo(r["nome"], d)])
+        if pid is not None:
+            r, d = _linha(con, pid)
+            if r["papel"] == "titular":  # a ficha do Ricardo nunca é escrita por aqui; o Hermes pergunta
+                raise ErroFamilia("pessoa_ambigua", candidatos=[rotulo(r["nome"], d)])
         criada = pid is None
         if criada:
             pid = _livre(con, "pessoa", *ids)
@@ -97,7 +127,9 @@ def registrar_pessoa(con, *, nome: str, parentesco: str, apelido: str = "", nasc
                 continue
             r = contato._aplicar(con, pid, campo, "definir", valor, quem, agora)
             mudancas.append({"campo": campo, **r})
-    return {"pessoa_id": pid, "criada": criada, "mudancas": mudancas}
+        r, d = _linha(con, pid)
+    return {"pessoa_id": pid, "nome": r["nome"], "nome_completo": d.get("nome_completo") or None, "criada": criada,
+            "mudancas": mudancas}
 
 
 def _pet(con, pet_id: str) -> dict | None:
@@ -109,7 +141,8 @@ def _pet(con, pet_id: str) -> dict | None:
     except (TypeError, ValueError):
         d = {}
     d = d if isinstance(d, dict) else {}
-    return {"id": r["id"], "nome": r["nome"], "especie": r["especie"], **{k: d.get(k) for k in DADOS_PET}}
+    return {"id": r["id"], "nome": r["nome"], "especie": r["especie"],
+            **{k: d.get(k) if d.get(k) is not None else d.get(LEGADO_PET.get(k, k)) for k in DADOS_PET}}
 
 
 def _gravar_pet(con, pet: dict) -> None:
@@ -170,22 +203,44 @@ def listar_pets(con) -> list[dict]:
     return [_pet(con, r["id"]) for r in con.execute("select id from pet order by nome, id")]
 
 
+def _vazio(v):
+    return None if v is None or v == [] else v
+
+
+def _criacao_intacta(con, h) -> bool:
+    """A pessoa ainda está como a chamada da criação a deixou? Só contam os campos tocados por linhas posteriores a essa
+    chamada (desfeitas ou não); cada um precisa estar no valor que a criação gravou, ou vazio de novo (nada se perde ao
+    excluir). As linhas da própria chamada (mesmo quem e quando da 'criada') definem os valores da criação."""
+    criacao = {"nome_completo": (json.loads(h["depois"]) or {}).get("nome")}
+    tocados = set()
+    for x in con.execute("select campo, depois, quem, quando from pessoa_historico where pessoa_id=? and id>? and campo<>'criada'"
+                         " order by id", (h["pessoa_id"], h["id"])):
+        if (x["quem"], x["quando"]) == (h["quem"], h["quando"]) and not tocados:
+            criacao[x["campo"]] = json.loads(x["depois"])
+        else:
+            tocados.add(x["campo"])
+    dados = contato._dados_da(con, h["pessoa_id"])
+    return all(_vazio(dados.get(c)) in (None, _vazio(criacao.get(c))) for c in tocados)
+
+
 def desfazer_especial(con, h, quem: str, agora: dt.datetime) -> dict:
     """Desfaz 'criada' (exclui a pessoa e marca desfeitas as linhas da mesma chamada; refaz se a linha for o próprio desfazer) e 'pet:<id>' (restaura o pet, apaga se
-    não existia). Chamado por `contato.desfazer` dentro da transação dele, que grava o histórico e a auditoria."""
+    não existia). Chamado por `contato.desfazer` dentro da transação dele, que grava o histórico e a auditoria.
+    Excluir só vale se a pessoa ainda estiver como a criação a deixou (`_criacao_intacta`): mudança posterior desfeita não
+    bloqueia; mudança posterior que ficou devolve `conflito`. As linhas posteriores ficam como estão (a exclusão não mexe em `dados`)."""
     depois, antes = json.loads(h["depois"]), json.loads(h["antes"])
     if h["campo"] == "criada":
         r = con.execute("select excluido_em from pessoa where id=?", (h["pessoa_id"],)).fetchone()
-        # As linhas da mesma chamada (mesmo quem e quando da 'criada') fazem parte da criação e são desfeitas junto.
-        mesma = "quem=? and quando=?" if depois is not None else "0"
-        args = (h["quem"], h["quando"]) if depois is not None else ()
-        posterior = con.execute("select 1 from pessoa_historico where pessoa_id=? and id>? and desfeito_em is null"
-                                f" and not ({mesma})", (h["pessoa_id"], h["id"], *args)).fetchone()
-        if r is None or posterior or (r["excluido_em"] is None) != (depois is not None):
+        if r is None or (r["excluido_em"] is None) != (depois is not None):
             raise ErroFamilia("conflito")
         if depois is not None:
+            if not _criacao_intacta(con, h):
+                raise ErroFamilia("conflito")
             con.execute("update pessoa_historico set desfeito_em=? where pessoa_id=? and id>? and desfeito_em is null and quem=?"
                         " and quando=?", (contato._ts(agora), h["pessoa_id"], h["id"], h["quem"], h["quando"]))
+        elif con.execute("select 1 from pessoa_historico where pessoa_id=? and id>? and desfeito_em is null",
+                         (h["pessoa_id"], h["id"])).fetchone():
+            raise ErroFamilia("conflito")
         con.execute("update pessoa set excluido_em=? where id=?", (None if antes else contato._ts(agora), h["pessoa_id"]))
         return {"antes": depois, "depois": antes}
     atual = _pet(con, h["campo"][4:])

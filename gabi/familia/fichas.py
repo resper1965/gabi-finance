@@ -51,6 +51,14 @@ def _nome_completo(r, d: dict) -> str | None:
     return d.get("nome_completo") or None
 
 
+def rotulo(nome: str, dados) -> str:
+    """Nome para candidato de ambiguidade: "Sandra (Sandra Maria Esper)" quando há nome completo diferente do nome."""
+    completo = dados.get("nome_completo") if isinstance(dados, dict) else None
+    if isinstance(completo, str) and completo.strip() and normalizar_nome(completo) != normalizar_nome(nome):
+        return f"{nome} ({completo.strip()})"
+    return nome
+
+
 def listar(con) -> list[dict]:
     """Quem está no cadastro, sem número de documento."""
     qtd = {r["pessoa_id"]: r["n"] for r in con.execute(
@@ -58,8 +66,9 @@ def listar(con) -> list[dict]:
     saida = []
     for r in con.execute("select id, nome, dados from pessoa where excluido_em is null order by nome collate nocase, id"):
         d = _dados(r)
-        saida.append({"id": r["id"], "nome": r["nome"], "apelido": d.get("apelido"), "parentesco": d.get("parentesco"),
-                      "nascimento": d.get("nascimento"), "documentos_qtd": qtd.get(r["id"], 0)})
+        saida.append({"id": r["id"], "nome": r["nome"], "nome_completo": _nome_completo(r, d), "apelido": d.get("apelido"),
+                      "parentesco": d.get("parentesco"), "nascimento": d.get("nascimento"), "falecido": d.get("falecido") is True,
+                      "observacao": d.get("observacao"), "documentos_qtd": qtd.get(r["id"], 0)})
     return saida
 
 
@@ -93,8 +102,8 @@ def ficha(con, pessoa_id: str) -> dict:
         " from familia_documento where pessoa_id=? and excluido_em is null order by id", (pessoa_id,))]
     enderecos = d.get("enderecos")
     return {"id": r["id"], "nome": r["nome"], "nome_completo": _nome_completo(r, d), "apelido": d.get("apelido"),
-            "parentesco": d.get("parentesco"), "nascimento": d.get("nascimento"),
-            "telefones": _lista(d, "telefone", "telefones"), "emails": _lista(d, "email", "emails"),
+            "parentesco": d.get("parentesco"), "nascimento": d.get("nascimento"), "falecido": d.get("falecido") is True,
+            "observacao": d.get("observacao"), "telefones": _lista(d, "telefone", "telefones"), "emails": _lista(d, "email", "emails"),
             "enderecos": enderecos if isinstance(enderecos, list) else [],
             "documentos": docs, "divergencias": divergencias(con, pessoa_id)}
 
@@ -105,7 +114,7 @@ def resolver_pessoa(con, texto: str, *, parcial: bool = True) -> str:
     candidatos (vazio se ninguém casar); com `parcial`, os candidatos incluem quem só contém o texto no meio."""
     alvo = normalizar_nome(texto)
     # Só valores texto casam (nome_completo/apelido de outro tipo no JSON são ignorados).
-    linhas = [(r["id"], r["nome"], [normalizar_nome(v) for v in (r["nome"], d.get("nome_completo"), d.get("apelido")) if isinstance(v, str)])
+    linhas = [(r["id"], rotulo(r["nome"], d), [normalizar_nome(v) for v in (r["nome"], d.get("nome_completo"), d.get("apelido")) if isinstance(v, str)])
               for r in con.execute("select id, nome, dados from pessoa where excluido_em is null") for d in (_dados(r),)]
     if alvo:
         exatos = [(i, n) for i, n, chaves in linhas if alvo in chaves]

@@ -110,9 +110,9 @@ def test_nome_completo_nao_encurta(con):
 
 def test_apelido_com_nome_alheio_nao_grava_completo(con):
     con.execute("insert into pessoa(id, nome, dados) values ('gigi','Giovanna',?)", (json.dumps({"apelido": "Gigi"}),))
-    r = _pessoa(con, nome="Fulana Beltrana", apelido="Gigi", parentesco="filha")
-    assert r["pessoa_id"] == "gigi" and "nome_completo" not in _dados(con, "gigi")
-    assert all(h["campo"] != "nome_completo" for h in contato.historico(con, "gigi"))
+    e = _erro(_pessoa, con, nome="Fulana Beltrana", apelido="Gigi", parentesco="filha")  # I2: pergunta em vez de juntar
+    assert e.codigo == "pessoa_ambigua" and e.candidatos == ["Giovanna"]
+    assert "nome_completo" not in _dados(con, "gigi") and contato.historico(con, "gigi") == []
 
 
 def test_so_primeiro_nome_dois_casam_ambiguo(con):
@@ -237,3 +237,119 @@ def test_auditoria_sem_nome(con):
     textos = [r["o_que"] for r in con.execute("select o_que, origem from decisao")]
     assert textos and all("Chafic" not in t and "Esper" not in t and "Chafa" not in t for t in textos)
     assert {r["origem"] for r in con.execute("select origem from decisao")} == {"familia"}
+
+
+# --- Forma de produção: nome completo em `nome`, sem `nome_completo`; titular com papel='titular'. ---
+
+@pytest.fixture
+def prod(tmp_path):
+    c = conectar(tmp_path / "p.db")
+    migrar(c, MIGRACOES)
+    for pid, nome, papel, dados in (
+            ("ricardo", "Ricardo Chafic Esper", "titular", {}),
+            ("louise", "Louise Lavrik Esper", "familia", {}),
+            ("giovanna", "Giovanna Della Torre Esper", "familia", {"apelido": "Gigi"}),
+            ("carla", "Carla Noce Della Torre", "familia", {})):
+        c.execute("insert into pessoa(id, nome, papel, dados) values (?,?,?,?)", (pid, nome, papel, json.dumps(dados)))
+    return c
+
+
+def test_nome_encurtado_e_a_mesma_pessoa(prod):
+    n = _conta(prod, "pessoa")
+    r = _pessoa(prod, nome="Louise Esper", parentesco="filha")
+    assert r["criada"] is False and r["pessoa_id"] == "louise" and _conta(prod, "pessoa") == n
+    assert _pessoa(prod, nome="Louise", parentesco="filha")["pessoa_id"] == "louise"  # sem sequestro do nome curto
+    assert _pessoa(prod, nome="Carla Torre", parentesco="ex-esposa")["pessoa_id"] == "carla"
+
+
+def test_apelido_como_primeira_palavra(prod):
+    r = _pessoa(prod, nome="Gigi Esper", parentesco="filha")
+    assert r["criada"] is False and r["pessoa_id"] == "giovanna"
+
+
+def test_primeira_palavra_diferente_cria(prod):
+    r = _pessoa(prod, nome="Chafic Esper", parentesco="irmão")
+    assert r["criada"] is True and r["pessoa_id"] == "chafic"
+    assert _dados(prod, "ricardo") == {}
+
+
+def test_encurtado_ambiguo(prod):
+    prod.execute("insert into pessoa(id, nome, papel, dados) values ('louise2','Louise Maria Esper','familia','{}')")
+    e = _erro(_pessoa, prod, nome="Louise Esper", parentesco="filha")
+    assert e.codigo == "pessoa_ambigua" and sorted(e.candidatos) == ["Louise Lavrik Esper", "Louise Maria Esper"]
+
+
+def test_titular_nunca_e_escrito(prod):
+    nh, nd = _conta(prod, "pessoa_historico"), _conta(prod, "decisao")
+    for nome in ("Ricardo", "Ricardo Esper", "Ricardo Chafic Esper"):
+        e = _erro(_pessoa, prod, nome=nome, parentesco="eu")
+        assert e.codigo == "pessoa_ambigua" and e.candidatos == ["Ricardo Chafic Esper"]
+    e = _erro(_pessoa, prod, nome="Fulano Novo", apelido="Ricardo", parentesco="eu")  # pelo apelido também
+    assert e.codigo == "pessoa_ambigua"
+    assert _dados(prod, "ricardo") == {} and (_conta(prod, "pessoa_historico"), _conta(prod, "decisao")) == (nh, nd)
+
+
+def test_resultado_traz_nome_e_nome_completo(prod):
+    r = _pessoa(prod, nome="Louise Esper", parentesco="filha")
+    assert r["nome"] == "Louise Lavrik Esper" and r["nome_completo"] is None
+    r2 = _pessoa(prod, nome="Chafic Esper", parentesco="irmão")
+    assert r2["nome"] == "Chafic" and r2["nome_completo"] == "Chafic Esper"
+
+
+def test_apelido_casa_mas_nome_contradiz_pergunta(prod):
+    n, nh = _conta(prod, "pessoa"), _conta(prod, "pessoa_historico")
+    e = _erro(_pessoa, prod, nome="Fulana Beltrana", apelido="Gigi", parentesco="filha")
+    assert e.codigo == "pessoa_ambigua" and e.candidatos == ["Giovanna Della Torre Esper"]
+    assert (_conta(prod, "pessoa"), _conta(prod, "pessoa_historico")) == (n, nh)
+
+
+def test_desfazer_criada_depois_de_desfazer_campo(con):
+    _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    p = pessoas.registrar_pessoa(con, nome="Chafic Esper", parentesco="primo", quem="boss", agora=AGORA + dt.timedelta(minutes=5))
+    contato.desfazer(con, p["mudancas"][0]["historico_id"], "boss", AGORA + dt.timedelta(minutes=6))
+    criada = [h for h in contato.historico(con, "chafic") if h["campo"] == "criada"][0]
+    contato.desfazer(con, criada["id"], "boss", AGORA + dt.timedelta(minutes=7))
+    assert con.execute("select excluido_em from pessoa where id='chafic'").fetchone()["excluido_em"]
+
+
+def test_desfazer_criada_depois_de_desfazer_o_proprio_campo(con):
+    r = _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    contato.desfazer(con, r["mudancas"][0]["historico_id"], "boss", AGORA + dt.timedelta(minutes=1))
+    criada = [h for h in contato.historico(con, "chafic") if h["campo"] == "criada"][0]
+    contato.desfazer(con, criada["id"], "boss", AGORA + dt.timedelta(minutes=2))  # campo vazio de novo: nada se perde
+    assert con.execute("select excluido_em from pessoa where id='chafic'").fetchone()["excluido_em"]
+
+
+def test_desfazer_criada_com_campo_novo_desfeito(con):
+    _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    h = contato.atualizar(con, "chafic", "telefones", "adicionar", "+55 11 98888-7777", "boss", AGORA + dt.timedelta(minutes=1))
+    criada = [x for x in contato.historico(con, "chafic") if x["campo"] == "criada"][0]
+    assert _erro(contato.desfazer, con, criada["id"], "boss", AGORA).codigo == "conflito"
+    contato.desfazer(con, h["historico_id"], "boss", AGORA + dt.timedelta(minutes=2))
+    contato.desfazer(con, criada["id"], "boss", AGORA + dt.timedelta(minutes=3))
+    assert con.execute("select excluido_em from pessoa where id='chafic'").fetchone()["excluido_em"]
+
+
+def test_candidatos_com_nome_completo(con):
+    _pessoa(con, nome="Sandra Maria Esper", parentesco="tia")
+    _pessoa(con, nome="Sandra Lima", parentesco="prima")
+    e = _erro(_pessoa, con, nome="Sandra", parentesco="tia")
+    assert e.codigo == "pessoa_ambigua"
+    assert sorted(e.candidatos) == ["Sandra (Sandra Lima)", "Sandra (Sandra Maria Esper)"]
+
+
+def test_pet_legado_le_chaves_antigas_e_grava_as_novas(prod):
+    prod.execute("insert into pet(id, nome, especie, dados) values ('cookie','Cookie','cachorro',?)",
+                 (json.dumps({"tutor": "louise", "aniversario": "2017-07-19", "plano": "petlove"}),))
+    assert pessoas.listar_pets(prod)[0] == {"id": "cookie", "nome": "Cookie", "especie": "cachorro", "raca": None,
+                                            "nascimento": "2017-07-19", "dono": "louise"}
+    r = _pet(prod, nome="Cookie", especie="cachorro", raca="shih-tzu", dono="Gigi", nascimento="2017-07-20")
+    assert r["criado"] is False
+    d = json.loads(prod.execute("select dados from pet where id='cookie'").fetchone()["dados"])
+    assert d["dono"] == "giovanna" and d["nascimento"] == "2017-07-20" and d["raca"] == "shih-tzu"
+    assert d["tutor"] == "louise" and d["aniversario"] == "2017-07-19" and d["plano"] == "petlove"  # legado intacto
+    p = pessoas.listar_pets(prod)[0]
+    assert (p["dono"], p["nascimento"]) == ("giovanna", "2017-07-20")
+    contato.desfazer(prod, r["historico_id"], "boss", AGORA)
+    p = pessoas.listar_pets(prod)[0]
+    assert (p["dono"], p["nascimento"], p["raca"]) == ("louise", "2017-07-19", None)

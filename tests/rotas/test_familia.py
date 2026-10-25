@@ -112,3 +112,12 @@ def test_vencimentos(cli):
 def test_nao_boss_403(cli, metodo, url):
     r = cli.request(metodo, url, headers={**VIP, **JSON}, content="{}" if metodo == "POST" else None)
     assert r.status_code == 403
+
+
+def test_historico_traz_ate_200(cli, banco):
+    c = conectar(banco)
+    for i in range(205):
+        ct.atualizar(c, "lia", "parentesco", "definir", f"filha {i}", "boss@x.com", AGORA)
+    c.close()
+    assert len(_get(cli, "/api/v1/familia/historico").json()["dados"]["itens"]) == 200
+    assert len(ct.historico(conectar(banco))) == 50  # o padrão da função fica para os outros chamadores

@@ -98,10 +98,10 @@ async def decidir_proposta(proposta_id: int, request: Request, ident: Identidade
 
 @router.get("/historico")
 def historico_de_contato(request: Request, pessoa: str | None = None):
-    """Mudanças de contato, da mais nova para a mais antiga; `pessoa` filtra pelo id."""
+    """Mudanças de contato, da mais nova para a mais antiga (até 200); `pessoa` filtra pelo id."""
     con = _con(request)
     try:
-        return envelope(con, {"itens": ct.historico(con, pessoa or None)}, agora=_agora(request))
+        return envelope(con, {"itens": ct.historico(con, pessoa or None, limite=200)}, agora=_agora(request))
     finally:
         con.close()
 

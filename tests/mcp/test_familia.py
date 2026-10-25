@@ -213,3 +213,23 @@ def test_docstrings_das_novas(clif, tokf):
     for n in NOVAS:
         assert "dado de terceiros" in desc[n] and "só diga que anotou depois do ok desta ferramenta" in desc[n], n
     assert "Nome ambíguo volta com candidatos: pergunte qual" in desc["familia_registrar_pessoa"]
+
+
+def test_registrar_pessoa_devolve_nome_e_titular_vira_pergunta(clif, tokf, bancof):
+    c = conectar(bancof)
+    c.execute("insert into pessoa(id, nome, papel, dados) values ('eu','Ricardo Chafic Esper','titular','{}')")
+    c.commit()
+    d = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Sandra Maria Esper", parentesco="tia")["dados"]
+    assert (d["nome"], d["nome_completo"]) == ("Sandra", "Sandra Maria Esper")
+    r = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Ricardo Esper", parentesco="eu")
+    assert r["erro"] == "pessoa_ambigua" and "candidatos: Ricardo Chafic Esper" in r["mensagem"]
+    assert c.execute("select dados from pessoa where id='eu'").fetchone()["dados"] == "{}"
+
+
+def test_candidatos_e_listar_mostram_nome_completo(clif, tokf, bancof):
+    for n in ("Sandra Maria Esper", "Sandra Lima"):
+        _reg(clif, tokf["familia"], "familia_registrar_pessoa", n, parentesco="tia")
+    r = _reg(clif, tokf["familia"], "familia_registrar_pessoa", "Sandra", parentesco="tia")
+    assert r["erro"] == "pessoa_ambigua" and "Sandra (Sandra Maria Esper)" in r["mensagem"] and "Sandra (Sandra Lima)" in r["mensagem"]
+    itens = chamar(clif, tokf["familia"], "familia_listar")["dados"]["itens"]
+    assert {i["nome_completo"] for i in itens if i["nome"] == "Sandra"} == {"Sandra Maria Esper", "Sandra Lima"}
