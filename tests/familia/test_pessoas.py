@@ -103,23 +103,42 @@ def test_falecido_e_observacao(con):
 
 
 def test_desfazer_criada_exclui(con):
-    r = _pessoa(con, nome="Chafic Esper", parentesco="")
-    criada = contato.historico(con, "chafic")[0]
-    assert criada["campo"] == "criada" and r["mudancas"] == []
+    r = _pessoa(con, nome="Chafic Esper", parentesco="irmão", apelido="Chafa")
+    criada = [h for h in contato.historico(con, "chafic") if h["campo"] == "criada"][0]
     contato.desfazer(con, criada["id"], "boss", AGORA)
     assert con.execute("select excluido_em from pessoa where id=?", (r["pessoa_id"],)).fetchone()["excluido_em"]
-    volta = contato.historico(con, "chafic")[0]
-    assert volta["campo"] == "criada" and volta["depois"] is None
+    hs = contato.historico(con, "chafic")
+    assert hs[0]["campo"] == "criada" and hs[0]["depois"] is None
+    assert all(h["desfeito_em"] for h in hs[1:])  # criada, parentesco e apelido da mesma chamada
     assert _erro(contato.desfazer, con, criada["id"], "boss", AGORA).codigo == "conflito"
-    contato.desfazer(con, volta["id"], "boss", AGORA)  # desfazer o desfazer traz a pessoa de volta
+    contato.desfazer(con, hs[0]["id"], "boss", AGORA)  # desfazer o desfazer traz a pessoa de volta
     assert con.execute("select excluido_em from pessoa where id='chafic'").fetchone()["excluido_em"] is None
 
 
 def test_desfazer_criada_com_mudanca_posterior_conflito(con):
     _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    pessoas.registrar_pessoa(con, nome="Chafic Esper", parentesco="irmão mais velho", quem="boss",
+                             agora=AGORA + dt.timedelta(minutes=5))
     criada = [h for h in contato.historico(con, "chafic") if h["campo"] == "criada"][0]
     assert _erro(contato.desfazer, con, criada["id"], "boss", AGORA).codigo == "conflito"
     assert con.execute("select excluido_em from pessoa where id='chafic'").fetchone()["excluido_em"] is None
+    assert not any(h["desfeito_em"] for h in contato.historico(con, "chafic"))
+
+
+def test_substring_nao_bloqueia_criacao(con):
+    con.execute("insert into pessoa(id, nome, dados) values ('ricardo2','Ricardo C',?)",
+                (json.dumps({"nome_completo": "Ricardo Chafic Esper"}),))
+    r = _pessoa(con, nome="Chafic Esper", parentesco="irmão")
+    assert r["criada"] is True and r["pessoa_id"] == "chafic"
+    assert _pet(con, nome="Rex", especie="cachorro", dono="Chafic Esper")["pet_id"] == "rex"
+    assert pessoas.listar_pets(con)[0]["dono"] == "chafic"
+
+
+def test_ambiguo_por_comeco_de_palavra(con):
+    con.execute("insert into pessoa(id, nome) values ('lu1','Louise Lavrik')")
+    con.execute("insert into pessoa(id, nome) values ('lu2','Louise Esper')")
+    e = _erro(_pessoa, con, nome="Louise", parentesco="filha")
+    assert e.codigo == "pessoa_ambigua" and sorted(e.candidatos) == ["Louise Esper", "Louise Lavrik"]
 
 
 def test_pet_cria_e_atualiza(con):

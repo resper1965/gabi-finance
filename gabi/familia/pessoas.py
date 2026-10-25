@@ -20,7 +20,7 @@ def _slug(texto: str) -> str:
 def _resolver(con, texto: str) -> str | None:
     """Id da pessoa que casa; None se ninguém casar; `pessoa_ambigua` (com candidatos) propagado."""
     try:
-        return resolver_pessoa(con, texto)
+        return resolver_pessoa(con, texto, parcial=False)
     except ErroFamilia as e:
         if e.codigo == "pessoa_ambigua" and not e.candidatos:
             return None
@@ -111,7 +111,7 @@ def registrar_pet(con, *, nome: str, especie: str, raca: str = "", nascimento: s
         novos["nascimento"] = contato.data(nascimento)
     with transacao(con, imediata=True):
         if isinstance(dono, str) and dono.strip():
-            novos["dono"] = resolver_pessoa(con, dono)
+            novos["dono"] = resolver_pessoa(con, dono, parcial=False)
         alvo = normalizar_nome(nome)
         pet_id = next((r["id"] for r in con.execute("select id, nome from pet order by id") if normalizar_nome(r["nome"]) == alvo), None)
         antes = _pet(con, pet_id) if pet_id else None
@@ -135,15 +135,21 @@ def listar_pets(con) -> list[dict]:
 
 
 def desfazer_especial(con, h, quem: str, agora: dt.datetime) -> dict:
-    """Desfaz 'criada' (exclui a pessoa; refaz se a linha for o próprio desfazer) e 'pet:<id>' (restaura o pet, apaga se
+    """Desfaz 'criada' (exclui a pessoa e marca desfeitas as linhas da mesma chamada; refaz se a linha for o próprio desfazer) e 'pet:<id>' (restaura o pet, apaga se
     não existia). Chamado por `contato.desfazer` dentro da transação dele, que grava o histórico e a auditoria."""
     depois, antes = json.loads(h["depois"]), json.loads(h["antes"])
     if h["campo"] == "criada":
         r = con.execute("select excluido_em from pessoa where id=?", (h["pessoa_id"],)).fetchone()
-        posterior = con.execute("select 1 from pessoa_historico where pessoa_id=? and id>? and desfeito_em is null",
-                                (h["pessoa_id"], h["id"])).fetchone()
+        # As linhas da mesma chamada (mesmo quem e quando da 'criada') fazem parte da criação e são desfeitas junto.
+        mesma = "quem=? and quando=?" if depois is not None else "0"
+        args = (h["quem"], h["quando"]) if depois is not None else ()
+        posterior = con.execute("select 1 from pessoa_historico where pessoa_id=? and id>? and desfeito_em is null"
+                                f" and not ({mesma})", (h["pessoa_id"], h["id"], *args)).fetchone()
         if r is None or posterior or (r["excluido_em"] is None) != (depois is not None):
             raise ErroFamilia("conflito")
+        if depois is not None:
+            con.execute("update pessoa_historico set desfeito_em=? where pessoa_id=? and id>? and desfeito_em is null and quem=?"
+                        " and quando=?", (contato._ts(agora), h["pessoa_id"], h["id"], h["quem"], h["quando"]))
         con.execute("update pessoa set excluido_em=? where id=?", (None if antes else contato._ts(agora), h["pessoa_id"]))
         return {"antes": depois, "depois": antes}
     atual = _pet(con, h["campo"][4:])
