@@ -31,6 +31,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 - **SP2:** apagados ouvinte da escuta (`/opt` e `/var/lib/escuta-ouvinte`), cofre `saude.enc` e as chaves (`/etc/gabi/saude.key`, `~/saude.key.COPIE-E-APAGUE`). Aparelho do WhatsApp: o Ricardo desconecta.
 
 ## Depois (sugeridos na revisão de 21/10, não escolhidos ainda)
+- Documentos (revisão final 25/10): no "Corrigir", remover o número principal promove o secundário e pode trocar o número do documento ativo; e uma correção sem nenhum número aprova documento sem número. Bloquear os dois no backend.
 - Enxugar a lixeira do e-mail (8 condições, conferência ao vivo, 8 tentativas) para regras de remetente.
 - Congelar a rodada diária de propostas de contatos (ADR-022 gera 0 propostas até o G12).
 - Tirar do alerta "emergencial" os e-mails do próprio sistema (falhas do ness.brain, Google Cloud).
