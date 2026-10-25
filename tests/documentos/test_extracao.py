@@ -22,7 +22,10 @@ class Falso:
     def completar(self, prompt, *, forte):
         self.prompts.append(prompt)
         self.fortes.append(forte)
-        return self.respostas.pop(0), 0.001
+        r = self.respostas.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r, 0.001
 
 
 def _orc():
@@ -154,6 +157,19 @@ def test_extrair_falha_nos_dois():
     c = Falso("a", "b")
     r = ex.extrair(c, _orc(), "T", "ocr", 12000)
     assert isinstance(r, Falha) and c.fortes == [False, True]
+
+
+def test_extrair_fraco_sem_texto_tenta_forte():
+    # deepseek-v4-flash gasta o max_tokens raciocinando e volta sem texto em documento grande (produção, 25/10)
+    c = Falso(RuntimeError("resposta do OpenRouter sem texto"), json.dumps(_json()))
+    r = ex.extrair(c, _orc(), "T", "ocr", 12000)
+    assert isinstance(r, dict) and r["tipo"] == "passaporte" and c.fortes == [False, True]
+
+
+def test_extrair_temporaria_nos_dois_e_falha_temporaria():
+    c = Falso(RuntimeError("x"), RuntimeError("y"))
+    r = ex.extrair(c, _orc(), "T", "ocr", 12000)
+    assert isinstance(r, Falha) and r.temporaria and r.motivo == "falha temporária do modelo" and c.fortes == [False, True]
 
 
 def test_extrair_sem_orcamento():

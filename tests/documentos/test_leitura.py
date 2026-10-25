@@ -233,7 +233,7 @@ def test_modelo_fora_do_ar_para_a_rodada_sem_gastar_tentativa(con):
     """I2b: 3 falhas temporárias seguidas do modelo param a rodada e não contam tentativa para esses 3."""
     m = ForaDoAr()
     r = _ler(con, Paperless(*(_d(i) for i in range(1, 6))), m)
-    assert r.parada == "modelo indisponível" and r.falhas == 0 and m.n == 3
+    assert r.parada == "modelo indisponível" and r.falhas == 0 and m.n == 6  # fraco e forte em cada um dos 3
     assert con.execute("select count(*) from documento_leitura").fetchone()[0] == 0
     for _ in range(4):  # rodadas seguidas fora do ar nunca esgotam as tentativas
         assert _ler(con, Paperless(*(_d(i) for i in range(1, 6))), ForaDoAr()).parada == "modelo indisponível"
