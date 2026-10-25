@@ -68,7 +68,7 @@ O Hermes deixa de falhar nas perguntas reais do Ricardo por falta de ferramenta,
 - `dados_ate` e `desatualizado` só olham as fontes declaradas. Um teste garante que toda ferramenta registrada tem declaração.
 
 **Pronto quando:**
-- a carga de 24/10 foi refeita pelo Ricardo no chat e ficou no brain (pessoas, parentesco e Cookie);
+- o que o Ricardo ditou em 24/10 está no brain (pessoas, parentesco e Cookie), aplicado pelo assistente a partir do histórico do Hermes e conferido pelo Ricardo;
 - `auditar_promessas` não mostra nenhum caso novo em 7 dias;
 - a ficha da família não diz mais "desatualizado".
 
