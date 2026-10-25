@@ -45,3 +45,13 @@ def test_soul_excecao_cobre_pessoa_pet_e_contato_sem_contradizer():
     assert "(apelido, telefone" not in soul  # apelido não vai mais para familia_atualizar_contato
     regra = next(l for l in soul.splitlines() if "Você lê e propõe" in l)
     assert "fora a exceção abaixo" in regra
+
+
+def test_soul_so_grava_fato_dito_e_nunca_cala():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    bloco = soul.split("Gravar de verdade:")[1].split("\n\n")[0]
+    assert "Grave só o que o Ricardo afirma como fato" in bloco
+    for termo in ("pergunta", "talvez", "acho que", "brincadeira", "terceiro", "você deduziu"):
+        assert termo in bloco, termo
+    assert "Quer que eu grave no brain: <fato>?" in bloco and "Não vou gravar isso no brain: <motivo curto>" in bloco
+    assert "Nunca fique calado" in bloco

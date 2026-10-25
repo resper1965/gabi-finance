@@ -233,3 +233,16 @@ def test_candidatos_e_listar_mostram_nome_completo(clif, tokf, bancof):
     assert r["erro"] == "pessoa_ambigua" and "Sandra (Sandra Maria Esper)" in r["mensagem"] and "Sandra (Sandra Lima)" in r["mensagem"]
     itens = chamar(clif, tokf["familia"], "familia_listar")["dados"]["itens"]
     assert {i["nome_completo"] for i in itens if i["nome"] == "Sandra"} == {"Sandra Maria Esper", "Sandra Lima"}
+
+
+FATO = "Só grave o que o Ricardo afirmou como fato"
+CALADO = "nunca fique calado"
+
+
+def test_docstrings_e_instrucoes_so_fato_dito(clif, tokf):
+    desc = {t["name"]: t["description"] for t in rpc(clif, tokf["familia"], "tools/list").json()["result"]["tools"]}
+    for n in NOVAS:
+        assert FATO in desc[n] and CALADO in desc[n], n
+    ini = rpc(clif, tokf["familia"], "initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                                                    "clientInfo": {"name": "t", "version": "0"}}).json()["result"]
+    assert FATO in ini["instructions"] and CALADO in ini["instructions"]
