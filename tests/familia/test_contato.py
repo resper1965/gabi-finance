@@ -184,3 +184,13 @@ def test_remover_endereco_dict_pelo_texto_formatado(con):
 def test_adicionar_endereco_igual_ao_dict_e_duplicado(con):
     _com_endereco_dict(con)
     assert _erro(con, "enderecos", "adicionar", "Rua Exemplo, 10, Centro, São Paulo/SP, 01000-000") == "valor_invalido"
+
+
+def test_observacao_e_falecido(con):
+    contato.atualizar(con, "ana", "observacao", "definir", " mora fora ", "boss", AGORA)
+    r = contato.atualizar(con, "ana", "falecido", "definir", True, "boss", AGORA)
+    d = _dados(con)
+    assert d["observacao"] == "mora fora" and d["falecido"] is True
+    assert _erro(con, "falecido", "definir", "sim") == "valor_invalido"
+    contato.desfazer(con, r["historico_id"], "boss", AGORA)
+    assert "falecido" not in _dados(con)

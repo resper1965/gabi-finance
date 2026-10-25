@@ -10,7 +10,8 @@ from gabi.contatos.telefone import normalizar_telefone
 from gabi.db import transacao
 from gabi.familia.fichas import ErroFamilia
 
-TEXTOS = ("apelido", "parentesco", "nascimento")
+TEXTOS = ("apelido", "parentesco", "nascimento", "observacao")
+BOOLEANOS = ("falecido",)
 LISTAS = ("telefones", "emails", "enderecos")
 MAX_ITENS = 10
 MAX_TEXTO = 200
@@ -132,40 +133,57 @@ def _historico(con, pessoa_id, campo, antes, depois, quem, agora) -> int:
                         quem, _ts(agora))).lastrowid
 
 
-def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agora: dt.datetime) -> dict:
-    """Grava `valor` em `campo` e registra o histórico, tudo na mesma transação. Devolve antes, depois e historico_id."""
-    if campo not in TEXTOS and campo not in LISTAS:
+def data(valor) -> str:
+    """Data `YYYY-MM-DD` válida, sem espaços nas pontas; `valor_invalido` senão."""
+    try:
+        if not (isinstance(valor, str) and _DATA.match(valor.strip())):
+            raise ValueError
+        dt.date.fromisoformat(valor.strip())
+    except ValueError:
+        raise ErroFamilia("valor_invalido")
+    return valor.strip()
+
+
+def validar(campo: str, acao: str, valor):
+    """Confere campo, ação e valor sem tocar no banco; devolve o valor na forma gravada."""
+    if campo not in TEXTOS and campo not in LISTAS and campo not in BOOLEANOS:
         raise ErroFamilia("campo_invalido")
     if acao not in ("definir", "adicionar", "remover") or (campo in LISTAS) == (acao == "definir"):
         raise ErroFamilia("requisicao_invalida")
-    if campo == "nascimento":
-        try:
-            if not (isinstance(valor, str) and _DATA.match(valor.strip())):
-                raise ValueError
-            dt.date.fromisoformat(valor.strip())
-        except ValueError:
+    if campo in BOOLEANOS:
+        if not isinstance(valor, bool):
             raise ErroFamilia("valor_invalido")
-    with transacao(con, imediata=True):
-        dados = _dados_da(con, pessoa_id)
-        antes = _atual(dados, campo)
-        if acao == "definir":
-            depois = _normalizar(campo, valor)
-        elif acao == "adicionar":
-            novo = _normalizar(campo, valor)
-            if len(antes) >= MAX_ITENS or any(_casa(campo, i, novo) for i in antes):
-                raise ErroFamilia("valor_invalido")
-            depois = antes + [novo]
-        else:
-            alvo = _normalizar(campo, valor)
-            ficam = [i for i in antes if not _casa(campo, i, alvo)]
-            if len(ficam) == len(antes):
-                raise ErroFamilia("valor_invalido")
-            depois = ficam
-        _colocar(dados, campo, depois)
-        _gravar(con, pessoa_id, dados)
-        hid = _historico(con, pessoa_id, campo, antes, depois, quem, agora)
-        _auditar(con, quem, agora, pessoa_id, campo, acao)
+        return valor
+    return data(valor) if campo == "nascimento" else _normalizar(campo, valor)
+
+
+def _aplicar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agora: dt.datetime) -> dict:
+    """Miolo de `atualizar`, sem transação própria (o chamador abre a sua)."""
+    novo = validar(campo, acao, valor)
+    dados = _dados_da(con, pessoa_id)
+    antes = _atual(dados, campo)
+    if acao == "definir":
+        depois = novo
+    elif acao == "adicionar":
+        if len(antes) >= MAX_ITENS or any(_casa(campo, i, novo) for i in antes):
+            raise ErroFamilia("valor_invalido")
+        depois = antes + [novo]
+    else:
+        ficam = [i for i in antes if not _casa(campo, i, novo)]
+        if len(ficam) == len(antes):
+            raise ErroFamilia("valor_invalido")
+        depois = ficam
+    _colocar(dados, campo, depois)
+    _gravar(con, pessoa_id, dados)
+    hid = _historico(con, pessoa_id, campo, antes, depois, quem, agora)
+    _auditar(con, quem, agora, pessoa_id, campo, acao)
     return {"antes": antes, "depois": depois, "historico_id": hid}
+
+
+def atualizar(con, pessoa_id: str, campo: str, acao: str, valor, quem: str, agora: dt.datetime) -> dict:
+    """Grava `valor` em `campo` e registra o histórico, tudo na mesma transação. Devolve antes, depois e historico_id."""
+    with transacao(con, imediata=True):
+        return _aplicar(con, pessoa_id, campo, acao, valor, quem, agora)
 
 
 CARGA = ("telefone", "enderecos")
@@ -216,13 +234,18 @@ def desfazer(con, historico_id: int, quem: str, agora: dt.datetime) -> dict:
             raise ErroFamilia("nao_encontrado")
         if h["desfeito_em"]:
             raise ErroFamilia("conflito")
-        dados = _dados_da(con, h["pessoa_id"])
-        atual = _atual(dados, h["campo"])
-        if atual != json.loads(h["depois"]):
-            raise ErroFamilia("conflito")
-        antes = json.loads(h["antes"])
-        _colocar(dados, h["campo"], antes)
-        _gravar(con, h["pessoa_id"], dados)
+        if h["campo"] == "criada" or h["campo"].startswith("pet:"):
+            from gabi.familia import pessoas  # import tardio: pessoas importa este módulo
+            r = pessoas.desfazer_especial(con, h, quem, agora)
+            atual, antes = r["antes"], r["depois"]
+        else:
+            dados = _dados_da(con, h["pessoa_id"])
+            atual = _atual(dados, h["campo"])
+            if atual != json.loads(h["depois"]):
+                raise ErroFamilia("conflito")
+            antes = json.loads(h["antes"])
+            _colocar(dados, h["campo"], antes)
+            _gravar(con, h["pessoa_id"], dados)
         novo = _historico(con, h["pessoa_id"], h["campo"], atual, antes, quem, agora)
         con.execute("update pessoa_historico set desfeito_em=? where id=?", (_ts(agora), historico_id))
         _auditar(con, quem, agora, h["pessoa_id"], h["campo"], "desfazer")
