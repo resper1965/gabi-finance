@@ -4,6 +4,7 @@ Uso: python -m tools.auditar_promessas [--desde YYYY-MM-DD] [--state-db ~/.herme
 Imprime uma linha por caso (data, sessão, 80 primeiros caracteres) e a contagem; sai 0. Sem timer: o assistente roda."""
 import argparse
 import datetime as dt
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -13,6 +14,32 @@ ESCRITAS = ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_re
 FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_brain__" + n for n in ESCRITAS}
 PROMESSA = re.compile(r"\b(anotad|anotei|registr|salv|guard|atualiz)\w*", re.I)
 PADRAO_STATE_DB = Path.home() / ".hermes" / "state.db"
+_EMBRULHO = re.compile(r"^\s*<untrusted_tool_result[^>]*>(.*?)(?:</untrusted_tool_result>\s*)?$", re.S)
+_CHAVE_ERRO = re.compile(r'\\*"erro\\*"\s*:')
+
+
+def _json(texto: str):
+    try:
+        return json.loads(texto)
+    except (TypeError, ValueError):
+        return None
+
+
+def falhou(content: str | None) -> bool:
+    """Resultado de ferramenta com chave `erro` no topo. O Hermes guarda o resultado embrulhado em
+    `<untrusted_tool_result …>` + aviso + `{"result": "<json do brain em texto>"}`: tira o embrulho, decodifica as duas
+    camadas e olha a chave. Se não decodificar (truncado), cai na regex só da chave (`"erro":`, com ou sem barras)."""
+    texto = content or ""
+    m = _EMBRULHO.match(texto)
+    if m:
+        corpo = m.group(1)
+        texto = corpo[corpo.find("{"):] if "{" in corpo else corpo
+    obj = _json(texto.strip())
+    if isinstance(obj, dict) and set(obj) == {"result"}:
+        obj = _json(obj["result"]) if isinstance(obj["result"], str) else obj["result"]
+    if isinstance(obj, dict):
+        return "erro" in obj
+    return bool(_CHAVE_ERRO.search(texto))
 
 
 def promessas_sem_escrita(state_db: Path, desde: dt.datetime) -> list[dict]:
@@ -32,7 +59,7 @@ def promessas_sem_escrita(state_db: Path, desde: dt.datetime) -> list[dict]:
         if role == "user":
             escreveu = False
         elif role == "tool":
-            if tool in FERRAMENTAS_DE_ESCRITA and '"erro"' not in (content or ""):
+            if tool in FERRAMENTAS_DE_ESCRITA and not falhou(content):
                 escreveu = True
         elif role == "assistant" and content and PROMESSA.search(content):
             if not escreveu and ts >= desde.timestamp():
