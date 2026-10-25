@@ -34,12 +34,13 @@ const BEM_NOVO = { ...PROPOSTA, id: 6, titular: null, doc: { ...DOC_PROPOSTO, ti
   bem_novo: { tipo: "imovel", nome: "Apartamento Rua das Flores", dados: {} }, motivos: ["titular não encontrado"], paperless_id: null };
 const HIST = { id: 9, pessoa_id: "lia", campo: "telefones", antes: [], depois: ["+5511999990000"], quem: "hermes", quando: "2026-10-20T10:00:00", desfeito_em: null };
 
-function fake(o: { propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[] } = {}) {
+function fake(o: { propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[]; erroPost?: { status: number; erro: string; mensagem: string } } = {}) {
   const chamadas: Chamada[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
     chamadas.push({ metodo, url, corpo: init?.body ? JSON.parse(String(init.body)) : undefined });
     const ok = (j: unknown) => ({ ok: true, status: 200, json: async () => env(j) }) as Response;
+    if (metodo !== "GET" && o.erroPost) { const e = o.erroPost; return { ok: false, status: e.status, json: async () => ({ erro: e.erro, mensagem: e.mensagem }) } as Response; }
     if (metodo !== "GET") return ok({});
     if (/\/documentos\/propostas/.test(url)) return ok({ itens: o.propostas ?? [PROPOSTA], paperless_url: "https://paperless.exemplo" });
     if (/\/documentos\/titulares/.test(url)) return ok(o.titulares ?? TITULARES);
@@ -180,4 +181,55 @@ test("Desfazer some na linha já desfeita", async () => {
   montar();
   expect(await screen.findByText(/desfeito em 21\/10\/2026/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Desfazer mudança/ })).toBeNull();
+});
+
+// ---------------- fix wave (revisão final) ----------------
+const SEM_TITULAR = { ...PROPOSTA, id: 7, titular: null, doc: { ...DOC_PROPOSTO, titular_id: null }, bem_novo: null };
+
+test("sem titular, o seletor mostra 'escolha…' e aprovar sem escolher mostra o erro", async () => {
+  const c = fake({ propostas: [SEM_TITULAR], erroPost: { status: 400, erro: "titular_invalido", mensagem: "titular inexistente ou inválido" } }); montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Corrigir proposta 7" }));
+  const sel = screen.getByLabelText("Titular da proposta 7") as HTMLSelectElement;
+  expect(sel.value).toBe("");
+  expect(sel.selectedOptions[0].textContent).toBe("escolha…");
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar proposta 7" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].corpo).toEqual({ estado: "aprovada" });
+  expect((await screen.findByRole("alert")).textContent).toContain("titular inexistente ou inválido");
+});
+
+test("corrigir acrescenta data e número que faltavam e remove o errado", async () => {
+  const c = fake(); montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Corrigir proposta 5" }));
+  fireEvent.change(screen.getByLabelText("tipo da data nova da proposta 5"), { target: { value: "emissao" } });
+  fireEvent.change(screen.getByLabelText("data nova da proposta 5"), { target: { value: "2021-02-03" } });
+  fireEvent.click(screen.getByRole("button", { name: "Acrescentar data na proposta 5" }));
+  fireEvent.change(screen.getByLabelText("nome do número novo da proposta 5"), { target: { value: "mrz" } });
+  fireEvent.change(screen.getByLabelText("valor do número novo da proposta 5"), { target: { value: "P<BRA" } });
+  fireEvent.click(screen.getByRole("button", { name: "Acrescentar número na proposta 5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remover validade da proposta 5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar proposta 5" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].corpo).toEqual({ estado: "aprovada", correcao: {
+    numeros: [{ nome: "numero", valor: "FK077009" }, { nome: "mrz", valor: "P<BRA" }], datas: [{ tipo: "emissao", data: "2021-02-03" }] } });
+});
+
+test("remover o número errado vai na correcao", async () => {
+  const c = fake(); montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Corrigir proposta 5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remover numero da proposta 5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar proposta 5" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].corpo).toEqual({ estado: "aprovada", correcao: { numeros: [] } });
+});
+
+test("bem novo: o nome do bem é editável e vai na correcao", async () => {
+  const c = fake({ propostas: [BEM_NOVO] }); montar();
+  fireEvent.click(await screen.findByRole("button", { name: "Corrigir proposta 6" }));
+  const nome = screen.getByLabelText("Nome do bem da proposta 6") as HTMLInputElement;
+  expect(nome.value).toBe("Apartamento Rua das Flores");
+  fireEvent.change(nome, { target: { value: "Apto da praia" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aprovar proposta 6" }));
+  await waitFor(() => expect(posts(c)).toHaveLength(1));
+  expect(posts(c)[0].corpo).toEqual({ estado: "aprovada", correcao: { bem_nome: "Apto da praia" } });
 });

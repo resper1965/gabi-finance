@@ -1,4 +1,5 @@
-/** Casa › Cadastros › Documentos: propostas de documento (aprovar, recusar, corrigir campo, trocar titular), vencimentos, documentos
+/** Casa › Cadastros › Documentos: propostas de documento (aprovar, recusar, corrigir campo, acrescentar ou remover número e data,
+ * trocar titular, dar nome ao bem novo), vencimentos, documentos
  * por pessoa (com contato) e por bem, com número completo e botão copiar, e o histórico de contato da família com Desfazer.
  * Consome: /api/v1/documentos (propostas, titulares, vencimentos) e /api/v1/familia/historico. Número completo só aqui (boss). */
 import { useState } from "react";
@@ -33,6 +34,7 @@ const atencao = { color: "var(--warn)", fontWeight: 600 } as const;
 const grupo = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } as const;
 
 const DATAS_VENCE = ["validade", "vigencia_fim", "vencimento"];
+const TIPOS_DATA = ["emissao", "validade", "vigencia_inicio", "vigencia_fim", "vencimento", "renovacao"];
 const ROTULO_DATA: Record<string, string> = { emissao: "emissão", validade: "validade", vigencia_inicio: "início da vigência", vigencia_fim: "fim da vigência", vencimento: "vencimento", renovacao: "renovação" };
 
 /** AAAA-MM-DD (ou ISO) para dd/mm/aaaa. */
@@ -69,9 +71,12 @@ function Paperless({ id, base }: { id: number | null; base: string | null }) {
     : <span style={suave}>Paperless #{id}</span>;
 }
 
+/** Correção enviada na aprovação: campos do documento (listas `numeros` e `datas` inteiras) e `bem_nome` do bem novo. */
+type Correcao = Partial<DocBase> & { bem_nome?: string };
+
 function CartaoProposta({ p, opcoes, paperless, ocupado, erro, decidir }: {
   p: Proposta; opcoes: [string, string][]; paperless: string | null; ocupado: boolean; erro?: string;
-  decidir: (estado: "aprovada" | "recusada", correcao?: Partial<DocBase>) => void;
+  decidir: (estado: "aprovada" | "recusada", correcao?: Correcao) => void;
 }) {
   const original = chaveTitular(p.doc.titular_tipo, p.doc.titular_id);
   const [editando, setEditando] = useState(false);
@@ -79,13 +84,29 @@ function CartaoProposta({ p, opcoes, paperless, ocupado, erro, decidir }: {
   const [datas, setDatas] = useState(p.doc.datas);
   const [emissor, setEmissor] = useState(p.doc.emissor ?? "");
   const [titular, setTitular] = useState(original);
-  const desfazer = () => { setNumeros(p.doc.numeros); setDatas(p.doc.datas); setEmissor(p.doc.emissor ?? ""); setTitular(original); setEditando(false); };
-  const correcao = (): Partial<DocBase> => {
-    const c: Partial<DocBase> = {};
-    if (numeros.some((n, i) => n.valor !== p.doc.numeros[i].valor)) c.numeros = numeros;
-    if (datas.some((d, i) => d.data !== p.doc.datas[i].data)) c.datas = datas;
+  const [bemNome, setBemNome] = useState(p.bem_novo?.nome ?? "");
+  const [novoNumero, setNovoNumero] = useState({ nome: "", valor: "" });
+  const [novaData, setNovaData] = useState({ tipo: "", data: "" });
+  const desfazer = () => {
+    setNumeros(p.doc.numeros); setDatas(p.doc.datas); setEmissor(p.doc.emissor ?? ""); setTitular(original); setBemNome(p.bem_novo?.nome ?? "");
+    setNovoNumero({ nome: "", valor: "" }); setNovaData({ tipo: "", data: "" }); setEditando(false);
+  };
+  const livres = TIPOS_DATA.filter((t) => !datas.some((d) => d.tipo === t));
+  const acrescentarNumero = () => {
+    if (!novoNumero.nome.trim() || !novoNumero.valor.trim()) return;
+    setNumeros([...numeros, { nome: novoNumero.nome.trim().toLowerCase(), valor: novoNumero.valor.trim() }]); setNovoNumero({ nome: "", valor: "" });
+  };
+  const acrescentarData = () => {
+    if (!novaData.tipo || !novaData.data) return;
+    setDatas(TIPOS_DATA.flatMap((t) => (t === novaData.tipo ? [novaData] : datas.filter((d) => d.tipo === t)))); setNovaData({ tipo: "", data: "" });
+  };
+  const correcao = (): Correcao => {
+    const c: Correcao = {};
+    if (JSON.stringify(numeros) !== JSON.stringify(p.doc.numeros)) c.numeros = numeros;
+    if (JSON.stringify(datas) !== JSON.stringify(p.doc.datas)) c.datas = datas;
     if (emissor !== (p.doc.emissor ?? "")) c.emissor = emissor.trim() || null;
     if (titular !== original && titular) { const [tipo, ...id] = titular.split(":"); c.titular_tipo = tipo; c.titular_id = id.join(":"); }
+    if (p.bem_novo && !titular && bemNome.trim() && bemNome.trim() !== p.bem_novo.nome) c.bem_nome = bemNome.trim();
     return c;
   };
   const aprovar = () => { const c = correcao(); decidir("aprovada", Object.keys(c).length ? c : undefined); };
@@ -105,15 +126,39 @@ function CartaoProposta({ p, opcoes, paperless, ocupado, erro, decidir }: {
         {editando && (
           <span style={grupo}>
             <label>Titular<br /><select aria-label={`Titular da proposta ${p.id}`} value={titular} onChange={(e) => setTitular(e.target.value)}>
-              {p.bem_novo && <option value="">bem novo: {p.bem_novo.nome}</option>}
+              {p.bem_novo ? <option value="">bem novo: {p.bem_novo.nome}</option> : <option value="">escolha…</option>}
               {opcoes.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
             </select></label>
+            {p.bem_novo && !titular && (
+              <label>Nome do bem<br /><input aria-label={`Nome do bem da proposta ${p.id}`} maxLength={120} value={bemNome} onChange={(e) => setBemNome(e.target.value)} /></label>)}
             {numeros.map((n, i) => (
-              <label key={`n${i}`}>{n.nome}<br /><input aria-label={`${n.nome} da proposta ${p.id}`} value={n.valor}
-                onChange={(e) => setNumeros(numeros.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)))} /></label>))}
+              <span key={`n${i}`} style={grupo}>
+                <label>{n.nome}<br /><input aria-label={`${n.nome} da proposta ${p.id}`} value={n.valor}
+                  onChange={(e) => setNumeros(numeros.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)))} /></label>
+                <button className="btn btn-secondary" aria-label={`Remover ${n.nome} da proposta ${p.id}`} onClick={() => setNumeros(numeros.filter((_, j) => j !== i))}>Remover</button>
+              </span>))}
             {datas.map((d, i) => (
-              <label key={d.tipo}>{ROTULO_DATA[d.tipo] ?? d.tipo}<br /><input type="date" aria-label={`${d.tipo} da proposta ${p.id}`} value={d.data}
-                onChange={(e) => setDatas(datas.map((x, j) => (j === i ? { ...x, data: e.target.value } : x)))} /></label>))}
+              <span key={d.tipo} style={grupo}>
+                <label>{ROTULO_DATA[d.tipo] ?? d.tipo}<br /><input type="date" aria-label={`${d.tipo} da proposta ${p.id}`} value={d.data}
+                  onChange={(e) => setDatas(datas.map((x, j) => (j === i ? { ...x, data: e.target.value } : x)))} /></label>
+                <button className="btn btn-secondary" aria-label={`Remover ${d.tipo} da proposta ${p.id}`} onClick={() => setDatas(datas.filter((_, j) => j !== i))}>Remover</button>
+              </span>))}
+            <span style={grupo}>
+              <label>Número novo<br /><input aria-label={`nome do número novo da proposta ${p.id}`} placeholder="nome" value={novoNumero.nome}
+                onChange={(e) => setNovoNumero({ ...novoNumero, nome: e.target.value })} /></label>
+              <label><br /><input aria-label={`valor do número novo da proposta ${p.id}`} placeholder="valor" value={novoNumero.valor}
+                onChange={(e) => setNovoNumero({ ...novoNumero, valor: e.target.value })} /></label>
+              <button className="btn btn-secondary" aria-label={`Acrescentar número na proposta ${p.id}`} onClick={acrescentarNumero}>Acrescentar número</button>
+            </span>
+            {livres.length > 0 && (
+              <span style={grupo}>
+                <label>Data nova<br /><select aria-label={`tipo da data nova da proposta ${p.id}`} value={novaData.tipo} onChange={(e) => setNovaData({ ...novaData, tipo: e.target.value })}>
+                  <option value="">escolha…</option>
+                  {livres.map((t) => <option key={t} value={t}>{ROTULO_DATA[t]}</option>)}
+                </select></label>
+                <label><br /><input type="date" aria-label={`data nova da proposta ${p.id}`} value={novaData.data} onChange={(e) => setNovaData({ ...novaData, data: e.target.value })} /></label>
+                <button className="btn btn-secondary" aria-label={`Acrescentar data na proposta ${p.id}`} onClick={acrescentarData}>Acrescentar data</button>
+              </span>)}
             <label>Emissor<br /><input aria-label={`emissor da proposta ${p.id}`} value={emissor} onChange={(e) => setEmissor(e.target.value)} /></label>
           </span>)}
       </span>
@@ -194,7 +239,7 @@ export function CadastrosDocumentos() {
   const opcoes: [string, string][] = [...(t?.pessoas ?? []).map((p): [string, string] => [`pessoa:${p.id}`, p.nome]), ...(t?.bens ?? []).map((b): [string, string] => [`bem:${b.id}`, `bem: ${b.nome}`])];
   const recarregar = async () => { await Promise.all([propostas.recarregar(), titulares.recarregar(), vencimentos.recarregar(), historico.recarregar()]); };
   const agirEm = async (chave: string, fn: () => Promise<unknown>, ok: string) => { if (!(await agir(chave, fn, ok, recarregar))) await recarregar(); };
-  const decidir = (p: Proposta) => (estado: "aprovada" | "recusada", correcao?: Partial<DocBase>) =>
+  const decidir = (p: Proposta) => (estado: "aprovada" | "recusada", correcao?: Correcao) =>
     agirEm(`proposta${p.id}`, () => api.post(`/api/v1/documentos/propostas/${p.id}/decisao`, correcao ? { estado, correcao } : { estado }),
       estado === "aprovada" ? "Proposta aprovada." : "Proposta recusada.");
   return (
