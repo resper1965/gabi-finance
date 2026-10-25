@@ -84,8 +84,9 @@ def listar_titulares(request: Request):
 
 @router.get("/vencimentos")
 def listar_vencimentos(request: Request, meses: int = 12):
-    """Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias (hoje
-    em Brasília, como o MCP)."""
+    """Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias.
+
+    "Hoje" é a data de Brasília, como no MCP."""
     if not 1 <= meses <= 120:
         raise erro(400, "requisicao_invalida", "meses deve ficar entre 1 e 120")
     con = _con(request)

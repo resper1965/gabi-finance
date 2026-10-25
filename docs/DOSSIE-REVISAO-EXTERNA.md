@@ -45,7 +45,7 @@ O Hermes (Telegram e WhatsApp) só conversa e consulta o brain pelo MCP. Os dado
 | Documentos | O Paperless guarda os PDFs. O MCP busca (com trecho e referência), baixa e lê o OCR; nada escreve no Paperless. |
 | Documentos (família, bens, vencimentos) | Pronto na branch `feat/documentos`, a instalar (ADR-027). |
 | Avisos e Hoje | Avisos com janela, entregues pelo Telegram; tela Hoje; resumo da manhã e agenda financeira pelo Hermes. |
-| Hermes | Telegram e WhatsApp; 26 ferramentas MCP (com envios e família). |
+| Hermes | Telegram e WhatsApp; 29 ferramentas MCP (com envios, família e documentos). |
 | Painel | Telas de decisão: regras, propostas, lixeira, cadastros, a pagar, gastos, qualidade. |
 
 **Instalado em 22/10: envios com anuência (ADR-024)**

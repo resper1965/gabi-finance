@@ -2,9 +2,13 @@
 -- Copia pessoa_documento para documento (+ número 'numero', + datas emissao/validade, mesmos ids) e pessoa_proposta para
 -- documento_proposta (todas: as decididas guardam o que o Ricardo já recusou); as antigas ficam como *_legado, não lidas mais.
 -- familia_documento e familia_proposta: as tabelas novas no formato da família (só leitura), para a família responder igual.
--- Desfazer: drop view familia_proposta; drop view familia_documento; drop table documento_leitura; drop table documento_proposta;
+-- Desfazer (perde tudo o que foi aprovado, recusado ou lido depois da instalação; passos completos em docs/runbook.md#documentos):
+--   com a API e o timer parados e backup do banco, numa transação:
+--   drop view familia_proposta; drop view familia_documento; drop table documento_leitura; drop table documento_proposta;
 --   drop table documento_data; drop table documento_numero; drop table documento; drop table bem;
---   alter table pessoa_documento_legado rename to pessoa_documento; alter table pessoa_proposta_legado rename to pessoa_proposta.
+--   alter table pessoa_documento_legado rename to pessoa_documento; alter table pessoa_proposta_legado rename to pessoa_proposta;
+--   delete from schema_versao where nome='0081_documentos.sql';
+--   e voltar o código para antes do merge (senão a API aplica a 0081 de novo ao subir).
 create table bem(
   id text primary key,
   tipo text not null check (tipo in ('imovel','veiculo','outro')),

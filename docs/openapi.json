@@ -2179,7 +2179,7 @@
   },
   "/api/v1/documentos/vencimentos": {
    "get": {
-    "description": "Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias.",
+    "description": "Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias.\n\n\"Hoje\" é a data de Brasília, como no MCP.",
     "operationId": "listar_vencimentos_api_v1_documentos_vencimentos_get",
     "parameters": [
      {

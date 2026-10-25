@@ -16,7 +16,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
-| DOC1 | Documentos (ADR-027): instalar (`sudo ~/instalar-documentos.sh`), `/new` no Hermes, aprovar as primeiras propostas na aba Documentos | R | 🔧 pronto na branch `feat/documentos`, a instalar; passos em `docs/runbook.md#documentos` | primeira rodada lida, propostas aprovadas e o Hermes responde um número com o link |
+| DOC1 | Documentos (ADR-027): instalar (`sudo ~/instalar-documentos.sh`: backup de `~/.hermes/config.yaml` em `config.yaml.bak-antes-documentos`, acrescenta `documentos_consultar`, `documentos_vencimentos` e `bens_listar` no `include` do `gabi_brain`, instala o SOUL e reinicia o `hermes-gateway`), `/new` no Telegram e no WhatsApp, aprovar as primeiras propostas na aba Documentos | R | 🔧 pronto na branch `feat/documentos`, a instalar; passos em `docs/runbook.md#documentos` | primeira rodada lida, propostas aprovadas e o Hermes responde um número com o link |
 | H7 | 7 dias de Hermes estável + backup exportado | R+C | ⛔ depende de H5 (número dedicado, lista do Ricardo) | sem queda em 7 dias |
 
 ## Decisões do Ricardo sem resposta
