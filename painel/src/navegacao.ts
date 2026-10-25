@@ -18,7 +18,7 @@ export const GRUPOS: Grupo[] = [
     { id: "regras", rotulo: "Regras", pergunta: "O que a Gabi sugere classificar?", abas: [["regras", "Regras", "O que a Gabi sugere classificar?"]] },
   ] },
   { titulo: "Casa", areas: [
-    { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["familia", "Família", "Quem é a família e quais documentos vencem?"], ["listacontatos", "Contatos", "Quem está nos meus contatos?"], ["agendas", "Agenda", "Quais agendas a Gabi lê?"], ["correio", "E-mail", "Quais caixas a Gabi lê?"], ["teams", "Teams", "Quais conversas do Teams a Gabi lê?"]] },
+    { id: "cadastros", rotulo: "Cadastros", pergunta: "O que a Gabi sabe, e o que só você sabe?", abas: [["cadastros", "Cadastros", "O que a Gabi sabe, e o que só você sabe?"], ["documentos", "Documentos", "Que documentos temos e quando vencem?"], ["listacontatos", "Contatos", "Quem está nos meus contatos?"], ["agendas", "Agenda", "Quais agendas a Gabi lê?"], ["correio", "E-mail", "Quais caixas a Gabi lê?"], ["teams", "Teams", "Quais conversas do Teams a Gabi lê?"]] },
     { id: "gabi", rotulo: "Gabi", pergunta: "A Gabi acerta e responde rápido?", abas: [["qualidade", "Qualidade", "A Gabi acerta e responde rápido?"]] },
   ] },
 ];

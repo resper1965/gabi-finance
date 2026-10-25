@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain leitura diária dos documentos do Paperless, 05h (Brasília)
+
+[Timer]
+OnCalendar=*-*-* 05:00:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-brain-documentos.service
+
+[Install]
+WantedBy=timers.target

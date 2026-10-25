@@ -448,3 +448,21 @@ def test_instalador_desliga_e_remove_as_units_cortadas_antes_do_reload():
     for nome in CORTADAS:
         assert f"/etc/systemd/system/{nome}" in texto[:reload] or nome in texto[:reload], nome
     assert "disable --now" in texto[:reload] and "rm -f" in texto[:reload]
+
+
+# ---------------- documentos (instalado e LIGADO) ----------------
+def test_unidades_dos_documentos_seguem_o_padrao_e_sao_ligadas():
+    srv, t = _ler("gabi-brain-documentos.service"), _ler("gabi-brain-documentos.timer")
+    assert "-m gabi.documentos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
+    assert "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
+    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
+    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
+        assert dur in srv, dur
+    assert "EnvironmentFile" not in srv
+    assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-documentos.service" in t
+    assert hasattr(importlib.import_module("gabi.documentos.__main__"), "main")
+    for nome in ("gabi-brain-documentos.service", "gabi-brain-documentos.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert ligadas and "gabi-brain-documentos.timer" in ligadas[0]

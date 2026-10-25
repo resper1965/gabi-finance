@@ -1,22 +1,25 @@
 """Propostas de documento da família: o Hermes e a carga propõem, o Ricardo aprova no painel.
-Consome: pessoa, pessoa_documento e pessoa_proposta (migração 0077), gabi.mascara (dígito do CPF); grava em decisao (origem 'familia').
+Consome: pessoa, as visões familia_documento/familia_proposta (migração 0081), gabi.documentos.repositorio (grava a proposta e
+decide; decisao com origem 'documentos'), gabi.mascara (dígito do CPF). Valida a entrada da família (TIPOS, ORIGENS) e mantém as
+respostas de antes da 0081.
 Proposta com campo opcional vazio não apaga o valor do documento ativo ao ser aprovada. A auditoria leva só ids, tipo e
 estado, nunca o número; os erros têm código fixo. Documento ativo com "*" no número é "mascarado" (cópia de 08/10): a proposta
 sem documento igual aponta para ele e aprovar grava também o número completo."""
 import datetime as dt
 import re
 
+import json
+
 from gabi.db import transacao
-from gabi.familia.contato import _ts
+from gabi.documentos import repositorio
+from gabi.documentos.repositorio import ErroDocumentos
 from gabi.familia.fichas import ErroFamilia, normalizar_numero
 from gabi.mascara import _cpf_valido
 
 TIPOS = ("cpf", "rg", "cnh", "passaporte", "outro")
 ORIGENS = ("hermes", "carga")
-ORIGEM_DOC = {"hermes": "ricardo", "carga": "carga"}
 _PAIS = re.compile(r"^[A-Z]{2}$")
 _DATA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-OPCIONAIS = ("emissor", "emissao", "validade", "paperless_id")
 
 
 def _data(v):
@@ -49,7 +52,7 @@ def _paperless(v):
 
 def _ativo(con, pessoa_id, tipo, pais, numero):
     alvo = normalizar_numero(numero)
-    for d in con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null order by id",
+    for d in con.execute("select * from familia_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null order by id",
                          (pessoa_id, tipo, pais)):
         if normalizar_numero(d["numero"]) == alvo:
             return d
@@ -69,12 +72,18 @@ def _visiveis_batem(mascarado_numero, numero) -> bool:
 def _mascarado(con, pessoa_id, tipo, pais, numero):
     """(mascarado ativo do mesmo tipo e país, dígitos visíveis batem?). Prefere o primeiro (por id) cujos dígitos visíveis
     são o fim do número novo; sem nenhum assim, o primeiro por id, com bate=False. (None, True) se não há mascarado."""
-    mascarados = [d for d in con.execute("select * from pessoa_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null"
+    mascarados = [d for d in con.execute("select * from familia_documento where pessoa_id=? and tipo=? and pais=? and excluido_em is null"
                                          " order by id", (pessoa_id, tipo, pais)) if mascarado(d["numero"])]
     for d in mascarados:
         if _visiveis_batem(d["numero"], numero):
             return d, True
     return (mascarados[0], False) if mascarados else (None, True)
+
+
+def _doc(pessoa_id, tipo, pais, numero, emissor, emissao, validade) -> dict:
+    return {"titular_tipo": "pessoa", "titular_id": pessoa_id, "tipo": tipo, "pais": pais, "emissor": emissor,
+            "numeros": [{"nome": "numero", "valor": numero}],
+            "datas": [{"tipo": t, "data": v} for t, v in (("emissao", emissao), ("validade", validade)) if v is not None]}
 
 
 def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao=None, validade=None, pais: str = "BR",
@@ -100,13 +109,13 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
         if con.execute("select 1 from pessoa where id=? and excluido_em is null", (pessoa_id,)).fetchone() is None:
             raise ErroFamilia("nao_encontrado")
         alvo = normalizar_numero(numero)
-        for p in con.execute("select id, numero from pessoa_proposta where pessoa_id=? and tipo=? and pais=? and estado='pendente'"
+        for p in con.execute("select id, numero from familia_proposta where pessoa_id=? and tipo=? and pais=? and estado='pendente'"
                              " order by id", (pessoa_id, tipo, pais)):
             if normalizar_numero(p["numero"]) == alvo:
                 return p["id"]
         # A carga não repropõe o que o Ricardo já recusou (rodar de novo não desfaz a decisão); o Hermes pode.
         if origem == "carga" and any(normalizar_numero(p["numero"]) == alvo for p in con.execute(
-                "select numero from pessoa_proposta where pessoa_id=? and tipo=? and pais=? and estado='recusada'", (pessoa_id, tipo, pais))):
+                "select numero from familia_proposta where pessoa_id=? and tipo=? and pais=? and estado='recusada'", (pessoa_id, tipo, pais))):
             return None
         ativo = _ativo(con, pessoa_id, tipo, pais, numero)
         if ativo is not None:
@@ -117,56 +126,38 @@ def propor(con, pessoa_id: str, *, tipo: str, numero: str, emissor=None, emissao
             ativo, bate = _mascarado(con, pessoa_id, tipo, pais, numero)
             if not bate:
                 conferir = True
-        return con.execute(
-            "insert into pessoa_proposta(pessoa_id, documento_id, tipo, pais, numero, emissor, emissao, validade, paperless_id,"
-            " origem, conferir, criada_em) values (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (pessoa_id, ativo["id"] if ativo is not None else None, tipo, pais, numero, emissor, emissao, validade,
-             paperless_id, origem, 1 if conferir else 0, _ts(agora))).lastrowid
+        return repositorio.inserir_proposta(
+            con, _doc(pessoa_id, tipo, pais, numero, emissor, emissao, validade), documento_id=ativo["id"] if ativo is not None else None,
+            paperless_id=paperless_id, conferir=conferir, motivos=[], origem=origem, criada_em=repositorio.ts(agora))
+
+
+def completar_proposta(con, proposta_id: int, *, validade=None, conferir=None, paperless_id=None) -> None:
+    """Completa a proposta ainda pendente (validade, conferir, paperless_id), na transação do chamador (a carga)."""
+    p = con.execute("select doc from documento_proposta where id=? and estado='pendente'", (proposta_id,)).fetchone()
+    if p is None:
+        return
+    sets, args = [], []
+    if validade is not None:
+        doc = json.loads(p["doc"])
+        doc["datas"] = [x for x in doc["datas"] if x["tipo"] != "validade"] + [{"tipo": "validade", "data": validade}]
+        sets.append("doc=?")
+        args.append(json.dumps(repositorio.validar(doc), ensure_ascii=False))
+    for col, v in (("conferir", conferir), ("paperless_id", paperless_id)):
+        if v is not None:
+            sets.append(f"{col}=?")
+            args.append(v)
+    if sets:
+        con.execute(f"update documento_proposta set {', '.join(sets)} where id=?", (*args, proposta_id))
 
 
 def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime) -> dict:
-    """Aprova (cria ou atualiza o documento, na mesma transação) ou recusa (nada muda). Já decidida: `conflito`."""
-    if estado not in ("aprovada", "recusada"):
-        raise ErroFamilia("requisicao_invalida")
-    with transacao(con, imediata=True):
-        p = con.execute("select * from pessoa_proposta where id=?", (proposta_id,)).fetchone()
-        if p is None:
-            raise ErroFamilia("nao_encontrado")
-        if p["estado"] != "pendente":
-            raise ErroFamilia("conflito")
-        ts = _ts(agora)
-        documento_id = None
-        if estado == "aprovada":
-            ativo = None
-            if p["documento_id"] is not None:
-                ativo = con.execute("select * from pessoa_documento where id=? and excluido_em is null", (p["documento_id"],)).fetchone()
-                # O alvo só vale se ainda for mascarado ou tiver o mesmo número (outra proposta pode já ter trocado o
-                # mascarado): senão um documento receberia os dados de outro.
-                if ativo is not None and not (mascarado(ativo["numero"]) or normalizar_numero(ativo["numero"]) == normalizar_numero(p["numero"])):
-                    ativo = None
-            if ativo is None:
-                ativo = _ativo(con, p["pessoa_id"], p["tipo"], p["pais"], p["numero"])
-            if ativo is not None:
-                # Campo vazio na proposta mantém o valor atual; o número fica como está (só muda a formatação), salvo
-                # sobre o mascarado, que ganha o número completo.
-                novos = {c: p[c] for c in OPCIONAIS if p[c] is not None}
-                if mascarado(ativo["numero"]):
-                    novos["numero"] = p["numero"]
-                    novos["origem"] = ORIGEM_DOC[p["origem"]]  # o número completo veio da proposta, não é mais o legado
-                sets = "".join(f"{c}=?, " for c in novos)
-                con.execute(f"update pessoa_documento set {sets}atualizado_em=? where id=?", (*novos.values(), ts, ativo["id"]))
-                documento_id = ativo["id"]
-            else:
-                documento_id = con.execute(
-                    "insert into pessoa_documento(pessoa_id, tipo, pais, numero, emissor, emissao, validade, paperless_id, origem,"
-                    " criado_em, atualizado_em) values (?,?,?,?,?,?,?,?,?,?,?)",
-                    (p["pessoa_id"], p["tipo"], p["pais"], p["numero"], p["emissor"], p["emissao"], p["validade"],
-                     p["paperless_id"], ORIGEM_DOC[p["origem"]], ts, ts)).lastrowid
-        con.execute("update pessoa_proposta set estado=?, decidida_em=?, decidida_por=?, documento_id=coalesce(?, documento_id) where id=?",
-                    (estado, ts, quem, documento_id, proposta_id))
-        con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,'familia')",
-                    (ts, quem, f"Proposta {proposta_id} de documento ({p['tipo']}) da pessoa {p['pessoa_id']}: {estado}"))
-    return {"proposta_id": proposta_id, "estado": estado, "documento_id": documento_id}
+    """Aprova (cria ou atualiza o documento, na mesma transação) ou recusa (nada muda). Já decidida: `conflito`.
+    Delegado ao repositório de documentos (que registra em decisao com origem 'documentos')."""
+    try:
+        r = repositorio.decidir(con, proposta_id, estado, quem, agora)
+    except ErroDocumentos as e:
+        raise ErroFamilia(e.codigo) from None
+    return {"proposta_id": r["proposta_id"], "estado": r["estado"], "documento_id": r["documento_id"]}
 
 
 _CAMPOS = ("tipo", "pais", "numero", "emissor", "emissao", "validade", "paperless_id")
@@ -177,10 +168,10 @@ def listar_propostas(con, estado: str = "pendente") -> list[dict]:
     if estado not in ("pendente", "aprovada", "recusada"):
         raise ErroFamilia("requisicao_invalida")
     saida = []
-    for p in con.execute("select p.*, n.nome from pessoa_proposta p join pessoa n on n.id=p.pessoa_id where p.estado=? order by p.id", (estado,)):
+    for p in con.execute("select p.*, n.nome from familia_proposta p join pessoa n on n.id=p.pessoa_id where p.estado=? order by p.id", (estado,)):
         atual = None
         if p["documento_id"] is not None:
-            d = con.execute("select * from pessoa_documento where id=?", (p["documento_id"],)).fetchone()
+            d = con.execute("select * from familia_documento where id=?", (p["documento_id"],)).fetchone()
             if d is not None:
                 atual = {c: d[c] for c in ("id", *_CAMPOS)}
         saida.append({"id": p["id"], "pessoa_id": p["pessoa_id"], "nome": p["nome"], "documento_id": p["documento_id"],

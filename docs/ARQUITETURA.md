@@ -10,7 +10,7 @@ fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
                                      │
               ┌──────────────────────┼───────────────────┐
               ▼                      ▼                   ▼
-        API /api/*              MCP /mcp (26 ferramentas)    rodadas (timers)
+        API /api/*              MCP /mcp (29 ferramentas)    rodadas (timers)
               │                      │
               ▼                      ▼
    painel (estático, servido pela API)   Hermes (Telegram, WhatsApp)

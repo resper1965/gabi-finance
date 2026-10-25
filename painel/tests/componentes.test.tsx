@@ -66,13 +66,13 @@ test("Shell lembra a ultima aba", () => {
   expect(screen.getByText("aba:contas")).toBeInTheDocument();
 });
 
-test("Shell abre área e aba do link (#cadastros/familia), mesmo com outra aba salva", () => {
+test("Shell abre área e aba do link (#cadastros/documentos), mesmo com outra aba salva", () => {
   localStorage.setItem("gabi.area", "cadastros");
   localStorage.setItem("gabi.aba.cadastros", "agendas");
-  window.location.hash = "#cadastros/familia";
+  window.location.hash = "#cadastros/documentos";
   const tela = (_a: unknown, aba: string) => <p>aba:{aba}</p>;
   render(<Shell tela={tela} />);
-  expect(screen.getByText("aba:familia")).toBeInTheDocument();
+  expect(screen.getByText("aba:documentos")).toBeInTheDocument();
   window.location.hash = "";
 });
 

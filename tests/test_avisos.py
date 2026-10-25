@@ -469,3 +469,109 @@ def test_descrever_google_parado():
     from gabi.rotas.avisos import descrever
     t, x = descrever("google_parado", {"fontes": 3, "contas": ["a@gmail.com", "b@esper.ws"]})
     assert "Google" in t and "a@gmail.com" in x and "obter_token_google" in x
+
+
+# ---------------- documento_vence: marcos 60/30/7 (documentos.avisar_dias), fechado por documento novo ou excluído ----------------
+from gabi.avisos import RESOLVIDO, VALE, revalidar  # noqa: E402
+
+NUM_DOC = "YB654321"
+
+
+def _doc_vence(con, data, tipo="passaporte", titular="louise", data_tipo="validade") -> int:
+    if not con.execute("select 1 from pessoa where id=?", (titular,)).fetchone():
+        con.execute("insert into pessoa(id, nome, dados) values (?, 'Louise Lavrik Esper', '{}')", (titular,))
+    i = con.execute("insert into documento(titular_tipo, titular_id, tipo, pais, origem, criado_em, atualizado_em)"
+                    " values ('pessoa',?,?,'BR','ricardo','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')", (titular, tipo)).lastrowid
+    con.execute("insert into documento_numero(documento_id, nome, valor) values (?, 'numero', ?)", (i, NUM_DOC))
+    con.execute("insert into documento_data(documento_id, tipo, data) values (?,?,?)", (i, data_tipo, data))
+    return i
+
+
+def _avisos_doc(con) -> list[dict]:
+    return [json.loads(r[0]) for r in con.execute("select payload from aviso where tipo='documento_vence' order by id")]
+
+
+def test_documento_vence_um_aviso_por_marco_sem_repetir(con):
+    i = _doc_vence(con, "2026-12-10")  # 55 dias
+    gerar_avisos(con, AGORA)
+    gerar_avisos(con, AGORA + dt.timedelta(hours=2))
+    gerar_avisos(con, AGORA + dt.timedelta(days=1))
+    assert _avisos_doc(con) == [{"chave": f"{i}|60", "titular_nome": "Louise Lavrik Esper", "tipo": "passaporte", "data_tipo": "validade",
+                                 "data": "2026-12-10", "dias": 55}]
+    gerar_avisos(con, AGORA + dt.timedelta(days=30))   # 25 dias
+    gerar_avisos(con, AGORA + dt.timedelta(days=50))   # 5 dias
+    gerar_avisos(con, AGORA + dt.timedelta(days=51))
+    assert [(a["chave"], a["dias"]) for a in _avisos_doc(con)] == [(f"{i}|60", 55), (f"{i}|30", 25), (f"{i}|7", 5)]
+    assert NUM_DOC not in json.dumps(_avisos_doc(con))
+
+
+def test_documento_que_ja_entra_perto_avisa_so_o_menor_marco(con):
+    i = _doc_vence(con, "2026-10-20", tipo="crlv", data_tipo="vencimento")  # 4 dias
+    j = _doc_vence(con, "2027-03-01")  # longe: nada
+    gerar_avisos(con, AGORA)
+    assert [a["chave"] for a in _avisos_doc(con)] == [f"{i}|7"] and j
+
+
+def test_documento_avisar_dias_do_parametro(con):
+    con.execute("insert into parametro(chave, valor) values ('documentos.avisar_dias', '[10]')")
+    _doc_vence(con, "2026-11-20")  # 35 dias: o padrão avisaria
+    gerar_avisos(con, AGORA)
+    assert _avisos_doc(con) == []
+    gerar_avisos(con, AGORA + dt.timedelta(days=26))
+    assert [a["dias"] for a in _avisos_doc(con)] == [9]
+
+
+def test_documento_vencido_ha_mais_de_30_dias_nao_avisa(con):
+    _doc_vence(con, "2019-05-01")
+    _doc_vence(con, "2026-09-10", tipo="cnh")  # 36 dias atrás
+    gerar_avisos(con, AGORA)
+    assert _avisos_doc(con) == []
+
+
+def test_documento_vencido_ha_poucos_dias_avisa_uma_vez(con):
+    i = _doc_vence(con, "2026-10-06", tipo="cnh")
+    gerar_avisos(con, AGORA)
+    gerar_avisos(con, AGORA + dt.timedelta(days=3))
+    assert [(a["chave"], a["dias"]) for a in _avisos_doc(con)] == [(f"{i}|7", -10)]
+
+
+def test_documento_novo_do_mesmo_titular_e_tipo_resolve_e_fecha(con):
+    i = _doc_vence(con, "2026-11-10")
+    gerar_avisos(con, AGORA)
+    [p] = _avisos_doc(con)
+    assert revalidar(con, "documento_vence", p)[0] == VALE
+    _doc_vence(con, "2036-11-01")  # renovação aprovada
+    assert revalidar(con, "documento_vence", p)[0] == RESOLVIDO
+    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
+    assert con.execute("select entregue_em is not null from aviso where tipo='documento_vence'").fetchone()[0] == 1
+    assert i
+
+
+def test_documento_de_outro_tipo_nao_resolve(con):
+    _doc_vence(con, "2026-11-10")
+    gerar_avisos(con, AGORA)
+    _doc_vence(con, "2036-11-01", tipo="rg")
+    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == VALE
+
+
+def test_documento_excluido_resolve(con):
+    i = _doc_vence(con, "2026-11-10")
+    gerar_avisos(con, AGORA)
+    con.execute("update documento set excluido_em='2026-10-16T13:00:00Z' where id=?", (i,))
+    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == RESOLVIDO
+
+
+def test_documento_renovado_no_lugar_resolve_e_volta_a_avisar_na_data_nova(con):
+    i = _doc_vence(con, "2026-11-10")
+    gerar_avisos(con, AGORA)
+    con.execute("update documento_data set data='2027-11-10' where documento_id=?", (i,))
+    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == RESOLVIDO
+    gerar_avisos(con, dt.datetime(2027, 10, 20, 12, 0, tzinfo=UTC))  # 21 dias da data nova
+    assert [(a["chave"], a["data"]) for a in _avisos_doc(con)] == [(f"{i}|30", "2026-11-10"), (f"{i}|30", "2027-11-10")]
+
+
+def test_descrever_documento_vence():
+    from gabi.rotas.avisos import descrever
+    t, x = descrever("documento_vence", {"chave": "3|30", "titular_nome": "Louise Lavrik Esper", "tipo": "passaporte", "data_tipo": "validade",
+                                         "data": "2026-11-10", "dias": 25})
+    assert f"{t} {x}" == "Documento vence: passaporte de Louise Lavrik Esper em 10/11 (25 dias)"

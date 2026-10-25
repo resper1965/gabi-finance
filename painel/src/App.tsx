@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Shell, type Contagens } from "./componentes/Shell";
 import { Seletores } from "./componentes/Seletores";
 import { Vazio } from "./componentes/Estados";
@@ -17,7 +17,7 @@ import { Parcelas } from "./telas/Gastos/Parcelas";
 import { Assinaturas } from "./telas/Gastos/Assinaturas";
 import { Regras } from "./telas/Regras";
 import { Cadastros } from "./telas/Cadastros";
-import { CadastrosFamilia } from "./telas/CadastrosFamilia";
+import { CadastrosDocumentos } from "./telas/CadastrosDocumentos";
 import { CadastrosContatos } from "./telas/CadastrosContatos";
 import { CadastrosAgenda } from "./telas/CadastrosAgenda";
 import { CadastrosTeams } from "./telas/CadastrosTeams";
@@ -35,7 +35,7 @@ import { AReceber } from "./telas/Cobrar/AReceber";
 export const TELAS: Record<string, () => ReactNode> = {
   visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
-  regras: Regras, cadastros: Cadastros, familia: CadastrosFamilia, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
+  regras: Regras, cadastros: Cadastros, documentos: CadastrosDocumentos, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
   qualidade: Qualidade, hoje: Hoje, agenda: Agenda, envios: Envios,
 };
 
@@ -44,7 +44,16 @@ function tela(area: Area, aba: string) {
   return T ? <Limite key={aba} arquivo={`${area.rotulo} / ${aba}`}><T /></Limite> : <Vazio frase={`${area.rotulo} ainda não foi construída nesta fase.`} />;
 }
 
+/** Links antigos (o brain mandava #cadastros/familia antes da aba Documentos) abrem a aba nova; roda antes do Shell ler a URL. */
+const LINKS_ANTIGOS: Record<string, string> = { "#cadastros/familia": "#cadastros/documentos" };
+function redirecionarLinkAntigo(): null {
+  const novo = LINKS_ANTIGOS[window.location.hash];
+  if (novo) window.history.replaceState(null, "", novo);
+  return null;
+}
+
 export function App() {
+  useState(redirecionarLinkAntigo);
   const leituraContagens = useApi<Contagens>("/api/v1/contagens");
   const contagens = leituraContagens.env?.dados;
   return (

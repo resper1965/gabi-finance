@@ -17,6 +17,7 @@ FONTES = {
     "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
     "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
+    "documentos": None,  # leitura diária do Paperless só gera propostas; não é dado servido (OnFailure do timer avisa)
     "teams": None,  # timers instalados e desligados até o Ricardo ligar; fontes None são filtradas (ficam fora da lista) e nunca contam em dados_ate
 }
 COM_CONFERENCIA = ("open-finance",)

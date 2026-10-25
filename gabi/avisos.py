@@ -71,7 +71,9 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     -> (estado, payload_atual). Estados: "vale" (pode enviar), "resolvido" (condição acabou: fechar SEM enviar), "incerto" (não enviar e NÃO fechar: reavalia na próxima rodada).
     conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, aberto por vencimento movido) = resolvido.
     vence_hoje: o payload atual traz só os itens ainda 'aberto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
-    `atrasado` sai (resolvido): quem assume é o conta_atrasada. cobrada_apos_cancelar: vale se a assinatura segue em `cancelar`. Demais tipos: sempre valem."""
+    `atrasado` sai (resolvido): quem assume é o conta_atrasada. cobrada_apos_cancelar: vale se a assinatura segue em `cancelar`.
+    documento_vence: resolvido se o documento ou o titular saiu, se a data dele mudou ou se há outro documento ativo do mesmo titular e tipo
+    com data posterior (renovação aprovada). Demais tipos: sempre valem."""
     if tipo == "conta_atrasada":
         r = con.execute("select estado from compromisso where id=?", (str(payload.get("chave")),)).fetchone()
         if r is None or r[0] == "a_conferir":
@@ -110,6 +112,8 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
         if para_mim is None or (resp is not None and resp >= para_mim):
             return RESOLVIDO, payload
         return VALE, payload
+    if tipo == "documento_vence":
+        return _documento_vence_estado(con, payload), payload
     return VALE, payload
 
 
@@ -126,7 +130,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
     return estado, atual
 
 
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta")
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence")
 ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -290,6 +294,54 @@ def _valor_diferente(con, agora: dt.datetime, novo) -> None:
                 novo("valor_diferente", i["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "estimado": formatar(est), "real": formatar(real)})
 
 
+AVISAR_DIAS_PADRAO = [60, 30, 7]
+DIAS_VENCIDO_SEM_AVISO = 30
+
+
+def _ultima_vence(con, documento_id: int) -> str | None:
+    from gabi.documentos.repositorio import DATAS_VENCE
+    return con.execute(f"select max(data) from documento_data where documento_id=? and tipo in ({','.join('?' * len(DATAS_VENCE))})",
+                       (documento_id, *DATAS_VENCE)).fetchone()[0]
+
+
+def _documento_vence_estado(con, payload: dict) -> str:
+    from gabi.documentos.repositorio import DATAS_VENCE
+    try:
+        documento_id = int(str(payload.get("chave")).split("|")[0])
+    except ValueError:
+        return RESOLVIDO
+    d = con.execute("select titular_tipo, titular_id, tipo from documento where id=? and excluido_em is null", (documento_id,)).fetchone()
+    if d is None or not con.execute(f"select 1 from {'pessoa' if d['titular_tipo'] == 'pessoa' else 'bem'} where id=? and excluido_em is null",
+                                    (d["titular_id"],)).fetchone():
+        return RESOLVIDO
+    if _ultima_vence(con, documento_id) != payload.get("data"):
+        return RESOLVIDO
+    mais_novo = con.execute(f"select 1 from documento x join documento_data y on y.documento_id=x.id where x.titular_tipo=? and x.titular_id=? and x.tipo=?"
+                            f" and x.id<>? and x.excluido_em is null and y.tipo in ({','.join('?' * len(DATAS_VENCE))}) and y.data>? limit 1",
+                            (d["titular_tipo"], d["titular_id"], d["tipo"], documento_id, *DATAS_VENCE, payload.get("data"))).fetchone()
+    return RESOLVIDO if mais_novo else VALE
+
+
+def _documento_vence(con, hoje: dt.date, novo) -> None:
+    """Documento aprovado com validade, fim de vigência ou vencimento (a última delas): um aviso por (documento, marco) de `documentos.avisar_dias`
+    (padrão 60, 30 e 7 dias), só o menor marco já alcançado (quem entra a 20 dias recebe o de 30, não o de 60). Vencido há mais de 30 dias não avisa
+    (o passaporte antigo aprovado agora não vira alerta). Data trocada no próprio documento (renovação no lugar) volta a avisar. Payload sem número."""
+    from gabi.documentos.repositorio import vencimentos
+    marcos = _parametro(con, "documentos.avisar_dias", AVISAR_DIAS_PADRAO)
+    if not (isinstance(marcos, list) and marcos and all(isinstance(m, int) and not isinstance(m, bool) and 1 <= m <= 365 for m in marcos)):
+        marcos = AVISAR_DIAS_PADRAO
+    for v in vencimentos(con, hoje, max(marcos) // 28 + 1):
+        dias = (dt.date.fromisoformat(v["data"]) - hoje).days
+        alcancados = [m for m in marcos if dias <= m]
+        if not alcancados or dias < -DIAS_VENCIDO_SEM_AVISO:
+            continue
+        chave = f"{v['documento_id']}|{min(alcancados)}"
+        if con.execute("select 1 from aviso where tipo='documento_vence' and json_extract(payload,'$.chave')=? and json_extract(payload,'$.data')=?",
+                       (chave, v["data"])).fetchone():
+            continue
+        novo("documento_vence", chave, {"titular_nome": v["titular_nome"], "tipo": v["tipo"], "data_tipo": v["data_tipo"], "data": v["data"], "dias": dias})
+
+
 def _bancos_desatualizados(con, agora: dt.datetime, novo) -> None:
     """Um aviso por banco por dia quando o provedor não atualiza o banco há mais de 24 h (regra única em `envelope.bancos_antigos`)."""
     for b in bancos_antigos(con, agora):
@@ -354,6 +406,7 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo("vence_hoje", hoje.isoformat(), {"itens": itens})
     _vence_em_breve(con, agora, hoje, novo)
     _valor_diferente(con, agora, novo)
+    _documento_vence(con, hoje, novo)
     n = con.execute("select count(*) from lancamento where convertido=0").fetchone()[0]
     if n:  # só a contagem: nunca valor nem descrição
         novo("lancamento_sem_conversao", hoje.isoformat(), {"quantidade": n})

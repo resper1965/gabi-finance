@@ -60,6 +60,10 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Vence em breve: {len(itens)} conta(s)", "; ".join(linhas) + "." + legenda
     if tipo == "valor_diferente":
         return f"Valor diferente: {p.get('nome', '?')}", f"estimado {_reais(p.get('estimado'))}, veio {_reais(p.get('real'))} (vence {_ddmm(p.get('vencimento'))})"
+    if tipo == "documento_vence":
+        dias = p.get("dias")
+        quando = f"venceu em {_ddmm(p.get('data'))} (há {-dias} dias)" if isinstance(dias, int) and dias < 0 else f"em {_ddmm(p.get('data'))} ({dias} dias)"
+        return f"Documento vence: {p.get('tipo', '?')} de {p.get('titular_nome', '?')}", quando
     if tipo == "rodada_parada":
         return "Dados do banco parados", p.get("motivo", "")
     if tipo == "saldo_divergente":
