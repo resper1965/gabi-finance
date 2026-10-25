@@ -134,7 +134,7 @@ Somente leitura (`calendar.readonly`). `python -m gabi.agenda` (unit `gabi-brain
 
 
 ## Ferramentas de análise no Hermes (MC1) {#analise-hermes}
-Somente leitura, escopo `fin`: `financeiro_recorrentes`, `financeiro_previsao`, `despesas_por_empresa` (ADR-023: `financeiro_vazamentos` e `financeiro_rumo` saíram). **Passo do dono:** em `~/.hermes/config.yaml`, em `mcp_servers › gabi_brain › tools › include`, deixe exatamente a lista oficial de `docs/fontes/hermes.md` (hoje 29 ferramentas) e `sudo systemctl restart hermes-gateway`; reinicie também o serviço do MCP do brain para ele expor as novas.
+Somente leitura, escopo `fin`: `financeiro_recorrentes`, `financeiro_previsao`, `despesas_por_empresa` (ADR-023: `financeiro_vazamentos` e `financeiro_rumo` saíram). **Passo do dono:** em `~/.hermes/config.yaml`, em `mcp_servers › gabi_brain › tools › include`, deixe exatamente a lista oficial de `docs/fontes/hermes.md` (hoje 31 ferramentas) e `sudo systemctl restart hermes-gateway`; reinicie também o serviço do MCP do brain para ele expor as novas.
 
 
 ## Canal de decisão (DC1) {#decisoes}
