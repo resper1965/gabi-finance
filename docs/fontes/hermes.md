@@ -17,6 +17,7 @@ mcp_servers:
       - agenda_listar
       - bens_listar
       - classificar_lancamento
+      - contatos_buscar
       - decisao_responder
       - decisoes_abertas
       - despesas_por_empresa
