@@ -260,3 +260,39 @@ def test_fonte_em_espera_com_valor_estranho_e_ignorado(con):
     _r(con, "notas-nibo", 200, status="erro")
     con.execute("insert into parametro(chave, valor) values ('fontes.em_espera', ?)", ("nao é json",))
     assert envelope(con, None, AGORA)["desatualizado"] is True
+
+
+def test_envelope_fontes_vazias_nunca_desatualizado(con):
+    _r(con, "open-finance", 100, conferida=1)  # rodada velha
+    _sync(con, Itau=(AGORA - dt.timedelta(hours=50)).isoformat())
+    e = envelope(con, {}, AGORA, fontes=())
+    assert e["desatualizado"] is False and e["fontes"] == [] and e["dados_ate"] is None and "bancos_antigos" not in e
+    assert e["dados"] == {} and e["proxima_rodada"]
+
+
+def test_envelope_fontes_filtradas(con):
+    _producao(con)
+    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    _r(con, "agenda", 1)
+    _sync(con, Itau=(AGORA - dt.timedelta(hours=50)).isoformat())
+    e = envelope(con, None, AGORA, fontes=("agenda",))
+    assert [f["nome"] for f in e["fontes"]] == ["agenda"]
+    assert e["dados_ate"] == (AGORA - dt.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert e["desatualizado"] is False and "bancos_antigos" not in e  # banco antigo é dado do open-finance: fora do recorte
+
+
+def test_envelope_fontes_com_open_finance_mantem_bancos_antigos(con):
+    _producao(con)
+    velho = (AGORA - dt.timedelta(hours=26)).isoformat()
+    _sync(con, Itau=velho)
+    e = envelope(con, None, AGORA, fontes=("open-finance",))
+    assert [f["nome"] for f in e["fontes"]] == ["open-finance"]
+    assert e["desatualizado"] is True and e["bancos_antigos"] == [{"banco": "Itau", "desde": velho}]
+
+
+def test_envelope_padrao_inalterado(con):
+    _producao(con)
+    _sync(con, Itau=(AGORA - dt.timedelta(hours=26)).isoformat())
+    e = envelope(con, {"x": 1}, AGORA)
+    assert envelope(con, {"x": 1}, AGORA, fontes=None) == e
+    assert [f["nome"] for f in e["fontes"]] == ["notas-nibo", "open-finance"] and "bancos_antigos" in e

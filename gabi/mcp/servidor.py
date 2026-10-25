@@ -36,6 +36,16 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS,
                        **ferramentas_familia.ESCOPOS, **ferramentas_documentos.ESCOPOS}
 
+# fontes de frescor por ferramenta (nomes de `envelope.FONTES`): None = todas; () = sem dado que envelhece (nunca "desatualizado")
+FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
+    **{n: None for n in ("financeiro_saldo", "despesas_por_empresa", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai",
+                         "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha")},
+    "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",),
+    **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
+                       "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
+                       "bens_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
+}
+
 
 def _reais(v, chave: str = ""):
     """Dinheiro das análises sai como string decimal em reais (R7), nunca float; percentuais (`*_pct`) ficam como número."""
@@ -131,7 +141,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
             _registrar(banco, t, ferramenta, escopo, "ok", ms())
             if isinstance(dados, dict) and dados.get("itens") == []:
                 dados = {**dados, "vazio": True, "aviso": AVISO_VAZIO}  # vazio explícito, sem apagar as outras chaves
-            return envelope(con, dados, agora=agora_fn())
+            return envelope(con, dados, agora=agora_fn(), fontes=FONTES_DA_FERRAMENTA[ferramenta])
         finally:
             con.close()
 

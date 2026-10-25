@@ -329,3 +329,18 @@ def test_previsao_sem_saldo_avisa_em_vez_de_zero(cli, banco, tokens):
     c.close()
     p = chamar(cli, tokens["fin"], "financeiro_previsao", dias=30)["dados"]
     assert p["saldo_indisponivel"] is True and "não valem" in p["aviso"]
+
+
+def test_toda_ferramenta_declara_fontes():
+    from gabi.mcp.servidor import FONTES_DA_FERRAMENTA
+    assert set(FONTES_DA_FERRAMENTA) == set(ESCOPOS_FERRAMENTAS)
+
+
+def test_familia_listar_sem_fontes(cli, banco):
+    c = conectar(banco)
+    tk = emitir(c, "fam", ["familia"])
+    c.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?)", (json.dumps({"Itau": "2026-09-01T00:00:00Z"}),))
+    c.commit()
+    c.close()
+    r = chamar(cli, tk, "familia_listar")
+    assert r["desatualizado"] is False and r["fontes"] == [] and "bancos_antigos" not in r
