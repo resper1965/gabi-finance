@@ -101,6 +101,20 @@ def test_so_primeiro_nome_sem_completo_e_a_mesma(con):
     assert pessoas.listar_pets(con)[0]["dono"] == "chafic"
 
 
+def test_nome_completo_nao_encurta(con):
+    con.execute("insert into pessoa(id, nome) values ('ana1','Ana Souza')")
+    r = _pessoa(con, nome="Ana", parentesco="prima")
+    assert r["pessoa_id"] == "ana1" and "nome_completo" not in _dados(con, "ana1")
+    assert [h["campo"] for h in contato.historico(con, "ana1")] == ["parentesco"]
+
+
+def test_apelido_com_nome_alheio_nao_grava_completo(con):
+    con.execute("insert into pessoa(id, nome, dados) values ('gigi','Giovanna',?)", (json.dumps({"apelido": "Gigi"}),))
+    r = _pessoa(con, nome="Fulana Beltrana", apelido="Gigi", parentesco="filha")
+    assert r["pessoa_id"] == "gigi" and "nome_completo" not in _dados(con, "gigi")
+    assert all(h["campo"] != "nome_completo" for h in contato.historico(con, "gigi"))
+
+
 def test_so_primeiro_nome_dois_casam_ambiguo(con):
     con.execute("insert into pessoa(id, nome) values ('chafic','Chafic')")
     con.execute("insert into pessoa(id, nome) values ('chafic2','Chafic')")

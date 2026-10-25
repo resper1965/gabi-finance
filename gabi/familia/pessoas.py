@@ -85,7 +85,7 @@ def registrar_pessoa(con, *, nome: str, parentesco: str, apelido: str = "", nasc
         mudancas = []
         dados = contato._dados_da(con, pid)
         linha = con.execute("select nome from pessoa where id=?", (pid,)).fetchone()
-        if not criada and _sem_nome_completo(dados) and normalizar_nome(nome) != normalizar_nome(linha["nome"]):
+        if not criada and _sem_nome_completo(dados) and normalizar_nome(nome).startswith(normalizar_nome(linha["nome"]) + " "):
             antes = dados.get("nome_completo")  # sem campo próprio em contato: grava aqui, desfazível pelo desfazer comum
             dados["nome_completo"] = nome
             contato._gravar(con, pid, dados)
