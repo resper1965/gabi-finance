@@ -45,6 +45,12 @@ def test_nome_do_graph_quando_google_sem_nome(con):
     assert buscar_contatos(con, "beto")["itens"][0]["nome"] == "Beto"
 
 
+def test_graph_sem_telefone_nao_junta(con):
+    for gid, nome in (("g1", "Ana Um"), ("g2", "Ana Dois")):
+        con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness',?,?,'x',null,'mobile','2026-10-01')", (gid, nome))
+    assert buscar_contatos(con, "ana")["itens"] == []
+
+
 def test_email_entra_no_item(con):
     _google(con, "a@x", TEL, "Ana")
     con.execute("insert into contato_google_email(conta, email, telefone, nome) values ('a@x','ana@y.com',?,'Ana')", (TEL,))

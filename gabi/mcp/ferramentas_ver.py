@@ -38,7 +38,7 @@ def buscar_contatos(con, texto: str, limite: int = 10) -> dict:
         nomear(d, r["nome"])
         d["emails"].add(r["email"])
         d["origens"].add(f"google:{r['conta']}")
-    for r in con.execute("select conta, telefone, nome from contato_graph order by conta, telefone"):
+    for r in con.execute("select conta, telefone, nome from contato_graph where coalesce(telefone, '')<>'' order by conta, telefone"):  # sem telefone: nada a juntar
         d = item(r["telefone"], r["telefone"])
         nomear(d, r["nome"], "graph")
         d["origens"].add(f"graph:{r['conta']}")
