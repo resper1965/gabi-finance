@@ -299,7 +299,7 @@ def _corpo(resp, status=200):
 def test_mensagem_texto_plano():
     r, f = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("Olá ")}}, {"mimeType": "text/plain", "body": {"data": _b64("mundo")}},
                          {"mimeType": "text/html", "body": {"data": _b64("<p>outro</p>")}}]))
-    assert r == {"corpo": "Olá mundo", "cortado": False}
+    assert r == {"corpo": "Olá\nmundo", "cortado": False}
     assert f.chamadas[0][0] == "GET" and f.chamadas[0][2]["format"] == ["full"]
 
 
@@ -325,3 +325,9 @@ def test_mensagem_id_invalido_e_404_e_erro_da_fonte():
 def test_classe_google_email_expoe_mensagem():
     f = Falso({("GET", "/messages/{id}"): [(200, _full([{"mimeType": "text/plain", "body": {"data": _b64("x")}}]))]})
     assert ge.GoogleEmail(Token(), f).mensagem("a@x.com", ID(7)) == {"corpo": "x", "cortado": False}
+
+
+def test_mensagem_ignora_anexo_de_texto():
+    r, _ = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("corpo")}},
+                         {"mimeType": "text/plain", "filename": "notas.txt", "body": {"data": _b64("anexo")}}]))
+    assert r == {"corpo": "corpo", "cortado": False}

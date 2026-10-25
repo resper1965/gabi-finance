@@ -309,7 +309,7 @@ def cortar_corpo(texto: str) -> dict:
 def _partes(parte, mime: str, saida: list) -> None:
     if not isinstance(parte, dict):
         return
-    if parte.get("mimeType") == mime:
+    if parte.get("mimeType") == mime and not parte.get("filename"):  # com `filename` é anexo, não corpo
         dados = (parte.get("body") or {}).get("data")
         if isinstance(dados, str) and dados:
             try:
@@ -335,11 +335,11 @@ def mensagem(conta: str, externo_id: str, token: Callable[[str], str], http=_htt
     planos: list[str] = []
     _partes(resp.get("payload"), "text/plain", planos)
     if planos:
-        texto = limpar_texto("".join(planos))
+        texto = limpar_texto("\n".join(planos))
     else:
         htmls: list[str] = []
         _partes(resp.get("payload"), "text/html", htmls)
-        texto = html_para_texto("".join(htmls))
+        texto = html_para_texto("\n".join(htmls))
     return cortar_corpo(texto)
 
 

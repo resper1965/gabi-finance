@@ -7,6 +7,8 @@ from gabi.agenda import consulta
 from gabi.correio import consulta as consulta_correio
 from gabi.dinheiro import agenda_financeira
 from gabi.envelope import envelope
+from gabi.fontes.google_oauth import ErroGoogleOAuth
+from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.mcp.ferramentas_prop import ErroFerramenta
 
 ESCOPOS = {"agenda_listar": "trabalho", "email_listar": "trabalho", "email_ler": "trabalho", "resumo_manha": "trabalho"}
@@ -110,7 +112,9 @@ def email_ler(con, correio, mensagem_id: int) -> dict:
         raise ErroFerramenta("fonte_indisponivel", "leitura do e-mail indisponível")
     try:
         corpo = ponte.mensagem(r["conta"], r["externo_id"])
-    except Exception:  # ErroGoogleOAuth, ErroGraphNess ou ponte fora: sem o texto do erro (pode citar conta ou id)
+    except (ErroGoogleOAuth, ErroGraphNess) as e:  # sem o texto do erro (pode citar conta ou id), salvo o 404 da origem; outros erros sobem para o `executar`
+        if str(e) == "mensagem não encontrada":
+            raise ErroFerramenta("nao_encontrado", "mensagem não encontrada") from None
         raise ErroFerramenta("fonte_indisponivel", "não consegui ler o e-mail agora") from None
     return {"mensagem_id": mid, "conta": r["conta"], "remetente": r["remetente"], "assunto": r["assunto"], "recebida_em": r["recebida_em"],
             "corpo": corpo["corpo"], "cortado": corpo["cortado"], "aviso": AVISO_TERCEIROS}

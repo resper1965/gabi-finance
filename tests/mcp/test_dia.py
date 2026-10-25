@@ -184,6 +184,15 @@ def test_email_ler_ponte_fora(tmp_path):
     assert e.value.codigo == "fonte_indisponivel" and "segredo" not in e.value.mensagem
 
 
+def test_email_ler_apagada_na_origem_e_nao_encontrada_e_erro_de_programacao_sobe(tmp_path):
+    c = _msg_email(tmp_path)
+    with pytest.raises(ErroFerramenta) as e:
+        email_ler(c, {"google": _Correio(ErroGoogleOAuth("mensagem não encontrada"))}, 1)
+    assert e.value.codigo == "nao_encontrado"
+    with pytest.raises(KeyError):
+        email_ler(c, {"google": _Correio(KeyError("bug"))}, 1)
+
+
 def test_email_ler_sem_correio_ou_sem_provedor(tmp_path):
     c = _msg_email(tmp_path)
     for correio in (None, {}, {"graph": _Correio()}):
