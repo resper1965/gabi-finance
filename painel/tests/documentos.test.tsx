@@ -247,3 +247,10 @@ test("histórico rotula pessoa criada e pet, e Desfazer continua igual", async (
   await waitFor(() => expect(posts(c)).toHaveLength(1));
   expect(posts(c)[0].url).toBe("/api/v1/familia/historico/11/desfazer");
 });
+
+test("desfazer de pessoa criada aparece como Pessoa removida com o nome", async () => {
+  fake({ hist: [{ ...HIST, id: 14, campo: "criada", antes: { nome: "Chafic Esper" }, depois: null }] });
+  montar();
+  expect(await screen.findByText(/Pessoa removida: Chafic Esper/)).toBeTruthy();
+  expect(screen.queryByText(/Pessoa criada:/)).toBeNull();
+});

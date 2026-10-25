@@ -24,10 +24,10 @@ interface Pessoa { id: string; nome: string; nome_completo: string | null; apeli
 interface Bem { id: string; tipo: string; nome: string; dados: Record<string, unknown>; documentos: Doc[] }
 interface Titulares { pessoas: Pessoa[]; bens: Bem[]; paperless_url: string | null }
 interface Vencimento { documento_id: number; titular_nome: string; tipo: string; data_tipo: string; data: string; vencido: boolean }
-/** Rótulo da linha do histórico: pessoa criada e pet têm texto próprio; o resto mostra o campo. */
+/** Rótulo da linha do histórico: pessoa criada (ou removida, no desfazer) e pet têm texto próprio; o resto mostra o campo. */
 function rotulo(h: Mudanca): string {
   const nome = (v: unknown) => (v && typeof v === "object" ? String((v as { nome?: unknown }).nome ?? "") : "");
-  if (h.campo === "criada") return `Pessoa criada: ${nome(h.depois)}`;
+  if (h.campo === "criada") return h.depois === null ? `Pessoa removida: ${nome(h.antes)}` : `Pessoa criada: ${nome(h.depois)}`;
   if (h.campo.startsWith("pet:")) return `Pet: ${nome(h.depois ?? h.antes)}`;
   return h.campo;
 }
