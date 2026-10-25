@@ -9,6 +9,7 @@ import unicodedata
 from gabi.cobrar.a_receber import a_receber_do_mes
 from gabi.dinheiro.regras import contar_casados
 from gabi.dinheiro.valor import formatar
+from gabi.contatos.contatos import conta_destino
 from gabi.mcp.ferramentas_dia import _inteiro
 from gabi.rotas.avisos import descrever
 from gabi.rotas.dinheiro import _regra
@@ -40,15 +41,18 @@ def buscar_contatos(con, texto: str, limite: int = 10) -> dict:
         if d[campo] is None and isinstance(nome, str) and nome.strip():
             d[campo] = nome
 
-    for r in con.execute("select conta, telefone, nome from contato_google order by conta, telefone"):
+    destino = conta_destino(con)
+    graph = {r[0] for r in con.execute("select distinct conta from contato_graph")}  # a sincronização também grava a conta do Graph nas tabelas contato_google*
+    origem = lambda conta: f"{'graph' if conta in graph else 'google'}:{conta}"  # noqa: E731
+    for r in con.execute("select conta, telefone, nome from contato_google order by conta=? desc, conta, telefone", (destino,)):  # como listar_unicos: o nome do destino vence
         d = item(r["telefone"], r["telefone"])
         nomear(d, r["nome"])
-        d["origens"].add(f"google:{r['conta']}")
-    for r in con.execute("select conta, email, telefone, nome from contato_google_email order by conta, email"):
+        d["origens"].add(origem(r["conta"]))
+    for r in con.execute("select conta, email, telefone, nome from contato_google_email order by conta=? desc, conta, email", (destino,)):
         d = item(r["telefone"] or f"email:{r['email']}", r["telefone"] or None)
         nomear(d, r["nome"])
         d["emails"].add(r["email"])
-        d["origens"].add(f"google:{r['conta']}")
+        d["origens"].add(origem(r["conta"]))
     for r in con.execute("select conta, telefone, nome from contato_graph where coalesce(telefone, '')<>'' order by conta, telefone"):  # sem telefone: nada a juntar
         d = item(r["telefone"], r["telefone"])
         nomear(d, r["nome"], "graph")

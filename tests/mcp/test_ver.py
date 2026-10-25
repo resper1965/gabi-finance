@@ -50,6 +50,19 @@ def test_nome_do_graph_quando_google_sem_nome(con):
     assert buscar_contatos(con, "beto")["itens"][0]["nome"] == "Beto"
 
 
+def test_conta_do_graph_nas_tabelas_google_sai_como_graph(con):
+    _google(con, "r@ness", TEL, "Ana Ness")  # a sincronização grava a ness também em contato_google
+    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness','g1','Ana N','x',?,'mobile','2026-10-01')", (TEL,))
+    assert buscar_contatos(con, "ana")["itens"][0]["origens"] == ["graph:r@ness"]
+
+
+def test_nome_da_conta_destino_vence(con):
+    con.execute("insert into parametro(chave, valor) values ('escuta.conta_destino_contatos', '\"z@gmail\"')")
+    _google(con, "a@outra", TEL, "Nome Outra")
+    _google(con, "z@gmail", TEL, "Nome Gmail")
+    assert buscar_contatos(con, "nome")["itens"][0]["nome"] == "Nome Gmail"
+
+
 def test_graph_sem_telefone_nao_junta(con):
     for gid, nome in (("g1", "Ana Um"), ("g2", "Ana Dois")):
         con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness',?,?,'x',null,'mobile','2026-10-01')", (gid, nome))
