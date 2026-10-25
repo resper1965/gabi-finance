@@ -34,3 +34,14 @@ def test_soul_ensina_a_gravar_de_verdade():
     soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
     assert "Gravar de verdade" in soul and "familia_registrar_pessoa" in soul and "familia_registrar_pet" in soul
     assert "Não tenho como gravar isso no brain; fica só nesta conversa." in soul
+
+
+def test_soul_excecao_cobre_pessoa_pet_e_contato_sem_contradizer():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção:"))
+    for n in ("familia_registrar_pessoa", "familia_registrar_pet", "familia_atualizar_contato", "familia_propor_documento"):
+        assert n in excecao
+    assert "pessoa, parentesco, apelido, nascimento, pet e contato da família" in excecao
+    assert "(apelido, telefone" not in soul  # apelido não vai mais para familia_atualizar_contato
+    regra = next(l for l in soul.splitlines() if "Você lê e propõe" in l)
+    assert "fora a exceção abaixo" in regra
