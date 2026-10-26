@@ -45,7 +45,7 @@ Pacote semanal criptografado, para o Ricardo puxar; a chave privada nunca fica n
 
 ## Servidor MCP e tokens de agentes (Fase 1)
 - O MCP escuta **só em 127.0.0.1:8081** (`gabi-brain-mcp.service`), Streamable HTTP em `/mcp`, e exige `Authorization: Bearer <token>`. Para agentes fora da VPS (Claude Code no seu Windows): `sudo tailscale serve --bg --https=8443 http://127.0.0.1:8081` (TLS na rede privada; o token continua obrigatório).
-- Emitir (o token aparece **uma vez**; o banco guarda só o hash): `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens emitir hermes fin` (escopos: `fin,docs,trabalho,pedidos,propostas,decisoes,envios,familia,sensivel`). Você cola o token no agente; eu não o vejo.
+- Emitir (o token aparece **uma vez**; o banco guarda só o hash): `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens emitir hermes fin` (escopos: `fin,docs,trabalho,pedidos,propostas,decisoes,envios,familia,sensivel,contatos`; trocar só os escopos de um token ativo, sem mudar o segredo: `... -m gabi.mcp.tokens escopos <id> fin,docs,...`). Você cola o token no agente; eu não o vejo.
 - Listar: `... -m gabi.mcp.tokens listar` · Revogar um: `... revogar <id>` · Revogar todos: `POST /api/revogar-tudo` (ver acima).
 - Cada chamada fica em `chamada_mcp` (token, ferramenta, escopo, status `ok|sem_escopo|erro|nao_autenticado`). Para ver: `sqlite3 $BANCO "select quando, ferramenta, status from chamada_mcp order by id desc limit 20"`.
 - Só existem ferramentas de **leitura** (`docs/api.md#mcp`). Não há como enviar, pagar, apagar, aprovar nem ligar regra por MCP (R13).
@@ -208,3 +208,14 @@ Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do R
 5. `/new` no Telegram **e** no WhatsApp (a conversa velha não vê as ferramentas nem o SOUL novos).
 6. **Conferir:** `cd ~/gabi-brain && .venv/bin/python -m tools.auditar_promessas` (somente leitura; `--desde YYYY-MM-DD` troca os 7 dias padrão). Imprime uma linha por resposta que disse "anotado/registrei/salvei..." sem escrita ok no turno, e a contagem. Depois da instalação o esperado é 0 casos novos; os anteriores são o histórico. Peça ao Hermes uma pessoa ou pet de teste e veja "Pessoa criada: …" no histórico do painel (Desfazer ali).
 - **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda1 ~/.hermes/config.yaml`, restaurar o SOUL (`cp -p ~/.hermes/SOUL.md.bak-<data> ~/.hermes/SOUL.md`), `sudo systemctl restart hermes-gateway` e `/new`. O código novo pode ficar: sem as ferramentas no `include`, o Hermes não as vê. Pessoas e pets gravados se desfazem pelo Desfazer do painel.
+
+## Hermes Onda 2: ver tudo, só leitura {#hermes-onda2}
+Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do Ricardo, depois do merge da branch da Onda 2.
+1. `sudo ~/instalar-brain.sh` (reinicia o MCP e o serviço de fontes; sem migração nova).
+2. **Token:** `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens listar` para achar o id do token do Hermes; depois `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens escopos <id> fin,docs,trabalho,propostas,pedidos,decisoes,envios,familia,contatos` (o comando troca a lista inteira: confira no `listar` que os escopos atuais são os 8 de antes e só acrescente `contatos`; o segredo não muda).
+3. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-onda2`; em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (39 ferramentas).
+4. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
+5. `sudo systemctl restart hermes-gateway`.
+6. `/new` no Telegram **e** no WhatsApp.
+7. **Conferir:** peça ao Hermes as três perguntas do "Pronto quando" da spec (`docs/superpowers/specs/2026-10-25-hermes-completo-design.md`).
+- **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda2 ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O escopo `contatos` extra no token é inofensivo; sem as ferramentas no `include`, o Hermes não as vê.

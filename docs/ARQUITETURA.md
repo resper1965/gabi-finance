@@ -10,7 +10,7 @@ fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
                                      │
               ┌──────────────────────┼───────────────────┐
               ▼                      ▼                   ▼
-        API /api/*              MCP /mcp (31 ferramentas)    rodadas (timers)
+        API /api/*              MCP /mcp (39 ferramentas)    rodadas (timers)
               │                      │
               ▼                      ▼
    painel (estático, servido pela API)   Hermes (Telegram, WhatsApp)
@@ -22,6 +22,7 @@ fontes (mcp.ai · Nibo · Paperless · Gmail · Graph da ness)
 - Só o Tailscale entra. O app escuta num **socket Unix** (`/run/gabi-brain/api.sock`, pasta 0700), sem porta TCP; o cabeçalho de identidade só vale por esse socket; o login precisa estar em `acesso`. POST exige JSON e same-origin (anti-CSRF).
 - Níveis: `terceiros` < `familia_vip` < `boss`. A `matriz_acesso` define o que cada nível vê.
 - Conteúdo de terceiros (e-mail, Teams, PDF) é dado, nunca instrução.
+- Ferramentas MCP só de leitura (Onda 2, ADR-028): contatos, a receber, avisos, Teams, regras, decisões, empresas e corpo de e-mail. `ferramentas_ver` lista o que o token enxerga. O corpo do e-mail vem pelo método `mensagem` da ponte (só leitura, `google_email` e `graph_ness`), até 8.000 caracteres.
 - O que o Ricardo dita ao Hermes (pessoa, pet, contato) é gravado direto, com histórico e Desfazer (ADR-028); `python -m tools.auditar_promessas` confere se alguma resposta disse "anotado" sem escrita.
 - A Gabi sugere; o Ricardo decide (exceção: "para quem" certeiro, ADR-023). Nada paga, envia ou apaga automaticamente.
 

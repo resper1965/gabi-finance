@@ -229,3 +229,32 @@ def test_erro_nunca_leva_texto_de_email_nem_segredo():
     with pytest.raises(ErroGraphNess) as e:
         gr.listar_novos(CONTA, None, 14)
     assert "ASSUNTO-SECRETO" not in repr(e.value) and "TOK" not in repr(e.value)
+
+
+# ---- Onda 2: corpo da mensagem (só leitura) ----
+def test_mensagem_graph_prefer_texto():
+    gr, http = graph([("GET", r"/messages/AAMk", (200, {"id": mid(1), "body": {"contentType": "text", "content": "Olá\nmundo"}}))])
+    assert gr.mensagem(CONTA, mid(1)) == {"corpo": "Olá\nmundo", "cortado": False}
+    c = http.chamadas[0]
+    assert c[0] == "GET" and c[2]["$select"] == ["body"]
+    assert 'outlook.body-content-type="text"' in c[4]["Prefer"] and 'IdType="ImmutableId"' in c[4]["Prefer"]
+
+
+def test_mensagem_graph_html_vira_texto_e_corta():
+    gr, _ = graph([("GET", r"/messages/AAMk", (200, {"body": {"contentType": "html", "content": "<style>x</style><p>Oi</p>"}}))])
+    assert gr.mensagem(CONTA, mid(1))["corpo"] == "Oi"
+    gr, _ = graph([("GET", r"/messages/AAMk", (200, {"body": {"contentType": "text", "content": "b" * 9000}}))])
+    r = gr.mensagem(CONTA, mid(1))
+    assert len(r["corpo"]) == 8000 and r["cortado"] is True
+
+
+def test_mensagem_graph_id_invalido_404_e_forma():
+    gr, _ = graph([])
+    with pytest.raises(ErroGraphNess):
+        gr.mensagem(CONTA, "a/b")
+    gr, _ = graph([("GET", r"/messages/AAMk", (404, {}))])
+    with pytest.raises(ErroGraphNess, match="mensagem não encontrada"):
+        gr.mensagem(CONTA, mid(1))
+    gr, _ = graph([("GET", r"/messages/AAMk", (200, {"body": "x"}))])
+    with pytest.raises(ErroGraphNess):
+        gr.mensagem(CONTA, mid(1))

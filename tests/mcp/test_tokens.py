@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.mcp.tokens import ESCOPOS, Token, emitir, listar, revogar, validar
+from gabi.mcp.tokens import ESCOPOS, Token, definir_escopos, emitir, listar, revogar, validar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 
@@ -81,10 +81,26 @@ def test_listar_nunca_expoe_hash_nem_token(con):
 
 
 def test_escopos_do_plano():
-    assert ESCOPOS == {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel"}
+    assert ESCOPOS == {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel", "contatos"}
 
 
 def test_revogar_tudo_da_api_invalida_os_tokens(con):
     t = emitir(con, "hermes", ["fin"])
     con.execute("update token_agente set revogado_em=datetime('now') where revogado_em is null")  # o que /api/revogar-tudo faz
     assert validar(con, t) is None
+
+
+def test_definir_escopos(con):
+    t = emitir(con, "hermes", ["fin"])
+    h = con.execute("select hash from token_agente").fetchone()[0]
+    definir_escopos(con, 1, ["fin", "contatos"])
+    assert validar(con, t).escopos == {"fin", "contatos"} and con.execute("select hash from token_agente").fetchone()[0] == h
+    with pytest.raises(ValueError):
+        definir_escopos(con, 1, ["x"])
+    with pytest.raises(ValueError):
+        definir_escopos(con, 1, [])
+    with pytest.raises(LookupError):
+        definir_escopos(con, 99, ["fin"])
+    revogar(con, 1)
+    with pytest.raises(LookupError):
+        definir_escopos(con, 1, ["fin"])

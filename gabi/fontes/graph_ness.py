@@ -18,7 +18,7 @@ from typing import Callable
 from gabi.fontes.google_agenda import ResultadoEventos
 from gabi.fontes.google_contatos import MAX_EMAILS, _EMAIL
 from gabi.fontes.google_email import (MAX_CARGA_MSGS, MAX_ENDERECOS, MAX_ENDERECOS_CONSULTA, MAX_ENVIADOS_MSGS, MAX_IDS_POR_CHAMADA, TAM_ASSUNTO,
-                                      TAM_TRECHO, ResultadoEmail, _endereco, _lista)
+                                      TAM_TRECHO, ResultadoEmail, _endereco, _lista, cortar_corpo, html_para_texto, limpar_texto)
 
 BASE = "https://graph.microsoft.com/v1.0"
 HOST = "https://graph.microsoft.com/"
@@ -265,6 +265,23 @@ class GraphNess:
 
     def _caixa(self, conta: str) -> str:
         return f"{BASE}/users/{urllib.parse.quote(self._conta(conta), safe='')}"
+
+    def mensagem(self, conta: str, externo_id: str) -> dict:
+        """Corpo em texto da mensagem (só GET; `Prefer: outlook.body-content-type="text"`; HTML que vier mesmo assim é convertido). Corta em MAX_CORPO."""
+        if not isinstance(externo_id, str) or not _ID_MSG.match(externo_id):
+            raise ErroGraphNess("id de mensagem inválido")
+        try:
+            resp = self._get(f"{self._caixa(conta)}/messages/{urllib.parse.quote(externo_id, safe='')}?$select=body",
+                             {"Prefer": f'{_IMUTAVEL}, outlook.body-content-type="text"'})
+        except _ErroStatus as e:
+            if e.status == 404:
+                raise ErroGraphNess("mensagem não encontrada") from None
+            raise
+        corpo = resp.get("body")
+        if not isinstance(corpo, dict) or not isinstance(corpo.get("content"), str):
+            raise ErroGraphNess("resposta inválida do Graph")
+        texto = corpo["content"]
+        return cortar_corpo(html_para_texto(texto) if str(corpo.get("contentType")).lower() == "html" else limpar_texto(texto))
 
     def listar_novos(self, conta: str, history_id: str | None, janela_dias: int) -> dict:
         """Mensagens novas na Caixa de Entrada. Sem `history_id`: carga pela janela. Com ele (o deltaLink anterior): só o que mudou; 410 (delta expirado)

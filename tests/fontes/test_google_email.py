@@ -204,7 +204,7 @@ def test_cliente_so_faz_get_e_post_de_trash_untrash():
     for proibido in (r"\.send\b", r"/send\b", r"drafts", r"batchDelete", r"batchModify", r"/delete", r"\.delete\b", r"\.modify\b", r"/modify\b", r"labels"):
         assert not re.search(proibido, codigo, re.I), proibido
     assert not [n for n in dir(ge.GoogleEmail) if n.lstrip("_").startswith(("enviar", "responder", "apagar", "rascunho", "rotular"))]
-    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "listar_novos", "lixeira", "respondeu_a", "restaurar"]
+    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "listar_novos", "lixeira", "mensagem", "respondeu_a", "restaurar"]
 
 
 def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
@@ -277,3 +277,57 @@ def test_mover_so_aceita_trash_e_untrash(acao):
     nunca = lambda *a, **k: pytest.fail("não deveria chamar")  # noqa: E731
     with pytest.raises(ErroGoogleOAuth):
         ge._mover("a@x.com", [ID(1)], acao, Token(), nunca)
+
+
+# ---- Onda 2: corpo da mensagem (só leitura) ----
+import base64  # noqa: E402
+
+
+def _b64(t):
+    return base64.urlsafe_b64encode(t.encode()).decode().rstrip("=")
+
+
+def _full(partes, mime="multipart/alternative"):
+    return {"id": ID(7), "payload": {"mimeType": mime, "headers": [], "parts": partes}}
+
+
+def _corpo(resp, status=200):
+    f = Falso({("GET", "/messages/{id}"): [(status, resp)]})
+    return ge.mensagem("a@x.com", ID(7), Token(), f), f
+
+
+def test_mensagem_texto_plano():
+    r, f = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("Olá ")}}, {"mimeType": "text/plain", "body": {"data": _b64("mundo")}},
+                         {"mimeType": "text/html", "body": {"data": _b64("<p>outro</p>")}}]))
+    assert r == {"corpo": "Olá\nmundo", "cortado": False}
+    assert f.chamadas[0][0] == "GET" and f.chamadas[0][2]["format"] == ["full"]
+
+
+def test_mensagem_so_html():
+    r, _ = _corpo(_full([{"mimeType": "text/html", "body": {"data": _b64("<style>x</style><p>Oi</p><script>y</script>")}}]))
+    assert r == {"corpo": "Oi", "cortado": False}
+
+
+def test_mensagem_corta_em_8000():
+    r, _ = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("a" * 9000)}}]))
+    assert len(r["corpo"]) == 8000 and r["cortado"] is True
+
+
+def test_mensagem_id_invalido_e_404_e_erro_da_fonte():
+    with pytest.raises(ErroGoogleOAuth):
+        ge.mensagem("a@x.com", "../x", Token(), Falso({}))
+    with pytest.raises(ErroGoogleOAuth, match="mensagem não encontrada"):
+        _corpo({}, 404)
+    with pytest.raises(ErroGoogleOAuth):
+        _corpo({}, 500)
+
+
+def test_classe_google_email_expoe_mensagem():
+    f = Falso({("GET", "/messages/{id}"): [(200, _full([{"mimeType": "text/plain", "body": {"data": _b64("x")}}]))]})
+    assert ge.GoogleEmail(Token(), f).mensagem("a@x.com", ID(7)) == {"corpo": "x", "cortado": False}
+
+
+def test_mensagem_ignora_anexo_de_texto():
+    r, _ = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("corpo")}},
+                         {"mimeType": "text/plain", "filename": "notas.txt", "body": {"data": _b64("anexo")}}]))
+    assert r == {"corpo": "corpo", "cortado": False}
