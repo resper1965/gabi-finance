@@ -176,7 +176,7 @@ def empresas(con, agora: dt.datetime) -> dict:
 def registrar(srv, executar) -> None:
     @srv.tool()
     def contatos_buscar(texto: str = "", limite: int = 10) -> dict:
-        """Contatos do Ricardo, Google e Microsoft da ness juntos (nunca pergunte de qual fonte), por nome, e-mail ou pedaço do telefone: nome, telefones, e-mails e de onde veio. Texto vazio dá o total por fonte e os primeiros por nome. Só leitura."""
+        """Contatos do Ricardo de todas as contas sincronizadas, já juntos (nunca pergunte de qual fonte; diga a origem só pelo campo `origens`/`por_origem`), por nome, e-mail ou pedaço do telefone: nome, telefones, e-mails e de onde veio. Texto vazio dá o total por origem e os primeiros por nome. Só leitura."""
         def f(con, agora):
             return buscar_contatos(con, texto, limite)
         return executar("contatos_buscar", f)
