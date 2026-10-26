@@ -13,7 +13,7 @@ from pathlib import Path
 
 from gabi.bruto import gravar_bruto
 from gabi.db import transacao
-from gabi.dinheiro import caixa, nao_gasto
+from gabi.dinheiro import caixa, gastador, nao_gasto
 from gabi.dinheiro.moeda import valor_lancamento
 from gabi.dinheiro.valor import para_centavos
 from gabi.rodada import registrar_rodada
@@ -336,18 +336,19 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
                 lidos, novos = lidos + n_lidos, novos + n_novos
             except Exception as e:  # a conta fica fora desta rodada (rollback do parcial); as outras seguem
                 falhas[aid] = type(e).__name__
-        erro_nao_gasto = None
+        erro_pos = None
         try:  # depois de todas as contas: o boleto do banco se confere com as faturas dos cartões gravadas nesta rodada
             with transacao(con):
                 nao_gasto.reaplicar(con)
-        except Exception as e:  # a natureza bruta do caixa.natureza fica; a próxima rodada tenta de novo
-            erro_nao_gasto = type(e).__name__
+                gastador.preencher(con)
+        except Exception as e:  # a natureza bruta do caixa.natureza fica e o gastador espera; a próxima rodada tenta de novo
+            erro_pos = type(e).__name__
         registrar_estado(con, contas, ids, sync, bancos_pj, hoje, agora, falhas)
         rodada.lidos, rodada.novos = lidos, novos
         if falhas:
             rodada.aviso = "falhas: " + ", ".join(sorted(falhas))
-        if erro_nao_gasto:
-            rodada.aviso = "; ".join(filter(None, [rodada.aviso, f"o que não é gasto não foi reaplicado: {erro_nao_gasto}"]))
+        if erro_pos:
+            rodada.aviso = "; ".join(filter(None, [rodada.aviso, f"não é gasto e quem gastou não foram reaplicados: {erro_pos}"]))
         rid = rodada.id
     return ResumoCaptura(len(contas), lidos, novos, sorted(falhas), problemas, rid)
 

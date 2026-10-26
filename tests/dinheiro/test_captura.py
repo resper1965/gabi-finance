@@ -349,3 +349,19 @@ def test_boleto_da_fatura_sai_de_gastos_na_mesma_rodada_e_a_marcacao_manual_fica
     _rodar(con, fin, tmp_path)  # a captura regrava a natureza bruta; a marcação do Ricardo volta a valer
     L = _lancs(con)
     assert (L["b2"]["natureza"], L["b2"]["natureza_regra"]) == ("caixa", "manual")
+
+
+def test_captura_preenche_gastador_e_mantem_indicacao(con, tmp_path):
+    from gabi.dinheiro import gastador
+    con.execute("insert into pessoa(id, nome, papel) values ('ricardo','Ricardo','titular'), ('louise','Louise','filha')")
+    txs = {"acc-bank-1111": [tx("b1", "2026-10-07", "PADARIA", 10.0)], "acc-card-9999": [tx("c1", "2026-10-03", "ZARA", 310.0)]}
+    fin = FakeFin([BANCO, CARTAO], txs)
+    _rodar(con, fin, tmp_path)
+    L = _lancs(con)
+    assert (L["b1"]["gastador_id"], L["b1"]["gastador_origem"]) == ("ricardo", "cartao")
+    assert L["c1"]["gastador_id"] is None  # cartão sem portador cadastrado: a indicar
+    con.execute("update conta set usuarios='[\"ricardo\",\"louise\"]' where externo_id='acc-card-9999'")
+    gastador.indicar(con, [L["c1"]["id"]], "louise")
+    _rodar(con, fin, tmp_path)
+    L = _lancs(con)
+    assert (L["c1"]["gastador_id"], L["c1"]["gastador_origem"]) == ("louise", "voce")
