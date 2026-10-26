@@ -12,7 +12,7 @@ import unicodedata
 
 from fastapi import APIRouter, Depends, Request
 
-from gabi.dinheiro import contas_pagar as cp, planilha
+from gabi.dinheiro import contas_pagar as cp, gastador, planilha
 from gabi.dinheiro.compromissos import _serie
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -293,6 +293,8 @@ class Contas:
 
         def fazer():
             con.execute("update conta set apelido=?, estado=?, pj=?, nibo_account_id=?, usuarios=? where id=?", (*vals.values(), atual["id"]))
+            if usuarios != atual["usuarios"]:  # portadores mudaram: quem gastou automático desta conta se refaz já (a indicação do Ricardo fica)
+                gastador.preencher(con, [r[0] for r in con.execute("select id from lancamento where conta_id=?", (atual["id"],))])
             _auditar(con, quem, tipo, atual["id"], "alterada")
         _tx(con, fazer)
         return self.obter(con, id_)

@@ -10,7 +10,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gabi.db import conectar
-from gabi.dinheiro import analise, consultas, contas_pagar as cp, nao_gasto, regras as rg, repositorio
+from gabi.dinheiro import analise, consultas, contas_pagar as cp, gastador, nao_gasto, regras as rg, repositorio
 from gabi.dinheiro.projecao import projetar
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -18,7 +18,7 @@ from gabi.identidade import Identidade, exigir
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
 PERIODOS = {"semana": 7, "mes": 30, "12m": 365}
-EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id", "gasto"}
+EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id", "gasto", "gastador_id"}
 
 
 # ---------------- utilitários ----------------
@@ -112,10 +112,10 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
         agenda = cp.contas_a_pagar(con, hoje)
         a_pagar = sum(i["valor_centavos"] or 0 for g in ("atrasadas", "hoje", "proximas") for i in agenda[g])
         fonte = repositorio.FonteAnalise(con)
-        recorrentes = [r for r in analise.recorrentes(fonte, "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
-        assinaturas = sum(r["valor_medio"] for r in recorrentes)
-        status_ass = {a["estabelecimento"]: a["status"] for a in con.execute("select estabelecimento, status from assinatura")}
-        a_conferir = sum(1 for r in recorrentes if status_ass.get(r.get("chave") or r.get("descricao"), "a_conferir") == "a_conferir")
+        from gabi.rotas.gastos import calcular_assinaturas  # tardio: gastos importa deste módulo
+        rol = calcular_assinaturas(con, hoje)  # a mesma conta da tela Assinaturas: "não é assinatura", encerrada e hábito não entram
+        ativas = [i for i in rol["itens"] if i["ativa"] and i["no_rol"]]
+        a_conferir = sum(1 for i in ativas if i["status"] == "a_conferir")
         abertas = [(f["vencimento"],) for f in cp.faturas_abertas(con, hoje)]
         serie = _serie_saldo(con, hoje, PERIODOS[periodo], conta)
         prev = analise.previsao(fonte, 14, None, hoje)
@@ -133,11 +133,11 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
             if qtd:
                 atencao.append({"tipo": tipo, "quantidade": qtd, "texto": f"{qtd} {um if qtd == 1 else varios}", "rota": rota})
         dados = {"kpis": {"saldo": formatar(saldo), "a_pagar_7_dias": formatar(a_pagar), "a_receber": None,
-                          "faturas_abertas": formatar(cx.faturas_abertas_centavos), "assinaturas_mes": formatar(para_centavos(round(assinaturas, 2)))},
+                          "faturas_abertas": formatar(cx.faturas_abertas_centavos), "assinaturas_mes": formatar(rol["total_mensal_centavos"])},
                  "detalhe": {"saldo_por_conta": [{"apelido": c["apelido"], "saldo": formatar(c["saldo_centavos"])} for c in contas],
                              "a_pagar_contas": sum(len(agenda[g]) for g in ("atrasadas", "hoje", "proximas")), "a_pagar_vencidas": len(agenda["atrasadas"]),
                              "cartoes_abertos": len(abertas), "proxima_fatura": abertas[0][0] if abertas else None,
-                             "assinaturas_ativas": len(recorrentes), "assinaturas_a_conferir": a_conferir},
+                             "assinaturas_ativas": len(ativas), "assinaturas_a_conferir": a_conferir},
                  "serie_saldo": serie, "atencao": atencao}
         return envelope(con, dados, agora=_agora(request))
     finally:
@@ -191,13 +191,13 @@ _lanc = consultas.lancamento_dict
 @router.get("/lancamentos")
 def lancamentos(request: Request, pendente: str | None = None, de: str | None = None, ate: str | None = None, conta: str | None = None,
                 categoria: int | None = None, para_quem: str | None = None, empresa: str | None = None, texto: str | None = None,
-                limite: int = 50, offset: int = 0):
-    """Lançamentos paginados, com filtros e a origem de cada classificação."""
+                limite: int = 50, offset: int = 0, gastador: str | None = None):
+    """Lançamentos paginados, com filtros e a origem de cada classificação. pendente=gastador: compras de cartão compartilhado a indicar."""
     con = _con(request)
     try:
         try:
             dados = consultas.listar_lancamentos(con, pendente=pendente, de=de, ate=ate, conta=conta, categoria=categoria, para_quem=para_quem,
-                                                 empresa=empresa, texto=texto, limite=limite, offset=offset)
+                                                 empresa=empresa, texto=texto, limite=limite, offset=offset, gastador=gastador)
         except ValueError as e:
             raise erro(400, "requisicao_invalida", str(e))
         return envelope(con, dados, agora=_agora(request))
@@ -206,8 +206,9 @@ def lancamentos(request: Request, pendente: str | None = None, de: str | None = 
 
 
 def _validar_mudancas(con, m: dict) -> dict:
-    """{categoria_id, beneficiario_id, empresa_id, frente_id, gasto} -> colunas, validando existência. None limpa o campo.
-    gasto: true/false é a marcação do Ricardo (vence as regras de nao_gasto); None devolve a decisão às regras."""
+    """{categoria_id, beneficiario_id, empresa_id, frente_id, gasto, gastador_id} -> colunas, validando existência. None limpa o campo.
+    gasto: true/false é a marcação do Ricardo (vence as regras de nao_gasto); None devolve a decisão às regras.
+    gastador_id: quem gastou (só portador da conta, conferido ao aplicar); None volta ao automático (ou a indicar)."""
     if not m:
         raise erro(400, "requisicao_invalida", "informe ao menos um campo para mudar")
     if set(m) - EDITAVEIS:
@@ -218,6 +219,11 @@ def _validar_mudancas(con, m: dict) -> dict:
             if valor is not None and not isinstance(valor, bool):
                 raise erro(400, "requisicao_invalida", "gasto deve ser true, false ou null")
             saida["natureza_manual"] = None if valor is None else ("gasto" if valor else "nao_gasto")
+            continue
+        if chave == "gastador_id":
+            if valor is not None and (not isinstance(valor, str) or con.execute("select 1 from pessoa where id=?", (valor,)).fetchone() is None):
+                raise erro(400, "requisicao_invalida", f"gastador_id={valor!r} não existe")
+            saida["gastador_id"] = valor
             continue
         col = "para_quem_id" if chave == "beneficiario_id" else chave
         if valor is not None:
@@ -232,7 +238,9 @@ def _validar_mudancas(con, m: dict) -> dict:
     return saida
 
 
-def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
+def _aplicar_mudancas(con, ids: list[int], cols: dict, regra_gastador: bool = False) -> None:
+    cols = dict(cols)
+    tem_gastador, quem = "gastador_id" in cols, cols.pop("gastador_id", None)
     for lid in ids:
         for col, valor in cols.items():
             origem = f"{col[:-3]}_origem" if col not in ("frente_id", "natureza_manual") else None
@@ -242,6 +250,11 @@ def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
                 con.execute(f"update lancamento set {col}=? where id=?", (valor, lid))
     if "natureza_manual" in cols:
         nao_gasto.reaplicar(con, ids)
+    if tem_gastador:
+        try:
+            gastador.indicar(con, ids, quem, regra=regra_gastador)
+        except ValueError as e:  # pessoa que não é portadora de alguma das contas: nada é gravado (a transação volta)
+            raise erro(400, "nao_portador", str(e).removeprefix("nao_portador: "))
 
 
 @router.patch("/lancamentos/{lid}")
@@ -280,13 +293,14 @@ async def lancamentos_lote(request: Request, ident: Identidade = Depends(exigir(
             raise erro(404, "nao_encontrado", f"lançamentos inexistentes: {faltam}")
         con.execute("begin")
         try:
-            _aplicar_mudancas(con, ids, cols)
+            _aplicar_mudancas(con, ids, cols, regra_gastador=corpo.get("criar_regra") is True)
             con.execute("commit")
         except BaseException:
             con.execute("rollback")
             raise
         regras = []
-        if corpo.get("criar_regra") is True:
+        # regra de classificação só quando o lote mexeu em categoria, para quem ou empresa; o "sempre" de quem gastou já virou gastador_regra
+        if corpo.get("criar_regra") is True and set(cols) & {"categoria_id", "para_quem_id", "empresa_id"}:
             vistos = set()
             for lid in ids:
                 r = con.execute("select estabelecimento, descricao_original from lancamento where id=?", (lid,)).fetchone()

@@ -293,6 +293,8 @@ def test_destino_agrupado_por_fornecedor_e_pessoa(cli):
     assert {"nome", "valor", "pct", "variacao"} <= set(d["itens"][0])
     p = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=pessoa").json()["dados"]
     assert p["itens"][0]["nome"] == "(sem pessoa)"
+    g = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=gastador").json()["dados"]
+    assert g["por"] == "gastador" and g["total"] == "533.90" and g["itens"][0]["nome"] == "(sem portador)"  # conta da amostra sem portador cadastrado
 
 
 def test_destino_agrupado_valida_entrada_e_exige_boss(cli):
@@ -355,3 +357,25 @@ def test_nao_e_assinatura_sai_do_total_e_dos_alertas_e_volta_ao_desfazer(cli, ba
     patch(cli, f"/api/v1/assinaturas/{a['id']}", {"status": "manter"})
     assert get(cli, "/api/v1/assinaturas").json()["dados"]["total_mensal"] == d["total_mensal"]
 
+
+
+def test_resumo_do_caixa_usa_o_rol_de_assinaturas(cli, banco):
+    k = get(cli, "/api/v1/caixa/resumo").json()["dados"]
+    assert (k["kpis"]["assinaturas_mes"], k["detalhe"]["assinaturas_ativas"], k["detalhe"]["assinaturas_a_conferir"]) == ("55.90", 1, 1)
+    aid = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["id"]
+    patch(cli, f"/api/v1/assinaturas/{aid}", {"status": "manter"})
+    assert get(cli, "/api/v1/caixa/resumo").json()["dados"]["detalhe"]["assinaturas_a_conferir"] == 0  # conferida: sai da revisão
+    patch(cli, f"/api/v1/assinaturas/{aid}", {"status": "nao_assinatura"})
+    k = get(cli, "/api/v1/caixa/resumo").json()["dados"]
+    assert (k["kpis"]["assinaturas_mes"], k["detalhe"]["assinaturas_ativas"], k["detalhe"]["assinaturas_a_conferir"]) == ("0.00", 0, 0)
+
+
+def test_quem_gastou_separa_a_indicar_de_sem_portador(cli, banco):
+    from tests.rotas.test_dinheiro_api import _compartilhado
+    c = conectar(banco)
+    c.execute("insert or ignore into pessoa(id, nome) values ('p1','Ricardo'), ('p9','Ana')")
+    c.close()
+    _compartilhado(banco)
+    g = {i["nome"]: i["valor"] for i in get(cli, "/api/v1/destino/agrupado?periodo=mes&por=gastador").json()["dados"]["itens"]}
+    assert g["(a indicar)"] == "120.00"  # as duas ZARA do cartão compartilhado
+    assert "(sem portador)" in g  # os gastos da amostra, em conta sem portador cadastrado

@@ -15,7 +15,7 @@ interface Cartao {
   serie_12m: { mes: string; total: string }[]; por_categoria: { categoria: string; valor: string }[];
 }
 interface Campo { id: number | string | null; nome: string | null; origem: string | null }
-interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; parcela: number | null; parcelas: number | null; categoria: Campo; para_quem: Campo; empresa: Campo }
+interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; parcela: number | null; parcelas: number | null; categoria: Campo; para_quem: Campo; empresa: Campo; gastador?: Campo; portadores?: string[] }
 interface Item { id: number | string; nome: string }
 
 const COR = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
@@ -38,7 +38,7 @@ export function Cartoes() {
   const [q, setQ] = useState("");
   const [fCat, setFCat] = useState(""), [fEmp, setFEmp] = useState(""), [fBen, setFBen] = useState(""), [fTipo, setFTipo] = useState("");
   const [marcados, setMarcados] = useState<number[]>([]);
-  const [bCat, setBCat] = useState(""), [bBen, setBBen] = useState(""), [bEmp, setBEmp] = useState(""), [bGasto, setBGasto] = useState(""), [bRegra, setBRegra] = useState(false);
+  const [bCat, setBCat] = useState(""), [bBen, setBBen] = useState(""), [bEmp, setBEmp] = useState(""), [bGasto, setBGasto] = useState(""), [bQuem, setBQuem] = useState(""), [bRegra, setBRegra] = useState(false);
   const filtros = `&limite=200${q ? `&texto=${encodeURIComponent(q)}` : ""}${fCat ? `&categoria=${fCat}` : ""}${fEmp ? `&empresa=${fEmp}` : ""}${fBen ? `&para_quem=${fBen}` : ""}`;
   const assinaturas = useApi<{ itens: { nome: string }[] }>("/api/v1/assinaturas").env?.dados.itens ?? [];
   const nomesAssinatura = new Set(assinaturas.map((a) => a.nome.toLowerCase()));
@@ -58,16 +58,23 @@ export function Cartoes() {
         cartoes.forEach((c) => c.por_categoria.forEach((p) => cats.set(p.categoria, (cats.get(p.categoria) ?? 0) + num(p.valor))));
         const totCat = [...cats.values()].reduce((a, b) => a + b, 0);
         const lista = [...cats.entries()].sort((a, b) => b[1] - a[1]);
-        const mudar = async (ids: number[], mudancas: Record<string, number | boolean | null>, regra: boolean, texto: string) => {
-          try { await api.post("/api/v1/lancamentos/lote", { ids, mudancas, criar_regra: regra }); avisar(texto); setMarcados([]); lanc.recarregar(); leitura.recarregar(); }
+        const mudar = async (ids: number[], mudancas: Record<string, number | string | boolean | null>, regra: boolean, texto: string) => {
+          try { await api.post("/api/v1/lancamentos/lote", { ids, mudancas, criar_regra: regra }); avisar(texto); setMarcados([]); setBQuem(""); lanc.recarregar(); leitura.recarregar(); }
           catch (e) { avisar((e as Error).message); }
         };
+        const nomePessoa = (pid: string) => pessoas.find((p) => String(p.id) === pid)?.nome ?? pid;
+        // no lote, só quem é portador de TODOS os marcados (a API recusa quem não for)
+        const portadoresMarcados = linhas.filter((l) => marcados.includes(l.id)).map((l) => l.portadores ?? [])
+          .reduce<string[] | null>((acc, ps) => (acc === null ? ps : acc.filter((x) => ps.includes(x))), null) ?? [];
+        const quemValido = bQuem !== "" && portadoresMarcados.includes(bQuem);  // escolha que não vale para os marcados agora não vai
+        const quemGastou = (l: Lanc) => l.gastador?.nome ?? ((l.portadores?.length ?? 0) >= 2 ? <span style={{ color: "var(--warn)", fontWeight: 600 }}>a indicar</span> : "—");
         const aplicar = () => {
-          const m: Record<string, number | boolean | null> = {};
+          const m: Record<string, number | string | boolean | null> = {};
           if (bCat) m.categoria_id = Number(bCat);
           if (bBen) m.beneficiario_id = Number(bBen);
           if (bEmp) m.empresa_id = bEmp === "none" ? null : Number(bEmp);
           if (bGasto) m.gasto = bGasto === "auto" ? null : bGasto === "sim";
+          if (quemValido) m.gastador_id = bQuem;
           return mudar(marcados, m, bRegra, `${marcados.length} lançamentos atualizados por você${bRegra ? " e regra criada" : ""}.`);
         };
         const beneficiario = (l: Lanc) => (
@@ -157,17 +164,18 @@ export function Cartoes() {
                   <select aria-label="Novo para quem" value={bBen} onChange={(e) => setBBen(e.target.value)} style={selecao}><option value="">Para quem: manter</option>{pessoas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
                   <select aria-label="Nova empresa" value={bEmp} onChange={(e) => setBEmp(e.target.value)} style={selecao}><option value="">Empresa: manter</option><option value="none">Nenhuma · pessoal</option>{empresas.map((c) => <option key={c.id} value={c.id}>Reembolso {c.nome}</option>)}</select>
                   <select aria-label="É gasto?" value={bGasto} onChange={(e) => setBGasto(e.target.value)} style={selecao}><option value="">Gasto: manter</option><option value="sim">É gasto</option><option value="nao">Não é gasto</option><option value="auto">O brain decide</option></select>
+                  {portadoresMarcados.length > 1 && <select aria-label="Quem gastou" value={bQuem} onChange={(e) => setBQuem(e.target.value)} style={selecao}><option value="">Quem gastou: manter</option>{portadoresMarcados.map((pid) => <option key={pid} value={pid}>{nomePessoa(pid)}</option>)}</select>}
                   <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, cursor: "pointer" }}><input type="checkbox" checked={bRegra} onChange={(e) => setBRegra(e.target.checked)} style={{ width: 16, height: 16 }} />criar regra para os próximos</label>
                   <span style={{ flex: 1 }} />
                   <button className="btn btn-ghost" onClick={() => setMarcados([])}>Limpar</button>
-                  <button className="btn btn-primary" disabled={!bCat && !bBen && !bEmp && !bGasto} onClick={aplicar}>Aplicar</button>
+                  <button className="btn btn-primary" disabled={!bCat && !bBen && !bEmp && !bGasto && !quemValido} onClick={aplicar}>Aplicar</button>
                 </>}
               </div>
               {linhas.length === 0 && <div style={{ border: "1px dashed var(--line3)", padding: 20 }}>Nenhum lançamento com esses filtros.</div>}
               {!celular && linhas.length > 0 && (
                 <div style={{ overflowX: "auto", maxWidth: "100%" }}>
                   <table className="table" style={{ fontSize: 13.5 }}>
-                    <thead><tr><th style={{ width: 32 }} /><th>Data</th><th>Estabelecimento</th><th>Cartão</th><th>Categoria</th><th>Para quem</th><th>Tipo</th><th style={{ textAlign: "right" }}>Valor</th></tr></thead>
+                    <thead><tr><th style={{ width: 32 }} /><th>Data</th><th>Estabelecimento</th><th>Cartão</th><th>Categoria</th><th>Quem gastou</th><th>Para quem</th><th>Tipo</th><th style={{ textAlign: "right" }}>Valor</th></tr></thead>
                     <tbody>
                       {linhas.map((l) => (
                         <tr key={l.id} data-lancamento={l.id} style={{ background: marcados.includes(l.id) ? "var(--sel)" : undefined }}>
@@ -176,6 +184,7 @@ export function Cartoes() {
                           <td style={{ fontWeight: 600 }}>{l.estabelecimento}</td>
                           <td>{l.conta}</td>
                           <td><span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>{l.categoria.nome ?? "sem categoria"}<Origem campo={l.categoria} /></span></td>
+                          <td>{quemGastou(l)}</td>
                           <td><span style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>{beneficiario(l)}<Origem campo={l.para_quem} /></span></td>
                           <td>{l.parcelas && l.parcelas > 1 ? `${l.parcela}/${l.parcelas}` : "à vista"}</td>
                           <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}><Valor valor={l.valor} /></td>
@@ -198,6 +207,7 @@ export function Cartoes() {
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--ink2)" }}>
                         <span style={{ fontFamily: "var(--mono)" }}>{dataCurta(l.data)}</span><span>· {l.conta} · {l.categoria.nome ?? "sem categoria"}</span><Origem campo={l.categoria} />
                       </div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>Quem gastou: {quemGastou(l)}</div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{beneficiario(l)}<Origem campo={l.para_quem} /></div>
                     </div>
                   ))}

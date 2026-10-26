@@ -2150,7 +2150,7 @@
   },
   "/api/v1/destino/agrupado": {
    "get": {
-    "description": "Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa).",
+    "description": "Para onde vai o dinheiro agrupado por categoria, pessoa (para quem), gastador (quem gastou) ou fornecedor (abas Fornecedores e Por pessoa).",
     "operationId": "destino_agrupado_api_v1_destino_agrupado_get",
     "parameters": [
      {
@@ -2752,7 +2752,7 @@
   },
   "/api/v1/lancamentos": {
    "get": {
-    "description": "Lançamentos paginados, com filtros e a origem de cada classificação.",
+    "description": "Lançamentos paginados, com filtros e a origem de cada classificação. pendente=gastador: compras de cartão compartilhado a indicar.",
     "operationId": "lancamentos_api_v1_lancamentos_get",
     "parameters": [
      {
@@ -2901,6 +2901,22 @@
        "default": 0,
        "title": "Offset",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "gastador",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Gastador"
       }
      }
     ],
