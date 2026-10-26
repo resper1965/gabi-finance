@@ -229,5 +229,5 @@ Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do R
 5. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
 6. `sudo systemctl restart hermes-gateway`.
 7. `/new` no Telegram **e** no WhatsApp.
-8. **Conferir ("Pronto quando"):** peça ao Hermes para anotar um a receber de teste (ele cita o id e como desfazer; aparece em Cobrar › A receber › Lançados por você; cancele em seguida), para mandar um e-mail triado para a lixeira (conta com lixeira ligada; restaure em Mensagens › Lixeira) e para criar e remover uma regra "sempre lixo".
+8. **Conferir ("Pronto quando"):** peça ao Hermes para anotar um a receber de teste (ele cita o id e como desfazer; aparece em Cobrar › A receber › Lançados por você; cancele em seguida), para mandar um e-mail triado para a lixeira (conta com lixeira ligada; restaure em Mensagens › Prioridades › Na lixeira) e para criar e remover uma regra "sempre lixo".
 - **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda3 ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O banco não precisa voltar: as tabelas novas ficam vazias e inofensivas (o backup `gabi.db.antes-onda3-<data>` é só garantia); sem as ferramentas no `include`, o Hermes não as vê.

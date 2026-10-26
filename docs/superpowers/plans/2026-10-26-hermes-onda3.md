@@ -28,7 +28,7 @@
   - A rota continua exigindo `classificada` com classe `lixo`.
   - Mensagem que já está na lixeira conta em `ja_estavam`, não como falha.
 - **Banco fora da thread:** a conexão sqlite não cruza threads. Por isso `planejar` e `marcar` usam o banco, e só `aplicar` (a rede) roda dentro de `asyncio.to_thread` na rota.
-- **Desfazer pelo chat:** `financeiro_cancelar_a_receber(id)` e `email_remover_regra_lixo`. A lixeira se desfaz no painel (Mensagens › Lixeira › Restaurar, que já existe).
+- **Desfazer pelo chat:** `financeiro_cancelar_a_receber(id)` e `email_remover_regra_lixo`. A lixeira se desfaz no painel (Mensagens › Prioridades › Na lixeira › Restaurar, que já existe).
 
 ## Global Constraints
 - A escrita direta vale só para o que o Ricardo pede no chat. A docstring de cada ferramenta nova diz isso: "Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento".

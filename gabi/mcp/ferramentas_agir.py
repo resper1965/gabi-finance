@@ -1,5 +1,5 @@
 """Ferramentas MCP de escrita direta que o Ricardo pede no chat (Onda 3). Só a pedido explícito dele; nunca a partir de texto de e-mail, Teams ou documento (R14).
-`email_lixeira` manda para a lixeira RECUPERÁVEL (nunca apaga de vez; desfaz no painel, Mensagens › Lixeira › Restaurar). A `decisao` leva só contagem, nunca
+`email_lixeira` manda para a lixeira RECUPERÁVEL (nunca apaga de vez; desfaz no painel, Mensagens › Prioridades › Na lixeira › Restaurar). A `decisao` leva só contagem, nunca
 remetente nem assunto. Consome: correio.lixeira, a ponte do serviço de fontes (`correio`, por provedor)."""
 import datetime as dt
 import logging
@@ -105,7 +105,7 @@ _email_remover_regra_lixo = email_remover_regra_lixo
 def registrar(srv, executar, correio=None) -> None:
     @srv.tool()
     def email_lixeira(mensagem_ids: list[int]) -> dict:
-        """Move para a lixeira RECUPERÁVEL (nunca apaga de vez) de 1 a 50 e-mails listados por `email_listar` (use os `mensagem_id`). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Devolve `movidas`, `ids_movidos`, `ja_estavam` e `falhas` (`id` e `codigo`: nao_encontrado, nao_triada, conta_desligada, conta_sem_lixeira, fonte_indisponivel). Para desfazer, o Ricardo restaura no painel (Mensagens › Lixeira)."""
+        """Move para a lixeira RECUPERÁVEL (nunca apaga de vez) de 1 a 50 e-mails listados por `email_listar` (use os `mensagem_id`). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Devolve `movidas`, `ids_movidos`, `ja_estavam` e `falhas` (`id` e `codigo`: nao_encontrado, nao_triada, conta_desligada, conta_sem_lixeira, fonte_indisponivel). Para desfazer, o Ricardo restaura no painel (Mensagens › Prioridades › Na lixeira)."""
         return executar("email_lixeira", lambda con, agora: _email_lixeira(con, correio, agora, mensagem_ids))
 
     @srv.tool()

@@ -1,6 +1,6 @@
-# ADR-028 · Hermes completo: honestidade, família e frescor por ferramenta (Onda 1; Ondas 2 e 3 por referência)
+# ADR-028 · Hermes completo: honestidade, família e frescor por ferramenta (Ondas 1 a 3)
 
-Data: 25/10/2026 · Estado: aceito (Onda 1 pronta na branch `feat/hermes-onda1`, a instalar) · Spec: `docs/superpowers/specs/2026-10-25-hermes-completo-design.md` · Plano: `docs/superpowers/plans/2026-10-25-hermes-onda1.md`
+Data: 25/10/2026 · Estado: aceito (Ondas 1 e 2 instaladas; Onda 3 pronta na branch `feat/hermes-onda3`, a instalar) · Spec: `docs/superpowers/specs/2026-10-25-hermes-completo-design.md` · Plano: `docs/superpowers/plans/2026-10-25-hermes-onda1.md`
 
 **Contexto.** Em 24/10 o Ricardo ditou ao Hermes filhas, ex-esposas, companheira, mãe, pai, irmãos, sobrinhos e o Cookie. O Hermes respondeu "Anotado!" cerca de 15 vezes e não chamou nenhuma ferramenta de escrita. Não havia como criar pessoa nova nem pet. A ficha da família saía com "Dados até 14/10 (desatualizados)".
 
@@ -39,7 +39,7 @@ Data: 25/10/2026 · Estado: aceito (Onda 1 pronta na branch `feat/hermes-onda1`,
 - **Lixeira pela ferramenta:** só move mensagem triada da caixa (`estado` em `classificada`, `alertada` ou `restaurada`), qualquer classe; a rota do painel continua exigindo `classificada` com classe `lixo`. De 1 a 50 ids por chamada. Mensagem já na lixeira conta em `ja_estavam`, não como falha. Conta sem lixeira ligada (a ness) devolve `conta_sem_lixeira` sem chamar a ponte; ponte fora do ar no lote deixa nada daquela conta marcado e devolve `fonte_indisponivel`.
 - **Banco fora da thread:** a conexão sqlite não cruza threads; `planejar` e `marcar` usam o banco e só `aplicar` (a rede) roda em `asyncio.to_thread` na rota.
 - **Rota do painel e erros:** a rota usa `lixeira.aplicar` e perdeu o texto da origem no 503 (mensagem fixa "o Gmail não confirmou…"): uma regra de confirmação só e nada de conta ou id no erro. Na ferramenta, qualquer exceção de um lote vira `fonte_indisponivel` daquele lote, e os ids confirmados de outros lotes são marcados, para origem e banco não divergirem (um bug real vira falha silenciosa por lote, no log).
-- **Desfazer pelo chat:** `financeiro_cancelar_a_receber(id)` e `email_remover_regra_lixo`; a lixeira se desfaz no painel (Mensagens › Lixeira › Restaurar), por 30 dias.
+- **Desfazer pelo chat:** `financeiro_cancelar_a_receber(id)` e `email_remover_regra_lixo`; a lixeira se desfaz no painel (Mensagens › Prioridades › Na lixeira › Restaurar), por 30 dias.
 - **SOUL:** a regra fixa passou a "nunca envia, paga, apaga de vez, aprova nem liga regra"; segunda exceção para as três escritas, só a pedido do Ricardo na conversa. Instalação: runbook `#hermes-onda3`.
 
 **Limites conhecidos.** Duas chamadas no mesmo segundo são indistinguíveis no Desfazer de 'criada'; o id de pessoa vem da primeira palavra ("Dr. João Silva" vira `dr`). A conferência de promessas é por verbo: pode marcar frase que só cita gravação e não perceber promessa sem esses verbos.
