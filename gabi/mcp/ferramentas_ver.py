@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import re
 import unicodedata
+from collections import Counter
 
 from gabi.cobrar.a_receber import a_receber_do_mes
 from gabi.dinheiro.regras import contar_casados
@@ -27,9 +28,10 @@ def _simples(s) -> str:
 
 def buscar_contatos(con, texto: str, limite: int = 10) -> dict:
     """Contatos (Google e Microsoft da ness) cujo nome ou e-mail contém o texto, sem acento nem caixa, ou cujo telefone contém os dígitos dele (4 ou mais).
-    Um item por telefone normalizado (o nome do Google vence); e-mail sem telefone vira item próprio. Ordenado por nome e telefone."""
-    if not isinstance(texto, str) or len(texto.strip()) < 2:
-        raise ValueError("texto deve ter ao menos 2 caracteres")
+    Um item por telefone normalizado (o nome do Google vence); e-mail sem telefone vira item próprio. Ordenado por nome e telefone.
+    Texto vazio: todos, com `total` e `por_origem` (as duas fontes já vêm juntas; não há fonte a escolher)."""
+    if not isinstance(texto, str) or len(texto.strip()) == 1:
+        raise ValueError("texto deve ter ao menos 2 caracteres (ou vazio, para o resumo)")
     limite = _inteiro(limite, 1, 50, "limite")
     q, digitos = _simples(texto.strip()), re.sub(r"\D", "", texto)
     por: dict[str, dict] = {}
@@ -62,12 +64,16 @@ def buscar_contatos(con, texto: str, limite: int = 10) -> dict:
     for chave, d in por.items():
         nome = d["nome"] or d["graph"]
         casa = q in _simples(nome) or any(q in _simples(e) for e in d["emails"])
-        if not casa and len(digitos) >= 4:
+        if not casa and len(digitos) >= 4 and q:
             casa = any(digitos in re.sub(r"\D", "", t) for t in d["telefones"])
         if casa:
             achados.append((((nome or "~").casefold(), chave), {"nome": nome, "telefones": d["telefones"], "emails": sorted(d["emails"]), "origens": sorted(d["origens"])}))
     achados.sort(key=lambda x: x[0])
-    return {"texto": texto.strip(), "itens": [i for _, i in achados[:limite]]}
+    resposta = {"texto": texto.strip(), "itens": [i for _, i in achados[:limite]]}
+    if not q:
+        resposta["total"] = len(achados)
+        resposta["por_origem"] = dict(sorted(Counter(o for _, i in achados for o in i["origens"]).items()))
+    return resposta
 
 
 def _em_reais(v):
@@ -169,8 +175,8 @@ def empresas(con, agora: dt.datetime) -> dict:
 
 def registrar(srv, executar) -> None:
     @srv.tool()
-    def contatos_buscar(texto: str, limite: int = 10) -> dict:
-        """Contatos do Ricardo (Google e Microsoft da ness) por nome, e-mail ou pedaço do telefone: nome, telefones, e-mails e de onde veio. Só leitura."""
+    def contatos_buscar(texto: str = "", limite: int = 10) -> dict:
+        """Contatos do Ricardo de todas as contas sincronizadas, já juntos (nunca pergunte de qual fonte; diga a origem só pelo campo `origens`/`por_origem`), por nome, e-mail ou pedaço do telefone: nome, telefones, e-mails e de onde veio. Texto vazio dá o total por origem e os primeiros por nome. Só leitura."""
         def f(con, agora):
             return buscar_contatos(con, texto, limite)
         return executar("contatos_buscar", f)

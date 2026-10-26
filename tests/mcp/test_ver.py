@@ -87,6 +87,16 @@ def test_texto_curto(con):
         buscar_contatos(con, " a ")
 
 
+def test_sem_texto_da_o_resumo_das_duas_fontes(con):
+    _google(con, "a@x", "+5511993290461", "Bia")
+    _google(con, "a@x", TEL, "Ana")
+    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('n@ness','g1','Ana N','(11) 99329-0462',?,'mobile','2026-10-01')", (TEL,))
+    r = buscar_contatos(con, "", limite=1)
+    assert r["total"] == 2 and r["por_origem"] == {"google:a@x": 2, "graph:n@ness": 1}
+    assert [i["nome"] for i in r["itens"]] == ["Ana"]
+    assert buscar_contatos(con, "  ")["total"] == 2
+
+
 def test_limite(con):
     for i, t in enumerate(("+5511993290461", "+5511993290462", "+5511993290463")):
         _google(con, "a@x", t, f"Maria {i}")
