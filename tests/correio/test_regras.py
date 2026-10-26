@@ -117,3 +117,35 @@ def test_regras_lixo_corrompido_ou_ausente_nao_derruba(con):
     assert regras.regra_lixo(con, "a@b.com") is None
     con.execute("insert into parametro(chave, valor) values ('email.regras_lixo', 'nao-e-json')")
     assert regras.regra_lixo(con, "a@b.com") is None
+
+
+# ---------------- acrescentar/remover regra "sempre lixo" (fontes) ----------------
+def test_acrescentar_normaliza_e_e_idempotente(con):
+    from gabi.correio import fontes
+    assert fontes.acrescentar_regra_lixo(con, "Fulano@X.com ") == ("fulano@x.com", True)
+    assert fontes.acrescentar_regra_lixo(con, "fulano@x.com") == ("fulano@x.com", False)
+    assert fontes.acrescentar_regra_lixo(con, " @X.com") == ("@x.com", True)
+    assert fontes.parametros(con)["regras_lixo"] == ["fulano@x.com", "@x.com"]
+
+
+@pytest.mark.parametrize("texto", ["x.com", "", "a b@x.com", None, 3])
+def test_acrescentar_sem_arroba_ou_invalida(con, texto):
+    from gabi.correio import fontes
+    with pytest.raises(fontes.ErroFonte):
+        fontes.acrescentar_regra_lixo(con, texto)
+
+
+def test_remover_inexistente_ok_false(con):
+    from gabi.correio import fontes
+    assert fontes.remover_regra_lixo(con, "Nao@Existe.com") == ("nao@existe.com", False)
+    fontes.acrescentar_regra_lixo(con, "a@x.com")
+    assert fontes.remover_regra_lixo(con, "A@x.com") == ("a@x.com", True)
+    assert fontes.parametros(con)["regras_lixo"] == []
+
+
+def test_acrescentar_respeita_limite_500(con):
+    from gabi.correio import fontes
+    fontes.gravar_parametros(con, {"regras_lixo": [f"u{i}@x.com" for i in range(fontes.REGRAS_MAX)]})
+    with pytest.raises(fontes.ErroFonte):
+        fontes.acrescentar_regra_lixo(con, "novo@x.com")
+    assert fontes.acrescentar_regra_lixo(con, "u0@x.com") == ("u0@x.com", False)

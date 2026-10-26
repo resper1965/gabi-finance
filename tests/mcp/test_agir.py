@@ -1,4 +1,6 @@
 """`email_lixeira` pelo MCP. Consome: gabi.mcp.ferramentas_agir, fixtures de tests/mcp/test_servidor.py e tests/correio/test_lixeira.py."""
+import json
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -127,3 +129,65 @@ def test_excecao_inesperada_numa_conta_nao_impede_marcar_a_outra(banco, con):
         r = chamar(cli, tok, "email_lixeira", mensagem_ids=[m["g1"], m["y1"]])["dados"]
     assert r["movidas"] == 1 and r["ids_movidos"] == [m["g1"]] and r["falhas"] == [{"id": m["y1"], "codigo": "fonte_indisponivel"}]
     assert _estado(banco, m["g1"]) == "na_lixeira"
+
+
+# ---------------- email_regra_lixo / email_remover_regra_lixo ----------------
+def _regras(banco):
+    c = conectar(banco)
+    try:
+        r = c.execute("select valor from parametro where chave='email.regras_lixo'").fetchone()
+        return json.loads(r[0]) if r else []
+    finally:
+        c.close()
+
+
+def test_regra_lixo_normaliza_idempotente_e_desfaz(banco, con):
+    cli, tok = _cli(banco, {})
+    with cli:
+        r = chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="Fulano@X.com ")["dados"]
+        assert r == {"regra": "fulano@x.com", "criada": True}
+        assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="fulano@x.com")["dados"] == {"regra": "fulano@x.com", "criada": False}
+        assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="@Spam.com")["dados"]["criada"] is True
+        assert _regras(banco) == ["fulano@x.com", "@spam.com"]
+        assert chamar(cli, tok, "email_remover_regra_lixo", remetente_ou_dominio="FULANO@x.com")["dados"] == {"regra": "fulano@x.com", "removida": True}
+        assert chamar(cli, tok, "email_remover_regra_lixo", remetente_ou_dominio="fulano@x.com")["dados"] == {"regra": "fulano@x.com", "removida": False}
+    assert _regras(banco) == ["@spam.com"]
+
+
+def test_regra_lixo_sem_arroba_invalida(banco, con):
+    cli, tok = _cli(banco, {})
+    with cli:
+        assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="x.com")["erro"] == "requisicao_invalida"
+        assert chamar(cli, tok, "email_remover_regra_lixo", remetente_ou_dominio="x.com")["erro"] == "requisicao_invalida"
+    assert _regras(banco) == []
+
+
+def test_regra_lixo_limite_500(banco, con):
+    con.execute("insert into parametro(chave, valor) values ('email.regras_lixo', ?)", (json.dumps([f"u{i}@x.com" for i in range(500)]),))
+    con.commit()
+    cli, tok = _cli(banco, {})
+    with cli:
+        assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="novo@x.com")["erro"] == "requisicao_invalida"
+    assert len(_regras(banco)) == 500
+
+
+def test_regra_lixo_decisao_so_o_tipo(banco, con):
+    cli, tok = _cli(banco, {})
+    with cli:
+        chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="segredo@empresa.com")
+        chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="segredo@empresa.com")  # nada mudou: sem decisão
+        chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="@empresa.com")
+        chamar(cli, tok, "email_remover_regra_lixo", remetente_ou_dominio="segredo@empresa.com")
+        chamar(cli, tok, "email_remover_regra_lixo", remetente_ou_dominio="segredo@empresa.com")  # já não existia
+    c = conectar(banco)
+    d = [tuple(x) for x in c.execute("select quem, o_que, origem from decisao where origem='hermes' order by id").fetchall()]
+    c.close()
+    assert d == [("hermes", "correio: hermes criou regra de lixo (remetente)", "hermes"), ("hermes", "correio: hermes criou regra de lixo (dominio)", "hermes"),
+                 ("hermes", "correio: hermes removeu regra de lixo (remetente)", "hermes")]
+    assert "empresa" not in str(d)
+
+
+def test_regra_lixo_exige_escopo_trabalho(banco, con):
+    cli, tok = _cli(banco, {}, escopos=("fin",))
+    with cli:
+        assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="a@x.com")["erro"] == "sem_escopo"

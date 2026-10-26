@@ -31,6 +31,8 @@ mcp_servers:
       - email_ler
       - email_listar
       - email_lixeira
+      - email_regra_lixo
+      - email_remover_regra_lixo
       - empresas_listar
       - familia_atualizar_contato
       - familia_consultar

@@ -5,7 +5,7 @@ from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS
 
 
 def test_ferramentas_de_trabalho_tem_escopo_trabalho():
-    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"agenda_listar", "avisos_abertos", "email_ler", "email_listar", "email_lixeira", "resumo_manha", "teams_pendentes"}
+    assert {n for n, e in ESCOPOS_FERRAMENTAS.items() if e == "trabalho"} == {"agenda_listar", "avisos_abertos", "email_ler", "email_listar", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "resumo_manha", "teams_pendentes"}
 
 
 def test_nenhuma_ferramenta_de_trabalho_envia_apaga_ou_confirma():

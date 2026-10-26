@@ -206,12 +206,11 @@ async def regra_de_lixo(mensagem_id: int, request: Request, ident: Identidade = 
             raise erro(409, "conflito", "a mensagem não tem um remetente válido para virar regra")
         regra = a if tipo == "remetente" else "@" + a.split("@", 1)[1]
         with transacao(con):
-            atuais = fn.parametros(con)["regras_lixo"]
-            if regra not in atuais:
-                try:
-                    fn.gravar_parametros(con, fn.validar_parametros({"regras_lixo": atuais + [regra]}))
-                except fn.ErroFonte as e:
-                    raise _traduzir(e) from None
+            try:
+                _, nova = fn.acrescentar_regra_lixo(con, regra)
+            except fn.ErroFonte as e:
+                raise _traduzir(e) from None
+            if nova:
                 _audit(con, ident.login, f"correio: regra de lixo ({tipo}) a partir da mensagem {mensagem_id}")
         return envelope(con, {"id": mensagem_id, "regra": regra}, agora=_agora(request))
     finally:

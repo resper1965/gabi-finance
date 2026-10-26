@@ -149,3 +149,28 @@ def gravar_parametros(con, novos: dict) -> None:
     for k, v in novos.items():
         con.execute("insert into parametro(chave, valor) values (?,?) on conflict(chave) do update set valor=excluded.valor",
                     (CHAVES[k], json.dumps(v, ensure_ascii=False)))
+
+
+def acrescentar_regra_lixo(con, texto) -> tuple[str, bool]:
+    """Acrescenta a regra "sempre lixo" (`a@x.com` ou `@x.com`) a `email.regras_lixo`. Devolve a regra normalizada e se é nova (idempotente).
+    Inválida ou acima do limite → `ErroFonte`. Quem chama abre a transação."""
+    regra = regra_valida(texto)
+    if regra is None:
+        raise ErroFonte("informe um endereço (a@x.com) ou um domínio (@x.com)")
+    atuais = parametros(con)["regras_lixo"]
+    if regra in atuais:
+        return regra, False
+    gravar_parametros(con, validar_parametros({"regras_lixo": atuais + [regra]}))
+    return regra, True
+
+
+def remover_regra_lixo(con, texto) -> tuple[str, bool]:
+    """Tira a regra de `email.regras_lixo`. Devolve a regra normalizada e se existia. Inválida → `ErroFonte`. Quem chama abre a transação."""
+    regra = regra_valida(texto)
+    if regra is None:
+        raise ErroFonte("informe um endereço (a@x.com) ou um domínio (@x.com)")
+    atuais = parametros(con)["regras_lixo"]
+    if regra not in atuais:
+        return regra, False
+    gravar_parametros(con, {"regras_lixo": [r for r in atuais if r != regra]})
+    return regra, True
