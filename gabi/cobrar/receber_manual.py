@@ -139,6 +139,7 @@ def confirmar(con, pid: int, por: str) -> None:
         con.execute("update receber_manual_proposta set estado='confirmado' where id=?", (pid,))
         con.execute("update receber_manual_proposta set estado='rejeitado' where estado='proposto' and id<>? and (receber_id=? or lancamento_id=?)",
                     (pid, p["receber_id"], p["lancamento_id"]))
+        con.execute("update recebimento_nota set estado='rejeitado' where estado='proposto' and lancamento_id=?", (p["lancamento_id"],))
         con.execute("update receber_manual set estado='recebido', lancamento_id=?, atualizado_em=? where id=?", (p["lancamento_id"], _agora(), p["receber_id"]))
         con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')",
                     (_agora(), por, f"a receber manual: proposta {pid} confirmada (receber {p['receber_id']}, lançamento {p['lancamento_id']})"))

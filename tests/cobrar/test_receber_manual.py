@@ -192,3 +192,30 @@ def test_cancelado_ou_recebido_nao_propoe(con):
     con.execute("update receber_manual set estado='recebido' where id=?", (r2["id"],))
     credito(con)
     assert propor(con) == 0
+
+
+def _nota_proposta(con, lid):
+    con.execute("insert or ignore into nota_fiscal(id, numero, emissao, status, valor_bruto_centavos, valor_liquido_centavos, tomador_nome, vencimento, importado_em, atualizado_em) "
+                "values ('n9','9','2026-10-01','autorizada',100000,100000,'FAMILIA REIS','2026-10-26','x','x')")
+    return con.execute("insert into recebimento_nota(nota_id, lancamento_id, confianca, motivo, criado_em) values ('n9',?,0.8,'m','t')", (lid,)).lastrowid
+
+
+def test_confirmar_manual_rejeita_proposta_de_nota_do_mesmo_credito(con):
+    reg(con, pagador="Família Reis", valor="1000,00")
+    l = credito(con)
+    propor(con)
+    nid = _nota_proposta(con, l)
+    confirmar(con, props(con)[0]["id"], "ricardo")
+    assert con.execute("select estado from recebimento_nota where id=?", (nid,)).fetchone()[0] == "rejeitado"
+
+
+def test_credito_confirmado_no_manual_nao_e_proposto_para_nota(con):
+    from gabi.cobrar.recebimentos import propor_recebimentos
+    reg(con, pagador="Família Reis", valor="1000,00")
+    l = credito(con)
+    propor(con)
+    confirmar(con, props(con)[0]["id"], "ricardo")
+    _nota_proposta(con, credito(con))  # só para criar a nota
+    con.execute("delete from recebimento_nota")
+    propor_recebimentos(con)
+    assert [r["lancamento_id"] for r in con.execute("select lancamento_id from recebimento_nota")] and l not in [r["lancamento_id"] for r in con.execute("select lancamento_id from recebimento_nota")]

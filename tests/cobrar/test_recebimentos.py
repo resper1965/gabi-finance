@@ -121,3 +121,22 @@ def test_nota_com_recebimento_confirmado_sai_da_previsao(con):
     propor_recebimentos(con)
     confirmar_recebimento(con, propostas(con)[0]["id"], "ricardo")
     assert previsao(con, HOJE, 1, projetar=False)["meses"][0]["a_vencer"]["qtd"] == 0
+
+
+def test_confirmar_nota_rejeita_proposta_de_manual_do_mesmo_credito(con):
+    from gabi.cobrar.receber_manual import propor as propor_manual
+    n = nota(con, liquido=100000, venc="2026-10-26", tomador="FAMILIA REIS")
+    l = credito(con, valor=100000, data="2026-10-26", desc="PIX FAMILIA REIS")
+    con.execute("insert into receber_manual(pagador, valor_centavos, vencimento, criado_em, quem, atualizado_em) values ('Familia Reis',100000,'2026-10-26','2026-10-26T00:00:00+00:00','r','t')")
+    propor_manual(con)
+    propor_recebimentos(con)
+    rid = con.execute("select id from recebimento_nota where nota_id=? and lancamento_id=?", (n, l)).fetchone()[0]
+    confirmar_recebimento(con, rid, "ricardo")
+    assert con.execute("select estado from receber_manual_proposta").fetchone()[0] == "rejeitado"
+
+
+def test_credito_confirmado_para_manual_nao_e_proposto_para_nota(con):
+    l = credito(con, valor=100000, data="2026-10-26", desc="PIX FAMILIA REIS")
+    con.execute("insert into receber_manual(pagador, valor_centavos, estado, lancamento_id, criado_em, quem, atualizado_em) values ('Familia Reis',100000,'recebido',?,'t','r','t')", (l,))
+    nota(con, liquido=100000, venc="2026-10-26", tomador="FAMILIA REIS")
+    assert propor_recebimentos(con) == 0

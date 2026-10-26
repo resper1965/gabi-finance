@@ -43,7 +43,9 @@ def propor_recebimentos(con) -> int:
             fim = (venc + dt.timedelta(days=JANELA_DIAS)).isoformat() if venc else "9999-12-31"
             for l in con.execute(
                     "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null and l.valor_centavos=? and l.data>=? and l.data<=? "
-                    "and not exists (select 1 from recebimento_nota r where r.lancamento_id=l.id and r.estado='confirmado')", (n["valor_liquido_centavos"], ini, fim)):
+                    "and not exists (select 1 from recebimento_nota r where r.lancamento_id=l.id and r.estado='confirmado') "
+                    "and not exists (select 1 from receber_manual_proposta p where p.lancamento_id=l.id and p.estado='confirmado') "
+                    "and not exists (select 1 from receber_manual m where m.lancamento_id=l.id)", (n["valor_liquido_centavos"], ini, fim)):
                 conf, motivo = _confianca(n, l)
                 novas += con.execute("insert or ignore into recebimento_nota(nota_id, lancamento_id, confianca, motivo, criado_em) values (?,?,?,?,?)",
                                      (n["id"], l["id"], conf, motivo, _agora())).rowcount
@@ -64,6 +66,7 @@ def confirmar_recebimento(con, rid: int, por: str) -> None:
         r = _proposta(con, rid)
         con.execute("update recebimento_nota set estado='confirmado' where id=?", (rid,))
         con.execute("update recebimento_nota set estado='rejeitado' where estado='proposto' and id<>? and (nota_id=? or lancamento_id=?)", (rid, r["nota_id"], r["lancamento_id"]))
+        con.execute("update receber_manual_proposta set estado='rejeitado' where estado='proposto' and lancamento_id=?", (r["lancamento_id"],))
         con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')", (_agora(), por, f"recebimento {rid} confirmado (nota {r['nota_id']}, lançamento {r['lancamento_id']})"))
 
 
