@@ -27,10 +27,10 @@ def _utc(agora: dt.datetime) -> str:
 
 
 def valor_ditado(v: str) -> int:
-    """Centavos de um valor ditado. "1.500" (um ponto e 3 dígitos) é ambíguo (para_centavos leria R$ 1,50): valor_invalido.
+    """Centavos de um valor ditado. "1.500" (um ponto e 3 dígitos) e "1,500" (3 ou mais dígitos depois da vírgula) são ambíguos (para_centavos leria R$ 1,50): valor_invalido.
     Zero e módulo acima de R$ 10.000.000,00 também. Negativo vale (desconto ou adiantamento)."""
     s = re.sub(r"^(R\$|BRL)\s*", "", str(v or "").strip(), flags=re.I).strip()
-    if re.fullmatch(r"-?\d{1,3}\.\d{3}", s):
+    if re.fullmatch(r"-?\d{1,3}\.\d{3}", s) or re.fullmatch(r"-?\d+,\d{3,}", s):
         raise ErroReceber("valor_invalido", "valor ambíguo: use vírgula nos centavos (1500,00)")
     try:
         c = para_centavos(v)
@@ -59,13 +59,16 @@ def registrar(con, *, pagador: str, valor: str, vencimento: str = "", conta: str
     pagador = (pagador or "").strip()
     if not pagador:
         raise ErroReceber("valor_invalido", "pagador vazio")
+    conta, observacao = (conta or "").strip(), (observacao or "").strip()
+    if len(pagador) > 200 or len(conta) > 200 or len(observacao) > 500:
+        raise ErroReceber("valor_invalido", "texto longo demais: pagador e conta até 200 caracteres, observação até 500")
     centavos = valor_ditado(valor)
     venc = _vencimento(vencimento)
     t = _utc(agora)
     with transacao(con, imediata=True):
         rid = con.execute(
             "insert into receber_manual(pagador, valor_centavos, vencimento, conta, observacao, criado_em, quem, atualizado_em) values (?,?,?,?,?,?,?,?)",
-            (pagador, centavos, venc, (conta or "").strip() or None, (observacao or "").strip() or None, t, quem, t)).lastrowid
+            (pagador, centavos, venc, conta or None, observacao or None, t, quem, t)).lastrowid
         con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,?)", (t, quem, f"a receber manual {rid} registrado", origem))
     return dict(con.execute("select * from receber_manual where id=?", (rid,)).fetchone())
 
@@ -108,7 +111,7 @@ def propor(con) -> int:
             v = r["valor_centavos"]
             for l in con.execute(
                     "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null "
-                    "and l.valor_centavos>0 and l.data>=? and l.data<=? "
+                    "and l.status='posted' and l.valor_centavos>0 and l.data>=? and l.data<=? "
                     "and not exists (select 1 from recebimento_nota n where n.lancamento_id=l.id and n.estado='confirmado') "
                     "and not exists (select 1 from receber_manual_proposta p where p.lancamento_id=l.id and p.estado='confirmado') "
                     "and not exists (select 1 from receber_manual m where m.lancamento_id=l.id)", (ini, fim)).fetchall():
@@ -136,6 +139,8 @@ def confirmar(con, pid: int, por: str) -> None:
     """Confirma: o a receber vira `recebido` com o lançamento; as outras propostas do mesmo a receber ou do mesmo crédito viram `rejeitado`."""
     with transacao(con):
         p = _proposta(con, pid)
+        if con.execute("select estado from receber_manual where id=?", (p["receber_id"],)).fetchone()["estado"] != "aberto":
+            raise ValueError(f"a receber {p['receber_id']} não está aberto")
         con.execute("update receber_manual_proposta set estado='confirmado' where id=?", (pid,))
         con.execute("update receber_manual_proposta set estado='rejeitado' where estado='proposto' and id<>? and (receber_id=? or lancamento_id=?)",
                     (pid, p["receber_id"], p["lancamento_id"]))

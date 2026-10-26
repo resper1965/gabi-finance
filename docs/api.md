@@ -149,7 +149,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `financeiro_para_onde_vai` | `fin` | periodo, por | Para onde foi o dinheiro: periodo = mes | semana | 12m; por = categoria | pessoa | fornecedor. Traz % do total e variação contra o período anterior. |
 | `financeiro_previsao` | `fin` | dias | Previsão de saldo para os próximos `dias` (1 a 90): recorrentes, faturas e parcelas do cartão, com o menor saldo e o dia dele. Só leitura. |
 | `financeiro_recorrentes` | `fin` | sentido | Entradas e saídas recorrentes aprendidas dos últimos 6 meses (valor médio, dia típico, fixo ou variável). `sentido`: entrada ou saida. Só leitura. |
-| `financeiro_registrar_a_receber` | `fin` | conta, observacao, pagador, valor, vencimento | Registra um valor a receber que o Ricardo disse (fora das notas): aparece em `manuais` de `financeiro_a_receber` e o extrato pode casar depois (ele confirma no painel). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Passe o `valor` exatamente como ele disse (ex.: "1500,00"); "1.500" é recusado como ambíguo (`valor_invalido`), então peça a vírgula. Valor negativo é desconto ou adiantamento e abate o esperado. `vencimento` AAAA-MM-DD (opcional). Devolve `id`, `valor` em reais, `estado` e `desfazer`. |
+| `financeiro_registrar_a_receber` | `fin` | conta, observacao, pagador, valor, vencimento | Registra um valor a receber que o Ricardo disse (fora das notas): aparece em `manuais` de `financeiro_a_receber` e o extrato pode casar depois (ele confirma no painel). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Passe o `valor` exatamente como ele disse (ex.: "1500,00"); "1.500" e "1,500" são recusados como ambíguos (`valor_invalido`), então peça a vírgula. Valor negativo é desconto ou adiantamento e abate o esperado. `vencimento` AAAA-MM-DD (opcional). Devolve `id`, `valor` em reais, `estado` e `desfazer`. |
 | `financeiro_saldo` | `fin` | conta | Saldo do caixa único (só as contas que o Ricardo liberou) e faturas de cartão em aberto. `conta` filtra pelo apelido. |
 | `propor_evento` | `envios` | conta, convidados, descricao, duracao_min, inicio, online, titulo | PROPÕE um evento na agenda (conta liberada, `inicio` ISO de Brasília, duração 5 a 720 min, 1 a 30 convidados por e-mail ou nome de contato). |
 | `propor_teams` | `envios` | canal, chat_com, equipe, texto | PROPÕE uma mensagem no Teams da ness (texto simples, 1 a 4000 caracteres). Exatamente um destino: `chat_com` (nome da conversa) ou `equipe` + `canal`. |
@@ -158,7 +158,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `resumo_manha` | `trabalho` | — | Resumo da manhã já formatado para o celular, em blocos Financeiro, Agenda e E-mail (começa por 'dados desatualizados' se for o caso). Entregar exatamente como vem. |
 | `teams_pendentes` | `trabalho` | — | Conversas do Teams com mensagem para o Ricardo sem resposta dele: quem, tipo, desde quando, horas úteis, se passou do prazo e se já foi avisado. Sem texto de mensagem. Só leitura. |
 
-Não existem ferramentas de enviar, pagar, apagar, aprovar nem ligar regra (R13).
+Não existem ferramentas de enviar, pagar, apagar de vez, aprovar nem ligar regra de outro tipo (R13).
 
 ## Pedidos {#pedidos}
 

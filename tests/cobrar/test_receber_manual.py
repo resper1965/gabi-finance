@@ -36,6 +36,47 @@ def test_valor_ditado():
     assert codigo(valor_ditado, "0") == "valor_invalido"
     assert codigo(valor_ditado, "10000000,01") == "valor_invalido"
     assert codigo(valor_ditado, "abc") == "valor_invalido"
+    assert codigo(valor_ditado, "1,500") == "valor_invalido"
+    assert codigo(valor_ditado, "12,345") == "valor_invalido"
+    assert valor_ditado("1.500,00") == 150000
+    assert valor_ditado("1500,5") == 150050
+
+
+def test_texto_livre_com_limite(con):
+    assert codigo(reg, con, pagador="x" * 201) == "valor_invalido"
+    assert codigo(reg, con, conta="x" * 201) == "valor_invalido"
+    assert codigo(reg, con, observacao="x" * 501) == "valor_invalido"
+    assert reg(con, pagador="x" * 200, conta="y" * 200, observacao="z" * 500)["id"]
+
+
+def test_confirmar_exige_a_receber_aberto(con):
+    r = reg(con, pagador="Familia Reis", valor="1000,00", vencimento="2026-10-26")
+    credito(con, 100000)
+    propor(con)
+    cancelar(con, r["id"], quem="r", origem="cobrar", agora=AGORA)
+    con.execute("update receber_manual_proposta set estado='proposto'")
+    with pytest.raises(ValueError):
+        confirmar(con, props(con)[0]["id"], "ricardo")
+    assert con.execute("select estado from receber_manual where id=?", (r["id"],)).fetchone()[0] == "cancelado"
+
+
+def test_credito_pending_nao_gera_proposta(con):
+    reg(con, pagador="Familia Reis", valor="1000,00", vencimento="2026-10-26")
+    lid = credito(con, 100000)
+    con.execute("update lancamento set status='pending' where id=?", (lid,))
+    assert propor(con) == 0 and props(con) == []
+
+
+def test_negativo_so_no_mes_da_base_e_nunca_atrasado(con):
+    from gabi.cobrar.a_receber import a_receber_do_mes
+    reg(con, pagador="Desc Ago", valor="-300,00", vencimento="2026-08-10")
+    reg(con, pagador="Desc Criado", valor="-50,00")           # criado em 2026-10-26
+    ago = a_receber_do_mes(con, dt.date(2026, 8, 20))["manuais"]
+    assert [(i["pagador"], i["situacao"]) for i in ago] == [("Desc Ago", "a_receber")]
+    out = a_receber_do_mes(con, dt.date(2026, 10, 26))["manuais"]
+    assert [i["pagador"] for i in out] == ["Desc Criado"] and out[0]["situacao"] == "a_receber"
+    nov = a_receber_do_mes(con, dt.date(2026, 11, 20))
+    assert nov["manuais"] == []
 
 
 def test_registrar_grava_e_audita_sem_dado(con):
@@ -247,7 +288,7 @@ def test_bloco_manuais(con):
     m = d["manuais"]
     assert [i["pagador"] for i in m] == ["Provavel", "Recebido", "Atrasado", "Sem Venc"]      # maior valor absoluto primeiro
     por = {i["pagador"]: i for i in m}
-    assert por["Sem Venc"]["situacao"] == "a_receber" and por["Atrasado"]["situacao"] == "atrasado"
+    assert por["Sem Venc"]["situacao"] == "a_receber" and por["Atrasado"]["situacao"] == "a_receber"
     p = por["Provavel"]
     assert p["situacao"] == "credito_provavel" and p["proposta"]["valor_centavos"] == 200000 and p["proposta"]["data"] == "2026-10-20" and p["proposta"]["descricao"] == "Pix Provavel"
     assert set(p["proposta"]) == {"id", "confianca", "motivo", "data", "descricao", "valor_centavos"} and p["id"] == prov
@@ -257,5 +298,5 @@ def test_bloco_manuais(con):
     assert por["Atrasado"]["esperado_centavos"] == -30000 and por["Atrasado"]["vencimento"] == "2026-10-10"
     t = d["totais"]["manuais"]
     assert t == {"esperado_centavos": 10000 - 30000 + 200000 + 50000, "recebido_centavos": 50000,
-                 "falta_centavos": 10000 - 30000 + 200000, "atrasado_centavos": -30000}
+                 "falta_centavos": 10000 - 30000 + 200000, "atrasado_centavos": 0}
     assert sem_venc and atras

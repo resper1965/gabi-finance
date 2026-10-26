@@ -140,3 +140,10 @@ def test_credito_confirmado_para_manual_nao_e_proposto_para_nota(con):
     con.execute("insert into receber_manual(pagador, valor_centavos, estado, lancamento_id, criado_em, quem, atualizado_em) values ('Familia Reis',100000,'recebido',?,'t','r','t')", (l,))
     nota(con, liquido=100000, venc="2026-10-26", tomador="FAMILIA REIS")
     assert propor_recebimentos(con) == 0
+
+
+def test_credito_pending_nao_gera_proposta_de_nota(con):
+    nota(con)
+    lid = credito(con)
+    con.execute("update lancamento set status='pending' where id=?", (lid,))
+    assert propor_recebimentos(con) == 0 and propostas(con) == []

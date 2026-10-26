@@ -4,7 +4,7 @@ Três fontes, mantidas separadas para não somar duas vezes o mesmo dinheiro (o 
 - `recorrentes`: pagadores que o extrato mostra como normais (esperados.py). Situação: `recebido` (já caiu este mês, com data e valor),
   `a_receber` (ainda dentro do dia costumeiro) ou `atrasado` (passou do dia mais tardio visto e não caiu).
 - `manuais`: o que o Ricardo disse no chat ou no painel que vai receber (receber_manual). Aberto sem vencimento é `a_receber`; vencido, `atrasado`; com crédito proposto no extrato, `credito_provavel`
-  (ele confirma); `recebido` só com o crédito confirmado e na data dentro do mês. Cancelado e vencimento depois do mês ficam fora. Valor negativo (desconto ou adiantamento) entra e abate o esperado.
+  (ele confirma); `recebido` só com o crédito confirmado e na data dentro do mês. Cancelado e vencimento depois do mês ficam fora. Valor negativo (desconto ou adiantamento) entra e abate o esperado só no mês da base (vencimento, ou o dia de criação) e nunca fica `atrasado`.
 - `notas`: NFS-e do Nibo com vencimento neste mês. `recebido` só quando o Ricardo confirmou o crédito no extrato; `credito_provavel` quando a Gabi achou um crédito de mesmo valor e falta ele confirmar; o "pago" do Nibo, defasado,
   vira `nibo_diz_pago` (a conferir), nunca recebimento."""
 import calendar
@@ -64,9 +64,15 @@ def a_receber_do_mes(con, hoje: dt.date) -> dict:
                 continue
             sit = "recebido"
         else:
-            if m["vencimento"] and m["vencimento"] > fim:
-                continue
-            sit = "credito_provavel" if prop else "atrasado" if m["vencimento"] and m["vencimento"] < hoje.isoformat() else "a_receber"
+            base = m["vencimento"] or m["criado_em"][:10]
+            if m["valor_centavos"] < 0:          # desconto ou adiantamento: só no mês da base, nunca atrasado
+                if not ini <= base <= fim:
+                    continue
+                sit = "a_receber"
+            else:
+                if m["vencimento"] and m["vencimento"] > fim:
+                    continue
+                sit = "credito_provavel" if prop else "atrasado" if m["vencimento"] and m["vencimento"] < hoje.isoformat() else "a_receber"
         manuais.append({"id": m["id"], "pagador": m["pagador"], "situacao": sit, "esperado_centavos": m["valor_centavos"], "vencimento": m["vencimento"],
                         "conta": m["conta"], "observacao": m["observacao"],
                         "recebido_em": m["ldata"][:10] if sit == "recebido" else prop["data"][:10] if prop else None,

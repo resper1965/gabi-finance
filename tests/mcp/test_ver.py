@@ -244,6 +244,7 @@ def test_ver_pelo_servidor_e_fontes(banco):
         assert chamar(cli, tok, "financeiro_a_receber", mes="2026-10")["dados"]["notas"][0]["esperado"] == "1234.56"
         assert chamar(cli, tok, "financeiro_a_receber", mes="2026-13")["erro"] == "requisicao_invalida"
     assert FONTES_DA_FERRAMENTA["financeiro_a_receber"] is None
+    assert FONTES_DA_FERRAMENTA["financeiro_registrar_a_receber"] == () and FONTES_DA_FERRAMENTA["financeiro_cancelar_a_receber"] == ()
     assert set(FONTES_DA_FERRAMENTA) == set(ESCOPOS_FERRAMENTAS)
 
 

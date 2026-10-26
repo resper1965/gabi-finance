@@ -1,9 +1,10 @@
 """Lixeira do correio, em três passos que o painel (rota) e o chat (ferramenta `email_lixeira`) compartilham: `planejar` (banco), `aplicar` (rede, sem banco) e
-`marcar` (banco). A conexão sqlite não cruza threads: quem chama roda só `aplicar` dentro de `asyncio.to_thread`.
+`marcar` (banco, e fecha o aviso emergencial da conversa, como restaurar e dispensar). A conexão sqlite não cruza threads: quem chama roda só `aplicar` dentro de `asyncio.to_thread`.
 Só trash (recuperável): nada é apagado de vez; restaurar é pelo painel. Nenhum texto de erro da origem sai daqui (pode citar conta ou id).
 Consome: a ponte do serviço de fontes (método `lixeira`), tabelas email_msg e email_fonte."""
 import datetime as dt
 
+from gabi.correio.processar import fechar_alerta
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 from gabi.fontes.graph_ness import ErroGraphNess
 
@@ -55,6 +56,8 @@ def marcar(con, ids: list[int], agora: dt.datetime) -> list[int]:
     quando = agora.astimezone(dt.timezone.utc).isoformat()
     mudou = []
     for i in ids:
+        m = con.execute("select thread_id, externo_id from email_msg where id=?", (i,)).fetchone()
         if con.execute("update email_msg set estado='na_lixeira', atualizado_em=? where id=? and estado in ('classificada','alertada','restaurada')", (quando, i)).rowcount:
             mudou.append(i)
+            fechar_alerta(con, m["thread_id"] or m["externo_id"], quando)   # a mensagem saiu da caixa: o aviso emergencial dela perde o sentido
     return mudou

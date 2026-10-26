@@ -42,7 +42,7 @@ def propor_recebimentos(con) -> int:
             ini = (n["emissao"] or (venc - dt.timedelta(days=JANELA_DIAS)).isoformat())[:10] if (n["emissao"] or venc) else "0000-01-01"
             fim = (venc + dt.timedelta(days=JANELA_DIAS)).isoformat() if venc else "9999-12-31"
             for l in con.execute(
-                    "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null and l.valor_centavos=? and l.data>=? and l.data<=? "
+                    "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null and l.status='posted' and l.valor_centavos=? and l.data>=? and l.data<=? "
                     "and not exists (select 1 from recebimento_nota r where r.lancamento_id=l.id and r.estado='confirmado') "
                     "and not exists (select 1 from receber_manual_proposta p where p.lancamento_id=l.id and p.estado='confirmado') "
                     "and not exists (select 1 from receber_manual m where m.lancamento_id=l.id)", (n["valor_liquido_centavos"], ini, fim)):

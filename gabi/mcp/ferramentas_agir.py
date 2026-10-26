@@ -120,7 +120,7 @@ def registrar(srv, executar, correio=None) -> None:
 
     @srv.tool()
     def financeiro_registrar_a_receber(pagador: str, valor: str, vencimento: str = "", conta: str = "", observacao: str = "") -> dict:
-        """Registra um valor a receber que o Ricardo disse (fora das notas): aparece em `manuais` de `financeiro_a_receber` e o extrato pode casar depois (ele confirma no painel). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Passe o `valor` exatamente como ele disse (ex.: "1500,00"); "1.500" é recusado como ambíguo (`valor_invalido`), então peça a vírgula. Valor negativo é desconto ou adiantamento e abate o esperado. `vencimento` AAAA-MM-DD (opcional). Devolve `id`, `valor` em reais, `estado` e `desfazer`."""
+        """Registra um valor a receber que o Ricardo disse (fora das notas): aparece em `manuais` de `financeiro_a_receber` e o extrato pode casar depois (ele confirma no painel). Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Passe o `valor` exatamente como ele disse (ex.: "1500,00"); "1.500" e "1,500" são recusados como ambíguos (`valor_invalido`), então peça a vírgula. Valor negativo é desconto ou adiantamento e abate o esperado. `vencimento` AAAA-MM-DD (opcional). Devolve `id`, `valor` em reais, `estado` e `desfazer`."""
         return executar("financeiro_registrar_a_receber", lambda con, agora: financeiro_registrar_a_receber_(con, agora, pagador, valor, vencimento, conta, observacao))
 
     @srv.tool()

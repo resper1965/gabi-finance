@@ -79,3 +79,12 @@ def test_ponte_falha_nada_marcado(tmp_path):
     ok, f = lixeira.aplicar(Ponte(erro=ErroGoogleOAuth("token de a@x.com venceu")), "a@x.com", [(a, "e1")])
     assert ok == [] and f == [{"id": a, "codigo": "fonte_indisponivel"}]
     assert c.execute("select estado from email_msg where id=?", (a,)).fetchone()[0] == "classificada"
+
+
+def test_marcar_alertada_fecha_o_alerta_emergencial(tmp_path):
+    c = _banco(tmp_path)
+    a = _msg(c, 1, "e1", estado="alertada", classe="emergencial")
+    c.execute("insert into aviso(tipo, payload, criado_em) values ('email_emergencial', '{\"chave\": \"e1\"}', '2026-10-25T10:00:00Z')")
+    c.execute("insert into aviso(tipo, payload, criado_em) values ('email_emergencial', '{\"chave\": \"outra\"}', '2026-10-25T10:00:00Z')")
+    assert lixeira.marcar(c, [a], AGORA) == [a]
+    assert [r[0] is not None for r in c.execute("select entregue_em from aviso order by id")] == [True, False]
