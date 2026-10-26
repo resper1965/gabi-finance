@@ -1013,7 +1013,7 @@
   },
   "/api/v1/cobrar/a-receber": {
    "get": {
-    "description": "O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois).",
+    "description": "O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato, NFS-e do mês e os lançados pelo Ricardo (manuais), em blocos separados (não somar).",
     "operationId": "a_receber_api_v1_cobrar_a_receber_get",
     "responses": {
      "200": {
@@ -1026,6 +1026,120 @@
      }
     },
     "summary": "A Receber"
+   }
+  },
+  "/api/v1/cobrar/a-receber-manual/propostas/{pid}/confirmar": {
+   "post": {
+    "description": "Confirma o crédito proposto para um a receber lançado por você (ele vira recebido).",
+    "operationId": "a_receber_manual_confirmar_api_v1_cobrar_a_receber_manual_propostas__pid__confirmar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pid",
+      "required": true,
+      "schema": {
+       "title": "Pid",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "A Receber Manual Confirmar"
+   }
+  },
+  "/api/v1/cobrar/a-receber-manual/propostas/{pid}/rejeitar": {
+   "post": {
+    "description": "Rejeita o crédito proposto para um a receber lançado por você.",
+    "operationId": "a_receber_manual_rejeitar_api_v1_cobrar_a_receber_manual_propostas__pid__rejeitar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "pid",
+      "required": true,
+      "schema": {
+       "title": "Pid",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "A Receber Manual Rejeitar"
+   }
+  },
+  "/api/v1/cobrar/a-receber-manual/{rid}/cancelar": {
+   "post": {
+    "description": "Cancela um a receber lançado por você (as propostas de casamento dele caem). Só o que está aberto.",
+    "operationId": "a_receber_manual_cancelar_api_v1_cobrar_a_receber_manual__rid__cancelar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "rid",
+      "required": true,
+      "schema": {
+       "title": "Rid",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "A Receber Manual Cancelar"
    }
   },
   "/api/v1/cobrar/notas": {

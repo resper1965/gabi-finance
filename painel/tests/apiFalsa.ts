@@ -5,7 +5,7 @@ import { vi } from "vitest";
 const amostra = (n: string) => JSON.parse(readFileSync(join(__dirname, "amostras", `${n}.json`), "utf-8"));
 
 const ROTAS: [RegExp, string][] = [
-  [/\/avisos/, "avisos"], [/\/caixa\/projecao/, "caixa-projecao"], [/\/cobrar\/previsao/, "cobrar-previsao"], [/\/cobrar\/recebimentos/, "cobrar-recebimentos"], [/\/cobrar\/notas/, "cobrar-notas"],
+  [/\/avisos/, "avisos"], [/\/caixa\/projecao/, "caixa-projecao"], [/\/cobrar\/a-receber$/, "cobrar-a-receber"], [/\/cobrar\/previsao/, "cobrar-previsao"], [/\/cobrar\/recebimentos/, "cobrar-recebimentos"], [/\/cobrar\/notas/, "cobrar-notas"],
   [/\/categorias\/equivalencias\/pendentes/, "equivalencias-pendentes"],
   [/\/caixa\/resumo/, "caixa-resumo"], [/\/caixa\/semanas/, "caixa-semanas"], [/\/contas-pagar/, "contas-pagar"],
   [/\/lancamentos.*pendente=para_quem/, "lancamentos-pendentes"], [/\/lancamentos/, "lancamentos"],

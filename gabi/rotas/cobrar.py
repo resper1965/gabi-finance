@@ -4,6 +4,7 @@ import datetime as dt
 
 from fastapi import APIRouter, Depends, Request
 
+from gabi.cobrar import receber_manual as manual
 from gabi.cobrar import recebimentos as rec
 from gabi.cobrar.a_receber import a_receber_do_mes
 from gabi.cobrar.previsao import RECENTE_DIAS, previsao as calcular_previsao
@@ -70,14 +71,16 @@ def notas(request: Request, aberta: int = 0):
 
 @router.get("/a-receber")
 def a_receber(request: Request):
-    """O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois)."""
+    """O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato, NFS-e do mês e os lançados pelo Ricardo (manuais), em blocos separados (não somar)."""
     con = _con(request)
     try:
         d = a_receber_do_mes(con, _agora(request).date())
         fmt = lambda t: {k.removesuffix("_centavos"): formatar(v) for k, v in t.items()}  # noqa: E731
-        for i in d["recorrentes"] + d["notas"]:
+        for i in d["recorrentes"] + d["notas"] + d["manuais"]:
             i["esperado"], i["recebido"] = formatar(i.pop("esperado_centavos")), (formatar(i["recebido_centavos"]) if i["recebido_centavos"] is not None else None)
             i.pop("recebido_centavos")
+            if i.get("proposta"):
+                i["proposta"]["valor"] = formatar(i["proposta"].pop("valor_centavos"))
         d["totais"] = {k: fmt(v) for k, v in d["totais"].items()}
         return envelope(con, d, agora=_agora(request))
     finally:
@@ -127,3 +130,27 @@ async def recebimento_rejeitar(rid: int, request: Request, ident: Identidade = D
     return _decidir_recebimento(request, rid, rec.rejeitar_recebimento, ident)
 
 
+@router.post("/a-receber-manual/{rid}/cancelar")
+async def a_receber_manual_cancelar(rid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Cancela um a receber lançado por você (as propostas de casamento dele caem). Só o que está aberto."""
+    con = _con(request)
+    try:
+        try:
+            manual.cancelar(con, rid, quem=ident.login, origem="cobrar", agora=_agora(request))
+        except manual.ErroReceber as e:
+            raise erro(404 if e.codigo == "nao_encontrado" else 409, e.codigo, e.mensagem)
+        return envelope(con, {"id": rid, "ok": True}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.post("/a-receber-manual/propostas/{pid}/confirmar")
+async def a_receber_manual_confirmar(pid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Confirma o crédito proposto para um a receber lançado por você (ele vira recebido)."""
+    return _decidir_recebimento(request, pid, manual.confirmar, ident)
+
+
+@router.post("/a-receber-manual/propostas/{pid}/rejeitar")
+async def a_receber_manual_rejeitar(pid: int, request: Request, ident: Identidade = Depends(exigir("boss"))):
+    """Rejeita o crédito proposto para um a receber lançado por você."""
+    return _decidir_recebimento(request, pid, manual.rejeitar, ident)

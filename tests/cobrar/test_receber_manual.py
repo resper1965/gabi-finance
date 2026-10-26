@@ -219,3 +219,43 @@ def test_credito_confirmado_no_manual_nao_e_proposto_para_nota(con):
     con.execute("delete from recebimento_nota")
     propor_recebimentos(con)
     assert [r["lancamento_id"] for r in con.execute("select lancamento_id from recebimento_nota")] and l not in [r["lancamento_id"] for r in con.execute("select lancamento_id from recebimento_nota")]
+
+
+# ---- bloco "manuais" de a_receber_do_mes ----
+def _mes_manuais(con):
+    from gabi.cobrar.a_receber import a_receber_do_mes
+    return a_receber_do_mes(con, dt.date(2026, 10, 26))
+
+
+def test_bloco_manuais(con):
+    con.execute("insert into conta(externo_id, instituicao, tipo, apelido, pj, estado) values ('pf','Itau','BANK','Itaú PF',0,'sim')")
+    sem_venc = reg(con, pagador="Sem Venc", valor="100,00")["id"]
+    atras = reg(con, pagador="Atrasado", valor="-300,00", vencimento="2026-10-10")["id"]
+    prov = reg(con, pagador="Provavel", valor="2000,00", vencimento="2026-10-30")["id"]
+    rec = reg(con, pagador="Recebido", valor="500,00")["id"]
+    fora_cancel = reg(con, pagador="Cancelado", valor="9,00")["id"]
+    reg(con, pagador="Futuro", valor="8,00", vencimento="2026-11-05")
+    rec_fora = reg(con, pagador="Outro Mes", valor="7,00")["id"]
+    cancelar(con, fora_cancel, quem="r", origem="cobrar", agora=AGORA)
+    lp = con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (1,'p','2026-10-20',200000,'Pix Provavel','posted')").lastrowid
+    lr = con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (1,'r','2026-10-15',50000,'Pix Recebido','posted')").lastrowid
+    lo = con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (1,'o','2026-09-15',700,'Pix Outro','posted')").lastrowid
+    con.execute("insert into receber_manual_proposta(receber_id, lancamento_id, confianca, motivo, criado_em) values (?,?,1.0,'m','x')", (prov, lp))
+    con.execute("update receber_manual set estado='recebido', lancamento_id=? where id=?", (lr, rec))
+    con.execute("update receber_manual set estado='recebido', lancamento_id=? where id=?", (lo, rec_fora))
+    d = _mes_manuais(con)
+    m = d["manuais"]
+    assert [i["pagador"] for i in m] == ["Provavel", "Recebido", "Atrasado", "Sem Venc"]      # maior valor absoluto primeiro
+    por = {i["pagador"]: i for i in m}
+    assert por["Sem Venc"]["situacao"] == "a_receber" and por["Atrasado"]["situacao"] == "atrasado"
+    p = por["Provavel"]
+    assert p["situacao"] == "credito_provavel" and p["proposta"]["valor_centavos"] == 200000 and p["proposta"]["data"] == "2026-10-20" and p["proposta"]["descricao"] == "Pix Provavel"
+    assert set(p["proposta"]) == {"id", "confianca", "motivo", "data", "descricao", "valor_centavos"} and p["id"] == prov
+    assert por["Sem Venc"]["proposta"] is None
+    r = por["Recebido"]
+    assert r["situacao"] == "recebido" and r["recebido_em"] == "2026-10-15" and r["recebido_centavos"] == 50000 and r["extrato"]["descricao"] == "Pix Recebido"
+    assert por["Atrasado"]["esperado_centavos"] == -30000 and por["Atrasado"]["vencimento"] == "2026-10-10"
+    t = d["totais"]["manuais"]
+    assert t == {"esperado_centavos": 10000 - 30000 + 200000 + 50000, "recebido_centavos": 50000,
+                 "falta_centavos": 10000 - 30000 + 200000, "atrasado_centavos": -30000}
+    assert sem_venc and atras

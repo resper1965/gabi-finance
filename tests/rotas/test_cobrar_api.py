@@ -162,3 +162,31 @@ def test_a_receber_nota_com_credito_proposto_vira_credito_provavel_com_o_lancame
     cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
     [n] = cli.get("/api/v1/cobrar/a-receber", headers=BOSS).json()["dados"]["notas"]
     assert n["situacao"] == "credito_provavel" and n["recebido_em"] == "2026-10-05" and n["extrato"]["descricao"] == "Pix recebido BARRA DO PARA"
+
+
+def test_a_receber_manuais_em_string_e_cancelar_confirmar(banco):
+    from gabi.cobrar.receber_manual import propor, registrar
+    c = conectar(banco)
+    a = registrar(c, pagador="ORM Reis", valor="1500,00", vencimento="2026-10-20", quem="r", origem="hermes", agora=AGORA)["id"]
+    b = registrar(c, pagador="Outro Cliente", valor="-300,00", quem="r", origem="hermes", agora=AGORA)["id"]
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, status) values (2,'m1','2026-10-05',150000,'Pix ORM REIS LTDA','posted')")
+    assert propor(c) == 1
+    pid = c.execute("select id from receber_manual_proposta").fetchone()[0]
+    c.close()
+    cli = TestClient(criar_app(banco, permite_tcp_local=True, relogio=lambda: AGORA), client=("127.0.0.1", 50000))
+    d = cli.get("/api/v1/cobrar/a-receber", headers=BOSS).json()["dados"]
+    por = {i["pagador"]: i for i in d["manuais"]}
+    assert por["ORM Reis"]["esperado"] == "1500.00" and por["ORM Reis"]["situacao"] == "credito_provavel" and por["ORM Reis"]["proposta"]["valor"] == "1500.00"
+    assert por["Outro Cliente"]["esperado"] == "-300.00" and por["Outro Cliente"]["recebido"] is None
+    assert d["totais"]["manuais"]["esperado"] == "1200.00" and d["totais"]["manuais"]["recebido"] == "0.00"
+    base = "/api/v1/cobrar/a-receber-manual"
+    assert post(cli, f"{base}/propostas/{pid}/confirmar", h=VIP).status_code == 403
+    assert post(cli, f"{base}/propostas/{pid}/confirmar").status_code == 200
+    assert post(cli, f"{base}/propostas/{pid}/confirmar").status_code == 409
+    assert post(cli, f"{base}/propostas/999/rejeitar").status_code == 404
+    assert post(cli, f"{base}/{a}/cancelar").status_code == 409       # já recebido
+    assert post(cli, f"{base}/999/cancelar").status_code == 404
+    assert post(cli, f"{base}/{b}/cancelar").status_code == 200
+    assert post(cli, f"{base}/{b}/cancelar").status_code == 409
+    d = cli.get("/api/v1/cobrar/a-receber", headers=BOSS).json()["dados"]
+    assert [i["situacao"] for i in d["manuais"]] == ["recebido"] and d["totais"]["manuais"]["recebido"] == "1500.00"

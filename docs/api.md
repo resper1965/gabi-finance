@@ -37,7 +37,10 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/caixa/resumo` | KPIs do caixa único, série de saldo (passado e projeção) e o que pede a sua atenção. |
 | GET | `/api/v1/caixa/semanas` | Semanas (passado real e projeção): entradas e saídas por categoria e saldo. |
 | GET | `/api/v1/cartoes` | Cartões: fatura aberta, % do limite, série de 12 meses e categorias. |
-| GET | `/api/v1/cobrar/a-receber` | O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato e NFS-e do mês, em blocos separados (não somar os dois). |
+| GET | `/api/v1/cobrar/a-receber` | O que se espera receber neste mês e se já entrou: pagadores recorrentes do extrato, NFS-e do mês e os lançados pelo Ricardo (manuais), em blocos separados (não somar). |
+| POST | `/api/v1/cobrar/a-receber-manual/propostas/{pid}/confirmar` | Confirma o crédito proposto para um a receber lançado por você (ele vira recebido). |
+| POST | `/api/v1/cobrar/a-receber-manual/propostas/{pid}/rejeitar` | Rejeita o crédito proposto para um a receber lançado por você. |
+| POST | `/api/v1/cobrar/a-receber-manual/{rid}/cancelar` | Cancela um a receber lançado por você (as propostas de casamento dele caem). Só o que está aberto. |
 | GET | `/api/v1/cobrar/notas` | NFS-e autorizadas (Nibo): a vencer, vencidas a confirmar pelo extrato, antigas e as que o Nibo diz pagas (não é prova de recebimento). |
 | GET | `/api/v1/cobrar/previsao` | Previsão de entradas a partir das NFS-e: a vencer, projetado (contrato recorrente) e, à parte, vencidas a confirmar pelo extrato. |
 | GET | `/api/v1/cobrar/recebimentos` | Créditos do extrato que a Gabi propõe como recebimento de uma NFS-e (valor líquido igual); só o Ricardo confirma. |
