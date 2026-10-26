@@ -12,6 +12,7 @@ import unicodedata
 from gabi.dinheiro import contas_pagar as cp, planilha
 from gabi.dinheiro.compromissos import _serie
 from gabi.dinheiro.valor import formatar, para_centavos
+from gabi.hoje import BRT
 
 CAMPOS = {"nome", "extrato", "apelidos", "vencimento", "ajuste_dia_util", "valor_tipo", "valor_padrao", "forma", "conta", "cartao", "pix"}
 
@@ -26,6 +27,15 @@ def _id_unico(con, tabela: str, base: str) -> str:
     while con.execute(f"select 1 from {tabela} where id=?", (cand,)).fetchone():
         cand, n = f"{base}-{n}", n + 1
     return cand
+
+
+def _id_de_serie_nova(con, base: str, sufixo: str = "") -> str:
+    """Primeiro `base`, `base-2`, `base-3`... cuja SÉRIE (`_serie`) não tem nenhuma linha no cadastro (nem excluída): cada despesa nova é série própria."""
+    usadas = {_serie(r[0]) for r in con.execute("select id from compromisso_linha")}
+    cand, n = base, 2
+    while _serie(f"{cand}{sufixo}") in usadas:
+        cand, n = f"{base}-{n}", n + 1
+    return f"{cand}{sufixo}"
 
 
 def validar_linha(con, d: dict, proprio: str | None) -> dict:
@@ -87,22 +97,21 @@ def _gravar_nova(con, agora, quem, origem, dado: dict, tipo: str, hoje: dt.date)
 
 
 def criar_fixa(con, agora: dt.datetime, quem: str, origem: str, campos: dict) -> dict:
-    hoje = agora.date()
+    hoje = agora.astimezone(BRT).date()
     c = _campos_validos(campos)
-    dado = {**c, "id": _id_unico(con, "compromisso_linha", _slug(c["nome"])), "extrato": c.get("extrato") or c["nome"], "valido_de": hoje.strftime("%Y-%m")}
+    dado = {**c, "id": _id_de_serie_nova(con, _slug(c["nome"])), "extrato": c.get("extrato") or c["nome"], "valido_de": hoje.strftime("%Y-%m")}
     return _gravar_nova(con, agora, quem, origem, dado, "fixa", hoje)
 
 
 def criar_avulsa(con, agora: dt.datetime, quem: str, origem: str, campos: dict, data: str) -> dict:
-    hoje = agora.date()
+    hoje = agora.astimezone(BRT).date()
     try:
         d = dt.date.fromisoformat(data)
     except (TypeError, ValueError):
         raise ValueError(f"data '{data}' não é AAAA-MM-DD")
     c = _campos_validos(campos)
     mes = data[:7]
-    base = f"{_slug(c['nome'])}-{mes.replace('-', '')}"
-    dado = {**c, "id": _id_unico(con, "compromisso_linha", base), "extrato": c.get("extrato") or c["nome"], "vencimento": f"dia:{d.day}",
+    dado = {**c, "id": _id_de_serie_nova(con, _slug(c["nome"]), "-" + mes.replace("-", "")), "extrato": c.get("extrato") or c["nome"], "vencimento": f"dia:{d.day}",
             "valido_de": mes, "valido_ate": mes}
     return _gravar_nova(con, agora, quem, origem, dado, "avulsa", hoje)
 
