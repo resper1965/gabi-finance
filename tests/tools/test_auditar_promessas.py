@@ -119,3 +119,8 @@ def test_falhou(tmp_path):
     assert not ap.falhou(_embrulhado(json.dumps({"estado": "erro"})))
     assert ap.falhou('<untrusted_tool_result>\n{"result": "{\\n  \\"erro\\": \\"x\\"')  # truncado: cai na regex
     assert not ap.falhou('texto "estado": "erro" qualquer') and not ap.falhou(None)
+
+
+def test_escritas_da_onda3_contam():
+    for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo"):
+        assert "mcp__gabi_brain__" + n in ap.FERRAMENTAS_DE_ESCRITA
