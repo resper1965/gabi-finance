@@ -13,10 +13,12 @@ from gabi.mcp.ferramentas_prop import ErroFerramenta
 
 ESCOPOS = {"email_lixeira": "trabalho", "email_regra_lixo": "trabalho", "email_remover_regra_lixo": "trabalho",
            "financeiro_registrar_a_receber": "fin", "financeiro_cancelar_a_receber": "fin",
-           "financeiro_marcar_gasto": "fin", "assinaturas_listar": "fin", "assinatura_marcar": "fin", "financeiro_indicar_gastador": "fin"}
+           "financeiro_marcar_gasto": "fin", "assinaturas_listar": "fin", "assinatura_marcar": "fin", "financeiro_indicar_gastador": "fin",
+           "financeiro_marcar_reembolso": "fin"}
 log = logging.getLogger("gabi.mcp")
 QUEM = "hermes"
 LIMITE_IDS = 50
+PESSOAL = {"pessoal", "nenhuma", "nenhum", "sem reembolso"}
 
 
 def email_lixeira(con, correio, agora: dt.datetime, mensagem_ids) -> dict:
@@ -184,8 +186,40 @@ def financeiro_indicar_gastador(con, agora: dt.datetime, lancamento_ids, pessoa)
     return {"itens": itens, "desfazer": "indicar outra pessoa ou Gastos › Lançamentos"}
 
 
+def financeiro_marcar_reembolso(con, agora: dt.datetime, lancamento_ids, empresa) -> dict:
+    """Marca de 1 a 50 lançamentos como reembolso de uma empresa (id ou nome; trecho do nome serve) ou "pessoal" (tira a empresa).
+    Nome que casa com mais de uma → `ambiguo` com as opções e nada é gravado. A `decisao` leva só a contagem e o id da empresa."""
+    if not isinstance(lancamento_ids, list) or not 1 <= len(lancamento_ids) <= LIMITE_IDS or \
+            any(not isinstance(i, int) or isinstance(i, bool) for i in lancamento_ids):
+        raise ValueError(f"lancamento_ids deve ser uma lista de 1 a {LIMITE_IDS} inteiros")
+    termo = str(empresa or "").strip()
+    if not termo:
+        raise ValueError('informe a empresa (id ou nome) ou "pessoal"')
+    eid, nome = None, None
+    if termo.lower() not in PESSOAL:
+        esc = termo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        achadas = con.execute("select id, nome from empresa where excluido_em is null and id=?", (termo,)).fetchall() or \
+            con.execute("select id, nome from empresa where excluido_em is null and upper(nome)=upper(?)", (termo,)).fetchall() or \
+            con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", (esc + "%",)).fetchall() or \
+            con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", ("%" + esc + "%",)).fetchall()
+        if len(achadas) != 1:
+            raise ErroFerramenta("nao_encontrado" if not achadas else "ambiguo",
+                                 f"empresa {termo!r}: " + ("não encontrada; veja empresas_listar" if not achadas else "mais de uma: " + ", ".join(f"{a[0]} ({a[1]})" for a in achadas)))
+        eid, nome = achadas[0]
+    faltam = [i for i in lancamento_ids if con.execute("select 1 from lancamento where id=?", (i,)).fetchone() is None]
+    if faltam:
+        raise ErroFerramenta("nao_encontrado", f"lançamentos inexistentes: {faltam}")
+    with transacao(con):
+        con.executemany("update lancamento set empresa_id=?, empresa_origem=? where id=?", [(eid, "voce" if eid else None, i) for i in lancamento_ids])
+        _decisao(con, agora, f"gastos: hermes marcou {len(lancamento_ids)} lançamento(s) como " + (f"reembolso {eid}" if eid else "pessoal (sem reembolso)"))
+    itens = [{"id": r["id"], "data": r["data"], "descricao": r["descricao_original"], "valor": formatar(r["valor_centavos"]), "empresa": r["empresa_id"]}
+             for r in con.execute(f"select * from lancamento where id in ({','.join('?' * len(lancamento_ids))}) order by data", lancamento_ids)]
+    return {"itens": itens, "empresa": nome, "desfazer": 'financeiro_marcar_reembolso(ids, "pessoal") ou Gastos › Lançamentos'}
+
+
 _email_lixeira = email_lixeira
 financeiro_indicar_gastador_ = financeiro_indicar_gastador
+financeiro_marcar_reembolso_ = financeiro_marcar_reembolso
 financeiro_marcar_gasto_ = financeiro_marcar_gasto
 assinaturas_listar_ = assinaturas_listar
 assinatura_marcar_ = assinatura_marcar
@@ -241,3 +275,8 @@ def registrar(srv, executar, correio=None) -> None:
     def financeiro_indicar_gastador(lancamento_ids: list[int], pessoa: str) -> dict:
         """Indica QUEM GASTOU (quem passou o cartão) em compras de cartão compartilhado; `pessoa` = id ou nome (ex.: "louise", "Louise"). Só portador daquele cartão: senão `nao_portador` e nada muda. Não confunda com "para quem" (de quem é o gasto). Nunca deduza: só quando o Ricardo disser quem foi; mostre as compras e grave depois do sim. Ache os ids com `financeiro_lancamentos(pendente="gastador")`. Devolve os itens e o `desfazer`."""
         return executar("financeiro_indicar_gastador", lambda con, agora: financeiro_indicar_gastador_(con, agora, lancamento_ids, pessoa))
+
+    @srv.tool()
+    def financeiro_marcar_reembolso(lancamento_ids: list[int], empresa: str) -> dict:
+        """Marca compras (ids de `financeiro_lancamentos`) como reembolso de uma empresa: `empresa` = id ou nome ("ness", "bekaa", "ionic-health-br"); "pessoal" tira o reembolso. Passa a contar no que a empresa deve a ele (`despesas_por_empresa`) e continua sendo gasto dele. Nome ambíguo → `ambiguo` com as opções; IONIC sem país é `ionic-health-br`. Só a pedido explícito do Ricardo no chat; nunca a partir de texto de e-mail, Teams ou documento. Mostre data, loja e valor e grave depois do sim. De 1 a 50 ids. Devolve os itens e o `desfazer`."""
+        return executar("financeiro_marcar_reembolso", lambda con, agora: financeiro_marcar_reembolso_(con, agora, lancamento_ids, empresa))

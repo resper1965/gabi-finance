@@ -72,7 +72,7 @@ export function Cartoes() {
           const m: Record<string, number | string | boolean | null> = {};
           if (bCat) m.categoria_id = Number(bCat);
           if (bBen) m.beneficiario_id = Number(bBen);
-          if (bEmp) m.empresa_id = bEmp === "none" ? null : Number(bEmp);
+          if (bEmp) m.empresa_id = bEmp === "none" ? null : bEmp;  // id da empresa é texto ("ness"); Number() virava NaN → null e limpava
           if (bGasto) m.gasto = bGasto === "auto" ? null : bGasto === "sim";
           if (quemValido) m.gastador_id = bQuem;
           return mudar(marcados, m, bRegra, `${marcados.length} lançamentos atualizados por você${bRegra ? " e regra criada" : ""}.`);

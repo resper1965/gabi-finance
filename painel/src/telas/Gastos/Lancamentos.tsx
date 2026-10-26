@@ -27,6 +27,7 @@ export function Lancamentos() {
   const leitura = useApi<{ itens: Lanc[]; total: number }>(url);
   const pessoas = useApi<{ itens: Pessoa[] }>("/api/v1/cadastros/pessoas").env?.dados.itens ?? [];
   const contas = useApi<{ itens: ContaUso[] }>("/api/v1/cadastros/contas").env?.dados.itens ?? [];
+  const empresas = useApi<{ itens: { id: string; nome: string }[] }>("/api/v1/cadastros/empresas").env?.dados.itens ?? [];
   const sugestoes = useApi<{ itens: Sug[] }>("/api/v1/sugestoes");
   const sugParaQuem = (sugestoes.env?.dados.itens ?? []).filter((s) => s.tipo === "para_quem" && s.lancamento_id !== null);
   const recarregar = () => { leitura.recarregar(); sugestoes.recarregar(); };
@@ -53,6 +54,12 @@ export function Lancamentos() {
   /** gasto: true/false é a sua marcação (vence as regras); null devolve a decisão ao brain. */
   const marcarGasto = async (l: Lanc, gasto: boolean | null) => {
     try { await api.patch(`/api/v1/lancamentos/${l.id}`, { gasto }); avisar(gasto === null ? `${l.estabelecimento}: o brain volta a decidir.` : `Anotado: ${l.estabelecimento} ${gasto ? "é" : "não é"} gasto.`); recarregar(); }
+    catch (e) { avisar((e as Error).message); }
+  };
+  /** Reembolso: a empresa que te devolve esta compra (entra em "Despesas por empresa"); continua sendo gasto seu. "" = pessoal. */
+  const marcarReembolso = async (l: Lanc, empresa: string) => {
+    const nome = empresas.find((c) => c.id === empresa)?.nome;
+    try { await api.patch(`/api/v1/lancamentos/${l.id}`, { empresa_id: empresa || null }); avisar(nome ? `Anotado: ${l.estabelecimento} é reembolso ${nome}.` : `Anotado: ${l.estabelecimento} é pessoal, sem reembolso.`); recarregar(); }
     catch (e) { avisar((e as Error).message); }
   };
   /** Quem gastou (portador): só nos cartões com 2+ portadores; "sempre" grava a regra desta loja neste cartão. */
@@ -133,6 +140,16 @@ export function Lancamentos() {
                       <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
                       <button onClick={() => marcarGasto(l, !l.gasto!.valor)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
                       {l.gasto.origem === "voce" && <button onClick={() => marcarGasto(l, null)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>deixar o brain decidir</button>}
+                    </>}
+                    {num(l.valor) < 0 && empresas.length > 0 && <>
+                      <span aria-hidden="true">·</span>
+                      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>Reembolso:
+                        <select aria-label={`Reembolso: ${l.estabelecimento}`} value={l.empresa.id == null ? "" : String(l.empresa.id)} onChange={(e) => marcarReembolso(l, e.target.value)}
+                          style={{ minHeight: 28, font: "500 12px var(--font-body)", color: "var(--color-text)", background: "transparent", border: "1px solid var(--line3)" }}>
+                          <option value="">pessoal</option>
+                          {empresas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        </select>
+                      </label>
                     </>}
                   </div>
                 </div>

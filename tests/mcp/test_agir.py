@@ -327,3 +327,28 @@ def test_indicar_gastador_nome_exato_vence_prefixo(banco):
         assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="bia")["dados"]["itens"][0]["gastador"] == "bia"
         assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="Bia")["dados"]["itens"][0]["gastador"] == "bia"
         assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="%")["erro"] == "nao_encontrado"
+
+
+def test_marcar_reembolso_por_nome_pessoal_e_auditoria(banco):
+    c = conectar(banco)
+    c.execute("insert or ignore into empresa(id, nome) values ('ness','NESS Processos e Tecnologia LTDA'), ('bekaa','Bekaa Tecnologia LTDA'), "
+              "('ionic-health-br','IONIC HEALTH TECHNOLOGIES S.A.'), ('ionic-health-us','IONIC Health Holding Technologies LLC')")
+    c.execute("insert into conta(id, externo_id, instituicao, tipo, apelido, estado) values (932,'kr','Itaú','CREDIT','BLACK','sim')")
+    lid = c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                    "values (932,'r1','2026-10-05',-12000,'UBER','custo','posted')").lastrowid
+    c.close()
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        r = chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="ness")["dados"]
+        assert r["itens"][0]["empresa"] == "ness" and r["empresa"] == "NESS Processos e Tecnologia LTDA"
+        assert chamar(cli, tok, "financeiro_lancamentos", empresa="ness")["dados"]["itens"][0]["id"] == lid
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="ionic")["erro"] == "ambiguo"
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="ionic-health-br")["dados"]["itens"][0]["empresa"] == "ionic-health-br"
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="Bekaa")["dados"]["itens"][0]["empresa"] == "bekaa"
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="pessoal")["dados"]["itens"][0]["empresa"] is None
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[lid], empresa="acme")["erro"] == "nao_encontrado"
+        assert chamar(cli, tok, "financeiro_marcar_reembolso", lancamento_ids=[999999], empresa="ness")["erro"] == "nao_encontrado"
+    c = conectar(banco)
+    assert tuple(c.execute("select empresa_id, empresa_origem from lancamento where id=?", (lid,)).fetchone()) == (None, None)
+    d = [x[0] for x in c.execute("select o_que from decisao where origem='hermes' order by id")]
+    assert d[0] == "gastos: hermes marcou 1 lançamento(s) como reembolso ness" and d[-1] == "gastos: hermes marcou 1 lançamento(s) como pessoal (sem reembolso)"
