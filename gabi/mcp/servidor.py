@@ -1,7 +1,6 @@
 """Servidor MCP do gabi.brain (Streamable HTTP, sem estado): ferramentas de LEITURA da Fase 1, por token com escopo.
 
-R1/R2/R13: leitura e propostas; as escritas diretas são o contato da família (`familia_atualizar_contato`, a pedido do Ricardo,
-com histórico e Desfazer no painel) e a lixeira recuperável do e-mail (`email_lixeira`, a pedido dele no chat; restaura no painel). Não existe ferramenta de enviar, pagar, apagar, aprovar ou ligar regra.
+R1/R2/R13: leitura e propostas; as escritas diretas são só as que o Ricardo pede no chat: contato, pessoa e pet da família (com histórico e Desfazer no painel), valor a receber manual (`financeiro_registrar_a_receber`, desfaz por `financeiro_cancelar_a_receber`), a lixeira recuperável do e-mail (`email_lixeira`, restaura no painel) e a regra "sempre lixo" (`email_regra_lixo`, desfaz por `email_remover_regra_lixo`). Não existe ferramenta de enviar, pagar, apagar de vez, aprovar ou ligar regra de outro tipo.
 R4: toda chamada vira `chamada_mcp`. R14: texto de terceiros chega como dado, e não há ferramenta capaz de obedecê-lo.
 Auth por Bearer (token com escopos, tokens.py). Anti DNS-rebinding: só os hosts listados. Consome: dinheiro.*, envelope, tokens, ferramentas_* (prop, dia, dec, envios, familia, documentos, ver, agir).
 """

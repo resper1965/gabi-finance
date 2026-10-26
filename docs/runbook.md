@@ -219,3 +219,15 @@ Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do R
 6. `/new` no Telegram **e** no WhatsApp.
 7. **Conferir:** peça ao Hermes as três perguntas do "Pronto quando" da spec (`docs/superpowers/specs/2026-10-25-hermes-completo-design.md`).
 - **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda2 ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O escopo `contatos` extra no token é inofensivo; sem as ferramentas no `include`, o Hermes não as vê.
+
+## Hermes Onda 3: agir com aprovação {#hermes-onda3}
+Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do Ricardo, depois do merge da branch `feat/hermes-onda3`. Sem token novo: `fin` e `trabalho` já estão no token do Hermes.
+1. **Backup do banco:** `sudo cp -p /var/lib/gabi-brain/gabi.db /var/lib/gabi-brain/gabi.db.antes-onda3-$(date +%F)`.
+2. `sudo ~/instalar-brain.sh` (aplica a migração 0082 e reinicia o MCP e a API).
+3. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-onda3`.
+4. Em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (44 ferramentas: acrescenta `financeiro_registrar_a_receber`, `financeiro_cancelar_a_receber`, `email_lixeira`, `email_regra_lixo` e `email_remover_regra_lixo`).
+5. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
+6. `sudo systemctl restart hermes-gateway`.
+7. `/new` no Telegram **e** no WhatsApp.
+8. **Conferir ("Pronto quando"):** peça ao Hermes para anotar um a receber de teste (ele cita o id e como desfazer; aparece em Cobrar › A receber › Lançados por você; cancele em seguida), para mandar um e-mail triado para a lixeira (conta com lixeira ligada; restaure em Mensagens › Lixeira) e para criar e remover uma regra "sempre lixo".
+- **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda3 ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O banco não precisa voltar: as tabelas novas ficam vazias e inofensivas (o backup `gabi.db.antes-onda3-<data>` é só garantia); sem as ferramentas no `include`, o Hermes não as vê.
