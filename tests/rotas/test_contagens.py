@@ -33,3 +33,14 @@ def test_sino_e_a_soma_dos_selos(cli, banco):
 
 def test_contagens_so_boss(cli):
     assert get(cli, "/api/v1/contagens", VIP).status_code == 403
+
+
+def test_menu_gastos_soma_quem_gastou_a_indicar_do_mes(cli, banco):
+    from tests.rotas.test_dinheiro_api import _compartilhado
+    antes = get(cli, "/api/v1/contagens").json()["dados"]["menu"]["gastos"]
+    _compartilhado(banco)  # duas compras de outubro no cartão compartilhado, a indicar
+    c = conectar(banco)
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+              "values (20,'velha','2026-08-01',-100,'ANTIGA','custo','posted')")  # mês passado: fica só no filtro da tela
+    c.close()
+    assert get(cli, "/api/v1/contagens").json()["dados"]["menu"]["gastos"] == antes + 2

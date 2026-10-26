@@ -76,7 +76,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/decisoes/perguntas` | Perguntas do canal de decisão (padrão: todas, as mais novas primeiro; `estado=aberta` só as que esperam resposta). |
 | POST | `/api/v1/decisoes/perguntas` | Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem). |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
-| GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa). |
+| GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa (para quem), gastador (quem gastou) ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/documentos/propostas` | Propostas de documento no estado dado (titular ou bem novo, motivos de conferir, documento atual) e a URL base do Paperless. |
 | POST | `/api/v1/documentos/propostas/{proposta_id}/decisao` | Aprova ou recusa a proposta pendente; `correcao` opcional troca campos (inclusive o titular) antes de aprovar; já decidida: 409. |
 | GET | `/api/v1/documentos/titulares` | Pessoas (com contato) e bens ativos, cada um com os documentos ativos (números completos), e a URL base do Paperless. |
@@ -94,7 +94,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/fontes` | Estado de cada fonte: ok, nao_conferida, erro, parada ou em_espera (parâmetro `fontes.em_espera`: aparece, mas não conta no dados_ate). |
 | GET | `/api/v1/gabi/qualidade` | A Gabi acerta, custa pouco e responde rápido? Sugestões aceitas, custo por tarefa (30 dias) e latência por ferramenta (7 dias). |
 | GET | `/api/v1/hoje` | O dia do Ricardo: prioridades, agenda, e-mails que importam e dinheiro. |
-| GET | `/api/v1/lancamentos` | Lançamentos paginados, com filtros e a origem de cada classificação. |
+| GET | `/api/v1/lancamentos` | Lançamentos paginados, com filtros e a origem de cada classificação. pendente=gastador: compras de cartão compartilhado a indicar. |
 | POST | `/api/v1/lancamentos/lote` | Muda vários lançamentos de uma vez; criar_regra cria uma regra por estabelecimento. |
 | PATCH | `/api/v1/lancamentos/{lid}` | Muda categoria, para quem, empresa ou frente de um lançamento (a origem vira 'voce'). |
 | GET | `/api/v1/parcelas` | Parcelas: comprometido por mês e andamento de cada compra parcelada. |

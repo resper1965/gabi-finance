@@ -340,3 +340,36 @@ def test_marcar_gasto_e_nao_gasto_e_devolver_as_regras(cli):
     itens = {i["id"]: i for i in get(cli, "/api/v1/lancamentos?limite=10").json()["dados"]["itens"]}
     assert itens[1]["gasto"] == {"valor": True, "origem": None} and itens[2]["gasto"]["valor"] is False
     assert patch(cli, "/api/v1/lancamentos/1", {"gasto": "sim"}).status_code == 400
+
+
+def _compartilhado(banco):
+    c = conectar(banco)
+    c.execute("insert into pessoa(id, nome, papel) values ('louise','Louise','filha')")
+    c.execute("insert into conta(id, externo_id, instituicao, tipo, apelido, estado, usuarios) values (20,'k1','Itaú','CREDIT','LATAM','sim','[\"p1\",\"louise\"]')")
+    c.execute("insert into conta(id, externo_id, instituicao, tipo, apelido, estado, usuarios) values (21,'k2','Itaú','CREDIT','PAO','sim','[\"p9\"]')")
+    ids = [c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, natureza, status) "
+                     "values (?,?, '2026-10-03', ?, ?, ?, ?, 'posted')", (conta, ext, v, d, d, nat)).lastrowid
+           for conta, ext, v, d, nat in [(20, "k1a", -5000, "ZARA", "custo"), (20, "k1b", 2000, "ESTORNO ZARA", "custo"),
+                                         (21, "k2a", -3000, "PADARIA", "custo"), (20, "k1c", -7000, "ZARA", "custo")]]
+    c.close()
+    return ids
+
+
+def test_indicar_gastador_so_portador_e_lote_atomico(cli, banco):
+    zara, estorno, padaria, zara2 = _compartilhado(banco)
+    pend = {i["id"] for i in get(cli, "/api/v1/lancamentos?pendente=gastador&limite=50").json()["dados"]["itens"]}
+    assert pend == {zara, zara2}  # estorno (entrada) e cartão de um portador não ficam a indicar
+    r = post(cli, "/api/v1/lancamentos/lote", {"ids": [zara, padaria], "mudancas": {"gastador_id": "louise"}})
+    assert r.status_code == 400 and r.json()["erro"] == "nao_portador"
+    assert get(cli, "/api/v1/lancamentos?pendente=gastador&limite=50").json()["dados"]["total"] == 2  # nada gravado
+    item = patch(cli, f"/api/v1/lancamentos/{zara}", {"gastador_id": "louise"}).json()["dados"]
+    assert item["gastador"] == {"id": "louise", "nome": "Louise", "origem": "voce"} and item["portadores"] == ["p1", "louise"]
+    assert patch(cli, f"/api/v1/lancamentos/{zara}", {"gastador_id": "naoexiste"}).status_code == 400
+    assert patch(cli, f"/api/v1/lancamentos/{zara}", {"gastador_id": None}).json()["dados"]["gastador"]["id"] is None
+
+
+def test_sempre_assim_de_gastador_no_lote(cli, banco):
+    zara, _, _, zara2 = _compartilhado(banco)
+    post(cli, "/api/v1/lancamentos/lote", {"ids": [zara], "mudancas": {"gastador_id": "louise"}, "criar_regra": True})
+    itens = {i["id"]: i for i in get(cli, "/api/v1/lancamentos?gastador=louise&limite=50").json()["dados"]["itens"]}
+    assert itens[zara]["gastador"]["origem"] == "voce" and itens[zara2]["gastador"]["origem"] == "regra"

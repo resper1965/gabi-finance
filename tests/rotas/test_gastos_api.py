@@ -293,6 +293,8 @@ def test_destino_agrupado_por_fornecedor_e_pessoa(cli):
     assert {"nome", "valor", "pct", "variacao"} <= set(d["itens"][0])
     p = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=pessoa").json()["dados"]
     assert p["itens"][0]["nome"] == "(sem pessoa)"
+    g = get(cli, "/api/v1/destino/agrupado?periodo=mes&por=gastador").json()["dados"]
+    assert g["por"] == "gastador" and g["total"] == "533.90" and g["itens"][0]["nome"] == "(a indicar)"
 
 
 def test_destino_agrupado_valida_entrada_e_exige_boss(cli):

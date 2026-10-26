@@ -10,7 +10,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gabi.db import conectar
-from gabi.dinheiro import analise, consultas, contas_pagar as cp, nao_gasto, regras as rg, repositorio
+from gabi.dinheiro import analise, consultas, contas_pagar as cp, gastador, nao_gasto, regras as rg, repositorio
 from gabi.dinheiro.projecao import projetar
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -18,7 +18,7 @@ from gabi.identidade import Identidade, exigir
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
 PERIODOS = {"semana": 7, "mes": 30, "12m": 365}
-EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id", "gasto"}
+EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id", "gasto", "gastador_id"}
 
 
 # ---------------- utilitários ----------------
@@ -191,13 +191,13 @@ _lanc = consultas.lancamento_dict
 @router.get("/lancamentos")
 def lancamentos(request: Request, pendente: str | None = None, de: str | None = None, ate: str | None = None, conta: str | None = None,
                 categoria: int | None = None, para_quem: str | None = None, empresa: str | None = None, texto: str | None = None,
-                limite: int = 50, offset: int = 0):
-    """Lançamentos paginados, com filtros e a origem de cada classificação."""
+                limite: int = 50, offset: int = 0, gastador: str | None = None):
+    """Lançamentos paginados, com filtros e a origem de cada classificação. pendente=gastador: compras de cartão compartilhado a indicar."""
     con = _con(request)
     try:
         try:
             dados = consultas.listar_lancamentos(con, pendente=pendente, de=de, ate=ate, conta=conta, categoria=categoria, para_quem=para_quem,
-                                                 empresa=empresa, texto=texto, limite=limite, offset=offset)
+                                                 empresa=empresa, texto=texto, limite=limite, offset=offset, gastador=gastador)
         except ValueError as e:
             raise erro(400, "requisicao_invalida", str(e))
         return envelope(con, dados, agora=_agora(request))
@@ -206,8 +206,9 @@ def lancamentos(request: Request, pendente: str | None = None, de: str | None = 
 
 
 def _validar_mudancas(con, m: dict) -> dict:
-    """{categoria_id, beneficiario_id, empresa_id, frente_id, gasto} -> colunas, validando existência. None limpa o campo.
-    gasto: true/false é a marcação do Ricardo (vence as regras de nao_gasto); None devolve a decisão às regras."""
+    """{categoria_id, beneficiario_id, empresa_id, frente_id, gasto, gastador_id} -> colunas, validando existência. None limpa o campo.
+    gasto: true/false é a marcação do Ricardo (vence as regras de nao_gasto); None devolve a decisão às regras.
+    gastador_id: quem gastou (só portador da conta, conferido ao aplicar); None volta ao automático (ou a indicar)."""
     if not m:
         raise erro(400, "requisicao_invalida", "informe ao menos um campo para mudar")
     if set(m) - EDITAVEIS:
@@ -218,6 +219,11 @@ def _validar_mudancas(con, m: dict) -> dict:
             if valor is not None and not isinstance(valor, bool):
                 raise erro(400, "requisicao_invalida", "gasto deve ser true, false ou null")
             saida["natureza_manual"] = None if valor is None else ("gasto" if valor else "nao_gasto")
+            continue
+        if chave == "gastador_id":
+            if valor is not None and (not isinstance(valor, str) or con.execute("select 1 from pessoa where id=?", (valor,)).fetchone() is None):
+                raise erro(400, "requisicao_invalida", f"gastador_id={valor!r} não existe")
+            saida["gastador_id"] = valor
             continue
         col = "para_quem_id" if chave == "beneficiario_id" else chave
         if valor is not None:
@@ -232,7 +238,9 @@ def _validar_mudancas(con, m: dict) -> dict:
     return saida
 
 
-def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
+def _aplicar_mudancas(con, ids: list[int], cols: dict, regra_gastador: bool = False) -> None:
+    cols = dict(cols)
+    tem_gastador, quem = "gastador_id" in cols, cols.pop("gastador_id", None)
     for lid in ids:
         for col, valor in cols.items():
             origem = f"{col[:-3]}_origem" if col not in ("frente_id", "natureza_manual") else None
@@ -242,6 +250,11 @@ def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
                 con.execute(f"update lancamento set {col}=? where id=?", (valor, lid))
     if "natureza_manual" in cols:
         nao_gasto.reaplicar(con, ids)
+    if tem_gastador:
+        try:
+            gastador.indicar(con, ids, quem, regra=regra_gastador)
+        except ValueError as e:  # pessoa que não é portadora de alguma das contas: nada é gravado (a transação volta)
+            raise erro(400, "nao_portador", str(e).removeprefix("nao_portador: "))
 
 
 @router.patch("/lancamentos/{lid}")
@@ -280,7 +293,7 @@ async def lancamentos_lote(request: Request, ident: Identidade = Depends(exigir(
             raise erro(404, "nao_encontrado", f"lançamentos inexistentes: {faltam}")
         con.execute("begin")
         try:
-            _aplicar_mudancas(con, ids, cols)
+            _aplicar_mudancas(con, ids, cols, regra_gastador=corpo.get("criar_regra") is True)
             con.execute("commit")
         except BaseException:
             con.execute("rollback")

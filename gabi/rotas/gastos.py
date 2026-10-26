@@ -131,7 +131,7 @@ def destino(request: Request, periodo: str = "mes"):
 
 @router.get("/destino/agrupado")
 def destino_agrupado(request: Request, periodo: str = "mes", por: str = "categoria"):
-    """Para onde vai o dinheiro agrupado por categoria, pessoa ou fornecedor (abas Fornecedores e Por pessoa)."""
+    """Para onde vai o dinheiro agrupado por categoria, pessoa (para quem), gastador (quem gastou) ou fornecedor (abas Fornecedores e Por pessoa)."""
     con = _con(request)
     try:
         try:
