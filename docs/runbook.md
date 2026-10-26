@@ -254,3 +254,8 @@ Decisão: `docs/adr/030-gastadores.md`.
 2. **Portadores:** em Cadastros › Contas, "Quem usa" de cada cartão (Bradesco Platinum: Ricardo e Louise).
 3. **Histórico:** `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.dinheiro.gastador --banco /var/lib/gabi-brain/gabi.db` (imprime contagens e o total por quem gastou; a captura repete sozinha).
 4. **Hermes:** acrescentar `financeiro_indicar_gastador` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.
+
+## Reembolso por compra {#reembolso}
+Decisão: `docs/adr/031-reembolso-por-compra.md`.
+1. **Instalar:** `sudo ~/instalar-brain.sh` (sem migração).
+2. **Hermes:** acrescentar `financeiro_marcar_reembolso` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.

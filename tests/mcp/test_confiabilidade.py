@@ -68,11 +68,14 @@ def test_documentos_buscar_vazio_traz_aviso(cli, tok):
     assert d["itens"] == [] and d["vazio"] is True and d["aviso"] == TEXTO_AVISO
 
 
-def test_soul_do_repositorio_tem_as_tres_regras_e_nao_tem_reembolso_nem_exames():
+def test_soul_do_repositorio_tem_as_tres_regras_e_nao_promete_fluxo_de_exames_nem_de_reembolso():
     t = SOUL.read_text()
     for r in REGRAS:
         assert r in t
-    assert "reembolso" not in t.lower() and "exames" not in t.lower()
+    # o SOUL antigo prometia que o PDF "entra no fluxo (exames, contas, reembolso)"; esses fluxos saíram (ADR-023).
+    # "reembolso" só aparece como a Empresa marcada na compra (financeiro_marcar_reembolso), que alimenta despesas_por_empresa
+    assert "exames" not in t.lower() and "fluxo (" not in t.lower()
+    assert all("financeiro_marcar_reembolso" in linha or "despesas_por_empresa" in linha for linha in t.splitlines() if "reembolso" in linha.lower())
     assert "vai para o Paperless" in t or "foi para o Paperless" in t
 
 

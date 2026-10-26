@@ -50,6 +50,7 @@ mcp_servers:
       - financeiro_indicar_gastador
       - financeiro_lancamentos
       - financeiro_marcar_gasto
+      - financeiro_marcar_reembolso
       - financeiro_para_onde_vai
       - financeiro_previsao
       - financeiro_recorrentes
