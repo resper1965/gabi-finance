@@ -299,7 +299,8 @@ async def lancamentos_lote(request: Request, ident: Identidade = Depends(exigir(
             con.execute("rollback")
             raise
         regras = []
-        if corpo.get("criar_regra") is True:
+        # regra de classificação só quando o lote mexeu em categoria, para quem ou empresa; o "sempre" de quem gastou já virou gastador_regra
+        if corpo.get("criar_regra") is True and set(cols) & {"categoria_id", "para_quem_id", "empresa_id"}:
             vistos = set()
             for lid in ids:
                 r = con.execute("select estabelecimento, descricao_original from lancamento where id=?", (lid,)).fetchone()

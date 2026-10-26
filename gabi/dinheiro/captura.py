@@ -340,9 +340,13 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
         try:  # depois de todas as contas: o boleto do banco se confere com as faturas dos cartões gravadas nesta rodada
             with transacao(con):
                 nao_gasto.reaplicar(con)
-                gastador.preencher(con)
-        except Exception as e:  # a natureza bruta do caixa.natureza fica e o gastador espera; a próxima rodada tenta de novo
+        except Exception as e:  # a natureza bruta do caixa.natureza fica; a próxima rodada tenta de novo
             erro_pos = type(e).__name__
+        try:  # em transação própria: um erro aqui não desfaz o não-é-gasto
+            with transacao(con):
+                gastador.preencher(con)
+        except Exception as e:  # o gastador espera a próxima rodada
+            erro_pos = "; ".join(filter(None, [erro_pos, type(e).__name__]))
         registrar_estado(con, contas, ids, sync, bancos_pj, hoje, agora, falhas)
         rodada.lidos, rodada.novos = lidos, novos
         if falhas:

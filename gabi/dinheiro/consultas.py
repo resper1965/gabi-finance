@@ -102,13 +102,14 @@ def janelas(periodo: str, hoje: dt.date):
 def custos(con, de: dt.date, ate: dt.date):
     return con.execute(
         f"select -l.valor_centavos as gasto, c.apelido as conta, {CATEGORIA} as cat, e.nome as empresa, p.nome as pessoa, g.nome as gastador, "
+        f"case when {A_INDICAR} then 1 else 0 end as a_indicar, "
         "coalesce(l.estabelecimento, l.descricao_original) as fornecedor from lancamento l join conta c on c.id=l.conta_id "
         "left join categoria cat on cat.id=l.categoria_id left join empresa e on e.id=l.empresa_id left join pessoa p on p.id=l.para_quem_id "
         "left join pessoa g on g.id=l.gastador_id where l.natureza like '%custo%' and l.data>=? and l.data<=?", (de.isoformat(), ate.isoformat())).fetchall()
 
 
 POR = {"categoria": "cat", "pessoa": "pessoa", "fornecedor": "fornecedor", "gastador": "gastador"}  # pessoa = para quem foi; gastador = quem gastou
-SEM_NOME = {"pessoa": "(sem pessoa)", "gastador": "(a indicar)"}
+SEM_NOME = {"pessoa": "(sem pessoa)", "gastador": "(a indicar)"}  # gastador vazio fora do A_INDICAR (cartão sem portador, estorno): "(sem portador)"
 
 
 def agrupar(con, periodo: str, por: str, hoje: dt.date) -> dict:
@@ -124,7 +125,7 @@ def agrupar(con, periodo: str, por: str, hoje: dt.date) -> dict:
     def somar(de, ate):
         s = {}
         for r in custos(con, de, ate):
-            k = r[chave] or SEM_NOME.get(por, "(sem nome)")
+            k = r[chave] or ("(sem portador)" if por == "gastador" and not r["a_indicar"] else SEM_NOME.get(por, "(sem nome)"))
             s[k] = s.get(k, 0) + r["gasto"]
         return s
     atual, antes = somar(ini, fim), somar(a_ini, a_fim)

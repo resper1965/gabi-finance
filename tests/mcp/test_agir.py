@@ -313,3 +313,17 @@ def test_indicar_gastador_por_nome_portador_e_auditoria(banco):
         assert chamar(cli, tok, "financeiro_lancamentos", gastador="louise")["dados"]["itens"][0]["gastador"]["id"] == "louise"
     d = conectar(banco).execute("select o_que from decisao where origem='hermes' order by id").fetchall()
     assert [x[0] for x in d] == ["gastos: hermes indicou louise como quem gastou em 1 lançamento(s)"]
+
+
+def test_indicar_gastador_nome_exato_vence_prefixo(banco):
+    c = conectar(banco)
+    c.execute("insert or ignore into pessoa(id, nome, papel) values ('bia','Bia','filha'), ('biaclara','Bia Clara','filha')")
+    c.execute("insert into conta(id, externo_id, instituicao, tipo, apelido, estado, usuarios) values (931,'kz','Itaú','CREDIT','X','sim','[\"bia\",\"biaclara\"]')")
+    lid = c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                    "values (931,'z9','2026-10-05',-5000,'LOJA','custo','posted')").lastrowid
+    c.close()
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="bia")["dados"]["itens"][0]["gastador"] == "bia"
+        assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="Bia")["dados"]["itens"][0]["gastador"] == "bia"
+        assert chamar(cli, tok, "financeiro_indicar_gastador", lancamento_ids=[lid], pessoa="%")["erro"] == "nao_encontrado"

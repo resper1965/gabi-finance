@@ -59,13 +59,14 @@ export function Cartoes() {
         const totCat = [...cats.values()].reduce((a, b) => a + b, 0);
         const lista = [...cats.entries()].sort((a, b) => b[1] - a[1]);
         const mudar = async (ids: number[], mudancas: Record<string, number | string | boolean | null>, regra: boolean, texto: string) => {
-          try { await api.post("/api/v1/lancamentos/lote", { ids, mudancas, criar_regra: regra }); avisar(texto); setMarcados([]); lanc.recarregar(); leitura.recarregar(); }
+          try { await api.post("/api/v1/lancamentos/lote", { ids, mudancas, criar_regra: regra }); avisar(texto); setMarcados([]); setBQuem(""); lanc.recarregar(); leitura.recarregar(); }
           catch (e) { avisar((e as Error).message); }
         };
         const nomePessoa = (pid: string) => pessoas.find((p) => String(p.id) === pid)?.nome ?? pid;
         // no lote, só quem é portador de TODOS os marcados (a API recusa quem não for)
         const portadoresMarcados = linhas.filter((l) => marcados.includes(l.id)).map((l) => l.portadores ?? [])
           .reduce<string[] | null>((acc, ps) => (acc === null ? ps : acc.filter((x) => ps.includes(x))), null) ?? [];
+        const quemValido = bQuem !== "" && portadoresMarcados.includes(bQuem);  // escolha que não vale para os marcados agora não vai
         const quemGastou = (l: Lanc) => l.gastador?.nome ?? ((l.portadores?.length ?? 0) >= 2 ? <span style={{ color: "var(--warn)", fontWeight: 600 }}>a indicar</span> : "—");
         const aplicar = () => {
           const m: Record<string, number | string | boolean | null> = {};
@@ -73,7 +74,7 @@ export function Cartoes() {
           if (bBen) m.beneficiario_id = Number(bBen);
           if (bEmp) m.empresa_id = bEmp === "none" ? null : Number(bEmp);
           if (bGasto) m.gasto = bGasto === "auto" ? null : bGasto === "sim";
-          if (bQuem) m.gastador_id = bQuem;
+          if (quemValido) m.gastador_id = bQuem;
           return mudar(marcados, m, bRegra, `${marcados.length} lançamentos atualizados por você${bRegra ? " e regra criada" : ""}.`);
         };
         const beneficiario = (l: Lanc) => (
@@ -167,7 +168,7 @@ export function Cartoes() {
                   <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, cursor: "pointer" }}><input type="checkbox" checked={bRegra} onChange={(e) => setBRegra(e.target.checked)} style={{ width: 16, height: 16 }} />criar regra para os próximos</label>
                   <span style={{ flex: 1 }} />
                   <button className="btn btn-ghost" onClick={() => setMarcados([])}>Limpar</button>
-                  <button className="btn btn-primary" disabled={!bCat && !bBen && !bEmp && !bGasto && !bQuem} onClick={aplicar}>Aplicar</button>
+                  <button className="btn btn-primary" disabled={!bCat && !bBen && !bEmp && !bGasto && !quemValido} onClick={aplicar}>Aplicar</button>
                 </>}
               </div>
               {linhas.length === 0 && <div style={{ border: "1px dashed var(--line3)", padding: 20 }}>Nenhum lançamento com esses filtros.</div>}

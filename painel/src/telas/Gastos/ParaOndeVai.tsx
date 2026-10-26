@@ -35,7 +35,7 @@ export function ParaOndeVai() {
     const cat = categorias.find((c) => c.nome === escolhido.nome);
     const pes = escolhido.tipo === "pessoa" ? pessoas.find((x) => x.nome === escolhido.nome) : undefined;
     const gas = escolhido.tipo === "gastador" ? pessoas.find((x) => x.nome === escolhido.nome) : undefined;
-    filtro = escolhido.tipo === "gastador" ? (gas ? `gastador=${gas.id}` : "pendente=gastador") : escolhido.tipo === "origem" ? `conta=${encodeURIComponent(escolhido.nome)}` : pes ? `para_quem=${pes.id}` : emp ? `empresa=${emp.id}` : cat ? `categoria=${cat.id}` : `texto=${encodeURIComponent(escolhido.nome)}`;
+    filtro = escolhido.tipo === "gastador" ? (gas ? `gastador=${gas.id}` : escolhido.nome === "(a indicar)" ? "pendente=gastador" : null) : escolhido.tipo === "origem" ? `conta=${encodeURIComponent(escolhido.nome)}` : pes ? `para_quem=${pes.id}` : emp ? `empresa=${emp.id}` : cat ? `categoria=${cat.id}` : `texto=${encodeURIComponent(escolhido.nome)}`;
   }
   const lanc = useApi<{ itens: { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: { nome: string | null } }[] }>(
     filtro && destino.env ? `/api/v1/lancamentos?${filtro}&de=${destino.env.dados.periodo.de}&ate=${destino.env.dados.periodo.ate}&limite=50` : null);

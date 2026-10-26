@@ -163,8 +163,10 @@ def financeiro_indicar_gastador(con, agora: dt.datetime, lancamento_ids, pessoa)
     termo = str(pessoa or "").strip()
     if not termo:
         raise ValueError("informe a pessoa (id ou nome)")
+    prefixo = termo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     achadas = con.execute("select id from pessoa where id=?", (termo,)).fetchall() or \
-        con.execute("select id from pessoa where upper(nome) like upper(?)", (f"{termo}%",)).fetchall()
+        con.execute("select id from pessoa where upper(nome)=upper(?)", (termo,)).fetchall() or \
+        con.execute("select id from pessoa where upper(nome) like upper(?) escape '\\'", (prefixo,)).fetchall()
     if len(achadas) != 1:
         raise ErroFerramenta("nao_encontrado" if not achadas else "ambiguo",
                              f"pessoa {termo!r}: " + ("não encontrada" if not achadas else "mais de uma: " + ", ".join(a[0] for a in achadas)))

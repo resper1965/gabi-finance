@@ -373,3 +373,22 @@ def test_sempre_assim_de_gastador_no_lote(cli, banco):
     post(cli, "/api/v1/lancamentos/lote", {"ids": [zara], "mudancas": {"gastador_id": "louise"}, "criar_regra": True})
     itens = {i["id"]: i for i in get(cli, "/api/v1/lancamentos?gastador=louise&limite=50").json()["dados"]["itens"]}
     assert itens[zara]["gastador"]["origem"] == "voce" and itens[zara2]["gastador"]["origem"] == "regra"
+
+
+def test_sempre_de_gastador_nao_cria_regra_de_classificacao(cli, banco):
+    zara, *_ = _compartilhado(banco)
+    patch(cli, f"/api/v1/lancamentos/{zara}", {"beneficiario_id": "p9"})  # para quem decidido por ele antes
+    post(cli, "/api/v1/lancamentos/lote", {"ids": [zara], "mudancas": {"gastador_id": "louise"}, "criar_regra": True})
+    assert conectar(banco).execute("select count(*) from regra").fetchone()[0] == 0
+
+
+def test_mudar_portadores_no_cadastro_refaz_quem_gastou(cli, banco):
+    *_, padaria, _ = _compartilhado(banco)
+    c = conectar(banco)
+    from gabi.dinheiro import gastador
+    gastador.preencher(c)
+    assert c.execute("select gastador_id from lancamento where id=?", (padaria,)).fetchone()[0] == "p9"
+    assert patch(cli, "/api/v1/cadastros/contas/21", {"usuarios": ["p9", "louise"]}).status_code == 200
+    assert c.execute("select gastador_id from lancamento where id=?", (padaria,)).fetchone()[0] is None
+    pend = {i["id"] for i in get(cli, "/api/v1/lancamentos?pendente=gastador&limite=50").json()["dados"]["itens"]}
+    assert padaria in pend
