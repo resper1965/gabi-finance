@@ -286,3 +286,44 @@ def test_bem_novo_com_nome_dado_na_aprovacao(con):
     p2 = _propor(con, _doc("bem", None, "crlv", "XYZ9Z99"), paperless_id=51, bem_novo={"tipo": "veiculo", "nome": "Veículo", "dados": {}})
     r2 = rep.decidir(con, p2, "aprovada", "ricardo", AGORA, correcao={"bem_nome": "  "})  # vazio: fica o nome proposto
     assert {x["id"]: x for x in rep.bens(con)}[r2["bem_id"]]["nome"] == "Veículo"
+
+
+def _dois_numeros(con):
+    return _propor(con, _doc(numeros=[{"nome": "numero", "valor": "FK077009"}, {"nome": "mrz", "valor": "P1234"}]))
+
+
+def test_correcao_sem_numero_recusa(con):
+    """Correção que deixa o documento sem nenhum número não aprova; a proposta segue pendente."""
+    pid = _dois_numeros(con)
+    vazio = {"numeros": [{"nome": "numero", "valor": ""}, {"nome": "mrz", "valor": " "}]}
+    assert _erro(rep.decidir, con, pid, "aprovada", "ricardo", AGORA, correcao=vazio) == "numero_obrigatorio"
+    assert _erro(rep.decidir, con, pid, "aprovada", "ricardo", AGORA, correcao={"numeros": []}) == "numero_obrigatorio"
+    assert rep.listar_propostas(con)[0]["estado"] == "pendente" and con.execute("select count(*) from documento").fetchone()[0] == 0
+
+
+def test_correcao_que_remove_principal_recusa(con):
+    """Remover o principal promoveria o secundário a número do documento (e trocaria o número do ativo): recusado."""
+    did = _aprovado(con, _doc(numero="P<MASCARADO"))
+    pid = _dois_numeros(con)
+    corr = {"numeros": [{"nome": "numero", "valor": ""}, {"nome": "mrz", "valor": "P 1234"}]}
+    assert _erro(rep.decidir, con, pid, "aprovada", "ricardo", AGORA, correcao=corr) == "principal_removido"
+    assert rep.listar_propostas(con)[0]["estado"] == "pendente"
+    assert rep.documento(con, did)["numeros"] == [{"nome": "numero", "valor": "P<MASCARADO"}]
+
+
+def test_correcao_do_valor_do_principal_aprova(con):
+    pid = _dois_numeros(con)
+    rep.decidir(con, pid, "aprovada", "ricardo", AGORA,
+                correcao={"numeros": [{"nome": "numero", "valor": "FK077008"}, {"nome": "mrz", "valor": "P1234"}]})
+    assert rep.consultar(con, titular_id="ana")[0]["numeros"][0]["valor"] == "FK077008"
+
+
+def test_correcao_sem_chave_numeros_inalterada(con):
+    pid = _dois_numeros(con)
+    rep.decidir(con, pid, "aprovada", "ricardo", AGORA, correcao={"datas": [{"tipo": "validade", "data": "2031-01-01"}]})
+    assert rep.consultar(con, titular_id="ana")[0]["numeros"][0]["valor"] == "FK077009"
+
+
+def test_recusar_com_correcao_vazia_nao_bloqueia(con):
+    pid = _dois_numeros(con)
+    assert rep.decidir(con, pid, "recusada", "ricardo", AGORA, correcao={"numeros": []})["estado"] == "recusada"

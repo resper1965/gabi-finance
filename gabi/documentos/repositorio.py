@@ -340,6 +340,20 @@ def _sem_vazios(campos: dict) -> dict:
     return saida
 
 
+def _conferir_numeros(doc: dict, numeros) -> None:
+    """Correção não deixa o documento sem número nem tira o principal: sem ele, o secundário viraria o número do documento
+    (e trocaria o número do ativo na aprovação). Corrigir o VALOR do principal continua valendo."""
+    if not isinstance(numeros, list):
+        return  # `validar` recusa
+    if not numeros:
+        raise ErroDocumentos("numero_obrigatorio")
+    if not isinstance(numeros[0], dict) or len(doc.get("numeros") or []) < 2:
+        return
+    novo, principal = chave(numeros[0].get("valor")), _principal(doc)
+    if novo != principal and novo in {chave(n["valor"]) for n in doc["numeros"][1:]}:
+        raise ErroDocumentos("principal_removido")
+
+
 def _quem(doc: dict) -> str:
     if doc["titular_tipo"] == "pessoa" and doc["titular_id"]:
         return f"da pessoa {doc['titular_id']}"
@@ -365,6 +379,8 @@ def decidir(con, proposta_id: int, estado: str, quem: str, agora: dt.datetime, c
         quando, doc = ts(agora), json.loads(p["doc"])
         documento_id = bem_id = None
         if estado == "aprovada":
+            if "numeros" in campos:
+                _conferir_numeros(doc, campos["numeros"])
             if campos:
                 doc = validar({**doc, **campos})
             trocou = "titular_id" in campos or "titular_tipo" in campos

@@ -19,6 +19,8 @@ router = APIRouter(prefix="/api/v1/documentos", dependencies=[Depends(exigir("bo
 MENSAGENS = {
     "nao_encontrado": (404, "não encontrado"), "conflito": (409, "a proposta já foi decidida"),
     "titular_invalido": (400, "titular inexistente ou inválido"), "valor_invalido": (400, "valor inválido"),
+    "numero_obrigatorio": (400, "o documento precisa de ao menos um número"),
+    "principal_removido": (400, "o número principal não pode ser removido; corrija o valor dele"),
 }
 
 

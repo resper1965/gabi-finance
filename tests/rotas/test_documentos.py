@@ -109,6 +109,8 @@ def test_correcao_invalida_e_titular_inexistente(cli, banco):
     assert r.status_code == 400 and r.json()["erro"] == "valor_invalido" and "2031" not in r.text
     assert _post(cli, url, {}).status_code == 400
     assert _post(cli, url, {"estado": "talvez"}).status_code == 400
+    r = _post(cli, url, {"estado": "aprovada", "correcao": {"numeros": []}})
+    assert r.status_code == 400 and r.json()["erro"] == "numero_obrigatorio" and "ao menos um número" in r.text
 
 
 def test_recusar_e_409_em_decisao_repetida(cli, banco):
