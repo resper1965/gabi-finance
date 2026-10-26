@@ -239,3 +239,11 @@ def test_a_receber_manual_sem_escopo_fin(banco):
     with cli:
         assert chamar(cli, tok, "financeiro_registrar_a_receber", pagador="X", valor="1,00")["erro"] == "sem_escopo"
         assert chamar(cli, tok, "financeiro_cancelar_a_receber", id=1)["erro"] == "sem_escopo"
+
+
+@pytest.mark.parametrize("bruto", ["abc", "R$ 12x", "12,3,4"])
+def test_valor_ilegivel_nao_ecoa_o_texto(banco, bruto):
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        r = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="X", valor=bruto)
+    assert r["erro"] == "valor_invalido" and bruto not in json.dumps(r, ensure_ascii=False)

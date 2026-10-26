@@ -127,7 +127,7 @@ def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar"}
     for n in nomes:
-        if n in ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber"):  # escrita de contato com histórico e Desfazer (spec do cadastro familiar), nunca documento
+        if n in ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber"):  # escrita reversível a pedido do Ricardo (contato com Desfazer no painel; Onda 3: lixeira recuperável, regra de lixo, a receber manual), nunca documento
             continue
         palavras = set(n.replace("contas_a_pagar", "contas").split("_"))  # "contas a pagar" é consulta, não ação
         assert not (palavras & proibidas), n

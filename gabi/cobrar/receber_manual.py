@@ -34,8 +34,8 @@ def valor_ditado(v: str) -> int:
         raise ErroReceber("valor_invalido", "valor ambíguo: use vírgula nos centavos (1500,00)")
     try:
         c = para_centavos(v)
-    except ValueError as e:
-        raise ErroReceber("valor_invalido", str(e)) from e
+    except ValueError:
+        raise ErroReceber("valor_invalido", "valor inválido: use números, com vírgula nos centavos (1500,00)") from None
     if not c or abs(c) > LIMITE_CENTAVOS:
         raise ErroReceber("valor_invalido", "valor zero, vazio ou acima de R$ 10.000.000,00")
     return c
