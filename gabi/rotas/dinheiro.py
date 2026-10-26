@@ -10,7 +10,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gabi.db import conectar
-from gabi.dinheiro import analise, consultas, contas_pagar as cp, regras as rg, repositorio
+from gabi.dinheiro import analise, consultas, contas_pagar as cp, nao_gasto, regras as rg, repositorio
 from gabi.dinheiro.projecao import projetar
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.envelope import envelope
@@ -18,7 +18,7 @@ from gabi.identidade import Identidade, exigir
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
 PERIODOS = {"semana": 7, "mes": 30, "12m": 365}
-EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id"}
+EDITAVEIS = {"categoria_id", "beneficiario_id", "empresa_id", "frente_id", "gasto"}
 
 
 # ---------------- utilitários ----------------
@@ -206,13 +206,19 @@ def lancamentos(request: Request, pendente: str | None = None, de: str | None = 
 
 
 def _validar_mudancas(con, m: dict) -> dict:
-    """{categoria_id, beneficiario_id, empresa_id, frente_id} -> colunas, validando existência. None limpa o campo."""
+    """{categoria_id, beneficiario_id, empresa_id, frente_id, gasto} -> colunas, validando existência. None limpa o campo.
+    gasto: true/false é a marcação do Ricardo (vence as regras de nao_gasto); None devolve a decisão às regras."""
     if not m:
         raise erro(400, "requisicao_invalida", "informe ao menos um campo para mudar")
     if set(m) - EDITAVEIS:
         raise erro(400, "requisicao_invalida", f"campos que não se editam: {sorted(set(m) - EDITAVEIS)}")
     saida = {}
     for chave, valor in m.items():
+        if chave == "gasto":
+            if valor is not None and not isinstance(valor, bool):
+                raise erro(400, "requisicao_invalida", "gasto deve ser true, false ou null")
+            saida["natureza_manual"] = None if valor is None else ("gasto" if valor else "nao_gasto")
+            continue
         col = "para_quem_id" if chave == "beneficiario_id" else chave
         if valor is not None:
             if chave == "frente_id":
@@ -229,11 +235,13 @@ def _validar_mudancas(con, m: dict) -> dict:
 def _aplicar_mudancas(con, ids: list[int], cols: dict) -> None:
     for lid in ids:
         for col, valor in cols.items():
-            origem = f"{col[:-3]}_origem" if col != "frente_id" else None
+            origem = f"{col[:-3]}_origem" if col not in ("frente_id", "natureza_manual") else None
             if origem:
                 con.execute(f"update lancamento set {col}=?, {origem}=? where id=?", (valor, "voce" if valor is not None else None, lid))
             else:
                 con.execute(f"update lancamento set {col}=? where id=?", (valor, lid))
+    if "natureza_manual" in cols:
+        nao_gasto.reaplicar(con, ids)
 
 
 @router.patch("/lancamentos/{lid}")

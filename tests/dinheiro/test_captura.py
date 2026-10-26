@@ -333,3 +333,19 @@ def test_sincronizar_devolve_a_ultima_atualizacao_de_cada_banco_pelo_nome():
     ultimas = {}
     sincronizar(FakeSync([st]), dorme=lambda s: None, agora=lambda: next(relogio), limite=250, inicio=ini, ultimas=ultimas)
     assert ultimas == {"C6 Bank": "2026-10-08T10:01:00Z", "Itau": "2026-10-07T09:00:00Z"}
+
+
+def test_boleto_da_fatura_sai_de_gastos_na_mesma_rodada_e_a_marcacao_manual_fica(con, tmp_path):
+    """O banco vem antes do cartão na lista: o boleto só se confere com a fatura depois de todas as contas gravadas."""
+    txs = {"acc-bank-1111": [tx("b1", "2026-10-07", "Pagamento de boleto ITAU UNIBANCO HOLDING S.A.", 800.25, category="Transfer - Bank Slip"),
+                              tx("b2", "2026-10-05", "Pagamento de boleto AVENUES SAO PAULO EDUCACAO LTD", 9766.67, category="Transfer - Bank Slip")]}
+    faturas = {"acc-card-9999": [{"id": "bill1", "dueDate": "2026-10-10T00:00:00Z", "totalAmount": 800.25}]}
+    fin = FakeFin([BANCO, CARTAO], txs, faturas)
+    _rodar(con, fin, tmp_path)
+    L = _lancs(con)
+    assert (L["b1"]["natureza"], L["b1"]["natureza_regra"]) == ("caixa", "fatura")
+    assert (L["b2"]["natureza"], L["b2"]["natureza_regra"]) == ("caixa+custo", None)
+    con.execute("update lancamento set natureza_manual='nao_gasto' where externo_id='b2'")
+    _rodar(con, fin, tmp_path)  # a captura regrava a natureza bruta; a marcação do Ricardo volta a valer
+    L = _lancs(con)
+    assert (L["b2"]["natureza"], L["b2"]["natureza_regra"]) == ("caixa", "manual")

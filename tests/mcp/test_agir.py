@@ -247,3 +247,49 @@ def test_valor_ilegivel_nao_ecoa_o_texto(banco, bruto):
     with cli:
         r = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="X", valor=bruto)
     assert r["erro"] == "valor_invalido" and bruto not in json.dumps(r, ensure_ascii=False)
+
+
+# ---------------- o que não é gasto e assinaturas ----------------
+def _gastos(banco):
+    c = conectar(banco)
+    c.execute("insert into conta(id, externo_id, instituicao, tipo, apelido, estado) values (901,'bx','Itaú','BANK','itau','sim')")
+    a = c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, natureza, status) "
+                  "values (901,'g1','2026-10-05',-976667,'Pagamento de boleto AVENUES','caixa+custo','posted')").lastrowid
+    c.execute("insert into assinatura(estabelecimento) values ('NETFLIX')")
+    c.execute("insert into assinatura(estabelecimento) values ('SEM PARAR')")
+    c.execute("insert into assinatura(estabelecimento) values ('SEM PARAR TAG')")
+    return a
+
+
+def test_marcar_nao_gasto_desfazer_e_auditoria(banco):
+    lid = _gastos(banco)
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        r = chamar(cli, tok, "financeiro_marcar_gasto", lancamento_ids=[lid], gasto="nao")["dados"]
+        assert r["itens"][0]["gasto"] is False and r["itens"][0]["motivo"] == "manual"
+        assert chamar(cli, tok, "financeiro_marcar_gasto", lancamento_ids=[lid], gasto="automatico")["dados"]["itens"][0]["gasto"] is True
+        assert chamar(cli, tok, "financeiro_marcar_gasto", lancamento_ids=[lid], gasto="talvez")["erro"] == "requisicao_invalida"
+        assert chamar(cli, tok, "financeiro_marcar_gasto", lancamento_ids=[999999], gasto="nao")["erro"] == "nao_encontrado"
+    d = conectar(banco).execute("select o_que from decisao where origem='hermes' order by id").fetchall()
+    assert [x[0] for x in d] == ["gastos: hermes marcou 1 lançamento(s) como gasto=nao", "gastos: hermes marcou 1 lançamento(s) como gasto=automatico"]
+
+
+def test_assinatura_marcar_por_nome_ambiguo_e_desfazer(banco):
+    _gastos(banco)
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        r = chamar(cli, tok, "assinatura_marcar", assinatura="netflix", status="nao_assinatura")["dados"]
+        assert (r["nome"], r["status"], r["status_antes"], r["no_rol"]) == ("NETFLIX", "nao_assinatura", "a_conferir", False)
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="sem", status="manter")["erro"] == "ambiguo"
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="SEM PARAR", status="manter")["dados"]["nome"] == "SEM PARAR"  # nome exato desempata
+        assert chamar(cli, tok, "assinatura_marcar", assinatura=str(r["id"]), status="a_conferir")["dados"]["no_rol"] is True
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="hbo", status="manter")["erro"] == "nao_encontrado"
+        itens = chamar(cli, tok, "assinaturas_listar")["dados"]["itens"]
+    assert {i["nome"]: i["status"] for i in itens} == {"NETFLIX": "a_conferir", "SEM PARAR": "manter", "SEM PARAR TAG": "a_conferir"}
+
+
+def test_nao_gasto_e_assinatura_exigem_escopo_fin(banco):
+    cli, tok = _cli(banco, None, ("trabalho",))
+    with cli:
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="x", status="manter")["erro"] == "sem_escopo"
+        assert chamar(cli, tok, "financeiro_marcar_gasto", lancamento_ids=[1], gasto="nao")["erro"] == "sem_escopo"

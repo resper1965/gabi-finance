@@ -239,3 +239,11 @@ Sem modelo, toda segunda às 09h: units `gabi-brain-*`/`hermes-*` em `failed`, f
 2. `hermes cron create '0 9 * * 1' --name vigia-semanal --script vigia_semanal.py --no-agent --deliver telegram --failure-deliver whatsapp`
 3. Teste: `python3 ~/.hermes/scripts/vigia_semanal.py`.
 - **Desfazer:** `hermes cron remove <id>` (id em `hermes cron list`).
+
+## O que não é gasto e rol de assinaturas {#nao-gasto}
+Decisão: `docs/adr/029-nao-gasto-e-rol-de-assinaturas.md`.
+1. **Instalar:** `sudo ~/instalar-brain.sh` (aplica a migração 0083).
+2. **Bekaa como empresa sua:** no cadastro de empresas, `relacao: "pj_titular"` na Bekaa (sem isso o Pix para ela continua gasto).
+3. **Reaplicar no histórico** (a captura reaplica sozinha a cada rodada; isto só antecipa e imprime o total de Gastos antes e depois): `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.dinheiro.nao_gasto --banco /var/lib/gabi-brain/gabi.db`.
+4. **Hermes:** acrescentar `financeiro_marcar_gasto`, `assinaturas_listar` e `assinatura_marcar` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`; lista oficial em `docs/fontes/hermes.md`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.
+- **Corrigir um caso:** Gastos › Lançamentos, "é gasto / não é gasto" em cada saída ("deixar o brain decidir" tira a marcação), ou pelo Hermes.

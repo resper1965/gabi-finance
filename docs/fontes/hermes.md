@@ -15,6 +15,8 @@ mcp_servers:
       include:
       - agenda_financeira
       - agenda_listar
+      - assinatura_marcar
+      - assinaturas_listar
       - avisos_abertos
       - bens_listar
       - classificar_lancamento
@@ -46,6 +48,7 @@ mcp_servers:
       - financeiro_cancelar_a_receber
       - financeiro_contas_a_pagar
       - financeiro_lancamentos
+      - financeiro_marcar_gasto
       - financeiro_para_onde_vai
       - financeiro_previsao
       - financeiro_recorrentes

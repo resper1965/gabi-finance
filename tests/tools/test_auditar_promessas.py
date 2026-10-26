@@ -122,5 +122,6 @@ def test_falhou(tmp_path):
 
 
 def test_escritas_da_onda3_contam():
-    for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo"):
+    for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo",
+              "financeiro_marcar_gasto", "assinatura_marcar"):
         assert "mcp__gabi_brain__" + n in ap.FERRAMENTAS_DE_ESCRITA

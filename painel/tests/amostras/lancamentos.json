@@ -19,6 +19,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 5,
     "natureza": "caixa+custo",
     "para_quem": {
@@ -49,6 +53,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 1,
     "natureza": "caixa+custo",
     "para_quem": {
@@ -79,6 +87,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 2,
     "natureza": "caixa+custo",
     "para_quem": {
@@ -109,6 +121,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": false
+    },
     "id": 3,
     "natureza": "caixa",
     "para_quem": {
@@ -139,6 +155,10 @@
     "fatura_id": "f1",
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 13,
     "natureza": "custo",
     "para_quem": {
@@ -169,6 +189,10 @@
     "fatura_id": "f1",
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 6,
     "natureza": "custo",
     "para_quem": {
@@ -199,6 +223,10 @@
     "fatura_id": "f1",
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 10,
     "natureza": "custo",
     "para_quem": {
@@ -229,6 +257,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 4,
     "natureza": "caixa+custo",
     "para_quem": {
@@ -259,6 +291,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 7,
     "natureza": "custo",
     "para_quem": {
@@ -289,6 +325,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 11,
     "natureza": "custo",
     "para_quem": {
@@ -319,6 +359,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 8,
     "natureza": "custo",
     "para_quem": {
@@ -349,6 +393,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 12,
     "natureza": "custo",
     "para_quem": {
@@ -379,6 +427,10 @@
     "fatura_id": null,
     "forma": null,
     "frente_id": null,
+    "gasto": {
+     "origem": null,
+     "valor": true
+    },
     "id": 9,
     "natureza": "custo",
     "para_quem": {
