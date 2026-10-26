@@ -234,7 +234,7 @@ Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do R
 - **Desfazer (rollback):** `cp -p ~/.hermes/config.yaml.bak-antes-onda3 ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O banco não precisa voltar: as tabelas novas ficam vazias e inofensivas (o backup `gabi.db.antes-onda3-<data>` é só garantia); sem as ferramentas no `include`, o Hermes não as vê.
 
 ## Vigia semanal (cron `no_agent` do Hermes) {#vigia}
-Sem modelo, toda segunda às 09h: units `gabi-brain-*`/`hermes-*` em `failed`, fontes de dados fora de `ok`/`em_espera` (envelope do `avisos_abertos`) e promessas do Hermes sem escrita nos últimos 7 dias (`tools.auditar_promessas`). Tudo certo = uma linha "tudo ok"; senão uma linha por problema. Falha (brain fora, sem token) = "Falhou: vigia semanal (...)" e o Hermes avisa a falha.
+Sem modelo, toda segunda às 09h: units `gabi-brain-*`/`hermes-*` em `failed`, fontes de dados em `erro` ou `parada` (envelope do `financeiro_saldo`, que olha todas as fontes) e promessas do Hermes sem escrita nos últimos 7 dias (`tools.auditar_promessas`). Tudo certo = uma linha "tudo ok"; senão uma linha por problema. Falha (brain fora, sem token) = "Falhou: vigia semanal (...)" e o Hermes avisa a falha.
 1. `cp -p ~/gabi-brain/deploy/hermes/scripts/vigia_semanal.py ~/.hermes/scripts/`
 2. `hermes cron create '0 9 * * 1' --name vigia-semanal --script vigia_semanal.py --no-agent --deliver telegram --failure-deliver whatsapp`
 3. Teste: `python3 ~/.hermes/scripts/vigia_semanal.py`.

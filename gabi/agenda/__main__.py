@@ -1,4 +1,4 @@
-"""Programa da agenda (timer de 15 min): sincroniza as fontes liberadas (`agenda_fonte.estado='sim'`) pela ponte e imprime SÓ contagens.
+"""Programa da agenda (timer de 30 min): sincroniza as fontes liberadas (`agenda_fonte.estado='sim'`) pela ponte e imprime SÓ contagens.
 O Google chega pela ponte do serviço de fontes (GABI_FONTES_SOCKET); este processo não tem rede nem segredo. Nunca imprime título de evento.
 Sai 0 se ao menos uma fonte sincronizou ou não há fonte liberada; 1 só se todas falham e alguma por motivo diferente de "conta não autorizada".
 Uso: python -m gabi.agenda"""

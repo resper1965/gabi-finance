@@ -13,7 +13,7 @@ URL = "http://127.0.0.1:8081/mcp"
 ENV = Path.home() / ".hermes" / ".env"
 BRAIN = Path.home() / "gabi-brain"
 NOSSAS = ("gabi-brain", "hermes")
-FONTE_OK = ("ok", "em_espera")
+PROBLEMA = ("erro", "parada")  # `nao_conferida` só informa (ADR-023), `em_espera` é fonte em espera de chave
 
 
 def token() -> str:
@@ -46,7 +46,10 @@ def units_falhando(saida: str) -> list[str]:
 
 
 def fontes_paradas(envelope: dict) -> list[str]:
-    return [f["nome"] for f in envelope.get("fontes") or [] if f.get("estado") not in FONTE_OK]
+    """Envelope de uma ferramenta que olha TODAS as fontes (`financeiro_saldo`); `avisos_abertos` sempre traz `fontes: []`."""
+    if not isinstance(envelope, dict) or "erro" in envelope:
+        raise RuntimeError("ferramenta devolveu erro")
+    return [str(f.get("nome") or "?") for f in envelope.get("fontes") or [] if isinstance(f, dict) and f.get("estado") in PROBLEMA]
 
 
 def promessas(saida: str) -> int | None:
@@ -74,14 +77,14 @@ def texto(units: list[str], paradas: list[str], casos: int | None) -> str:
 
 def main(argv: list[str]) -> int:
     try:
-        envelope = chamar(token(), "avisos_abertos", {"dias": 1})
+        paradas = fontes_paradas(chamar(token(), "financeiro_saldo", {}))
         failed = subprocess.run(["systemctl", "--failed", "--plain", "--no-legend"], capture_output=True, text=True, timeout=30).stdout
         aud = subprocess.run([str(BRAIN / ".venv" / "bin" / "python"), "-m", "tools.auditar_promessas"], cwd=BRAIN,
                              capture_output=True, text=True, timeout=120).stdout
     except Exception as e:  # noqa: BLE001 - qualquer falha vira aviso curto
         print(f"Falhou: vigia semanal ({type(e).__name__})")
         return 1
-    print(texto(units_falhando(failed), fontes_paradas(envelope), promessas(aud)))
+    print(texto(units_falhando(failed), paradas, promessas(aud)))
     return 0
 
 

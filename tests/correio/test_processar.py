@@ -518,7 +518,7 @@ def test_emergencial_de_remetente_sistema_vira_importante_sem_aviso(con):
     r = pr.processar(con, Modelo(padrao=_json("emergencial", 3, "falha", 0.9)), _orc(), Ponte(), AGORA)
     assert r["emergenciais"] == 0 and _avisos(con, "email_emergencial") == []
     assert _estado(con, "s1")[:2] == ("classificada", "importante")
-    assert con.execute("select prioridade, motivo from email_msg where externo_id='s1'").fetchone()[:] == (3, "remetente do sistema")
+    assert con.execute("select prioridade, motivo from email_msg where externo_id='s1'").fetchone()[:] == (3, "remetente do sistema: falha")
 
 
 def test_retomada_emergencial_de_sistema_rebaixada(con):
