@@ -113,7 +113,7 @@ def test_liberar_leitura_e_lixeira_sao_chaves_separadas_e_a_lixeira_exige_leitur
 def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
     padrao = cli.get(f"{U}/parametros", headers=BOSS).json()["dados"]
     assert {k: v for k, v in padrao.items() if k != "palavras_protegidas"} == {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30,
-                                                                                "retencao_msg_dias": 180, "dias_em_aberto": 7, "max_alertas_dia": 5, "regras_lixo": []}
+                                                                                "retencao_msg_dias": 180, "dias_em_aberto": 7, "max_alertas_dia": 5, "regras_lixo": [], "remetentes_sistema": []}
     assert "fatura" in padrao["palavras_protegidas"] and "boleto" in padrao["palavras_protegidas"]  # a lista padrão aparece para o dono editar
     r = _put(cli, {"vips": ["Chefe@Ionic.com", "chefe@ionic.com", " bia@x.com "], "criterios_emergencia": "banco ou cobrança com prazo", "lixeira_confianca": 0.95})
     assert r.status_code == 200
@@ -126,7 +126,7 @@ def test_parametros_padrao_gravacao_e_normalizacao_dos_vips(cli):
                                    {"lixeira_confianca": "0.9"}, {"lixeira_confianca": True}, {"janela_dias": 0}, {"janela_dias": 61}, {"janela_dias": 1.5},
                                    {"retencao_dias": 0}, {"retencao_dias": 366}, {"retencao_msg_dias": 89}, {"retencao_msg_dias": 3651}, {"retencao_msg_dias": True}, {"retencao_dias": True},
                                    {"dias_em_aberto": 0}, {"dias_em_aberto": 31}, {"dias_em_aberto": True}, {"max_alertas_dia": 0}, {"max_alertas_dia": 51}, {"max_alertas_dia": 2.5},
-                                   {"regras_lixo": "a@x.com"}, {"regras_lixo": ["nao-e-email"]}, {"regras_lixo": ["@"]}, {"regras_lixo": [3]}, {"regras_lixo": [f"u{i}@x.com" for i in range(501)]},
+                                   {"regras_lixo": "a@x.com"}, {"regras_lixo": ["nao-e-email"]}, {"regras_lixo": ["@"]}, {"regras_lixo": [3]}, {"remetentes_sistema": ["nao-e-email"]}, {"remetentes_sistema": "a@x.com"}, {"regras_lixo": [f"u{i}@x.com" for i in range(501)]},
                                    {"palavras_protegidas": "fatura"}, {"palavras_protegidas": [3]}, {"palavras_protegidas": ["x" * 61]}, {"palavras_protegidas": ["a"] * 0 + [f"p{i}" for i in range(201)]}])
 def test_parametros_validam_faixas(cli, corpo):
     assert _put(cli, corpo).status_code == 400

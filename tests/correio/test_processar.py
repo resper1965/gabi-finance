@@ -506,3 +506,24 @@ def test_regra_do_dono_tenta_de_novo_depois_de_falha_da_ponte(con):
     p = Ponte(); m = Modelo()
     pr.processar(con, m, _orc(), p, depois)
     assert m.n == 0 and p.chamadas == [("a@x.com", ["a1"])] and _estado(con, "a1")[0] == "na_lixeira"
+
+
+def _sistema(con, lista):
+    con.execute("insert into parametro(chave, valor) values ('email.remetentes_sistema', ?)", (json.dumps(lista),))
+
+
+def test_emergencial_de_remetente_sistema_vira_importante_sem_aviso(con):
+    _sistema(con, ["@loja.com"])
+    f = _fonte(con); _msg(con, f, "s1", "Falha no job", lista=0)
+    r = pr.processar(con, Modelo(padrao=_json("emergencial", 3, "falha", 0.9)), _orc(), Ponte(), AGORA)
+    assert r["emergenciais"] == 0 and _avisos(con, "email_emergencial") == []
+    assert _estado(con, "s1")[:2] == ("classificada", "importante")
+    assert con.execute("select prioridade, motivo from email_msg where externo_id='s1'").fetchone()[:] == (3, "remetente do sistema")
+
+
+def test_retomada_emergencial_de_sistema_rebaixada(con):
+    _sistema(con, ["promo@loja.com"])
+    f = _fonte(con); _msg(con, f, "s2", "Alerta", lista=0, classe="emergencial")
+    m = Modelo()
+    pr.processar(con, m, _orc(), Ponte(), AGORA)
+    assert m.n == 0 and _avisos(con, "email_emergencial") == [] and _estado(con, "s2")[1] == "importante"

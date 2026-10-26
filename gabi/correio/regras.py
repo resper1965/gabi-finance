@@ -43,12 +43,13 @@ def regra_valida(texto) -> str | None:
     return endereco(t)
 
 
-def regra_lixo(con, remetente) -> str | None:
-    """A regra do dono ("sempre lixo", parâmetro `email.regras_lixo`) que casa com este remetente, ou None. Endereço exato ou domínio exato (sem subdomínio)."""
+def _casa(con, chave: str, remetente) -> str | None:
+    """A entrada da lista do parâmetro `chave` (endereços e domínios, como em `regra_valida`) que casa com o remetente, ou None.
+    Endereço exato ou domínio exato (sem subdomínio). Parâmetro ausente ou corrompido: nada casa."""
     a = endereco(remetente)
     if a is None:
         return None
-    r = con.execute("select valor from parametro where chave='email.regras_lixo'").fetchone()
+    r = con.execute("select valor from parametro where chave=?", (chave,)).fetchone()
     try:
         lista = json.loads(r[0]) if r else []
     except (ValueError, TypeError):
@@ -60,6 +61,16 @@ def regra_lixo(con, remetente) -> str | None:
         if candidata in regras:
             return candidata
     return None
+
+
+def regra_lixo(con, remetente) -> str | None:
+    """A regra do dono ("sempre lixo", parâmetro `email.regras_lixo`) que casa com este remetente, ou None."""
+    return _casa(con, "email.regras_lixo", remetente)
+
+
+def remetente_sistema(con, remetente) -> str | None:
+    """Remetente de sistema (parâmetro `email.remetentes_sistema`: falhas de serviço, Google Cloud...): nunca vira alerta emergencial."""
+    return _casa(con, "email.remetentes_sistema", remetente)
 
 
 def _pessoa_conhecida(con, a: str) -> bool:

@@ -10,7 +10,8 @@ from gabi.fontes.google_oauth import ErroGoogleOAuth, conta_valida
 PROVEDORES = ("google", "graph")
 ESTADOS = ("sim", "nao", "a_decidir")
 PADROES = {"criterios_emergencia": "", "vips": [], "lixeira_confianca": 0.9, "janela_dias": 14, "retencao_dias": 30, "retencao_msg_dias": 180,
-           "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO), "regras_lixo": []}
+           "dias_em_aberto": 7, "max_alertas_dia": 5, "palavras_protegidas": list(PALAVRAS_PADRAO), "regras_lixo": [],
+           "remetentes_sistema": []}
 CHAVES = {k: f"email.{k}" for k in PADROES}
 CRITERIOS_MAX = 2000
 VIPS_MAX = 200
@@ -107,6 +108,13 @@ def validar_parametros(corpo) -> dict:
             normal = [regra_valida(x) for x in v]
             if not all(normal):
                 raise ErroFonte("regras_lixo tem um endereço ou domínio inválido")
+            v = list(dict.fromkeys(normal))
+        elif k == "remetentes_sistema":
+            if not isinstance(v, list) or len(v) > VIPS_MAX or not all(isinstance(x, str) for x in v):
+                raise ErroFonte(f"remetentes_sistema deve ser uma lista de até {VIPS_MAX} endereços (a@x.com) ou domínios (@x.com)")
+            normal = [regra_valida(x) for x in v]
+            if not all(normal):
+                raise ErroFonte("remetentes_sistema tem um endereço ou domínio inválido")
             v = list(dict.fromkeys(normal))
         elif k == "lixeira_confianca":
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0.7 <= v <= 1.0:

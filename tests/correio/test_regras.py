@@ -149,3 +149,18 @@ def test_acrescentar_respeita_limite_500(con):
     with pytest.raises(fontes.ErroFonte):
         fontes.acrescentar_regra_lixo(con, "novo@x.com")
     assert fontes.acrescentar_regra_lixo(con, "u0@x.com") == ("u0@x.com", False)
+
+
+# ---------------- remetentes do sistema (nunca emergencial) ----------------
+def test_remetente_sistema_endereco_e_dominio(con):
+    con.execute("insert into parametro(chave, valor) values ('email.remetentes_sistema', ?)", (json.dumps(["alertas@ness.com.br", "@google.com", 7]),))
+    assert regras.remetente_sistema(con, "Ness Brain <ALERTAS@ness.com.br>") == "alertas@ness.com.br"
+    assert regras.remetente_sistema(con, "cloud@google.com") == "@google.com"
+    assert regras.remetente_sistema(con, "pessoa@ness.com.br") is None
+    assert regras.regra_lixo(con, "cloud@google.com") is None  # listas separadas
+
+
+def test_remetente_sistema_parametro_invalido_e_vazio(con):
+    assert regras.remetente_sistema(con, "a@b.com") is None
+    con.execute("insert into parametro(chave, valor) values ('email.remetentes_sistema', '{\"x\": 1}')")
+    assert regras.remetente_sistema(con, "a@b.com") is None

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from gabi.avisos import _inicio_do_dia_utc, _novo
 from gabi.correio.classificar import Classe, classificar, decidir_lixeira
-from gabi.correio.regras import endereco, protegido, regra_lixo, texto_protegido
+from gabi.correio.regras import endereco, protegido, regra_lixo, remetente_sistema, texto_protegido
 from gabi.correio.sincronizar import JANELA_PADRAO, respondidos_prontos
 from gabi.correio.modelo import Falha
 
@@ -197,6 +197,11 @@ def processar(con, cliente, orcamento, ponte, agora: str, limites: Limites | Non
             classe = r
             c["invalidas"] += int(r.invalida)
             c["classificadas"] += 1
+            con.execute("update email_msg set classe=?, prioridade=?, motivo=?, confianca=?, atualizado_em=? where id=?",
+                        (classe.classe, classe.prioridade, classe.motivo, classe.confianca, agora, m["id"]))
+        if classe.classe == "emergencial" and remetente_sistema(con, m["remetente"]):
+            # falha de serviço, Google Cloud...: fica na fila como importante, sem alerta (o OnFailure do próprio serviço já avisa)
+            classe = Classe("importante", classe.prioridade, "remetente do sistema", classe.confianca)
             con.execute("update email_msg set classe=?, prioridade=?, motivo=?, confianca=?, atualizado_em=? where id=?",
                         (classe.classe, classe.prioridade, classe.motivo, classe.confianca, agora, m["id"]))
         if classe.classe == "emergencial":
