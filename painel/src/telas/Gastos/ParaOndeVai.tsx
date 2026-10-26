@@ -13,8 +13,8 @@ interface Destino {
   comparacao: { categoria: string; atual: string; anterior: string; variacao: string }[];
 }
 interface Agrupado { itens: { nome: string; valor: string; pct: number; variacao: string }[]; total: string }
-type Vista = "categoria" | "fornecedor" | "pessoa";
-const ROTULO: Record<Vista, string> = { categoria: "Categorias", fornecedor: "Fornecedores", pessoa: "Por pessoa" };
+type Vista = "categoria" | "fornecedor" | "gastador" | "pessoa";
+const ROTULO: Record<Vista, string> = { categoria: "Categorias", fornecedor: "Fornecedores", gastador: "Quem gastou", pessoa: "Para quem foi" };
 const MES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const ROTULO_PERIODO: Record<string, string> = { semana: "Últimos 7 dias", "12m": "Últimos 12 meses" };
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
@@ -34,7 +34,8 @@ export function ParaOndeVai() {
     const emp = empresas.find((e) => escolhido.nome === `A receber: ${e.nome}`);
     const cat = categorias.find((c) => c.nome === escolhido.nome);
     const pes = escolhido.tipo === "pessoa" ? pessoas.find((x) => x.nome === escolhido.nome) : undefined;
-    filtro = escolhido.tipo === "origem" ? `conta=${encodeURIComponent(escolhido.nome)}` : pes ? `para_quem=${pes.id}` : emp ? `empresa=${emp.id}` : cat ? `categoria=${cat.id}` : `texto=${encodeURIComponent(escolhido.nome)}`;
+    const gas = escolhido.tipo === "gastador" ? pessoas.find((x) => x.nome === escolhido.nome) : undefined;
+    filtro = escolhido.tipo === "gastador" ? (gas ? `gastador=${gas.id}` : "pendente=gastador") : escolhido.tipo === "origem" ? `conta=${encodeURIComponent(escolhido.nome)}` : pes ? `para_quem=${pes.id}` : emp ? `empresa=${emp.id}` : cat ? `categoria=${cat.id}` : `texto=${encodeURIComponent(escolhido.nome)}`;
   }
   const lanc = useApi<{ itens: { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: { nome: string | null } }[] }>(
     filtro && destino.env ? `/api/v1/lancamentos?${filtro}&de=${destino.env.dados.periodo.de}&ate=${destino.env.dados.periodo.ate}&limite=50` : null);
@@ -98,10 +99,10 @@ export function ParaOndeVai() {
                   ))}
                 </ol>
               </>}
-              {vista === "pessoa" && agrupado.env && <>
-                <span style={{ fontSize: 12, color: "var(--ink2)" }}>categoria diz o quê, "para quem" diz de quem é o gasto · toque numa pessoa para ver os lançamentos</span>
+              {(vista === "pessoa" || vista === "gastador") && agrupado.env && <>
+                <span style={{ fontSize: 12, color: "var(--ink2)" }}>{vista === "gastador" ? "quem passou o cartão (o portador); nos cartões compartilhados é você quem indica" : "categoria diz o quê, \"para quem\" diz de quem é o gasto"} · toque numa pessoa para ver os lançamentos</span>
                 {agrupado.env.dados.itens.map((p) => (
-                  <button key={p.nome} onClick={() => setEscolhido({ nome: p.nome, tipo: "pessoa" })} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "4px 12px", padding: "10px 4px", border: 0, borderTop: "1px solid var(--line2)", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer", font: "inherit" }}>
+                  <button key={p.nome} onClick={() => setEscolhido({ nome: p.nome, tipo: vista })} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "4px 12px", padding: "10px 4px", border: 0, borderTop: "1px solid var(--line2)", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer", font: "inherit" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
                       <span style={{ font: "600 17px/1.1 var(--font-heading)" }}>{p.nome}</span>
                       <span style={{ height: 6, background: "var(--line2)" }}><span style={{ display: "block", height: "100%", width: `${Math.min(100, p.pct)}%`, background: "var(--color-accent)" }} /></span>

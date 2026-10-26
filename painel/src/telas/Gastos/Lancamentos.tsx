@@ -9,7 +9,7 @@ import { useApi } from "../../lib/useApi";
 import { useOcultar } from "../../lib/ocultar";
 
 interface Campo { id: number | string | null; nome: string | null; origem: string | null }
-interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo; moeda?: string; valor_original?: string | null; convertido?: boolean; gasto?: { valor: boolean; origem: string | null } }
+interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo; moeda?: string; valor_original?: string | null; convertido?: boolean; gasto?: { valor: boolean; origem: string | null }; gastador?: Campo; portadores?: string[] }
 interface Sug { id: number; tipo: string; lancamento_id: number | null; payload: Record<string, number | string>; motivo: string }
 interface Pessoa { id: number | string; nome: string; papel?: string | null; dados?: Record<string, unknown> }
 interface ContaUso { apelido: string; usuarios?: string[] }
@@ -22,8 +22,8 @@ export function Lancamentos() {
   const { conta } = useFiltros();
   const avisar = useToast();
   const oculto = useOcultar();
-  const [filtro, setFiltro] = useState<"esperando" | "todos">("esperando");
-  const url = `/api/v1/lancamentos?limite=100${filtro === "esperando" ? "&pendente=para_quem" : ""}${conta ? `&conta=${encodeURIComponent(conta)}` : ""}`;
+  const [filtro, setFiltro] = useState<"esperando" | "gastador" | "todos">("esperando");
+  const url = `/api/v1/lancamentos?limite=100${filtro === "esperando" ? "&pendente=para_quem" : filtro === "gastador" ? "&pendente=gastador" : ""}${conta ? `&conta=${encodeURIComponent(conta)}` : ""}`;
   const leitura = useApi<{ itens: Lanc[]; total: number }>(url);
   const pessoas = useApi<{ itens: Pessoa[] }>("/api/v1/cadastros/pessoas").env?.dados.itens ?? [];
   const contas = useApi<{ itens: ContaUso[] }>("/api/v1/cadastros/contas").env?.dados.itens ?? [];
@@ -55,6 +55,14 @@ export function Lancamentos() {
     try { await api.patch(`/api/v1/lancamentos/${l.id}`, { gasto }); avisar(gasto === null ? `${l.estabelecimento}: o brain volta a decidir.` : `Anotado: ${l.estabelecimento} ${gasto ? "é" : "não é"} gasto.`); recarregar(); }
     catch (e) { avisar((e as Error).message); }
   };
+  /** Quem gastou (portador): só nos cartões com 2+ portadores; "sempre" grava a regra desta loja neste cartão. */
+  const indicar = async (l: Lanc, pessoa: string, sempre = false) => {
+    const nome = pessoas.find((p) => String(p.id) === pessoa)?.nome ?? pessoa;
+    try {
+      await api.post("/api/v1/lancamentos/lote", { ids: [l.id], mudancas: { gastador_id: pessoa }, criar_regra: sempre });
+      avisar(sempre ? `Regra criada por você: ${l.estabelecimento} neste cartão é sempre de ${nome}.` : `Anotado: ${nome} gastou em ${l.estabelecimento}.`); recarregar();
+    } catch (e) { avisar((e as Error).message); }
+  };
   const sempreAssim = async (l: Lanc) => {
     try { await api.post("/api/v1/lancamentos/lote", { ids: [l.id], mudancas: { beneficiario_id: l.para_quem.id }, criar_regra: true }); avisar(`Regra criada por você: os próximos de ${l.estabelecimento} seguem igual.`); recarregar(); }
     catch (e) { avisar((e as Error).message); }
@@ -69,14 +77,14 @@ export function Lancamentos() {
           </p>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <div role="group" aria-label="Filtro" className="seg">
-              {([["esperando", "Esperando você"], ["todos", "Todos"]] as const).map(([id, r]) => (
+              {([["esperando", "Esperando você"], ["gastador", "Quem gastou: a indicar"], ["todos", "Todos"]] as const).map(([id, r]) => (
                 <button key={id} className="seg-opt" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
                   style={{ whiteSpace: "nowrap", border: 0, borderLeft: "1px solid var(--color-divider)", marginLeft: -1, background: filtro === id ? "var(--color-accent)" : "transparent", color: filtro === id ? "var(--color-bg)" : "var(--color-text)" }}>{r}</button>
               ))}
             </div>
             {sugParaQuem.length > 0 && <button className="btn btn-secondary" onClick={confirmarTodas}>Confirmar as {sugParaQuem.length} sugestões da Gabi</button>}
           </div>
-          {d.itens.length === 0 && <div style={{ border: "1px dashed var(--line3)", padding: 18, color: "var(--ok)", fontWeight: 600 }}>✓ Nada esperando você. Todos os lançamentos têm dono.</div>}
+          {d.itens.length === 0 && <div style={{ border: "1px dashed var(--line3)", padding: 18, color: "var(--ok)", fontWeight: 600 }}>{filtro === "gastador" ? "✓ Nenhuma compra de cartão compartilhado esperando você indicar quem gastou." : "✓ Nada esperando você. Todos os lançamentos têm dono."}</div>}
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.itens.map((l) => {
               const sug = sugParaQuem.find((s) => s.lancamento_id === l.id);
@@ -93,6 +101,20 @@ export function Lancamentos() {
                       {!oculto && originalEmReais(l) && <span style={{ display: "block", font: "500 11.5px var(--font-body)", color: "var(--ink2)" }}>{originalEmReais(l)}</span>}
                     </span>
                   </div>
+                  {(l.portadores?.length ?? 0) >= 2 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--ink2)" }}>
+                      <span>Quem gastou:</span>
+                      <span role="group" aria-label={`Quem gastou: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {l.portadores!.map((pid) => {
+                          const marcado = l.gastador?.id === pid;
+                          return <button key={pid} aria-pressed={marcado} onClick={() => indicar(l, pid)}
+                            style={{ minHeight: 32, padding: "0 10px", border: `1px solid ${marcado ? "var(--color-accent)" : "var(--line3)"}`, background: marcado ? "var(--color-accent)" : "transparent", color: marcado ? "var(--color-bg)" : "var(--color-text)", cursor: "pointer", font: "600 12.5px var(--font-body)" }}>{pessoas.find((p) => String(p.id) === pid)?.nome ?? pid}</button>;
+                        })}
+                      </span>
+                      {l.gastador?.id && l.gastador.origem === "voce" && <button onClick={() => indicar(l, String(l.gastador!.id), true)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>sempre {l.gastador.nome} em {l.estabelecimento} neste cartão</button>}
+                      {l.gastador?.origem === "regra" && <span>(regra desta loja)</span>}
+                    </div>
+                  )}
                   <div role="group" aria-label={`Para quem: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {opcoesPara(l).map((p) => {
                       const marcado = l.para_quem.id === p.id, sugerido = sug?.payload.para_quem_id === p.id;
