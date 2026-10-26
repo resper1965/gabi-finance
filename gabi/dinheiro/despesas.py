@@ -188,8 +188,8 @@ def _vigente(con, id_: str, m: str):
     return next((v for v in serie_de(con, id_) if _cobre(v, m)), None)
 
 
-def _teve_pagamento(con, ids: list[str]) -> bool:
-    """Alguma dessas versões já teve ocorrência paga ou conciliada, em qualquer mês."""
+def _meses_pagos(con, ids: list[str]) -> set[str]:
+    """Meses em que alguma dessas versões teve ocorrência paga ou conciliada."""
     marca = ",".join("?" * len(ids))
     cand = {tuple(r) for r in con.execute(f"select linha_id, substr(id, -7) from compromisso where origem='planilha' and linha_id in ({marca})", ids)}
     cand |= {tuple(r) for r in con.execute(f"select compromisso, mes from valor_do_mes where tipo='pago' and compromisso in ({marca})", ids)}
@@ -197,7 +197,11 @@ def _teve_pagamento(con, ids: list[str]) -> bool:
         linha, _, ym = str(cid).rpartition(":")
         if linha in ids:
             cand.add((linha, ym))
-    return any(repositorio.ocorrencia_paga(con, linha, ym) for linha, ym in cand)
+    return {ym for linha, ym in cand if repositorio.ocorrencia_paga(con, linha, ym)}
+
+
+def _teve_pagamento(con, ids: list[str]) -> bool:
+    return bool(_meses_pagos(con, ids))
 
 
 def limpar_nao_pagas(con, serie: str, meses: Callable[[str], bool]) -> int:
@@ -279,6 +283,8 @@ def mudar(con, agora: dt.datetime, quem: str, origem: str, id_: str, campos: dic
         gravar_linha(con, linha, bool(v["ativo"]), v["obs"], not existe, v["tipo"])
         if existe:
             con.execute("update compromisso_linha set excluido_em=null, tipo=? where id=?", (v["tipo"], novo_id))
+        # o que foi decidido para um mês (valor/data ou dispensa) acompanha o mês para a versão nova; a baixa `pago` fica
+        con.execute("update valor_do_mes set compromisso=? where compromisso=? and mes>=? and tipo in ('valor','dispensado')", (novo_id, v["id"], m))
 
     mudou = ", ".join(sorted(campos)) or "nada"
     _escrever(con, agora, quem, origem, f"despesa {serie} mudada a partir de {m}" + (f" (nova versão {novo_id})" if nova_versao else "") + f": {mudou}", faz)
@@ -293,10 +299,13 @@ def _versao_do_mes(con, id_: str, mes: str):
 
 
 def mudar_mes(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes: str, valor: str | None = None, vencimento: str | None = None) -> dict:
-    """Valor e/ou data de um mês só (`valor_do_mes` `valor` da versão que vale no mês); o que não vier fica como está."""
+    """Valor e/ou data de um mês só (`valor_do_mes` `valor` da versão que vale no mês); o que não vier fica como está.
+    Mês já pago não muda."""
     if valor is None and vencimento is None:
         raise ValueError("informe o valor ou o vencimento do mês")
     v = _versao_do_mes(con, id_, mes)
+    if mes_pago(con, _serie(id_), mes):
+        raise ValueError("mês já pago")
     centavos = None
     if valor is not None:
         centavos = para_centavos(valor)
@@ -355,12 +364,20 @@ def desfazer_dispensa(con, agora: dt.datetime, quem: str, origem: str, id_: str,
 
 
 def encerrar(con, agora: dt.datetime, quem: str, origem: str, id_: str, ultimo_mes: str | None = None) -> dict:
-    """Último mês = `ultimo_mes` ou o anterior a `mes_inicial`. Versões que começariam depois viram excluídas (nunca
+    """Último mês = `ultimo_mes` ou o anterior a `mes_inicial` (nunca antes do último mês pago, mesmo pago adiantado).
+    `ultimo_mes` antes de um mês pago é recusado. Versões que começariam depois viram excluídas (nunca
     `valido_ate` < `valido_de`); a que cobre o último mês termina nele. O que não foi pago depois sai de A Pagar."""
     hoje = agora.astimezone(BRT).date()
     serie = _serie(id_)
     vs = serie_de(con, serie)
-    u = _mes_valido(ultimo_mes, "ultimo_mes") if ultimo_mes is not None else _somar_mes(mes_inicial(con, serie, hoje), -1)
+    pagos = _meses_pagos(con, _todas_as_versoes(con, serie))
+    if ultimo_mes is not None:
+        u = _mes_valido(ultimo_mes, "ultimo_mes")
+        depois = sorted(m for m in pagos if m > u)
+        if depois:
+            raise ValueError(f"já há pagamento em {depois[0]}; o último mês não pode ser antes dele")
+    else:
+        u = max([_somar_mes(mes_inicial(con, serie, hoje), -1), *pagos])
     quando = agora.astimezone(dt.timezone.utc).isoformat()
 
     def faz():

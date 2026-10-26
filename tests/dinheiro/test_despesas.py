@@ -272,3 +272,80 @@ def test_decisao_registrada(con):
     linhas = con.execute("select quem, origem, o_que from decisao order by id").fetchall()[1:]
     assert len(linhas) == 3 and all(l[0] == "ricardo" and l[1] == "hermes" for l in linhas)
     assert "luz" in linhas[0][2] and "2026-11" in linhas[1][2] and "2026-12" in linhas[2][2]
+
+
+# ---------------- Task 3, correção 1 ----------------
+def test_mudar_leva_dispensa_e_valor_do_mes_para_versao_nova(con):
+    _luz(con)
+    despesas.dispensar_mes(con, AGORA3, "r", "painel", "luz", "2026-11")
+    despesas.mudar_mes(con, AGORA3, "r", "painel", "luz", "2026-11", valor="1.00")
+    r = despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "300.00"}, a_partir="2026-11")
+    assert r["versao_id"] == "luz-202611"
+    assert _comp(con, "luz-202611:2026-11") is None and _comp(con, "luz:2026-11") is None
+    assert {tuple(x) for x in con.execute("select compromisso, tipo from valor_do_mes where mes='2026-11'")} == {("luz-202611", "valor"), ("luz-202611", "dispensado")}
+
+
+def test_mudar_leva_valor_do_mes_e_deixa_pago(con):
+    _luz(con)
+    _pagar(con, "luz", "2026-10")
+    despesas.mudar_mes(con, AGORA3, "r", "painel", "luz", "2026-11", valor="1.00")
+    despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "300.00"})
+    assert _comp(con, "luz-202611:2026-11")[0] == 100
+    assert con.execute("select compromisso from valor_do_mes where tipo='pago'").fetchone()[0] == "luz"
+    assert _comp(con, "luz:2026-10")[2] == "pago"
+
+
+def test_mudar_mes_pago_recusa(con):
+    _luz(con)
+    _pagar(con, "luz", "2026-10")
+    with pytest.raises(ValueError, match="mês já pago"):
+        despesas.mudar_mes(con, AGORA3, "r", "painel", "luz", "2026-10", valor="1.00")
+
+
+def test_encerrar_antes_de_mes_pago_recusa(con):
+    _luz(con, desde_sempre=True)
+    _pagar(con, "luz", "2026-10")
+    with pytest.raises(ValueError, match="já há pagamento em 2026-10"):
+        despesas.encerrar(con, AGORA3, "r", "painel", "luz", ultimo_mes="2026-09")
+    assert con.execute("select valido_ate from compromisso_linha where id='luz'").fetchone()[0] is None
+    assert despesas.encerrar(con, AGORA3, "r", "painel", "luz")["ultimo_mes"] == "2026-10"
+
+
+def test_encerrar_padrao_nao_fica_antes_de_pago_adiantado(con):
+    _luz(con, desde_sempre=True)
+    _pagar(con, "luz", "2026-11")  # novembro pago adiantado, outubro não
+    assert despesas.excluir(con, AGORA3, "r", "painel", "luz") == {"id": "luz", "excluida": False, "encerrada": True, "ultimo_mes": "2026-11"}
+    assert _comp(con, "luz:2026-11")[2] == "pago" and _comp(con, "luz:2026-10")[2] != "pago"
+
+
+def test_excluir_com_pago_em_versao_antiga_excluida_encerra(con):
+    _luz(con)
+    con.execute("insert into compromisso_linha(id, nome, extrato, vencimento, valido_ate, excluido_em) values ('luz-202601','Luz','Luz','dia:10','2026-09','2026-10-01')")
+    con.execute("update compromisso_linha set id='luz-202610' where id='luz'")
+    con.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, estado) "
+                "values ('luz-202601:2026-08','planilha','luz-202601','Luz','2026-08-10','2026-08-10','pago')")
+    assert despesas.excluir(con, AGORA3, "r", "painel", "luz")["encerrada"] is True
+
+
+def test_excluir_com_vinculo_a_conferir_encerra(con):
+    _luz(con, desde_sempre=True)
+    _ocorrencia(con, "luz:2026-08", "a_conferir")
+    con.execute("insert into conciliacao(tx_id, compromisso_id, metodo) values ('tx-1','luz:2026-08','valor')")
+    r = despesas.excluir(con, AGORA3, "r", "painel", "luz")
+    assert r["encerrada"] is True and _comp(con, "luz:2026-08") is not None
+
+
+def test_excluir_com_baixa_sem_ocorrencia_encerra(con):
+    _luz(con, desde_sempre=True)
+    con.execute("insert into valor_do_mes(mes, compromisso, tipo, valor_centavos) values ('2026-08','luz','pago',20000)")
+    assert despesas.excluir(con, AGORA3, "r", "painel", "luz")["encerrada"] is True
+
+
+def test_virada_de_ano(con):
+    dez = dt.datetime(2026, 12, 15, 12, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
+    despesas.criar_fixa(con, dez, "r", "painel", {"nome": "Luz", "valor_padrao": "200.00", "vencimento": "dia:10"})
+    con.execute("insert into valor_do_mes(mes, compromisso, tipo, valor_centavos) values ('2026-12','luz','pago',20000)")
+    cp.atualizar_compromissos(con, dez.date(), dez)
+    assert despesas.mes_inicial(con, "luz", dez.date()) == "2027-01"
+    assert despesas.encerrar(con, dez, "r", "painel", "luz")["ultimo_mes"] == "2026-12"
+    assert _comp(con, "luz:2027-01") is None and _comp(con, "luz:2026-12")[2] == "pago"
