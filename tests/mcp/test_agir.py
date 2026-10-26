@@ -32,7 +32,11 @@ def _cli(banco, correio, escopos=("trabalho",)):
 
 
 def _estado(banco, i):
-    return conectar(banco).execute("select estado from email_msg where id=?", (i,)).fetchone()[0]
+    c = conectar(banco)
+    try:
+        return c.execute("select estado from email_msg where id=?", (i,)).fetchone()[0]
+    finally:
+        c.close()
 
 
 def test_duas_contas_uma_sem_lixeira(banco, con):
@@ -49,7 +53,9 @@ def test_duas_contas_uma_sem_lixeira(banco, con):
 def test_ponte_fora_no_meio_do_lote(banco, con):
     m = _ids(con)
     class Dupla:  # a segunda conta falha
-        chamadas = []
+        def __init__(self):
+            self.chamadas = []
+
         def lixeira(self, conta, ids):
             self.chamadas.append(conta)
             if conta == "c@y.com":
@@ -70,7 +76,9 @@ def test_sem_ponte_e_ja_estavam(banco, con):
     with cli:
         r = chamar(cli, tok, "email_lixeira", mensagem_ids=[m["g1"], ja])["dados"]
     assert r["movidas"] == 0 and r["ja_estavam"] == [ja] and r["falhas"] == [{"id": m["g1"], "codigo": "fonte_indisponivel"}]
-    assert conectar(banco).execute("select count(*) from decisao where origem='hermes'").fetchone()[0] == 0
+    c = conectar(banco)
+    assert c.execute("select count(*) from decisao where origem='hermes'").fetchone()[0] == 0
+    c.close()
 
 
 def test_aceita_importante(banco, con):
@@ -92,7 +100,9 @@ def test_decisao_sem_remetente_nem_assunto(banco, con):
     cli, tok = _cli(banco, {"google": Ponte()})
     with cli:
         chamar(cli, tok, "email_lixeira", mensagem_ids=[m["g1"], m["g2"]])
-    d = conectar(banco).execute("select quem, o_que, origem from decisao where origem='hermes'").fetchall()
+    c = conectar(banco)
+    d = c.execute("select quem, o_que, origem from decisao where origem='hermes'").fetchall()
+    c.close()
     assert [tuple(x) for x in d] == [("hermes", "correio: hermes moveu 2 mensagem(ns) para a lixeira", "hermes")]
 
 
@@ -102,3 +112,18 @@ def test_sem_escopo_trabalho(banco, con):
     with cli:
         assert chamar(cli, tok, "email_lixeira", mensagem_ids=[m["g1"]])["erro"] == "sem_escopo"
     assert _estado(banco, m["g1"]) == "classificada"
+
+
+def test_excecao_inesperada_numa_conta_nao_impede_marcar_a_outra(banco, con):
+    m = _ids(con)
+
+    class Quebra:
+        def lixeira(self, conta, ids):
+            if conta == "c@y.com":
+                raise RuntimeError("falha com y1@y.com")
+            return {i: "ok" for i in ids}
+    cli, tok = _cli(banco, {"google": Quebra()})
+    with cli:
+        r = chamar(cli, tok, "email_lixeira", mensagem_ids=[m["g1"], m["y1"]])["dados"]
+    assert r["movidas"] == 1 and r["ids_movidos"] == [m["g1"]] and r["falhas"] == [{"id": m["y1"], "codigo": "fonte_indisponivel"}]
+    assert _estado(banco, m["g1"]) == "na_lixeira"

@@ -2,11 +2,13 @@
 `email_lixeira` manda para a lixeira RECUPERÁVEL (nunca apaga de vez; desfaz no painel, Mensagens › Lixeira › Restaurar). A `decisao` leva só contagem, nunca
 remetente nem assunto. Consome: correio.lixeira, a ponte do serviço de fontes (`correio`, por provedor)."""
 import datetime as dt
+import logging
 
 from gabi.correio import lixeira
 from gabi.db import transacao
 
 ESCOPOS = {"email_lixeira": "trabalho"}
+log = logging.getLogger("gabi.mcp")
 QUEM = "hermes"
 LIMITE_IDS = 50
 
@@ -25,17 +27,21 @@ def email_lixeira(con, correio, agora: dt.datetime, mensagem_ids) -> dict:
         if ponte is None:
             falhas += [{"id": i, "codigo": "fonte_indisponivel"} for i, _ in itens]
             continue
-        ok, f = lixeira.aplicar(ponte, conta, itens)
+        try:
+            ok, f = lixeira.aplicar(ponte, conta, itens)
+        except Exception as e:  # noqa: BLE001 - uma conta com problema não pode impedir de marcar as já confirmadas em outra
+            log.error("falha inesperada na lixeira do correio (fonte %s): %s", _fonte, type(e).__name__)  # só o id da fonte e o tipo do erro: o texto pode citar conta ou id
+            ok, f = [], [{"id": i, "codigo": "fonte_indisponivel"} for i, _ in itens]
         movidos += ok
         falhas += f
-    n = 0
+    movidos_ok: list[int] = []
     if movidos:
         with transacao(con):
-            n = lixeira.marcar(con, movidos, agora)
-            if n:
+            movidos_ok = lixeira.marcar(con, movidos, agora)
+            if movidos_ok:
                 con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,?)",
-                            (agora.astimezone(dt.timezone.utc).isoformat(), QUEM, f"correio: hermes moveu {n} mensagem(ns) para a lixeira", "hermes"))
-    return {"movidas": n, "ids_movidos": movidos, "ja_estavam": ja, "falhas": falhas}
+                            (agora.astimezone(dt.timezone.utc).isoformat(), QUEM, f"correio: hermes moveu {len(movidos_ok)} mensagem(ns) para a lixeira", "hermes"))
+    return {"movidas": len(movidos_ok), "ids_movidos": movidos_ok, "ja_estavam": ja, "falhas": falhas}
 
 
 _email_lixeira = email_lixeira

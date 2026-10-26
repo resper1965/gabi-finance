@@ -176,11 +176,8 @@ async def mover_para_lixeira(mensagem_id: int, request: Request, ident: Identida
         fonte = fabrica() if fabrica else None
         if fonte is None:
             raise erro(503, "fonte_indisponivel", "o e-mail do Google não está configurado")
-        try:
-            resultado = await asyncio.to_thread(fonte.lixeira, conta, [itens[0][1]])  # rede bloqueante: fora do laço da API
-        except (ErroGoogleOAuth, ErroGraphNess) as e:
-            raise erro(503, "fonte_indisponivel", str(e)) from None
-        if not isinstance(resultado, dict) or resultado.get(itens[0][1]) != "ok":
+        ok, falhas_rede = await asyncio.to_thread(lixeira_mod.aplicar, fonte, conta, itens)  # rede bloqueante: fora do laço da API
+        if falhas_rede or not ok:
             raise erro(503, "fonte_indisponivel", "o Gmail não confirmou o movimento; tente de novo")
         with transacao(con):
             lixeira_mod.marcar(con, [mensagem_id], _agora(request))

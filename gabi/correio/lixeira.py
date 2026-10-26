@@ -50,10 +50,11 @@ def aplicar(ponte, conta: str, itens: list[tuple[int, str]]) -> tuple[list[int],
     return ok, [{"id": i, "codigo": "fonte_indisponivel"} for i, ext in itens if res.get(ext) != "ok"]
 
 
-def marcar(con, ids: list[int], agora: dt.datetime) -> int:
-    """Marca `na_lixeira` só onde a mensagem ainda é triada (o estado pode ter mudado entre planejar e marcar). Devolve quantas mudaram. Quem chama abre a transação."""
+def marcar(con, ids: list[int], agora: dt.datetime) -> list[int]:
+    """Marca `na_lixeira` só onde a mensagem ainda é triada (o estado pode ter mudado entre planejar e marcar). Devolve os ids que mudaram. Quem chama abre a transação."""
     quando = agora.astimezone(dt.timezone.utc).isoformat()
-    n = 0
+    mudou = []
     for i in ids:
-        n += con.execute("update email_msg set estado='na_lixeira', atualizado_em=? where id=? and estado in ('classificada','alertada','restaurada')", (quando, i)).rowcount
-    return n
+        if con.execute("update email_msg set estado='na_lixeira', atualizado_em=? where id=? and estado in ('classificada','alertada','restaurada')", (quando, i)).rowcount:
+            mudou.append(i)
+    return mudou

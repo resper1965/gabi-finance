@@ -69,7 +69,7 @@ def test_aplicar_e_marcar(tmp_path):
     a, b = _msg(c, 1, "e1"), _msg(c, 1, "e2")
     ok, f = lixeira.aplicar(Ponte(res={"e1": "ok", "e2": "erro"}), "a@x.com", [(a, "e1"), (b, "e2")])
     assert ok == [a] and f == [{"id": b, "codigo": "fonte_indisponivel"}]
-    assert lixeira.marcar(c, ok, AGORA) == 1 and lixeira.marcar(c, ok, AGORA) == 0
+    assert lixeira.marcar(c, ok, AGORA) == [a] and lixeira.marcar(c, ok, AGORA) == []
     assert c.execute("select estado from email_msg where id=?", (a,)).fetchone()[0] == "na_lixeira"
 
 
