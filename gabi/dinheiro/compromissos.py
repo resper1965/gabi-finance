@@ -131,6 +131,7 @@ def gerar(fontes, leitura, docs, hoje, invalidas=None):
     ult = ultimos_pagamentos(fontes.debitos(hoje), [ln for ln in linhas if ln["ativo"]])
     valores = {(v["compromisso"], v["mes"]): v for v in sorted(valores_em_centavos(leitura["valores"]),
                                                               key=lambda v: v["linha_planilha"]) if v["tipo"] == "valor"}
+    dispensados = {(d["compromisso"], d["mes"]) for d in leitura.get("dispensados", [])}
     faturas = {}
     for f in fontes.faturas():
         if f["vencimento"][:7] in yms:
@@ -150,7 +151,7 @@ def gerar(fontes, leitura, docs, hoje, invalidas=None):
     for ano, mes in meses:
         ym = f"{ano}-{mes:02d}"
         for ln in linhas:
-            if not _mes_ok(ln, ym):
+            if not _mes_ok(ln, ym) or (ln["id"], ym) in dispensados:
                 continue
             try:
                 ven = vencimento_do_mes(ln["vencimento"], ano, mes)

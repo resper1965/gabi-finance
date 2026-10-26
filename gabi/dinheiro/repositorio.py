@@ -54,7 +54,7 @@ def gravar_leitura(con, leitura: dict) -> None:
 
 
 def ler_leitura(con) -> dict:
-    """{'linhas', 'params', 'valores'} no formato que o gerar/conciliar esperam. Só linhas ativas e não excluídas."""
+    """{'linhas', 'params', 'valores', 'dispensados'} no formato que o gerar/conciliar esperam. Só linhas ativas e não excluídas."""
     linhas = []
     # Linha/valor criados no painel não têm número de planilha: recebem um número alto e crescente (o mais recente vence,
     # como na planilha, onde linha de baixo prevalece) — e a lógica portada ordena por esse número.
@@ -71,11 +71,25 @@ def ler_leitura(con) -> dict:
     for r in con.execute("select chave, valor from parametro"):
         v = json.loads(r["valor"])
         params[r["chave"]] = set(v) if r["chave"] in _CONJUNTOS else v
+    vdm = [r for r in con.execute("select * from valor_do_mes order by coalesce(linha_planilha, 1000000 + id), id") if r["compromisso"] in ativos]
     valores = [{"mes": r["mes"], "compromisso": r["compromisso"], "tipo": r["tipo"], "valor": _real(r["valor_centavos"]),
                 "vencimento": r["vencimento"], "data_pagamento": r["data_pagamento"], "origem": r["origem"] or "",
                 "linha_planilha": r["linha_planilha"] if r["linha_planilha"] is not None else 1_000_000 + r["id"]}
-               for r in con.execute("select * from valor_do_mes order by coalesce(linha_planilha, 1000000 + id), id") if r["compromisso"] in ativos]
-    return {"linhas": linhas, "params": params, "valores": valores}
+               for r in vdm if r["tipo"] != "dispensado"]
+    # mês dispensado (despesas.dispensar_mes) não é valor nem pago: o `gerar` só pula a ocorrência
+    dispensados = [{"compromisso": r["compromisso"], "mes": r["mes"]} for r in vdm if r["tipo"] == "dispensado"]
+    return {"linhas": linhas, "params": params, "valores": valores, "dispensados": dispensados}
+
+
+def ocorrencia_paga(con, linha_id: str, ym: str) -> bool:
+    """A ocorrência `linha_id:ym` foi paga: estado `pago`, baixa `pago` no Valores do mês ou vínculo com lançamento em
+    `conciliacao`. O vínculo `manual:` não conta sozinho: ele só espelha a baixa do Valores do mês (sem ela, é órfão).
+    Ocorrência paga nunca é apagada (despesas.limpar_nao_pagas e a rodada usam este mesmo teste)."""
+    cid = f"{linha_id}:{ym}"
+    return bool(con.execute(
+        "select 1 where exists(select 1 from compromisso where id=? and estado='pago') "
+        "or exists(select 1 from valor_do_mes where compromisso=? and mes=? and tipo='pago') "
+        "or exists(select 1 from conciliacao where compromisso_id=? and tx_id not like 'manual:%')", (cid, linha_id, ym, cid)).fetchone())
 
 
 # ---------------- o que o `gerar` lê do banco ----------------
