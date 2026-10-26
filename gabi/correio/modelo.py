@@ -116,7 +116,10 @@ class ModeloComCusto:
             # I9: falha DEPOIS do envio pode ter sido faturada; sem esta linha o brain não enxerga o gasto e o teto não segura.
             # Recusa antes do envio (não configurado, teto, limite, prompt grande, PDF inválido ou grande) não cobra nada.
             if recusa_sem_envio(e) is None:
-                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), reserva_falha_usd(self._con, tarefa, self._relogio()), f"{tarefa}-falha"))
+                from gabi.fontes.openrouter import custo_da_falha
+                custo = custo_da_falha(e)  # resposta cobrada e sem texto: o custo real informado vale mais que a reserva
+                custo = custo if custo is not None else reserva_falha_usd(self._con, tarefa, self._relogio())
+                self.pendentes.append((self._relogio().astimezone(BRT).isoformat(), custo, f"{tarefa}-falha"))
                 self._gravar_pendentes()
             raise
         try:

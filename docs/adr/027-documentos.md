@@ -8,7 +8,7 @@ Data: 25/10/2026 · Estado: aceito · Spec: `docs/superpowers/specs/2026-10-23-d
 1. **Usos:** perguntar ao Hermes, aviso de vencimento, ver no painel e ter os dados para preencher cadastros.
 2. **Fonte única: o Paperless**, lido pela ponte só de leitura.
 3. **Imagem nunca vai a modelo.** Escaneado sem texto fica com o OCR que o Paperless tiver.
-4. **O texto (OCR) pode ir a um modelo** pelo OpenRouter (fraco; forte só se o fraco não devolver JSON válido).
+4. **O texto (OCR) pode ir a um modelo** pelo OpenRouter, direto no modelo forte (26/10: o fraco de raciocínio voltava sem texto em 46 de 50 documentos). Resposta cobrada e sem texto grava o custo informado pela OpenRouter, não a reserva.
 5. **Caminho A:** ampliar o cadastro familiar (proposta, aprovação no painel), com bens ao lado das pessoas.
 
 **Como ficou.**

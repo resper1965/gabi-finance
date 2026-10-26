@@ -66,19 +66,13 @@ def _json(texto: str):
 
 
 def extrair(cliente, orcamento, titulo: str, ocr: str, max_caracteres: int, *, data=None) -> "dict | Falha":
-    """Modelo fraco; o forte se o fraco não devolver JSON válido ou falhar de forma temporária (o fraco de raciocínio volta sem texto
-    em documento grande). `Falha` do correio se o orçamento, o modelo ou os dois JSONs falham. `data`: o `created` do Paperless (vai no prompt)."""
-    prompt = _prompt(titulo, ocr, max_caracteres, data)
-    for forte in (False, True):
-        r = _chamar(cliente, prompt, forte, orcamento)
-        if isinstance(r, Falha):
-            if r.temporaria and not forte:
-                continue
-            return r
-        v = _json(r)
-        if v is not None:
-            return v
-    return Falha("resposta do modelo sem JSON válido", True)
+    """Direto no modelo forte: o fraco de raciocínio gastava o max_tokens e voltava sem texto em 46 de 50 documentos (produção, 25/10).
+    `Falha` do correio se o orçamento ou o modelo falham, ou se a resposta não tem JSON. `data`: o `created` do Paperless (vai no prompt)."""
+    r = _chamar(cliente, _prompt(titulo, ocr, max_caracteres, data), True, orcamento)
+    if isinstance(r, Falha):
+        return r
+    v = _json(r)
+    return v if v is not None else Falha("resposta do modelo sem JSON válido", True)
 
 
 def _lista(v, maximo: int, motivos: list) -> list:

@@ -141,35 +141,28 @@ def test_tipo_normalizado(con):
     assert doc["tipo"] == "certidao_de_nascimento"
 
 
-def test_extrair_fraco_ok():
+def test_extrair_vai_direto_no_forte():
+    # o fraco (deepseek-v4-flash) voltou sem texto em 46 de 50 documentos (produção, 25/10): documento vai direto no forte
     c = Falso(json.dumps(_json()))
     r = ex.extrair(c, _orc(), "T", "ocr", 12000)
-    assert r["tipo"] == "passaporte" and c.fortes == [False]
+    assert r["tipo"] == "passaporte" and c.fortes == [True]
 
 
-def test_extrair_chama_forte_se_nao_json():
-    c = Falso("desculpe", "```json\n" + json.dumps(_json()) + "\n```")
+def test_extrair_aceita_json_em_bloco():
+    c = Falso("```json\n" + json.dumps(_json()) + "\n```")
+    assert isinstance(ex.extrair(c, _orc(), "T", "ocr", 12000), dict)
+
+
+def test_extrair_sem_json_e_falha_temporaria():
+    c = Falso("desculpe")
     r = ex.extrair(c, _orc(), "T", "ocr", 12000)
-    assert isinstance(r, dict) and c.fortes == [False, True]
+    assert isinstance(r, Falha) and r.temporaria and r.motivo == "resposta do modelo sem JSON válido" and c.fortes == [True]
 
 
-def test_extrair_falha_nos_dois():
-    c = Falso("a", "b")
+def test_extrair_temporaria_e_falha_temporaria():
+    c = Falso(RuntimeError("x"))
     r = ex.extrair(c, _orc(), "T", "ocr", 12000)
-    assert isinstance(r, Falha) and c.fortes == [False, True]
-
-
-def test_extrair_fraco_sem_texto_tenta_forte():
-    # deepseek-v4-flash gasta o max_tokens raciocinando e volta sem texto em documento grande (produção, 25/10)
-    c = Falso(RuntimeError("resposta do OpenRouter sem texto"), json.dumps(_json()))
-    r = ex.extrair(c, _orc(), "T", "ocr", 12000)
-    assert isinstance(r, dict) and r["tipo"] == "passaporte" and c.fortes == [False, True]
-
-
-def test_extrair_temporaria_nos_dois_e_falha_temporaria():
-    c = Falso(RuntimeError("x"), RuntimeError("y"))
-    r = ex.extrair(c, _orc(), "T", "ocr", 12000)
-    assert isinstance(r, Falha) and r.temporaria and r.motivo == "falha temporária do modelo" and c.fortes == [False, True]
+    assert isinstance(r, Falha) and r.temporaria and r.motivo == "falha temporária do modelo" and c.fortes == [True]
 
 
 def test_extrair_sem_orcamento():
