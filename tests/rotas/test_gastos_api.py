@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from gabi.acesso import adicionar
 from gabi.api import criar_app
 from gabi.db import conectar, migrar
+from gabi.dinheiro.valor import para_centavos
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 BOSS = {"Tailscale-User-Login": "boss@x.com"}
@@ -340,3 +341,17 @@ def test_assinaturas_tiram_da_lista_o_habito_de_consumo_pelo_parametro(cli, banc
     c.close()
     nomes = [i["nome"] for i in get(cli, "/api/v1/assinaturas").json()["dados"]["itens"]]
     assert "AMORA" not in nomes and "NETFLIX" in nomes
+
+
+def test_nao_e_assinatura_sai_do_total_e_dos_alertas_e_volta_ao_desfazer(cli, banco):
+    d = get(cli, "/api/v1/assinaturas").json()["dados"]
+    a = d["itens"][0]
+    assert a["no_rol"] is True and d["total_mensal"] != "0.00"
+    patch(cli, f"/api/v1/assinaturas/{a['id']}", {"status": "nao_assinatura"})
+    d2 = get(cli, "/api/v1/assinaturas").json()["dados"]
+    fora = next(i for i in d2["itens"] if i["id"] == a["id"])
+    assert fora["no_rol"] is False  # continua na resposta, para o filtro "fora do rol" e o desfazer
+    assert para_centavos(d2["total_mensal"]) == para_centavos(d["total_mensal"]) - para_centavos(a["mensal"])
+    patch(cli, f"/api/v1/assinaturas/{a['id']}", {"status": "manter"})
+    assert get(cli, "/api/v1/assinaturas").json()["dados"]["total_mensal"] == d["total_mensal"]
+

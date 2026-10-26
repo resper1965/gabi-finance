@@ -328,3 +328,15 @@ def test_rumo_traz_os_12_meses_e_exige_boss(cli):
     d = get(cli, "/api/v1/rumo?ano=2026").json()["dados"]
     assert d["ano"] == 2026 and len(d["meses"]) == 12 and d["meses"][0]["mes"] == "2026-01"
     assert get(cli, "/api/v1/rumo", VIP).status_code == 403 and get(cli, "/api/v1/rumo?ano=1").status_code == 400
+
+
+def test_marcar_gasto_e_nao_gasto_e_devolver_as_regras(cli):
+    r = post(cli, "/api/v1/lancamentos/lote", {"ids": [1, 2], "mudancas": {"gasto": False}})
+    assert r.status_code == 200
+    itens = {i["id"]: i for i in get(cli, "/api/v1/lancamentos?limite=10").json()["dados"]["itens"]}
+    assert itens[1]["gasto"] == {"valor": False, "origem": "voce"} and itens[1]["natureza"] == "caixa"
+    assert itens[4]["gasto"] == {"valor": True, "origem": None}
+    assert patch(cli, "/api/v1/lancamentos/1", {"gasto": None}).status_code == 200
+    itens = {i["id"]: i for i in get(cli, "/api/v1/lancamentos?limite=10").json()["dados"]["itens"]}
+    assert itens[1]["gasto"] == {"valor": True, "origem": None} and itens[2]["gasto"]["valor"] is False
+    assert patch(cli, "/api/v1/lancamentos/1", {"gasto": "sim"}).status_code == 400

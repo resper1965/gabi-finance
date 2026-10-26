@@ -3,18 +3,19 @@ import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { api } from "../../lib/api";
 import { useFiltros } from "../../lib/filtros";
-import { dataCurta, originalEmReais } from "../../lib/formato";
+import { dataCurta, num, originalEmReais } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
 import { useApi } from "../../lib/useApi";
 import { useOcultar } from "../../lib/ocultar";
 
 interface Campo { id: number | string | null; nome: string | null; origem: string | null }
-interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo; moeda?: string; valor_original?: string | null; convertido?: boolean }
+interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: Campo; para_quem: Campo; empresa: Campo; moeda?: string; valor_original?: string | null; convertido?: boolean; gasto?: { valor: boolean; origem: string | null } }
 interface Sug { id: number; tipo: string; lancamento_id: number | null; payload: Record<string, number | string>; motivo: string }
 interface Pessoa { id: number | string; nome: string; papel?: string | null; dados?: Record<string, unknown> }
 interface ContaUso { apelido: string; usuarios?: string[] }
 
 const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "Gabi sugere", voce: "você", fonte: "padrão do cadastro" };
+const POR_QUE: Record<string, string> = { fatura: "paga fatura de cartão", emissor: "boleto de fatura de cartão", propria: "transferência para empresa sua", investimento: "investimento", voce: "marcado por você" };
 
 /** "De quem é cada gasto?": toque no chip; vale só para aquele lançamento. "sempre assim" cria regra (R1: só com o seu toque). */
 export function Lancamentos() {
@@ -48,6 +49,11 @@ export function Lancamentos() {
     for (const s of sugParaQuem) await api.post(`/api/v1/sugestoes/${s.id}/aprovar`).catch(() => null);
     avisar(`${sugParaQuem.length} sugestões confirmadas por você.`);
     recarregar();
+  };
+  /** gasto: true/false é a sua marcação (vence as regras); null devolve a decisão ao brain. */
+  const marcarGasto = async (l: Lanc, gasto: boolean | null) => {
+    try { await api.patch(`/api/v1/lancamentos/${l.id}`, { gasto }); avisar(gasto === null ? `${l.estabelecimento}: o brain volta a decidir.` : `Anotado: ${l.estabelecimento} ${gasto ? "é" : "não é"} gasto.`); recarregar(); }
+    catch (e) { avisar((e as Error).message); }
   };
   const sempreAssim = async (l: Lanc) => {
     try { await api.post("/api/v1/lancamentos/lote", { ids: [l.id], mudancas: { beneficiario_id: l.para_quem.id }, criar_regra: true }); avisar(`Regra criada por você: os próximos de ${l.estabelecimento} seguem igual.`); recarregar(); }
@@ -100,6 +106,12 @@ export function Lancamentos() {
                     <span>{sug ? `Gabi sugere: ${pessoas.find((p) => p.id === sug.payload.para_quem_id)?.nome ?? "?"} · ${sug.motivo}` : l.para_quem.origem ? `${l.para_quem.nome} · ${ORIGEM[l.para_quem.origem] ?? l.para_quem.origem}` : "sem dono ainda"}</span>
                     {sug && <button className="btn-link" onClick={() => confirmar(sug, l)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>confirmar</button>}
                     {l.para_quem.origem === "voce" && <button onClick={() => sempreAssim(l)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>sempre assim para {l.estabelecimento}</button>}
+                    {l.gasto && num(l.valor) < 0 && <>
+                      <span aria-hidden="true">·</span>
+                      <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
+                      <button onClick={() => marcarGasto(l, !l.gasto!.valor)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
+                      {l.gasto.origem === "voce" && <button onClick={() => marcarGasto(l, null)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>deixar o brain decidir</button>}
+                    </>}
                   </div>
                 </div>
               );

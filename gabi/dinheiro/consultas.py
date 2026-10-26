@@ -30,7 +30,9 @@ def _lancamento_base(r) -> dict:
             "categoria": {"id": r["categoria_id"], "nome": r["cat_nome"], "origem": r["categoria_origem"]},
             "para_quem": {"id": r["para_quem_id"], "nome": r["pessoa_nome"], "origem": r["para_quem_origem"]},
             "empresa": {"id": r["empresa_id"], "nome": r["empresa_nome"], "origem": r["empresa_origem"]},
-            "frente_id": r["frente_id"], "fatura_id": r["fatura_id"], "parcela": r["parcela"], "parcelas": r["parcelas"]}
+            "frente_id": r["frente_id"], "fatura_id": r["fatura_id"], "parcela": r["parcela"], "parcelas": r["parcelas"],
+            # é gasto? origem 'voce' = marcação do Ricardo; senão a regra que tirou de Gastos (fatura, emissor, propria, investimento) ou None
+            "gasto": {"valor": "custo" in (r["natureza"] or ""), "origem": "voce" if r["natureza_regra"] == "manual" else r["natureza_regra"]}}
 
 
 def data_iso(texto: str | None, nome: str) -> dt.date | None:

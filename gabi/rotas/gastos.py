@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/v1", dependencies=[Depends(exigir("boss"))])
 SEM_CATEGORIA = "sem categoria"
 CATEGORIA = "coalesce(cat.nome, l.categoria_banco, 'sem categoria')"
 STATUS_ASSINATURA = ("a_conferir", "manter", "cancelar", "nao_assinatura", "encerrada")
+FORA_DO_ROL = ("nao_assinatura", "encerrada")  # o Ricardo disse que não é (ou acabou): sai da lista padrão, do total e dos alertas
 
 
 def _lista(por_categoria: dict, sinal: int) -> list[dict]:
@@ -237,7 +238,7 @@ def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
     if r["mediana_anterior"] and r["ultimo"] > r["mediana_anterior"] * 1.10:
         reaj = {"antes": formatar(para_centavos(r["mediana_anterior"])), "agora": formatar(para_centavos(r["ultimo"]))}
     return {"id": a["id"], "nome": nome, "mensal": formatar(para_centavos(r["valor_medio"])), "anual": formatar(para_centavos(round(r["valor_medio"] * 12, 2))),
-            "meses_vistos": r["meses"], "status": a["status"], "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
+            "meses_vistos": r["meses"], "status": a["status"], "no_rol": a["status"] not in FORA_DO_ROL, "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
             "serie_12m": serie, "desde": deb[0]["data"] if deb else None, "ultimo": deb[-1]["data"] if deb else None, "total_12m": formatar(sum(por_mes.values())),
             "sinais": {"nova": r["meses"] == 3, "reajustou": reaj, "cobrada_depois_de_cancelar": cobrada}}
 
@@ -265,9 +266,9 @@ def assinaturas(request: Request):
             con.execute("rollback")
             raise
         itens.sort(key=lambda i: (not i["ativa"], -float(i["anual"])))
-        total = sum(para_centavos(r["valor_medio"]) for r in todas if r["ativa"])
+        total = sum(para_centavos(i["mensal"]) for i in itens if i["ativa"] and i["no_rol"])
         return envelope(con, {"itens": itens, "total_mensal": formatar(total),
-                              "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens)}, agora=_agora(request))
+                              "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens if i["no_rol"])}, agora=_agora(request))
     finally:
         con.close()
 
