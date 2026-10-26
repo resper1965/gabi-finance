@@ -1,8 +1,8 @@
 [Unit]
-Description=gabi.brain agenda do Google, a cada 15 min das 06h às 22h (Brasília)
+Description=gabi.brain agenda (Google e Microsoft), a cada 30 min das 06h às 22h (Brasília)
 
 [Timer]
-OnCalendar=*-*-* 06..22:10,25,40,55:00 America/Sao_Paulo
+OnCalendar=*-*-* 06..22:10,40:00 America/Sao_Paulo
 Persistent=true
 Unit=gabi-brain-agenda.service
 

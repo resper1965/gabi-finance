@@ -360,7 +360,7 @@ def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
     for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
         assert dur in srv, dur
     assert "EnvironmentFile" not in srv
-    assert "OnCalendar=*-*-* 06..22:10,25,40,55:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-agenda.service" in t
+    assert "OnCalendar=*-*-* 06..22:10,40:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-agenda.service" in t
     assert hasattr(importlib.import_module("gabi.agenda.__main__"), "main")
     for nome in ("gabi-brain-agenda.service", "gabi-brain-agenda.timer"):
         assert nome in INSTALAR
@@ -403,7 +403,7 @@ def test_unidades_do_teams_seguem_o_padrao_e_nao_sao_habilitadas():
         assert dur in srv, dur
     assert "EnvironmentFile" not in srv
     assert "TimeoutStartSec=300" in srv
-    assert "OnCalendar=*-*-* 07..20:00/5:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-teams.service" in t
+    assert "OnCalendar=*-*-* 07..20:00/15:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-teams.service" in t
     assert hasattr(importlib.import_module("gabi.teams.__main__"), "main")
     for nome in ("gabi-brain-teams.service", "gabi-brain-teams.timer"):
         assert nome in INSTALAR

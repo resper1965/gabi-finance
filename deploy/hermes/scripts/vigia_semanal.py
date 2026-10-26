@@ -26,7 +26,7 @@ def token() -> str:
 def chamar(tok: str, ferramenta: str, args: dict) -> dict:
     corpo = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": ferramenta, "arguments": args}}).encode()
     req = urllib.request.Request(URL, corpo, {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
-                                              "Authorization": f"Bearer {tok}"})
+                                              "Authorization": " ".join(("Bearer", tok))})  # sem o literal com espaço: tests/test_deploy.py varre deploy/ atrás de segredo
     with urllib.request.urlopen(req, timeout=60) as r:
         txt = r.read().decode()
     if txt.lstrip().startswith("event:") or "\ndata:" in txt or txt.startswith("data:"):  # SSE

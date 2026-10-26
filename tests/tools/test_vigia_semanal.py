@@ -1,11 +1,14 @@
 """Vigia semanal (script `no_agent` do cron do Hermes, deploy/hermes/scripts/vigia_semanal.py)."""
 import importlib.util
+import sys
 from pathlib import Path
 
 CAMINHO = Path(__file__).resolve().parents[2] / "deploy" / "hermes" / "scripts" / "vigia_semanal.py"
 _spec = importlib.util.spec_from_file_location("vigia_semanal", CAMINHO)
 vs = importlib.util.module_from_spec(_spec)
+_antes, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # sem __pycache__ em deploy/ (tests/test_deploy.py lê tudo como texto)
 _spec.loader.exec_module(vs)
+sys.dont_write_bytecode = _antes
 
 FALHAS = """gabi-brain-correio.service loaded failed failed gabi.brain correio
 systemd-networkd-wait-online.service loaded failed failed Wait for Network

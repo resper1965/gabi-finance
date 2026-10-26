@@ -23,4 +23,4 @@
 - **`$select`:** o Graph honra o `$select` nas mensagens (conferido ao vivo: itens vêm sem `body`). Mesmo que não honrasse, o texto só passaria pela memória do serviço de fontes, sem persistir. O id da conta vem dos membros dos chats (`/users/{conta}` dá 403 sem `User.Read.All`).
 - **Aviso:** `teams_sem_resposta`. API: `/api/v1/teams/fontes` (cadastrar a conta; estado `sim` por `PUT .../estado`).
 - **Permissões:** as permissões de aplicativo (`Chat.Read.All`) alcançam o tenant inteiro; a restrição está no código, que só lê os chats da conta cadastrada. Se a ionic restringir por política do administrador, a alternativa é acesso delegado (`Chat.Read`), não implementada.
-- **Timer:** `gabi-brain-teams.timer`, a cada 5 min das 07h às 20h55 (Brasília), instalado e desligado.
+- **Timer:** `gabi-brain-teams.timer`, a cada 15 min das 07h às 20h45 (Brasília), instalado e desligado.

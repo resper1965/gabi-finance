@@ -7,7 +7,7 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide (exceção: "para q
 **Regra para o que vier (ADR-023):** pergunta vai para o Hermes (MCP); o painel só ganha tela quando há decisão ou lista para revisar; nada vira sistema (tabela, timer, ADR) antes de um mês de uso manual que mostre a necessidade.
 
 ## Em espera por chave de terceiros (ordem do dono, 21/10)
-Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13) aguardam chave ou consentimento. **Não alertar, não cobrar e não propor ações sobre eles até o Ricardo dizer que estamos liberados.** `gabi-brain-notas.timer` está desligado (religar: `sudo systemctl enable --now gabi-brain-notas.timer`).
+**26/10: Google (G12, 4 contas) e Tailscale da família (G13) liberados pelo Ricardo** (itens GO1 e G13 em "Aberto"). Graph da ionic e Nibo (A7/C3) seguem aguardando chave. **Não alertar, não cobrar e não propor ações sobre eles até o Ricardo dizer que estamos liberados.** `gabi-brain-notas.timer` está desligado (religar: `sudo systemctl enable --now gabi-brain-notas.timer`).
 
 ## Aberto
 | # | Item | Dono | Status | Pronto quando |
@@ -16,10 +16,12 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |
-| DOC1 | Documentos (ADR-027): instalar (`sudo ~/instalar-documentos.sh`: backup de `~/.hermes/config.yaml` em `config.yaml.bak-antes-documentos`, acrescenta `documentos_consultar`, `documentos_vencimentos` e `bens_listar` no `include` do `gabi_brain`, instala o SOUL e reinicia o `hermes-gateway`), `/new` no Telegram e no WhatsApp, aprovar as primeiras propostas na aba Documentos | R | 🔧 pronto na branch `feat/documentos`, a instalar; passos em `docs/runbook.md#documentos` | primeira rodada lida, propostas aprovadas e o Hermes responde um número com o link |
 | HE1 | Hermes Onda 1 (ADR-028): instalar pelo runbook `#hermes-onda1` (`sudo ~/instalar-brain.sh`, backup `config.yaml.bak-antes-onda1`, acrescentar `familia_registrar_pessoa` e `familia_registrar_pet`, SOUL, restart do `hermes-gateway`, `/new` nos dois canais); depois o assistente aplica o que o Ricardo ditou ao Hermes em 24/10 (lido do `state.db`: irmãos, mãe, pai falecido, sobrinhos, ex-esposas, companheira, filhas, dona do apto da Gigi e Cookie) com `quem='ricardo (ditado ao Hermes em 24/10, via Claude)'`, mostra a lista ao Ricardo e confere com `familia_listar` e `auditar_promessas` | R+C | ✅ instalado 25/10; ditado aplicado (12 pessoas + Cookie), auditar_promessas 0 casos; falta `/new` e o Ricardo conferir a lista | ditado de 24/10 no brain e conferido pelo Ricardo, 0 casos novos em `auditar_promessas` |
 | HE2 | Hermes Onda 2 (ADR-028): instalar pelo runbook `#hermes-onda2` (`sudo ~/instalar-brain.sh`, escopo `contatos` no token, backup `config.yaml.bak-antes-onda2`, include com 39 ferramentas, SOUL, restart do `hermes-gateway`, `/new` nos dois canais) | R | ⏳ instalada 26/10; falta `/new` nos dois canais | Hermes responde contatos, a receber e corpo de e-mail com dado do brain |
 | HE3 | Hermes Onda 3 (ADR-028): instalar pelo runbook `#hermes-onda3` (backup `gabi.db.antes-onda3-<data>`, `sudo ~/instalar-brain.sh` com a migração 0082, backup `config.yaml.bak-antes-onda3`, include com 44 ferramentas, SOUL, restart do `hermes-gateway`, `/new` nos dois canais) | R | 🔧 instalada 26/10; passo 8 conferido pelo Claude via `hermes -z` em 26/10 (a receber id 1 lançado e cancelado; regra "sempre lixo" criada e removida); falta `/new` nos dois canais e o teste da lixeira com e-mail real | Hermes registra um a receber, move e-mail para a lixeira e cria regra "sempre lixo", e o Ricardo desfaz cada um |
+| GO1 | Ligar o Google (contatos, agenda, e-mail) em resper@gmail.com, resper@bekaa.eu, backoffice@bekaa.eu e a conta do esper.ws: app OAuth "Em produção", `tools.obter_token_google <conta> --gravar` (4×), restart `gabi-brain-fontes`; o assistente libera as fontes (lixeira desligada) e confere a 1ª rodada | R+C | 🔧 liberado 26/10 | as 4 contas sincronizam contatos, agenda e e-mail |
+| G13 | Tailscale da família: definir quem entra e para ver o quê (hoje toda rota é só do boss) antes de convidar | R | ❓ | decisão de quem e o quê |
+| AR1 | Arrumação pós-Hermes (plano `docs/superpowers/plans/2026-10-26-arrumacao-pos-hermes.md`): bloqueios na correção de Documentos, `email.remetentes_sistema`, vigia semanal, timers de Teams (15 min) e agenda (30 min) | C | 🔧 branch `feat/arrumacao-26-10`, falta merge e instalação | instalado e primeiro vigia entregue |
 | H7 | 7 dias de Hermes estável + backup exportado | R+C | ⛔ depende de H5 (número dedicado, lista do Ricardo) | sem queda em 7 dias |
 
 ## Decisões do Ricardo sem resposta
@@ -34,11 +36,7 @@ Google (contatos G12), Graph da ionic, Nibo (A7/C3) e Tailscale da família (G13
 - **SP2:** apagados ouvinte da escuta (`/opt` e `/var/lib/escuta-ouvinte`), cofre `saude.enc` e as chaves (`/etc/gabi/saude.key`, `~/saude.key.COPIE-E-APAGUE`). Aparelho do WhatsApp: o Ricardo desconecta.
 
 ## Depois (sugeridos na revisão de 21/10, não escolhidos ainda)
-- Documentos (revisão final 25/10): no "Corrigir", remover o número principal promove o secundário e pode trocar o número do documento ativo; e uma correção sem nenhum número aprova documento sem número. Bloquear os dois no backend.
 - Enxugar a lixeira do e-mail (8 condições, conferência ao vivo, 8 tentativas) para regras de remetente.
-- Congelar a rodada diária de propostas de contatos (ADR-022 gera 0 propostas até o G12).
-- Tirar do alerta "emergencial" os e-mails do próprio sistema (falhas do ness.brain, Google Cloud).
-- Reduzir a frequência dos timers de Teams (5 min) e agenda (15 min).
 - Microsoft Graph da ionic (G11): parado pelo administrador do tenant (`docs/fontes/graph-ionic-passo-a-passo.md`).
 - Agenda financeira diária sem LLM (cron `no_agent` do Hermes, como a semanal).
 - Documentos que coexistem (apólice, contrato, outro): um mais novo do mesmo titular e tipo fecha o aviso de vencimento do outro (ADR-027).
