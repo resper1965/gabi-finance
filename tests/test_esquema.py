@@ -194,3 +194,13 @@ def test_documentos_0081_tabelas_e_checks(con):
     con.execute("insert into documento_leitura(paperless_id, estado, lido_em) values (1, 'lido', '2026-10-23T05:00:00Z')")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into documento_leitura(paperless_id, estado, lido_em) values (2, 'quebrado', '2026-10-23T05:00:00Z')")
+
+
+def test_receber_manual_0082(con):
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert {"receber_manual", "receber_manual_proposta"} <= nomes
+    ins = "insert into receber_manual(pagador, valor_centavos, criado_em, quem, atualizado_em) values ('X', ?, 'x','r','x')"
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute(ins, (0,))
+    con.execute(ins, (-100,))
+    assert con.execute("select estado from receber_manual").fetchone()[0] == "aberto"
