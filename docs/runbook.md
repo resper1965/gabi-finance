@@ -247,3 +247,10 @@ Decisão: `docs/adr/029-nao-gasto-e-rol-de-assinaturas.md`.
 3. **Reaplicar no histórico** (a captura reaplica sozinha a cada rodada; isto só antecipa e imprime o total de Gastos antes e depois): `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.dinheiro.nao_gasto --banco /var/lib/gabi-brain/gabi.db`.
 4. **Hermes:** acrescentar `financeiro_marcar_gasto`, `assinaturas_listar` e `assinatura_marcar` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`; lista oficial em `docs/fontes/hermes.md`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.
 - **Corrigir um caso:** Gastos › Lançamentos, "é gasto / não é gasto" em cada saída ("deixar o brain decidir" tira a marcação), ou pelo Hermes.
+
+## Quem gastou (portadores) {#gastador}
+Decisão: `docs/adr/030-gastadores.md`.
+1. **Instalar:** `sudo ~/instalar-brain.sh` (migração 0084).
+2. **Portadores:** em Cadastros › Contas, "Quem usa" de cada cartão (Bradesco Platinum: Ricardo e Louise).
+3. **Histórico:** `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.dinheiro.gastador --banco /var/lib/gabi-brain/gabi.db` (imprime contagens e o total por quem gastou; a captura repete sozinha).
+4. **Hermes:** acrescentar `financeiro_indicar_gastador` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.

@@ -112,10 +112,10 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
         agenda = cp.contas_a_pagar(con, hoje)
         a_pagar = sum(i["valor_centavos"] or 0 for g in ("atrasadas", "hoje", "proximas") for i in agenda[g])
         fonte = repositorio.FonteAnalise(con)
-        recorrentes = [r for r in analise.recorrentes(fonte, "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
-        assinaturas = sum(r["valor_medio"] for r in recorrentes)
-        status_ass = {a["estabelecimento"]: a["status"] for a in con.execute("select estabelecimento, status from assinatura")}
-        a_conferir = sum(1 for r in recorrentes if status_ass.get(r.get("chave") or r.get("descricao"), "a_conferir") == "a_conferir")
+        from gabi.rotas.gastos import calcular_assinaturas  # tardio: gastos importa deste módulo
+        rol = calcular_assinaturas(con, hoje)  # a mesma conta da tela Assinaturas: "não é assinatura", encerrada e hábito não entram
+        ativas = [i for i in rol["itens"] if i["ativa"] and i["no_rol"]]
+        a_conferir = sum(1 for i in ativas if i["status"] == "a_conferir")
         abertas = [(f["vencimento"],) for f in cp.faturas_abertas(con, hoje)]
         serie = _serie_saldo(con, hoje, PERIODOS[periodo], conta)
         prev = analise.previsao(fonte, 14, None, hoje)
@@ -133,11 +133,11 @@ def caixa_resumo(request: Request, periodo: str = "mes", conta: str | None = Non
             if qtd:
                 atencao.append({"tipo": tipo, "quantidade": qtd, "texto": f"{qtd} {um if qtd == 1 else varios}", "rota": rota})
         dados = {"kpis": {"saldo": formatar(saldo), "a_pagar_7_dias": formatar(a_pagar), "a_receber": None,
-                          "faturas_abertas": formatar(cx.faturas_abertas_centavos), "assinaturas_mes": formatar(para_centavos(round(assinaturas, 2)))},
+                          "faturas_abertas": formatar(cx.faturas_abertas_centavos), "assinaturas_mes": formatar(rol["total_mensal_centavos"])},
                  "detalhe": {"saldo_por_conta": [{"apelido": c["apelido"], "saldo": formatar(c["saldo_centavos"])} for c in contas],
                              "a_pagar_contas": sum(len(agenda[g]) for g in ("atrasadas", "hoje", "proximas")), "a_pagar_vencidas": len(agenda["atrasadas"]),
                              "cartoes_abertos": len(abertas), "proxima_fatura": abertas[0][0] if abertas else None,
-                             "assinaturas_ativas": len(recorrentes), "assinaturas_a_conferir": a_conferir},
+                             "assinaturas_ativas": len(ativas), "assinaturas_a_conferir": a_conferir},
                  "serie_saldo": serie, "atencao": atencao}
         return envelope(con, dados, agora=_agora(request))
     finally:

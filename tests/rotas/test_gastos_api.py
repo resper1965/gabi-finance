@@ -357,3 +357,14 @@ def test_nao_e_assinatura_sai_do_total_e_dos_alertas_e_volta_ao_desfazer(cli, ba
     patch(cli, f"/api/v1/assinaturas/{a['id']}", {"status": "manter"})
     assert get(cli, "/api/v1/assinaturas").json()["dados"]["total_mensal"] == d["total_mensal"]
 
+
+
+def test_resumo_do_caixa_usa_o_rol_de_assinaturas(cli, banco):
+    k = get(cli, "/api/v1/caixa/resumo").json()["dados"]
+    assert (k["kpis"]["assinaturas_mes"], k["detalhe"]["assinaturas_ativas"], k["detalhe"]["assinaturas_a_conferir"]) == ("55.90", 1, 1)
+    aid = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["id"]
+    patch(cli, f"/api/v1/assinaturas/{aid}", {"status": "manter"})
+    assert get(cli, "/api/v1/caixa/resumo").json()["dados"]["detalhe"]["assinaturas_a_conferir"] == 0  # conferida: sai da revisão
+    patch(cli, f"/api/v1/assinaturas/{aid}", {"status": "nao_assinatura"})
+    k = get(cli, "/api/v1/caixa/resumo").json()["dados"]
+    assert (k["kpis"]["assinaturas_mes"], k["detalhe"]["assinaturas_ativas"], k["detalhe"]["assinaturas_a_conferir"]) == ("0.00", 0, 0)

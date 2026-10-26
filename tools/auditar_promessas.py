@@ -12,7 +12,7 @@ from pathlib import Path
 ESCRITAS = ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "familia_propor_documento",
             "decisao_responder", "classificar_lancamento", "regras_sugerir", "propor_evento", "propor_teams",
             "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo",
-            "financeiro_marcar_gasto", "assinatura_marcar")
+            "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador")
 FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_brain__" + n for n in ESCRITAS}
 PROMESSA = re.compile(r"\b(anotad|anotei|registr|salv|guard|atualiz)\w*", re.I)
 PADRAO_STATE_DB = Path.home() / ".hermes" / "state.db"

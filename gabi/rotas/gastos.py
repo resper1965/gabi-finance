@@ -243,32 +243,38 @@ def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
             "sinais": {"nova": r["meses"] == 3, "reajustou": reaj, "cobrada_depois_de_cancelar": cobrada}}
 
 
+def calcular_assinaturas(con, hoje: dt.date) -> dict:
+    """O rol de assinaturas (a mesma conta da tela, do Resumo e do contador): itens com status e sinais, total mensal só do que está no rol."""
+    recs = [r for r in analise.recorrentes(repositorio.FonteAnalise(con), "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
+    # Além do detector: lojas das categorias de assinatura (parâmetro editável) com cobrança em 2+ meses; as que pararam vêm como inativas.
+    p = con.execute("select valor from parametro where chave='categorias_assinatura'").fetchone()
+    nomes = json.loads(p["valor"]) if p else []
+    h = con.execute("select valor from parametro where chave='categorias_habito'").fetchone()
+    habito = json.loads(h["valor"]) if h else []
+    recs = [r for r in recs if not assinaturas_mod.eh_habito(con, r["chave"], habito)]   # almoço, mercado... repetem todo mês mas não são assinatura
+    extras = assinaturas_mod.candidatas_por_categoria(con, hoje, nomes, {r["chave"] for r in recs})
+    todas = [{**r, "ativa": True} for r in recs] + extras
+    con.execute("begin")
+    try:
+        itens = [{**_assinatura(con, r["chave"], r["descricao"], r, hoje), "ativa": r["ativa"]} for r in todas]
+        con.execute("commit")
+    except BaseException:
+        con.execute("rollback")
+        raise
+    itens.sort(key=lambda i: (not i["ativa"], -float(i["anual"])))
+    total = sum(para_centavos(i["mensal"]) for i in itens if i["ativa"] and i["no_rol"])
+    return {"itens": itens, "total_mensal_centavos": total,
+            "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens if i["no_rol"])}
+
+
 @router.get("/assinaturas")
 def assinaturas(request: Request):
     """Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar."""
     con = _con(request)
     try:
-        hoje = _agora(request).date()
-        recs = [r for r in analise.recorrentes(repositorio.FonteAnalise(con), "custo", hoje) if r["sentido"] == "saida" and r["valor_medio"] < 600]
-        # Além do detector: lojas das categorias de assinatura (parâmetro editável) com cobrança em 2+ meses; as que pararam vêm como inativas.
-        p = con.execute("select valor from parametro where chave='categorias_assinatura'").fetchone()
-        nomes = json.loads(p["valor"]) if p else []
-        h = con.execute("select valor from parametro where chave='categorias_habito'").fetchone()
-        habito = json.loads(h["valor"]) if h else []
-        recs = [r for r in recs if not assinaturas_mod.eh_habito(con, r["chave"], habito)]   # almoço, mercado... repetem todo mês mas não são assinatura
-        extras = assinaturas_mod.candidatas_por_categoria(con, hoje, nomes, {r["chave"] for r in recs})
-        todas = [{**r, "ativa": True} for r in recs] + extras
-        con.execute("begin")
-        try:
-            itens = [{**_assinatura(con, r["chave"], r["descricao"], r, hoje), "ativa": r["ativa"]} for r in todas]
-            con.execute("commit")
-        except BaseException:
-            con.execute("rollback")
-            raise
-        itens.sort(key=lambda i: (not i["ativa"], -float(i["anual"])))
-        total = sum(para_centavos(i["mensal"]) for i in itens if i["ativa"] and i["no_rol"])
-        return envelope(con, {"itens": itens, "total_mensal": formatar(total),
-                              "alerta_forte": any(i["sinais"]["cobrada_depois_de_cancelar"] for i in itens if i["no_rol"])}, agora=_agora(request))
+        r = calcular_assinaturas(con, _agora(request).date())
+        return envelope(con, {"itens": r["itens"], "total_mensal": formatar(r["total_mensal_centavos"]), "alerta_forte": r["alerta_forte"]},
+                        agora=_agora(request))
     finally:
         con.close()
 

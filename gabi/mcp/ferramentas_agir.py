@@ -7,13 +7,13 @@ import logging
 from gabi.cobrar import receber_manual
 from gabi.correio import fontes, lixeira
 from gabi.db import transacao
-from gabi.dinheiro import nao_gasto
+from gabi.dinheiro import gastador, nao_gasto
 from gabi.dinheiro.valor import formatar
 from gabi.mcp.ferramentas_prop import ErroFerramenta
 
 ESCOPOS = {"email_lixeira": "trabalho", "email_regra_lixo": "trabalho", "email_remover_regra_lixo": "trabalho",
            "financeiro_registrar_a_receber": "fin", "financeiro_cancelar_a_receber": "fin",
-           "financeiro_marcar_gasto": "fin", "assinaturas_listar": "fin", "assinatura_marcar": "fin"}
+           "financeiro_marcar_gasto": "fin", "assinaturas_listar": "fin", "assinatura_marcar": "fin", "financeiro_indicar_gastador": "fin"}
 log = logging.getLogger("gabi.mcp")
 QUEM = "hermes"
 LIMITE_IDS = 50
@@ -154,7 +154,36 @@ def assinatura_marcar(con, agora: dt.datetime, assinatura, status) -> dict:
             "desfazer": f"assinatura_marcar({a['id']}, \"{a['status']}\") ou Gastos › Assinaturas"}
 
 
+def financeiro_indicar_gastador(con, agora: dt.datetime, lancamento_ids, pessoa) -> dict:
+    """Indica quem gastou (portador do cartão) em 1 a 50 lançamentos; `pessoa` = id ou nome. Quem não é portador de algum dos cartões →
+    `nao_portador` e nada é gravado. A `decisao` leva só a contagem e o id da pessoa."""
+    if not isinstance(lancamento_ids, list) or not 1 <= len(lancamento_ids) <= LIMITE_IDS or \
+            any(not isinstance(i, int) or isinstance(i, bool) for i in lancamento_ids):
+        raise ValueError(f"lancamento_ids deve ser uma lista de 1 a {LIMITE_IDS} inteiros")
+    termo = str(pessoa or "").strip()
+    if not termo:
+        raise ValueError("informe a pessoa (id ou nome)")
+    achadas = con.execute("select id from pessoa where id=?", (termo,)).fetchall() or \
+        con.execute("select id from pessoa where upper(nome) like upper(?)", (f"{termo}%",)).fetchall()
+    if len(achadas) != 1:
+        raise ErroFerramenta("nao_encontrado" if not achadas else "ambiguo",
+                             f"pessoa {termo!r}: " + ("não encontrada" if not achadas else "mais de uma: " + ", ".join(a[0] for a in achadas)))
+    pid = achadas[0][0]
+    try:
+        with transacao(con):
+            gastador.indicar(con, lancamento_ids, pid)
+            _decisao(con, agora, f"gastos: hermes indicou {pid} como quem gastou em {len(lancamento_ids)} lançamento(s)")
+    except LookupError as e:
+        raise ErroFerramenta("nao_encontrado", str(e)) from None
+    except ValueError as e:
+        raise ErroFerramenta("nao_portador", str(e).removeprefix("nao_portador: ")) from None
+    itens = [{"id": r["id"], "data": r["data"], "descricao": r["descricao_original"], "valor": formatar(r["valor_centavos"]), "gastador": r["gastador_id"]}
+             for r in con.execute(f"select * from lancamento where id in ({','.join('?' * len(lancamento_ids))}) order by data", lancamento_ids)]
+    return {"itens": itens, "desfazer": "indicar outra pessoa ou Gastos › Lançamentos"}
+
+
 _email_lixeira = email_lixeira
+financeiro_indicar_gastador_ = financeiro_indicar_gastador
 financeiro_marcar_gasto_ = financeiro_marcar_gasto
 assinaturas_listar_ = assinaturas_listar
 assinatura_marcar_ = assinatura_marcar
@@ -205,3 +234,8 @@ def registrar(srv, executar, correio=None) -> None:
         """Muda o status de uma assinatura pelo id ou pelo nome (trecho do nome serve). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (o brain avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`."""
         alvo = int(assinatura) if str(assinatura).strip().isdigit() else assinatura
         return executar("assinatura_marcar", lambda con, agora: assinatura_marcar_(con, agora, alvo, status))
+
+    @srv.tool()
+    def financeiro_indicar_gastador(lancamento_ids: list[int], pessoa: str) -> dict:
+        """Indica QUEM GASTOU (quem passou o cartão) em compras de cartão compartilhado; `pessoa` = id ou nome (ex.: "louise", "Louise"). Só portador daquele cartão: senão `nao_portador` e nada muda. Não confunda com "para quem" (de quem é o gasto). Nunca deduza: só quando o Ricardo disser quem foi; mostre as compras e grave depois do sim. Ache os ids com `financeiro_lancamentos(pendente="gastador")`. Devolve os itens e o `desfazer`."""
+        return executar("financeiro_indicar_gastador", lambda con, agora: financeiro_indicar_gastador_(con, agora, lancamento_ids, pessoa))

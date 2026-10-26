@@ -47,6 +47,7 @@ mcp_servers:
       - financeiro_a_receber
       - financeiro_cancelar_a_receber
       - financeiro_contas_a_pagar
+      - financeiro_indicar_gastador
       - financeiro_lancamentos
       - financeiro_marcar_gasto
       - financeiro_para_onde_vai
