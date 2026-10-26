@@ -43,11 +43,13 @@ mcp_servers:
       - familia_vencimentos
       - fechamento_dia
       - financeiro_a_receber
+      - financeiro_cancelar_a_receber
       - financeiro_contas_a_pagar
       - financeiro_lancamentos
       - financeiro_para_onde_vai
       - financeiro_previsao
       - financeiro_recorrentes
+      - financeiro_registrar_a_receber
       - financeiro_saldo
       - propor_evento
       - propor_teams

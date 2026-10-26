@@ -245,3 +245,12 @@ def test_ver_pelo_servidor_e_fontes(banco):
         assert chamar(cli, tok, "financeiro_a_receber", mes="2026-13")["erro"] == "requisicao_invalida"
     assert FONTES_DA_FERRAMENTA["financeiro_a_receber"] is None
     assert set(FONTES_DA_FERRAMENTA) == set(ESCOPOS_FERRAMENTAS)
+
+
+def test_financeiro_a_receber_traz_manuais_em_reais(con):
+    from gabi.cobrar import receber_manual
+    receber_manual.registrar(con, pagador="NESS", valor="1500,00", quem="t", origem="cobrar", agora=AGORA)
+    receber_manual.registrar(con, pagador="NESS", valor="-300,00", quem="t", origem="cobrar", agora=AGORA)
+    r = a_receber(con, AGORA)
+    assert [m["esperado"] for m in r["manuais"]] == ["1500.00", "-300.00"] and r["totais"]["manuais"]["esperado"] == "1200.00"
+    assert _sem_centavos(r)

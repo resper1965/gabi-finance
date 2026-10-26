@@ -191,3 +191,51 @@ def test_regra_lixo_exige_escopo_trabalho(banco, con):
     cli, tok = _cli(banco, {}, escopos=("fin",))
     with cli:
         assert chamar(cli, tok, "email_regra_lixo", remetente_ou_dominio="a@x.com")["erro"] == "sem_escopo"
+
+
+# ---------------- a receber manual ----------------
+def test_registrar_pelo_mcp_e_aparece_no_a_receber(banco):
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        r = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="NESS", valor="1500,00", vencimento="2026-10-30", conta="Itaú", observacao="rateio")["dados"]
+        assert r == {"id": r["id"], "pagador": "NESS", "valor": "1500.00", "vencimento": "2026-10-30", "conta": "Itaú", "observacao": "rateio", "estado": "aberto",
+                     "desfazer": f"financeiro_cancelar_a_receber({r['id']}) ou Cobrar › A receber"}
+        v = chamar(cli, tok, "financeiro_a_receber")["dados"]
+    assert [m["id"] for m in v["manuais"]] == [r["id"]] and v["manuais"][0]["esperado"] == "1500.00" and v["totais"]["manuais"]["esperado"] == "1500.00"
+
+
+def test_valor_ambiguo_pelo_mcp(banco):
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        assert chamar(cli, tok, "financeiro_registrar_a_receber", pagador="NESS", valor="1.500")["erro"] == "valor_invalido"
+    c = conectar(banco)
+    assert c.execute("select count(*) from receber_manual").fetchone()[0] == 0
+
+
+def test_cancelar_pelo_mcp(banco):
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        i = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="NESS", valor="-300,00")["dados"]["id"]
+        assert chamar(cli, tok, "financeiro_cancelar_a_receber", id=i)["dados"] == {"id": i, "estado": "cancelado"}
+        assert chamar(cli, tok, "financeiro_cancelar_a_receber", id=i)["erro"] == "conflito"
+        assert chamar(cli, tok, "financeiro_cancelar_a_receber", id=9999)["erro"] == "nao_encontrado"
+        assert chamar(cli, tok, "financeiro_a_receber")["dados"]["manuais"] == []
+
+
+def test_auditoria_origem_hermes_sem_pagador(banco):
+    cli, tok = _cli(banco, None, ("fin",))
+    with cli:
+        i = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="Segredo Ltda", valor="777,77")["dados"]["id"]
+        chamar(cli, tok, "financeiro_cancelar_a_receber", id=i)
+        e = chamar(cli, tok, "financeiro_registrar_a_receber", pagador="Segredo Ltda", valor="1.500")
+    c = conectar(banco)
+    d = c.execute("select quem, o_que, origem from decisao where origem='hermes' order by id").fetchall()
+    assert [tuple(x) for x in d] == [("hermes", f"a receber manual {i} registrado", "hermes"), ("hermes", f"a receber manual {i} cancelado", "hermes")]
+    assert "Segredo" not in json.dumps(e) and "1.500" not in json.dumps(e)
+
+
+def test_a_receber_manual_sem_escopo_fin(banco):
+    cli, tok = _cli(banco, None, ("trabalho",))
+    with cli:
+        assert chamar(cli, tok, "financeiro_registrar_a_receber", pagador="X", valor="1,00")["erro"] == "sem_escopo"
+        assert chamar(cli, tok, "financeiro_cancelar_a_receber", id=1)["erro"] == "sem_escopo"

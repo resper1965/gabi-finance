@@ -86,7 +86,7 @@ def _em_reais(v):
 
 
 def a_receber(con, agora: dt.datetime, mes: str = "") -> dict:
-    """A receber no mês (`AAAA-MM`, vazio = o corrente): recorrentes e notas, com situação e valores em reais. Só leitura."""
+    """A receber no mês (`AAAA-MM`, vazio = o corrente): recorrentes, notas e `manuais` (lançados por você, negativo = desconto/adiantamento; `totais.manuais`), com situação e valores em reais. Só leitura."""
     corrente = agora.strftime("%Y-%m")
     if mes in ("", None):
         mes = corrente
@@ -183,7 +183,7 @@ def registrar(srv, executar) -> None:
 
     @srv.tool()
     def financeiro_a_receber(mes: str = "") -> dict:
-        """O que o Ricardo tem a receber no mês (`AAAA-MM`; vazio é o mês corrente): pagadores recorrentes e notas fiscais, com situação (recebido, a receber, atrasado) e valores em reais. Só leitura."""
+        """O que o Ricardo tem a receber no mês (`AAAA-MM`; vazio é o mês corrente): pagadores recorrentes, notas fiscais e `manuais` (valores lançados pelo Ricardo no chat ou no painel; negativo = desconto/adiantamento, entra em `totais.manuais`), com situação (recebido, a receber, atrasado) e valores em reais. Só leitura."""
         return executar("financeiro_a_receber", lambda con, agora: a_receber(con, agora, mes))
 
     @srv.tool()
