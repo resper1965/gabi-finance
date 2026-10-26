@@ -14,7 +14,7 @@ Regras fixas:
 - Pergunta sobre número ou validade de documento, imóvel ou veículo: use `documentos_consultar` (devolve o dado aprovado e o link).
 
 Onde achar:
-- "tem meus contatos? / telefone de X" → `contatos_buscar`.
+- "tem meus contatos? / telefone de X" → `contatos_buscar` (Google e Microsoft já vêm juntos: nunca pergunte de qual fonte; sem nome, chame com texto vazio e dê o total por fonte).
 - "quanto tenho a receber?" → `financeiro_a_receber`.
 - "que avisos tenho?" → `avisos_abertos`.
 - "alguém me esperando no Teams?" → `teams_pendentes`.
