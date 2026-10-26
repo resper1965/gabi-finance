@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from gabi.cobrar import receber_manual
 from gabi.cobrar.recebimentos import propor_recebimentos
 from gabi.db import conectar, migrar
 from gabi.dinheiro import repositorio, sugestoes_agenda, sugestoes_dono
@@ -65,6 +66,7 @@ def rodar_extratos(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: 
         conferida = marcar_conferida(con, captura.rodada_id)
         resultado = ResultadoExtratos(captura, conferida, classificar_pendentes(con), atualizar_compromissos(con, hoje, agora))
         propor_recebimentos(con)  # crédito em conta PJ x NFS-e autorizada: só PROPÕE (R1)
+        receber_manual.propor(con)  # a receber manual x crédito do extrato: só PROPÕE (R1)
         try:
             aplicar_fila_para_quem(con, agora.astimezone(dt.timezone.utc).isoformat())  # sugestão de "para quem" que ficou certeira é aplicada (ADR-023)
         except Exception:

@@ -1,7 +1,12 @@
-"""A receber manual: valor que o Ricardo diz no chat (ou no painel) que vai receber, fora das notas. Consome: dinheiro.valor, db, cobrar.util."""
+"""A receber manual: valor que o Ricardo diz no chat (ou no painel) que vai receber, fora das notas. Consome: dinheiro.valor, db, cobrar.util, cobrar.recebimentos (_norm).
+
+Casamento com o extrato (`propor`): só propõe (estado `proposto`); confirmar ou rejeitar é do Ricardo. Mesmo pagador (até 2 primeiras palavras com 3+ letras no descritivo),
+valor a ±1% do registrado, janela de 30 dias antes a 90 depois da base (vencimento, ou o dia de criação). Confiança 0,7; +0,3 se o valor bate ao centavo."""
 import datetime as dt
 import re
 
+from gabi.cobrar.recebimentos import _norm
+from gabi.cobrar.util import agora as _agora
 from gabi.db import transacao
 from gabi.dinheiro.valor import para_centavos
 
@@ -78,3 +83,69 @@ def cancelar(con, rid: int, *, quem: str, origem: str, agora: dt.datetime) -> di
         con.execute("update receber_manual_proposta set estado='rejeitado' where receber_id=? and estado='proposto'", (rid,))
         con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,?)", (t, quem, f"a receber manual {rid} cancelado", origem))
     return dict(con.execute("select * from receber_manual where id=?", (rid,)).fetchone())
+
+
+JANELA_ANTES, JANELA_DEPOIS = 30, 90
+
+
+def _confianca(valor: int, l) -> tuple[float, str]:
+    if l["valor_centavos"] == valor:
+        return 1.0, "valor igual ao a receber, pagador no descritivo"
+    return 0.7, "valor a até 1% do a receber, pagador no descritivo"
+
+
+def propor(con) -> int:
+    """Quantas propostas novas. Não propõe para valor negativo, nem para a receber que não está aberto, nem com crédito já confirmado (nota ou manual)."""
+    novas = 0
+    abertos = con.execute("select * from receber_manual where estado='aberto' and valor_centavos>0").fetchall()
+    with transacao(con):
+        for r in abertos:
+            toks = [t for t in _norm(r["pagador"]).split() if len(t) >= 3][:2]
+            if not toks:
+                continue
+            base = dt.date.fromisoformat(r["vencimento"] or r["criado_em"][:10])
+            ini, fim = (base - dt.timedelta(days=JANELA_ANTES)).isoformat(), (base + dt.timedelta(days=JANELA_DEPOIS)).isoformat()
+            v = r["valor_centavos"]
+            for l in con.execute(
+                    "select l.* from lancamento l join conta c on c.id=l.conta_id where c.tipo='BANK' and c.estado='sim' and c.excluido_em is null "
+                    "and l.valor_centavos>0 and l.data>=? and l.data<=? "
+                    "and not exists (select 1 from recebimento_nota n where n.lancamento_id=l.id and n.estado='confirmado') "
+                    "and not exists (select 1 from receber_manual_proposta p where p.lancamento_id=l.id and p.estado='confirmado') "
+                    "and not exists (select 1 from receber_manual m where m.lancamento_id=l.id)", (ini, fim)).fetchall():
+                if abs(l["valor_centavos"] - v) * 100 > v:
+                    continue
+                desc = _norm(l["descricao_original"])
+                if not all(t in desc for t in toks):
+                    continue
+                conf, motivo = _confianca(v, l)
+                novas += con.execute("insert or ignore into receber_manual_proposta(receber_id, lancamento_id, confianca, motivo, criado_em) values (?,?,?,?,?)",
+                                     (r["id"], l["id"], conf, motivo, _agora())).rowcount
+    return novas
+
+
+def _proposta(con, pid: int):
+    p = con.execute("select * from receber_manual_proposta where id=?", (pid,)).fetchone()
+    if p is None:
+        raise LookupError(f"proposta {pid} não existe")
+    if p["estado"] != "proposto":
+        raise ValueError(f"proposta {pid} já foi {p['estado']}")
+    return p
+
+
+def confirmar(con, pid: int, por: str) -> None:
+    """Confirma: o a receber vira `recebido` com o lançamento; as outras propostas do mesmo a receber ou do mesmo crédito viram `rejeitado`."""
+    with transacao(con):
+        p = _proposta(con, pid)
+        con.execute("update receber_manual_proposta set estado='confirmado' where id=?", (pid,))
+        con.execute("update receber_manual_proposta set estado='rejeitado' where estado='proposto' and id<>? and (receber_id=? or lancamento_id=?)",
+                    (pid, p["receber_id"], p["lancamento_id"]))
+        con.execute("update receber_manual set estado='recebido', lancamento_id=?, atualizado_em=? where id=?", (p["lancamento_id"], _agora(), p["receber_id"]))
+        con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')",
+                    (_agora(), por, f"a receber manual: proposta {pid} confirmada (receber {p['receber_id']}, lançamento {p['lancamento_id']})"))
+
+
+def rejeitar(con, pid: int, por: str) -> None:
+    with transacao(con):
+        _proposta(con, pid)
+        con.execute("update receber_manual_proposta set estado='rejeitado' where id=?", (pid,))
+        con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'cobrar')", (_agora(), por, f"a receber manual: proposta {pid} rejeitada"))
