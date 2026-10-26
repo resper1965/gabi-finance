@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 
 from gabi.correio import consulta
 from gabi.correio import fontes as fn
+from gabi.correio import lixeira as lixeira_mod
 from gabi.correio.regras import endereco
 from gabi.correio.processar import fechar_alerta
 from gabi.db import transacao
@@ -19,6 +20,10 @@ from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
 _FONTE_EMAIL = {"google": "google_email", "graph": "graph_email"}  # chave de `app.state.fontes` por provedor da conta
+
+_RECUSA_LIXEIRA = {"nao_triada": "só dá para mover o que o modelo sugeriu como lixo e continua na caixa",
+                   "conta_desligada": "a conta está desligada",
+                   "conta_sem_lixeira": "ligue a lixeira desta conta (Cadastros › E-mail) para mover"}  # mensagem da rota por código de `lixeira.planejar`
 
 router = APIRouter(prefix="/api/v1/correio", dependencies=[Depends(exigir("boss"))])
 
@@ -160,28 +165,25 @@ async def mover_para_lixeira(mensagem_id: int, request: Request, ident: Identida
     await _json(request)
     con = _con(request)
     try:
-        m = _mensagem(con, mensagem_id)
-        if m["estado"] == "na_lixeira":
+        _mensagem(con, mensagem_id)  # 404 se não existe
+        lotes, falhas, ja = lixeira_mod.planejar(con, [mensagem_id], so_lixo=True)
+        if ja:
             return envelope(con, {"id": mensagem_id, "estado": "na_lixeira"}, agora=_agora(request))
-        if m["estado"] != "classificada" or m["classe"] != "lixo":
-            raise erro(409, "conflito", "só dá para mover o que o modelo sugeriu como lixo e continua na caixa")
-        if m["conta_estado"] != "sim":
-            raise erro(409, "conflito", "a conta está desligada")
-        if not m["conta_lixeira"]:
-            raise erro(409, "conflito", "ligue a lixeira desta conta (Cadastros › E-mail) para mover")
-        fabrica = request.app.state.fontes.get(_FONTE_EMAIL[m["provedor"]])
+        if falhas:
+            raise erro(409, "conflito", _RECUSA_LIXEIRA[falhas[0]["codigo"]])
+        (provedor, conta, _fonte), itens = next(iter(lotes.items()))
+        fabrica = request.app.state.fontes.get(_FONTE_EMAIL[provedor])
         fonte = fabrica() if fabrica else None
         if fonte is None:
             raise erro(503, "fonte_indisponivel", "o e-mail do Google não está configurado")
         try:
-            resultado = await asyncio.to_thread(fonte.lixeira, m["conta"], [m["externo_id"]])  # rede bloqueante: fora do laço da API
+            resultado = await asyncio.to_thread(fonte.lixeira, conta, [itens[0][1]])  # rede bloqueante: fora do laço da API
         except (ErroGoogleOAuth, ErroGraphNess) as e:
             raise erro(503, "fonte_indisponivel", str(e)) from None
-        if not isinstance(resultado, dict) or resultado.get(m["externo_id"]) != "ok":
+        if not isinstance(resultado, dict) or resultado.get(itens[0][1]) != "ok":
             raise erro(503, "fonte_indisponivel", "o Gmail não confirmou o movimento; tente de novo")
-        agora = _agora(request).astimezone(dt.timezone.utc).isoformat()
         with transacao(con):
-            con.execute("update email_msg set estado='na_lixeira', atualizado_em=? where id=? and estado='classificada'", (agora, mensagem_id))
+            lixeira_mod.marcar(con, [mensagem_id], _agora(request))
             _audit(con, ident.login, f"correio: moveu mensagem {mensagem_id} para a lixeira")
         return envelope(con, {"id": mensagem_id, "estado": "na_lixeira"}, agora=_agora(request))
     finally:

@@ -30,6 +30,7 @@ mcp_servers:
       - documentos_vencimentos
       - email_ler
       - email_listar
+      - email_lixeira
       - empresas_listar
       - familia_atualizar_contato
       - familia_consultar
