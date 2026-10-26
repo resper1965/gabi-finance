@@ -1,6 +1,6 @@
 # ADR-028 · Hermes completo: honestidade, família e frescor por ferramenta (Ondas 1 a 3)
 
-Data: 25/10/2026 · Estado: aceito (Ondas 1 e 2 instaladas; Onda 3 pronta na branch `feat/hermes-onda3`, a instalar) · Spec: `docs/superpowers/specs/2026-10-25-hermes-completo-design.md` · Plano: `docs/superpowers/plans/2026-10-25-hermes-onda1.md`
+Data: 25/10/2026 · Estado: aceito (Ondas 1 a 3 instaladas; Onda 3 em 26/10) · Spec: `docs/superpowers/specs/2026-10-25-hermes-completo-design.md` · Plano: `docs/superpowers/plans/2026-10-25-hermes-onda1.md`
 
 **Contexto.** Em 24/10 o Ricardo ditou ao Hermes filhas, ex-esposas, companheira, mãe, pai, irmãos, sobrinhos e o Cookie. O Hermes respondeu "Anotado!" cerca de 15 vezes e não chamou nenhuma ferramenta de escrita. Não havia como criar pessoa nova nem pet. A ficha da família saía com "Dados até 14/10 (desatualizados)".
 
