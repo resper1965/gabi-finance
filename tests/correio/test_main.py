@@ -219,6 +219,19 @@ def test_modelo_com_custo_falha_depois_do_envio_grava_tarefa_falha(banco):
     assert [t for t, _ in _linhas_custo(banco)] == ["email-falha"]
 
 
+def test_falha_com_custo_informado_grava_o_custo_real(banco):
+    from gabi.fontes.openrouter import ErroOpenRouter
+
+    class SemTexto:
+        def completar(self, prompt, *, forte):
+            raise ErroOpenRouter("resposta do OpenRouter sem texto (custo_usd=0.000300)")
+    w = modelo_prog.ModeloComCusto(SemTexto(), banco, tarefa="documentos")
+    with pytest.raises(ErroOpenRouter):
+        w.completar("p", forte=False)
+    w.fechar()
+    assert _linhas_custo(banco) == [("documentos-falha", pytest.approx(0.0003))]
+
+
 def _historico_de_custo(banco, tarefa, n, custo):
     c = conectar(banco)
     for i in range(n):

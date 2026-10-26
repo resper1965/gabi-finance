@@ -6,6 +6,7 @@ Modelos e variáveis padrão: docs/fontes/openrouter.md."""
 import base64
 import json
 import math
+import re
 import threading
 import time
 from collections import deque
@@ -30,6 +31,15 @@ PDF_MOTOR_PADRAO = "mistral-ocr"  # único motor do plugin de arquivos que lê P
 
 class ErroOpenRouter(Exception):
     pass
+
+
+_CUSTO_NA_MENSAGEM = re.compile(r"\(custo_usd=([0-9]+(?:\.[0-9]+)?)\)$")
+
+
+def custo_da_falha(e: BaseException) -> float | None:
+    """Custo que a OpenRouter informou numa resposta cobrada e sem texto. Vai no fim da mensagem porque a ponte só leva a mensagem."""
+    m = _CUSTO_NA_MENSAGEM.search(str(e)) if isinstance(e, ErroOpenRouter) else None
+    return float(m.group(1)) if m else None
 
 
 def _num(env, nome, padrao, tipo, zero_ok=False):
@@ -127,6 +137,10 @@ class OpenRouter:
         return reserva
 
     def _custo(self, resp, forte: bool) -> float:
+        return self._custo_informado(resp, forte) or self.limites.custo_padrao_usd
+
+    def _custo_informado(self, resp, forte: bool) -> float | None:
+        """Custo pela `usage` da resposta (o `cost` ou a estimativa pelos tokens); None quando a resposta não diz nada."""
         usage = resp.get("usage") if isinstance(resp, dict) else None
         usage = usage if isinstance(usage, dict) else {}
         c = usage.get("cost")
@@ -140,7 +154,7 @@ class OpenRouter:
                    + (sai if _valido(sai) else 0) * self.limites.preco_saida_usd_m) / 1_000_000
             if est > 0:
                 return est
-        return self.limites.custo_padrao_usd
+        return None
 
     def completar(self, prompt: str, *, forte: bool) -> tuple[str, float]:
         """Devolve (texto, custo real em USD, nunca 0). Falha depois do envio mantém a reserva cobrada (pode ter sido faturada)."""
@@ -196,7 +210,12 @@ class OpenRouter:
         except (KeyError, IndexError, TypeError):
             pass
         if not isinstance(texto, str):
-            raise ErroOpenRouter("resposta do OpenRouter sem texto")
+            custo = self._custo_informado(resp, forte)
+            if custo is None:  # sem `usage`: a reserva fica cobrada
+                raise ErroOpenRouter("resposta do OpenRouter sem texto")
+            with self._trava:
+                self._gasto += custo - reserva
+            raise ErroOpenRouter(f"resposta do OpenRouter sem texto (custo_usd={custo:.6f})")
         custo = self._custo(resp, forte)
         with self._trava:
             self._gasto += custo - reserva

@@ -1,6 +1,6 @@
 import pytest
 
-from gabi.fontes.openrouter import ErroOpenRouter, Limites, OpenRouter
+from gabi.fontes.openrouter import ErroOpenRouter, Limites, OpenRouter, custo_da_falha
 
 CHAVE = "sk-or-SEGREDO123"
 
@@ -240,3 +240,25 @@ def test_janela_por_minuto_usa_relogio_monotonico():
         o.completar("p", forte=False)
     mono.t += 61
     o.completar("p", forte=False)
+
+
+def test_sem_texto_leva_o_custo_informado_na_mensagem():
+    # raciocínio gasta o max_tokens e volta sem texto: a OpenRouter cobra e informa o custo; ele vai na mensagem (a ponte só leva a mensagem)
+    http, _ = _ok({"choices": [{"message": {"content": None}}], "usage": {"cost": 0.0003}})
+    o = OpenRouter(CHAVE, "a", "b", http=http)
+    with pytest.raises(ErroOpenRouter) as e:
+        o.completar("p", forte=False)
+    assert custo_da_falha(e.value) == pytest.approx(0.0003) and o._gasto == pytest.approx(0.0003)
+
+
+def test_sem_texto_e_sem_usage_fica_com_a_reserva():
+    http, _ = _ok({"choices": [{"message": {}}]})
+    with pytest.raises(ErroOpenRouter) as e:
+        OpenRouter(CHAVE, "a", "b", http=http).completar("p", forte=False)
+    assert custo_da_falha(e.value) is None
+
+
+def test_custo_da_falha_ignora_outros_erros():
+    assert custo_da_falha(ErroOpenRouter("OpenRouter -> 500")) is None
+    assert custo_da_falha(RuntimeError("timeout")) is None
+    assert custo_da_falha(ErroOpenRouter("resposta do OpenRouter sem texto (custo_usd=nan)")) is None
