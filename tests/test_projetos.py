@@ -120,3 +120,13 @@ def test_atualizar_valor_prazo_e_nome(con):
         projetos.atualizar(con, AGORA, "painel", "painel", p["id"], prazo="amanhã")
     with pytest.raises(LookupError):
         projetos.atualizar(con, AGORA, "painel", "painel", 999, nome="x")
+
+
+def test_concluir_projeto_cancela_as_atividades_abertas_e_elas_param_de_avisar(con):
+    p = _tres(con)
+    ids = [a["id"] for a in atividades.listar(con, AGORA, projeto_id=p["id"])]
+    atividades.concluir(con, AGORA, "hermes", "hermes", ids[0])
+    projetos.atualizar(con, AGORA, "hermes", "hermes", p["id"], status="concluido")
+    assert atividades.listar(con, AGORA, projeto_id=p["id"]) == []
+    assert len(atividades.listar(con, AGORA, "feita", projeto_id=p["id"])) == 1  # o que foi feito continua feito
+    assert len(atividades.listar(con, AGORA, "cancelada", projeto_id=p["id"])) == 2

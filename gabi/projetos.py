@@ -2,7 +2,7 @@
 
 Regras de criar (com atividades e dependências), listar, atualizar e resolver; a API, o MCP e o painel só chamam daqui. `ValueError` = dado ou transição inválida; `LookupError` = id inexistente.
 As atividades do projeto são as de `gabi.atividades` (`projeto_id`, `depende_de_id`, `marco`). Estados: ativo, pausado, concluido, cancelado; os dois últimos não aceitam atividade nova e não reabrem.
-Cancelar o projeto cancela as atividades abertas dele. Prazo em Brasília (`AAAA-MM-DD`; passado é aceito: o projeto pode estar atrasado). Toda escrita grava `decisao`. Consome: db (projeto, projeto_pessoa, projeto_gasto, projeto_fato, anexo, lancamento), gabi.atividades.
+Concluir ou cancelar o projeto cancela as atividades abertas dele (as feitas continuam feitas). Prazo em Brasília (`AAAA-MM-DD`; passado é aceito: o projeto pode estar atrasado). Toda escrita grava `decisao`. Consome: db (projeto, projeto_pessoa, projeto_gasto, projeto_fato, anexo, lancamento), gabi.atividades.
 `ver` junta o que o Hermes e o painel mostram; dinheiro sai em string decimal de reais (`orcamento`/`saldo` nulos sem orçamento); lançamento removido ou sem valor soma 0."""
 import datetime as dt
 import re
@@ -154,7 +154,7 @@ def atualizar(con, agora: dt.datetime, quem: str, origem: str, id_: int, *, stat
     con.execute("savepoint projeto_atualizar")
     try:
         con.execute(f"update projeto set {', '.join(f'{k}=?' for k in campos)} where id=?", (*campos.values(), id_))
-        if campos.get("status") == "cancelado":
+        if campos.get("status") in FINAIS:  # encerrar não deixa atividade aberta avisando sem ligação visível com o projeto
             for (aid,) in con.execute("select id from atividade where projeto_id=? and status='aberta'", (id_,)).fetchall():
                 ativs.cancelar(con, agora, quem, origem, aid)
         _auditar(con, agora, quem, origem, f"projeto {id_} atualizado ({', '.join(campos)}): {r['nome'][:80]}")

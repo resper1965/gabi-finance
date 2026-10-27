@@ -198,7 +198,7 @@ function Detalhe_({ id, onVoltar }: { id: number; onVoltar: () => void }) {
                   </span>
                   {confirmar && (
                     <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <p style={{ margin: 0 }}>{confirmar === "concluido" ? "Concluir" : "Cancelar"} "{d.nome}"? Não há como reabrir; para voltar, crie um projeto novo.{confirmar === "cancelado" ? " As atividades abertas dele também são canceladas." : ""}</p>
+                      <p style={{ margin: 0 }}>{confirmar === "concluido" ? "Concluir" : "Cancelar"} "{d.nome}"? Não há como reabrir; para voltar, crie um projeto novo.{" As atividades abertas dele também são canceladas."}</p>
                       <span style={{ display: "flex", gap: 8 }}>
                         <button className="btn btn-primary" disabled={ocupado} aria-label={`Confirmar ${confirmar === "concluido" ? "concluir" : "cancelar"}`}
                           onClick={() => patch({ status: confirmar }, confirmar === "concluido" ? "Projeto concluído." : "Projeto cancelado.").then((ok) => ok && setConfirmar(null))}>Confirmar</button>

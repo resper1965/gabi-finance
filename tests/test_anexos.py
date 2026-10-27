@@ -167,3 +167,31 @@ def test_anexar_documento_do_paperless(con):
     assert projetos.anexar(con, AGORA, "hermes", "hermes", p, paperless_id=321)["id"] == d["id"]
     assert projetos.ver(con, AGORA, p)["anexos"] == 1
     assert projetos.anexos_recentes(con, AGORA) == []
+
+
+def test_anexo_ja_esta_registrado_antes_de_transcrever_e_sobrevive_a_queda(con, dirs):
+    _arq(dirs[0], "longo.ogg", b"voz longa")
+    vistos = []
+
+    def transcrever(caminho):
+        vistos.append(con.execute("select count(*) from anexo").fetchone()[0])
+        raise SystemExit("systemd matou a rodada")
+
+    with pytest.raises(SystemExit):
+        _coletar(con, dirs, transcrever=transcrever)
+    assert vistos == [1]
+    assert con.execute("select tipo, transcricao from anexo").fetchone()[:] == ("audio", None)
+    assert _coletar(con, dirs)["repetidos"] == 1  # a próxima rodada não perde nem duplica
+
+
+def test_rodada_concorrente_que_ja_gravou_o_mesmo_arquivo_conta_como_repetido(con, dirs, monkeypatch):
+    _arq(dirs[0], "a.jpg", b"igual")
+    sha = anexos._sha256(dirs[0] / "a.jpg")
+    original = con.execute
+    class Con:  # outra rodada grava o mesmo sha entre o select e o insert
+        def execute(self, sql, *a):
+            if sql.startswith("select 1 from anexo"):
+                original("insert into anexo(tipo, sha256, recebido_em) values ('imagem', ?, 'x')", (sha,))
+                return original("select 1 where 0")
+            return original(sql, *a)
+    assert anexos.coletar(Con(), AGORA, [dirs[0]], dirs[1]) == {"novos": 0, "repetidos": 1, "ignorados": 0, "adiados": 0}

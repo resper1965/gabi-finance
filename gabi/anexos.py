@@ -80,14 +80,19 @@ def coletar(con, agora: dt.datetime, origens: list[Path], destino: Path, transcr
             except OSError:
                 cont["ignorados"] += 1
                 continue
-            texto = None
+            # registra antes de transcrever: se a rodada morrer na transcrição (áudio longo), o anexo já existe e `retranscrever` completa depois
+            cur = con.execute("insert or ignore into anexo(tipo, arquivo, sha256, recebido_em) values (?,?,?,?)",
+                              (tipo, rel, sha, dt.datetime.fromtimestamp(st.st_mtime, UTC).isoformat()))
+            if cur.rowcount == 0:  # outra rodada gravou o mesmo arquivo entre o select e o insert
+                cont["repetidos"] += 1
+                continue
             if transcrever is not None and tipo == "audio":
                 try:
                     texto = transcrever(destino / rel) or None
                 except Exception:
                     texto = None
-            con.execute("insert into anexo(tipo, arquivo, sha256, transcricao, recebido_em) values (?,?,?,?,?)",
-                        (tipo, rel, sha, texto, dt.datetime.fromtimestamp(st.st_mtime, UTC).isoformat()))
+                if texto:
+                    con.execute("update anexo set transcricao=? where id=?", (texto, cur.lastrowid))
             cont["novos"] += 1
     return cont
 

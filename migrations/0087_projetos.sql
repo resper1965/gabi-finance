@@ -1,7 +1,7 @@
 -- 0087: projetos (27/10): gestão de projetos conduzida pelo Hermes; atividades ganham projeto, dependência e marco.
 -- Spec: docs/superpowers/specs/2026-10-27-projetos-design.md. Datas em ISO (prazo = dia local de Brasília); dinheiro em centavos.
 -- Desfazer: drop table projeto_fato; drop table projeto_gasto; drop table anexo; drop table projeto_pessoa;
---   alter table atividade drop column marco; alter table atividade drop column depende_de_id; alter table atividade drop column projeto_id;
+--   drop index atividade_projeto; alter table atividade drop column marco; alter table atividade drop column depende_de_id; alter table atividade drop column projeto_id;
 --   drop table projeto; delete from schema_versao where nome='0087_projetos.sql';
 create table projeto(
   id integer primary key,

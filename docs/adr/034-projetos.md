@@ -17,7 +17,7 @@ Data: 27/10/2026 · Estado: aceito (implementado na branch `feat/projetos`, agua
 
 **Como ficou.**
 - Migração 0087 (`projeto`, `projeto_pessoa`, `projeto_gasto`, `projeto_fato`, `anexo`; colunas novas em `atividade`). Regras em `gabi/projetos.py` e `gabi/anexos.py`; API (`/api/v1/projetos`, `/api/v1/anexos`), MCP e painel só chamam daí.
-- **Estados** ativo, pausado, concluído e cancelado; concluído e cancelado não aceitam atividade nova e **não reabrem** (para voltar, criar de novo). Cancelar o projeto cancela as atividades abertas dele.
+- **Estados** ativo, pausado, concluído e cancelado; concluído e cancelado não aceitam atividade nova e **não reabrem** (para voltar, criar de novo). Concluir ou cancelar o projeto cancela as atividades abertas dele (as feitas continuam feitas); o painel avisa na confirmação.
 - MCP (`gabi/mcp/ferramentas_projetos.py`, escopo `projetos`): `projeto_criar`, `projeto_listar`, `projeto_ver`, `projeto_atualizar`, `projeto_pessoa`, `projeto_gasto`, `projeto_fato`, `projeto_fatos`, `anexo_recentes`, `projeto_anexar`; `atividade_criar` e `atividade_listar` ganham `projeto`, `depois_de` e `marco`. 70 ferramentas no include.
 - Serviço `gabi-brain-anexos` (timer de 2 min, instalado e **desligado**): a pasta do Hermes é 0700 do usuário `ricardo`, então um `ExecStartPre=+` (root, como o `gabi-wa-docs`) só copia os arquivos novos para `/var/lib/gabi-brain/anexos-entrada` e o Python roda como `gabibrain`; o log só imprime contagens.
 - Painel: Dia › Projetos (lista por status com progresso em texto, detalhe, caixa de entrada de anexos). Sem gráficos.

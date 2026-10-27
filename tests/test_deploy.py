@@ -478,3 +478,8 @@ def test_unidades_dos_anexos_seguem_o_padrao_e_nao_sao_habilitadas():
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert not any("anexos" in l for l in ligadas)
+
+
+def test_anexos_so_avancam_o_selo_se_todas_as_copias_deram_certo():
+    srv = _ler("gabi-brain-anexos.service")
+    assert "|| ok=0" in srv and "[ $ok = 1 ]" in srv and srv.index("[ $ok = 1 ]") < srv.index("mv $S.novo $S")
