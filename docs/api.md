@@ -17,6 +17,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir` | Pergunta ao Google ou ao Graph (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora. |
 | GET | `/api/v1/agenda/parametros` | Parâmetros da agenda: privados (mostrar|so_painel|ocultar), fuso e janela de leitura em dias (padrões se não definidos). |
 | PUT | `/api/v1/agenda/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves. |
+| GET | `/api/v1/anexos/recentes` | A caixa de entrada: anexos dos últimos 14 dias ainda sem projeto (com a transcrição do áudio, quando houver). |
+| GET | `/api/v1/anexos/{id_}/arquivo` | O original do anexo (imagem ou áudio), sem mascarar; 404 se o anexo não existe, é documento do Paperless ou o arquivo sumiu. |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |
 | PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura e o lembrete até cancelar. |
 | GET | `/api/v1/atividades` | Atividades por status (aberta, feita ou cancelada), vencidas primeiro, com o prazo (vencida, hoje, proxima, sem_data). |
@@ -111,6 +113,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/lancamentos/lote` | Muda vários lançamentos de uma vez; criar_regra cria uma regra por estabelecimento. |
 | PATCH | `/api/v1/lancamentos/{lid}` | Muda categoria, para quem, empresa ou frente de um lançamento (a origem vira 'voce'). |
 | GET | `/api/v1/parcelas` | Parcelas: comprometido por mês e andamento de cada compra parcelada. |
+| GET | `/api/v1/projetos` | Projetos por status (ativo, pausado, concluido ou cancelado), com o progresso (`feitas` de `total` atividades). |
+| POST | `/api/v1/projetos` | Cria o projeto: `nome` e, opcional, `objetivo`, `prazo` (AAAA-MM-DD), `orcamento` (reais, string) e `atividades` (até 30: `texto`, `vence`, `depois_de` índice anterior, `marco`). Tudo ou nada. |
+| GET | `/api/v1/projetos/{id_}` | O resumo do projeto: progresso, próximas, bloqueadas, atrasadas, pessoas, orçamento/gasto/saldo, últimos fatos e a contagem de anexos. |
+| PATCH | `/api/v1/projetos/{id_}` | Atualiza `status`, `prazo`, `objetivo`, `orcamento` ou `nome`. Concluído e cancelado não reabrem; cancelar cancela as atividades abertas. |
+| POST | `/api/v1/projetos/{id_}/anexos` | Liga ao projeto um anexo da caixa de entrada (`anexo_id`) ou um documento do Paperless (`paperless_id`); um dos dois. |
+| POST | `/api/v1/projetos/{id_}/fatos` | Anota um fato (até 1.000 caracteres) com `data` (padrão hoje), `pessoa_nome`, `anexo_id` e `atividade_id` opcionais. |
+| POST | `/api/v1/projetos/{id_}/gastos` | Registra um gasto: `valor` (reais, string) manual ou `lancamento_id` do banco (o valor vem dele); nunca os dois. |
+| POST | `/api/v1/projetos/{id_}/pessoas` | Adiciona uma pessoa ao projeto: `nome`, `papel`, `contato` e, opcional, `pessoa_id` do cadastro da família. |
 | GET | `/api/v1/regras` | Regras de classificação. |
 | PATCH | `/api/v1/regras/{rid}` | Liga ou desliga uma regra; ligar aplica ao passado. |
 | GET | `/api/v1/rodadas` | Últimas rodadas de ingestão e se foram conferidas. |

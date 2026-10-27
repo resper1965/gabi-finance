@@ -347,6 +347,61 @@
     "summary": "Gravar Parametros"
    }
   },
+  "/api/v1/anexos/recentes": {
+   "get": {
+    "description": "A caixa de entrada: anexos dos últimos 14 dias ainda sem projeto (com a transcrição do áudio, quando houver).",
+    "operationId": "recentes_api_v1_anexos_recentes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Recentes"
+   }
+  },
+  "/api/v1/anexos/{id_}/arquivo": {
+   "get": {
+    "description": "O original do anexo (imagem ou áudio), sem mascarar; 404 se o anexo não existe, é documento do Paperless ou o arquivo sumiu.",
+    "operationId": "arquivo_api_v1_anexos__id___arquivo_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Arquivo"
+   }
+  },
   "/api/v1/assinaturas": {
    "get": {
     "description": "Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar.",
@@ -3508,6 +3563,286 @@
      }
     },
     "summary": "Parcelas"
+   }
+  },
+  "/api/v1/projetos": {
+   "get": {
+    "description": "Projetos por status (ativo, pausado, concluido ou cancelado), com o progresso (`feitas` de `total` atividades).",
+    "operationId": "listar_api_v1_projetos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "default": "ativo",
+       "title": "Status",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar"
+   },
+   "post": {
+    "description": "Cria o projeto: `nome` e, opcional, `objetivo`, `prazo` (AAAA-MM-DD), `orcamento` (reais, string) e `atividades` (até 30: `texto`, `vence`, `depois_de` índice anterior, `marco`). Tudo ou nada.",
+    "operationId": "criar_api_v1_projetos_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar"
+   }
+  },
+  "/api/v1/projetos/{id_}": {
+   "get": {
+    "description": "O resumo do projeto: progresso, próximas, bloqueadas, atrasadas, pessoas, orçamento/gasto/saldo, últimos fatos e a contagem de anexos.",
+    "operationId": "ver_api_v1_projetos__id___get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ver"
+   },
+   "patch": {
+    "description": "Atualiza `status`, `prazo`, `objetivo`, `orcamento` ou `nome`. Concluído e cancelado não reabrem; cancelar cancela as atividades abertas.",
+    "operationId": "atualizar_api_v1_projetos__id___patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Atualizar"
+   }
+  },
+  "/api/v1/projetos/{id_}/anexos": {
+   "post": {
+    "description": "Liga ao projeto um anexo da caixa de entrada (`anexo_id`) ou um documento do Paperless (`paperless_id`); um dos dois.",
+    "operationId": "anexar_api_v1_projetos__id___anexos_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Anexar"
+   }
+  },
+  "/api/v1/projetos/{id_}/fatos": {
+   "post": {
+    "description": "Anota um fato (até 1.000 caracteres) com `data` (padrão hoje), `pessoa_nome`, `anexo_id` e `atividade_id` opcionais.",
+    "operationId": "fato_api_v1_projetos__id___fatos_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Fato"
+   }
+  },
+  "/api/v1/projetos/{id_}/gastos": {
+   "post": {
+    "description": "Registra um gasto: `valor` (reais, string) manual ou `lancamento_id` do banco (o valor vem dele); nunca os dois.",
+    "operationId": "gasto_api_v1_projetos__id___gastos_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Gasto"
+   }
+  },
+  "/api/v1/projetos/{id_}/pessoas": {
+   "post": {
+    "description": "Adiciona uma pessoa ao projeto: `nome`, `papel`, `contato` e, opcional, `pessoa_id` do cadastro da família.",
+    "operationId": "pessoa_api_v1_projetos__id___pessoas_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Pessoa"
    }
   },
   "/api/v1/regras": {

@@ -23,6 +23,7 @@ ROTAS = {
     "cadastros-categorias": "/api/v1/cadastros/categorias", "cadastros-empresas": "/api/v1/cadastros/empresas",
     "despesas": "/api/v1/despesas",
     "atividades": "/api/v1/atividades",
+    "projetos": "/api/v1/projetos",
 }
 
 
