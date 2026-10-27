@@ -211,10 +211,7 @@ def limpar_nao_pagas(con, serie: str, meses: Callable[[str], bool]) -> int:
     ids = _todas_as_versoes(con, serie)
     n = 0
     for cid, linha in con.execute(f"select id, linha_id from compromisso where origem='planilha' and linha_id in ({','.join('?' * len(ids))})", ids).fetchall():
-        ym = cid[-7:]
-        if meses(ym) and not repositorio.ocorrencia_paga(con, linha, ym):
-            con.execute("delete from compromisso where id=?", (cid,))
-            con.execute("delete from conciliacao where tx_id=?", (f"manual:{cid}",))
+        if meses(cid[-7:]) and repositorio.apagar_se_nao_paga(con, cid, linha):
             n += 1
     return n
 

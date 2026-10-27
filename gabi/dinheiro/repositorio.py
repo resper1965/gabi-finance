@@ -92,6 +92,16 @@ def ocorrencia_paga(con, linha_id: str, ym: str) -> bool:
         "or exists(select 1 from conciliacao where compromisso_id=? and tx_id not like 'manual:%')", (cid, linha_id, ym, cid)).fetchone())
 
 
+def apagar_se_nao_paga(con, cid: str, linha_id: str) -> bool:
+    """Apaga a ocorrência `cid` (de `linha_id`) e o vínculo `manual:` órfão dela, se não foi paga nem conciliada
+    (`ocorrencia_paga`). Não abre transação. Devolve se apagou."""
+    if ocorrencia_paga(con, linha_id, cid[-7:]):
+        return False
+    con.execute("delete from compromisso where id=?", (cid,))
+    con.execute("delete from conciliacao where tx_id=?", (f"manual:{cid}",))
+    return True
+
+
 # ---------------- o que o `gerar` lê do banco ----------------
 class FontesBanco:
     def __init__(self, con):
@@ -144,13 +154,22 @@ def titulares(con) -> list[str]:
 
 
 # ---------------- gravação do resultado ----------------
-def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime) -> None:
+def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime, meses: list[str] | None = None) -> None:
     """Grava a rodada: compromissos (insert or replace) e vínculos novos (insert or ignore: o primeiro vínculo de um
-    lançamento fica). Baixa manual que saiu dos Cadastros tem o vínculo `manual:` apagado. Idempotente e atômico."""
+    lançamento fica). Baixa manual que saiu dos Cadastros tem o vínculo `manual:` apagado. Com `meses` (os da rodada),
+    a ocorrência `origem='planilha'` desses meses que não veio na rodada (despesa desativada, encerrada, excluída,
+    versão trocada, mês dispensado) sai de A Pagar se não foi paga nem conciliada (`apagar_se_nao_paga`); `fatura:*` e
+    `doc:*` nunca. Idempotente e atômico."""
     ts = agora.isoformat(timespec="seconds")
     manuais = {v[0] for v in novos_vinculos if v[2] == "manual"}
     con.execute("begin")
     try:
+        if meses:
+            gerados = {c["id"] for c in comps}
+            for cid, linha in con.execute(f"select id, linha_id from compromisso where origem='planilha' and substr(id, -7) in "
+                                          f"({','.join('?' * len(meses))})", list(meses)).fetchall():
+                if cid not in gerados and linha:
+                    apagar_se_nao_paga(con, cid, linha)
         for comp in comps:
             r = resultado.get(comp["id"])
             if r is None:

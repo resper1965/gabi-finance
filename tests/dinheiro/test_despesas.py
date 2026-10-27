@@ -349,3 +349,62 @@ def test_virada_de_ano(con):
     assert despesas.mes_inicial(con, "luz", dez.date()) == "2027-01"
     assert despesas.encerrar(con, dez, "r", "painel", "luz")["ultimo_mes"] == "2026-12"
     assert _comp(con, "luz:2027-01") is None and _comp(con, "luz:2026-12")[2] == "pago"
+
+
+# ---------------- Task 4: o furo da rodada ----------------
+def _x(con):
+    """Linha `x` criada direto no banco (como a planilha deixa) e uma rodada: gera `x:2026-10` e `x:2026-11`."""
+    con.execute("insert into compromisso_linha(id, nome, extrato, vencimento, valor_padrao_centavos) values ('x','X','X','dia:5',5000)")
+    cp.atualizar_compromissos(con, AGORA3.date(), AGORA3)
+    assert {r[0] for r in con.execute("select id from compromisso where linha_id='x'")} == {"x:2026-10", "x:2026-11"}
+
+
+def test_meses_da_rodada():
+    from gabi.dinheiro import compromissos
+    assert compromissos.meses_da_rodada(dt.date(2026, 10, 26)) == ["2026-10", "2026-11"]
+    assert compromissos.meses_da_rodada(dt.date(2026, 12, 1)) == ["2026-12", "2027-01"]
+
+
+def test_rodada_apaga_orfa_nao_paga(con):
+    _x(con)
+    con.execute("insert into conciliacao(tx_id, compromisso_id, metodo) values ('manual:x:2026-11','x:2026-11','manual')")  # vínculo órfão
+    con.execute("update compromisso_linha set ativo=0 where id='x'")
+    cp.atualizar_compromissos(con, AGORA3.date(), AGORA3)
+    assert con.execute("select count(*) from compromisso where linha_id='x'").fetchone()[0] == 0
+    assert con.execute("select count(*) from conciliacao where tx_id like 'manual:x:%'").fetchone()[0] == 0
+
+
+def test_rodada_mantem_paga_e_conciliada(con):
+    _x(con)
+    con.execute("update compromisso set estado='pago' where id='x:2026-10'")
+    con.execute("update compromisso set estado='a_conferir' where id='x:2026-11'")
+    con.execute("insert into conciliacao(tx_id, compromisso_id, metodo) values ('tx-9','x:2026-11','valor')")
+    con.execute("update compromisso_linha set valido_ate='2026-09' where id='x'")  # encerrada antes da janela
+    cp.atualizar_compromissos(con, AGORA3.date(), AGORA3)
+    assert dict(con.execute("select id, estado from compromisso where linha_id='x'").fetchall()) == {"x:2026-10": "pago", "x:2026-11": "a_conferir"}
+    assert con.execute("select compromisso_id from conciliacao where tx_id='tx-9'").fetchone()[0] == "x:2026-11"
+
+
+def test_rodada_mantem_baixa_manual_do_valores_do_mes(con):
+    _x(con)
+    con.execute("insert into valor_do_mes(mes, compromisso, tipo, valor_centavos) values ('2026-10','x','pago',5000)")
+    con.execute("update compromisso_linha set excluido_em='2026-10-26' where id='x'")
+    cp.atualizar_compromissos(con, AGORA3.date(), AGORA3)
+    assert {r[0] for r in con.execute("select id from compromisso where linha_id='x'")} == {"x:2026-10"}
+
+
+def test_rodada_nao_toca_fatura_nem_documento(con):
+    for cid, origem in (("fatura:c1:2026-10", "fatura"), ("doc:9:2026-11", "documento")):
+        con.execute("insert into compromisso(id, origem, nome, vencimento, vencimento_util, estado) values (?,?,?,?,?, 'aberto')",
+                    (cid, origem, cid, f"{cid[-7:]}-10", f"{cid[-7:]}-10"))
+    _ocorrencia(con, "luz:2026-09", "atrasado")  # planilha fora da janela: a rodada não mexe
+    cp.atualizar_compromissos(con, AGORA3.date(), AGORA3)
+    assert {r[0] for r in con.execute("select id from compromisso")} == {"fatura:c1:2026-10", "doc:9:2026-11", "luz:2026-09"}
+
+
+def test_mudar_com_versao_nova_tira_a_ocorrencia_antiga(con):
+    _luz(con)
+    _pagar(con, "luz", "2026-10")
+    despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "250.00"})
+    assert {r[0] for r in con.execute("select id from compromisso where id like '%:2026-11'")} == {"luz-202611:2026-11"}
+    assert _comp(con, "luz:2026-10")[2] == "pago"

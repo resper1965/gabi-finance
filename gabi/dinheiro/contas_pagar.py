@@ -25,7 +25,7 @@ def atualizar_compromissos(con, hoje: dt.date, agora: dt.datetime, docs=()) -> R
     pagos = compromissos.valores_em_centavos(leitura["valores"])
     res, novos = conciliacao.conciliar(comps, repositorio.txs_para_conciliar(con, hoje), repositorio.vinculos(con),
                                        repositorio.estado_contas(con), pagos, leitura["params"], hoje, agora, donos)
-    repositorio.gravar_resultado(con, comps, res, novos, agora)
+    repositorio.gravar_resultado(con, comps, res, novos, agora, compromissos.meses_da_rodada(hoje))
     return ResumoCompromissos(len(comps), dict(Counter(r["estado"] for r in res.values())), invalidas)
 
 

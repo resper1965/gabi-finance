@@ -123,11 +123,16 @@ def _comp(ven, ajuste="adia", **kw):
             "doc_id": None, "doc_ids": [], "aviso": None, "linha": None, "pix": "", "payment_status": None} | kw
 
 
+def meses_da_rodada(hoje):
+    """Os meses (`AAAA-MM`) que a rodada gera: o corrente e o seguinte."""
+    return [f"{hoje.year}-{hoje.month:02d}", f"{hoje.year + (hoje.month == 12)}-{hoje.month % 12 + 1:02d}"]
+
+
 def gerar(fontes, leitura, docs, hoje, invalidas=None):
     """`invalidas` (lista opcional) recebe {"linha_id", "mes", "motivo"} das instancias puladas por regra invalida."""
     linhas = leitura["linhas"]
-    meses = [(hoje.year, hoje.month), (hoje.year + (hoje.month == 12), hoje.month % 12 + 1)]
-    yms = [f"{a}-{m:02d}" for a, m in meses]
+    yms = meses_da_rodada(hoje)
+    meses = [(int(ym[:4]), int(ym[5:])) for ym in yms]
     ult = ultimos_pagamentos(fontes.debitos(hoje), [ln for ln in linhas if ln["ativo"]])
     valores = {(v["compromisso"], v["mes"]): v for v in sorted(valores_em_centavos(leitura["valores"]),
                                                               key=lambda v: v["linha_planilha"]) if v["tipo"] == "valor"}
