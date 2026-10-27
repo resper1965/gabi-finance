@@ -34,6 +34,7 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
   "$AQUI"/deploy/gabi-brain-documentos.service "$AQUI"/deploy/gabi-brain-documentos.timer \
   "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
+  "$AQUI"/deploy/gabi-brain-anexos.service "$AQUI"/deploy/gabi-brain-anexos.timer \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
 # Units cortadas pela ADR-023 (22/10/2026): desliga e remove as que o instalador antigo deixou em /etc/systemd/system (idempotente; não apaga dado).
 for u in gabi-brain-escuta.service gabi-brain-escuta.timer gabi-brain-escuta.path escuta-ouvinte.service gabi-brain-trabalho.service gabi-brain-trabalho.timer \
@@ -47,6 +48,7 @@ systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-bra
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
 # O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
+# O timer dos anexos (gabi-brain-anexos.timer, ADR-034) também fica instalado e DESLIGADO: liga pelo runbook #projetos (systemctl enable --now).
 # O timer da agenda do Google (gabi-brain-agenda.timer) também fica instalado e DESLIGADO (liga quando houver fonte liberada na aba Agenda; precisa de calendar.readonly no /etc/gabi/google.env).
 # O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
 # O timer do Teams (gabi-brain-teams.timer) também fica instalado e DESLIGADO (liga quando houver conta de Teams liberada; runbook#graph-ness passo 7).

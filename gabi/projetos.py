@@ -275,3 +275,36 @@ def ver(con, agora: dt.datetime, projeto_id: int) -> dict:
             "orcamento": None if orc is None else formatar(orc), "gasto": formatar(gasto), "saldo": None if orc is None else formatar(orc - gasto),
             "fatos_recentes": listar_fatos(con, projeto_id, limite=FATOS_NO_RESUMO),
             "anexos": con.execute("select count(*) from anexo where projeto_id=?", (projeto_id,)).fetchone()[0]}
+
+
+def anexos_recentes(con, agora: dt.datetime, dias: int = 14) -> list[dict]:
+    """A caixa de entrada: anexos recebidos nos últimos `dias` e ainda não ligados a projeto (mais novos primeiro)."""
+    desde = (agora.astimezone(UTC) - dt.timedelta(days=dias)).isoformat()
+    return [{"id": r["id"], "tipo": r["tipo"], "recebido_em": r["recebido_em"], "transcricao": r["transcricao"]}
+            for r in con.execute("select * from anexo where projeto_id is null and tipo!='documento' and recebido_em>=? order by recebido_em desc, id desc", (desde,))]
+
+
+def anexar(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, anexo_id: int | None = None, paperless_id: int | None = None) -> dict:
+    """Liga ao projeto um anexo da caixa de entrada ou registra um documento do Paperless (`tipo='documento'`, sem copiar o arquivo). Repetir é inofensivo."""
+    p = _ler(con, projeto_id)
+    if (anexo_id is None) == (paperless_id is None):
+        raise ValueError("informe o anexo ou o documento do Paperless, um dos dois")
+    if anexo_id is not None:
+        r = con.execute("select * from anexo where id=?", (anexo_id,)).fetchone()
+        if r is None:
+            raise ValueError(f"o anexo {anexo_id} não existe")
+        if r["projeto_id"] not in (None, projeto_id):
+            raise ValueError(f"o anexo {anexo_id} já está ligado ao projeto {r['projeto_id']}")
+        if r["projeto_id"] is None:
+            con.execute("update anexo set projeto_id=? where id=?", (projeto_id, anexo_id))
+            _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): anexo {anexo_id} ligado")
+        alvo = anexo_id
+    else:
+        existente = con.execute("select id from anexo where tipo='documento' and paperless_id=? and projeto_id=?", (paperless_id, projeto_id)).fetchone()
+        if existente:
+            alvo = existente["id"]
+        else:
+            alvo = con.execute("insert into anexo(tipo, paperless_id, recebido_em, projeto_id) values ('documento',?,?,?)",
+                               (paperless_id, agora.astimezone(UTC).isoformat(), projeto_id)).lastrowid
+            _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): documento {paperless_id} do Paperless ligado")
+    return dict(con.execute("select id, tipo, arquivo, paperless_id, transcricao, recebido_em, projeto_id from anexo where id=?", (alvo,)).fetchone())

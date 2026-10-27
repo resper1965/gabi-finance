@@ -466,3 +466,15 @@ def test_unidades_dos_documentos_seguem_o_padrao_e_sao_ligadas():
         assert nome in INSTALAR
     ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
     assert ligadas and "gabi-brain-documentos.timer" in ligadas[0]
+
+
+# ---------------- anexos (ADR-034; instalado, NÃO habilitado) ----------------
+def test_unidades_dos_anexos_seguem_o_padrao_e_nao_sao_habilitadas():
+    srv, t = _ler("gabi-brain-anexos.service"), _ler("gabi-brain-anexos.timer")
+    assert "-m gabi.anexos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
+    assert "ExecStartPre=+" in srv and ".hermes/cache" in srv and "ANEXOS_DIR=/var/lib/gabi-brain/anexos" in srv and "ProtectSystem=strict" in srv
+    assert "OnUnitActiveSec=2min" in t and "Unit=gabi-brain-anexos.service" in t
+    for nome in ("gabi-brain-anexos.service", "gabi-brain-anexos.timer"):
+        assert nome in INSTALAR
+    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
+    assert not any("anexos" in l for l in ligadas)

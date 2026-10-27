@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi.brain anexos a cada 2 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=gabi-brain-anexos.service
+
+[Install]
+WantedBy=timers.target
