@@ -18,6 +18,7 @@ MAX_OBJETIVO = 2000
 MAX_FATO = 1000
 PROXIMAS = 10
 FATOS_NO_RESUMO = 5
+ANEXOS_NO_RESUMO = 20
 STATUS = ("ativo", "pausado", "concluido", "cancelado")
 FINAIS = ("concluido", "cancelado")
 _DIA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -263,18 +264,25 @@ def listar_fatos(con, projeto_id: int, texto: str = "", limite: int = 50) -> lis
     return achados[:max(1, int(limite))]
 
 
+def _texto_da(con, atividade_id: int | None) -> str | None:
+    r = con.execute("select texto from atividade where id=?", (atividade_id,)).fetchone()
+    return r["texto"] if r else None
+
+
 def ver(con, agora: dt.datetime, projeto_id: int) -> dict:
     r = _ler(con, projeto_id)
     abertas = ativs.listar(con, agora, projeto_id=projeto_id)
     gasto = sum(g["centavos"] for g in _gastos(con, projeto_id))
     orc = r["orcamento_centavos"]
     return {"id": r["id"], "nome": r["nome"], "objetivo": r["objetivo"], "status": r["status"], "prazo": r["prazo"], "progresso": _progresso(con, projeto_id),
-            "proximas": [a for a in abertas if not a["bloqueada"]][:PROXIMAS], "bloqueadas": [a for a in abertas if a["bloqueada"]],
+            "proximas": [a for a in abertas if not a["bloqueada"]][:PROXIMAS], "bloqueadas": [{**a, "espera": _texto_da(con, a["depende_de_id"])} for a in abertas if a["bloqueada"]],
             "atrasadas": [a for a in abertas if a["prazo"] == "vencida"],
             "pessoas": [dict(p) for p in con.execute("select id, nome, papel, pessoa_id, contato from projeto_pessoa where projeto_id=? order by id", (projeto_id,))],
             "orcamento": None if orc is None else formatar(orc), "gasto": formatar(gasto), "saldo": None if orc is None else formatar(orc - gasto),
             "fatos_recentes": listar_fatos(con, projeto_id, limite=FATOS_NO_RESUMO),
-            "anexos": con.execute("select count(*) from anexo where projeto_id=?", (projeto_id,)).fetchone()[0]}
+            "anexos": con.execute("select count(*) from anexo where projeto_id=?", (projeto_id,)).fetchone()[0],
+            "anexos_itens": [{"id": a["id"], "tipo": a["tipo"], "recebido_em": a["recebido_em"], "transcricao": a["transcricao"], "paperless_id": a["paperless_id"]}
+                             for a in con.execute("select * from anexo where projeto_id=? order by recebido_em desc, id desc limit ?", (projeto_id, ANEXOS_NO_RESUMO))]}
 
 
 def anexos_recentes(con, agora: dt.datetime, dias: int = 14) -> list[dict]:

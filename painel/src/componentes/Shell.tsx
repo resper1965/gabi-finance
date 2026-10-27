@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Bell, Building2, Calendar, CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, HeartPulse, LayoutDashboard, LayoutGrid, ListChecks, Mail, Menu, Send, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Building2, Calendar, CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, FolderKanban, HeartPulse, LayoutDashboard, LayoutGrid, ListChecks, Mail, Menu, Send, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
 import { AREAS, GRUPOS, type Area } from "../navegacao";
 import { useLocal, gravarLocal } from "../lib/local";
 import { IrContext, OcultarContext } from "../lib/ocultar";
@@ -7,7 +7,7 @@ import { FaixaSlot } from "./Faixa";
 import { CustoGabi } from "./CustoGabi";
 
 const ICONE: Record<string, LucideIcon> = {
-  hoje: CalendarDays, envios: Send, atividades: ListChecks, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
+  hoje: CalendarDays, envios: Send, atividades: ListChecks, projetos: FolderKanban, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
   caixa: LayoutDashboard, gastos: Workflow, cobrar: Building2, regras: Tag,
   familia: HeartPulse, cadastros: Users, gabi: Activity,
 };

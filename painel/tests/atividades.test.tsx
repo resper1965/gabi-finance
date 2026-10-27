@@ -80,7 +80,7 @@ test("Excluir só chama /cancelar depois de confirmar", async () => {
 
 test("o menu Dia tem a área Atividades, com tela registrada", () => {
   const dia = GRUPOS.find((g) => g.titulo === "Dia")!;
-  expect(dia.areas.map((a) => a.id)).toEqual(["hoje", "envios", "atividades"]);
+  expect(dia.areas.map((a) => a.id)).toEqual(["hoje", "envios", "atividades", "projetos"]);
   expect(dia.areas[2].abas).toEqual([["atividades", "Atividades", "O que tenho para fazer?"]]);
   expect("atividades" in TELAS).toBe(true);
 });

@@ -137,3 +137,13 @@ def test_ver_traz_proximas_bloqueadas_e_atrasadas(con):
     assert len(v["fatos_recentes"]) == 5 and v["fatos_recentes"][0]["texto"] == "fato 4" and v["anexos"] == 1 and v["pessoas"] == []
     with pytest.raises(LookupError):
         projetos.ver(con, AGORA, 999)
+
+
+def test_ver_bloqueada_diz_o_que_espera_e_lista_os_anexos(con):
+    p = _p(con, atividades=[{"texto": "pedir orçamento"}, {"texto": "aprovar", "depois_de": 1}])
+    v = projetos.ver(con, AGORA, p)
+    assert [(a["texto"], a["espera"]) for a in v["bloqueadas"]] == [("aprovar", "pedir orçamento")] and "espera" not in v["proximas"][0]
+    con.execute("insert into anexo(tipo, arquivo, sha256, transcricao, recebido_em, projeto_id) values ('audio','aa/a.ogg','a','oi','2026-10-27T10:00:00+00:00',?)", (p,))
+    con.execute("insert into anexo(tipo, paperless_id, recebido_em, projeto_id) values ('documento', 9, '2026-10-26T10:00:00+00:00', ?)", (p,))
+    v = projetos.ver(con, AGORA, p)
+    assert v["anexos"] == 2 and [(a["tipo"], a["transcricao"], a["paperless_id"]) for a in v["anexos_itens"]] == [("audio", "oi", None), ("documento", None, 9)]
