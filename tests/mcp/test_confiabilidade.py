@@ -118,3 +118,10 @@ def test_soul_atividades_nao_reabre_concluida():
     t = SOUL.read_text()
     linha = next(l for l in t.splitlines() if "atividade_concluir" in l and "→" in l)
     assert "atividade_criar" in linha and "reabrir" in linha
+
+
+def test_soul_projetos_nao_reabre_concluido_nem_cancelado():
+    # ADR-034: não existe reabrir; para voltar, cria de novo
+    t = SOUL.read_text()
+    linha = next(l for l in t.splitlines() if "projeto_atualizar" in l and "→" in l)
+    assert "projeto_criar" in linha and "reabrir" in linha

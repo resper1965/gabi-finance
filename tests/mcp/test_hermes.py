@@ -86,3 +86,20 @@ def test_soul_ensina_as_atividades_sem_pedir_sim_antes_de_criar():
     criar = next(l for l in onde.splitlines() if "atividade_criar" in l and "lembra de" in l)
     assert "sem pedir" in criar.casefold() and "segunda-feira" in criar and "atividade_cancelar" in criar
     assert "atividade_" in soul.split("Gravar de verdade:")[1]
+
+
+def test_soul_ensina_os_projetos_e_so_grava_depois_do_sim():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
+    for n in ("projeto_criar", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_anexar"):
+        assert n in excecao, n
+    onde = soul.split("Onde achar:")[1].split("\n\n")[0]
+    for frase, ferramenta in (("vou começar o projeto", "projeto_criar"), ("tenho um problema com", "projeto_criar"), ("como está o projeto", "projeto_ver"),
+                              ("o mecânico disse que", "projeto_fato"), ("ficou combinado", "projeto_fato"), ("print", "anexo_recentes"),
+                              ("gastei R$", "projeto_gasto"), ("quem é o", "projeto_pessoa"), ("conclui o projeto", "projeto_atualizar")):
+        assert any(frase in l and ferramenta in l for l in onde.splitlines()), frase
+    fato = next(l for l in onde.splitlines() if "projeto_fato" in l and "o mecânico disse que" in l)
+    assert "depois do sim" in fato and "anexo_recentes" in fato
+    criar = next(l for l in onde.splitlines() if "projeto_criar" in l and "vou começar o projeto" in l)
+    assert "depois do sim" in criar and "atividades" in criar
+    assert "projeto_" in soul.split("Gravar de verdade:")[1]

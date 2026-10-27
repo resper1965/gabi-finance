@@ -287,3 +287,20 @@ Decisão: `docs/adr/033-atividades.md`. Instalar só com autorização do Ricard
 - Não há reabrir: para voltar, criar de novo. No painel, Excluir pede confirmação.
 - **Desfazer (rollback):** `git revert` do merge e `sudo ~/instalar-brain.sh`; `cp -p ~/.hermes/config.yaml.bak-antes-atividades ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. A tabela `atividade` pode ficar; o backup do banco só é necessário se quiser descartar os dados.
 
+
+## Projetos: o Hermes conduz projetos de qualquer tipo {#projetos}
+Decisão: `docs/adr/034-projetos.md`. Instalar só com autorização do Ricardo, depois do merge da branch `feat/projetos`. **Token novo escopo:** `projetos` (o `fin` e o `atividades` não bastam).
+1. **Backup do banco:** `sudo cp -p /var/lib/gabi-brain/gabi.db /var/lib/gabi-brain/gabi.db.antes-projetos-$(date +%F)`.
+2. `sudo ~/instalar-brain.sh` (aplica a migração 0087, instala as units `gabi-brain-anexos.service` e `.timer` sem habilitá-las e reinicia o MCP e a API).
+3. **Pasta dos anexos:** `sudo install -d -m 0700 -o gabibrain -g gabibrain /var/lib/gabi-brain/anexos`.
+4. **Escopo no token do Hermes:** `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens listar` (veja o id do token do Hermes e os escopos atuais); depois, na mesma pasta, `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens escopos <id> <os atuais>,projetos`. O segredo não muda.
+5. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-projetos`.
+6. Em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (70 ferramentas: acrescenta `anexo_recentes`, `projeto_anexar`, `projeto_atualizar`, `projeto_criar`, `projeto_fato`, `projeto_fatos`, `projeto_gasto`, `projeto_listar`, `projeto_pessoa` e `projeto_ver`; `atividade_criar` e `atividade_listar` já estavam e ganham parâmetros).
+7. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
+8. **Anexos:** `sudo systemctl enable --now gabi-brain-anexos.timer` (a cada 2 min copia imagem e áudio novos do cache do Hermes para `/var/lib/gabi-brain/anexos`; confira com `journalctl -u gabi-brain-anexos -n 5`: o log só tem contagens).
+9. `sudo systemctl restart hermes-gateway`.
+10. `/new` no Telegram **e** no WhatsApp.
+11. **Transcrição de áudio (opcional):** `sudo -u gabibrain /opt/gabi-brain/venv/bin/pip install faster-whisper`. A primeira rodada com áudio baixa o modelo `small` (centenas de MB; precisa de rede) para `/var/lib/gabi-brain/modelos`. Sem o pacote, o áudio fica guardado sem texto e o resto funciona. Para desligar: `TRANSCRICAO=desligada` em `/etc/gabi/transcricao.env`. Áudios antigos sem texto: `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -c "from gabi.anexos import retranscrever; from gabi.transcricao import carregar; from gabi.db import conectar; print(retranscrever(conectar('/var/lib/gabi-brain/gabi.db'), carregar()))"`.
+12. **Conferir ("Pronto quando"):** pelo Telegram, *"vou começar um projeto de teste: trocar a lâmpada da sala"*; o Hermes propõe a lista e, depois do sim, cria o projeto com 3 atividades (uma depende da outra); mandar um print de conversa e ver o Hermes propor o fato ("Quer que eu grave no projeto…?") e gravar só depois do sim; mandar um áudio curto e ver a transcrição na proposta; conferir tudo em Dia › Projetos (blocos, anexos abrindo o original, caixa de entrada vazia depois de ligado). Encerrar o projeto de teste (não reabre).
+- Projeto concluído ou cancelado não reabre: para voltar, criar de novo. No painel, Concluir e Cancelar pedem confirmação; Pausar não. O aviso "Projeto parado" sai no Telegram depois de 7 dias sem atividade, fato ou anexo novo.
+- **Desfazer (rollback):** `git revert` do merge e `sudo ~/instalar-brain.sh`; `sudo systemctl disable --now gabi-brain-anexos.timer`; `cp -p ~/.hermes/config.yaml.bak-antes-projetos ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. As tabelas e os arquivos de anexo podem ficar; o backup do banco só é necessário se quiser descartar os dados.
