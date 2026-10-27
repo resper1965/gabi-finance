@@ -14,11 +14,11 @@ Google Tasks, Microsoft To Do e Linear; atividades recorrentes; insistir todo di
 ## Modelo (migração 0086)
 `atividade(id, texto not null, vence_em text null, tem_hora int not null default 0, status text not null default 'aberta' check (status in ('aberta','feita','cancelada')), origem text not null, criada_em, concluida_em null)`.
 - `vence_em`: ISO em UTC; `tem_hora=0` significa "o dia todo" (guarda o dia de Brasília às 00:00 BRT).
-- `origem`: `hermes:telegram`, `hermes:whatsapp` ou `painel`.
+- `origem`: `hermes` ou `painel` (a ferramenta do MCP não sabe se o recado veio do Telegram ou do WhatsApp).
 - Sem tabela de avisos nova: reaproveita `aviso` (ver abaixo).
 
 ## Regras (`gabi/atividades.py`, novo; usado pela API e pelo MCP)
-- `criar(con, texto, vence_em=None, tem_hora=False, origem, agora)`: texto não vazio; data no passado é recusada com mensagem clara (o Hermes pergunta).
+- `criar(...)`: texto não vazio (até 500 caracteres); data no passado é recusada com mensagem clara (o Hermes pergunta). Se já existe atividade **aberta** com o mesmo texto e o mesmo vencimento, devolve a existente com `ja_existia: true` (o Hermes repetir a chamada depois de um erro não duplica).
 - `listar(con, status='aberta')`: vencidas primeiro, depois por vencimento, sem data por último.
 - `concluir`, `cancelar` (só de `aberta`; idempotentes), `adiar(con, id, vence_em, tem_hora)`: reabre o aviso do novo horário.
 - Data vaga ("semana que vem"): o Hermes escolhe a segunda-feira e diz qual escolheu; a ferramenta só recebe data resolvida. Fuso: America/Sao_Paulo.
@@ -41,7 +41,7 @@ Cinco ferramentas no MCP: `atividade_criar`, `atividade_listar`, `atividade_conc
 
 ## API e painel
 - `GET /api/v1/atividades?status=`, `POST /atividades`, `POST /atividades/{id}/concluir|cancelar`, `PATCH /atividades/{id}` (adiar).
-- Tela **Atividades** (menu Gabi): lista agrupada em Vencidas, Hoje, Próximas, Sem data; campo para nova atividade; botões feita, adiar (hoje, amanhã, escolher data) e excluir (cancelar). Segue a navegação e o tema atuais; sem gráficos.
+- Tela **Atividades** (grupo Dia, logo depois de Envios): lista agrupada em Vencidas, Hoje, Próximas, Sem data; campo para nova atividade; botões feita, adiar (hoje, amanhã, escolher data) e excluir (cancelar). Segue a navegação e o tema atuais; sem gráficos.
 
 ## Erros e segurança
 - Texto da atividade é dado do Ricardo: nunca mascarado (privacidade é dele), mas nunca vai para log.
