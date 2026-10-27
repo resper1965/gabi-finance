@@ -62,7 +62,7 @@ const alvo = (b: Item): DespesaAlvo => ({ linha_id: b.linha_id!, nome: b.nome, v
 const MENU: [ModoDespesa | "dispensar" | "encerrar", string][] = [["mes", "Editar este mês"], ["dispensar", "Dispensar este mês"], ["daqui", "Mudar daqui em diante"], ["encerrar", "Encerrar"]];
 
 /** Linha de A Pagar. Despesa (item com `linha_id`; fatura e documento avulso não têm) ganha o menu Ações: dispensar tem "Desfazer" no toast;
- *  encerrar pede confirmação e o desfazer fica em Cadastros › Despesas (não há rota para reabrir); editar o mês e mudar daqui em diante abrem o formulário na linha. */
+ *  encerrar pede confirmação e não tem desfazer (não há reabrir; para voltar a pagar, cria-se uma despesa nova); editar o mês e mudar daqui em diante abrem o formulário na linha. */
 function Linha({ g, b, paga, recarregar }: { g: keyof Grupos; b: Item; paga: (i: Item) => void; recarregar: () => Promise<void> }) {
   const avisar = useToast();
   const [menu, setMenu] = useState(false);
@@ -82,7 +82,7 @@ function Linha({ g, b, paga, recarregar }: { g: keyof Grupos; b: Item; paga: (i:
   const encerrar = () => tentar(async () => {
     await api.post(`/api/v1/despesas/${id}/encerrar`);
     setAberto(null);
-    avisar(`${b.nome} encerrada: o que não foi pago saiu de A Pagar.`, { rotulo: "Desfazer", fazer: () => avisar("Para desfazer o encerramento, use Cadastros › Despesas.") });
+    avisar(`${b.nome} encerrada: o que não foi pago saiu de A Pagar.`);
     await recarregar();
   });
   const escolher = (k: (typeof MENU)[number][0]) => { setMenu(false); if (k === "dispensar") void dispensar(); else setAberto(k); };
