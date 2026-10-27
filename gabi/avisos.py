@@ -56,6 +56,10 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
                           (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
     if tipo in TIPOS_REVALIDADOS:
         consolidar_duplicados(con, agora)  # o recém-criado é o mais recente: os velhos da mesma conta ficam superados
+    if tipo == "atividade_resumo":  # a chave é o dia: o resumo de ontem não enviado fica superado pelo de hoje
+        ts = agora.astimezone(dt.timezone.utc).isoformat()
+        for r in con.execute("select id, telegram_em from aviso where tipo='atividade_resumo' and entregue_em is null and id<?", (novo_id,)).fetchall():
+            _fechar(con, r["id"], r["telegram_em"] is not None, ts)
     return novo_id
 
 

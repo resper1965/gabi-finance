@@ -52,6 +52,11 @@ def _hhmm(iso) -> str | None:
     return str(iso)[11:16] if isinstance(iso, str) and len(iso) >= 16 else None
 
 
+def _curto(texto: str, limite: int = 120) -> str:
+    """Linha do resumo cabe no limite do Telegram (4096 caracteres por mensagem): 15 linhas de até 500 caracteres estourariam."""
+    return texto if len(texto) <= limite else texto[: limite - 1].rstrip() + "…"
+
+
 def _descrever_atividade(tipo: str, p: dict) -> tuple[str, str]:
     """O texto da atividade é do Ricardo (vai só para os canais dele); nunca para log."""
     if tipo == "atividade_hora":
@@ -62,7 +67,7 @@ def _descrever_atividade(tipo: str, p: dict) -> tuple[str, str]:
     c = p.get("contagens") or {k: len(p.get(k) or []) for k in ("vencidas", "hoje", "sem_data")}
     partes = [f"{c['vencidas']} {'vencida' if c['vencidas'] == 1 else 'vencidas'}" if c.get("vencidas") else "", f"{c['hoje']} para hoje" if c.get("hoje") else "",
               f"{c['sem_data']} sem data" if c.get("sem_data") else ""]
-    linhas = [f"{rot}: {i.get('texto', '?')}" + (f" ({_ddmm(i['vence_em'])})" if i.get("vence_em") else "")
+    linhas = [f"{rot}: {_curto(i.get('texto', '?'))}" + (f" ({_ddmm(i['vence_em'])})" if i.get("vence_em") else "")
               for rot, chave in (("vencida", "vencidas"), ("hoje", "hoje"), ("sem data", "sem_data")) for i in p.get(chave) or []]
     mostradas = len(linhas)
     mais = f"; e mais {p['total'] - mostradas}" if isinstance(p.get("total"), int) and p["total"] > mostradas else ""

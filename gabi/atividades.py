@@ -148,50 +148,54 @@ def _resumo_item(i: dict) -> dict:
     return {"id": i["id"], "texto": i["texto"], "vence_em": i["vence_em"]}
 
 
+def _criada_antes_da_manha(r, local: dt.datetime) -> bool:
+    """Criada antes das 07:00 de hoje (Brasília): só essas ganham o aviso "para hoje"; as ditas durante o dia ele já sabe."""
+    try:
+        criada = dt.datetime.fromisoformat(r["criada_em"]).astimezone(BRT)
+    except ValueError:
+        return True
+    return criada < local.replace(hour=MANHA.hour, minute=MANHA.minute, second=0, microsecond=0)
+
+
+def montar_resumo(con, agora: dt.datetime) -> dict | None:
+    """O resumo do dia (vencidas, para hoje, sem data; até 15 linhas, `contagens` e `total` reais) ou None se não há nada aberto assim."""
+    abertas = [_item(r, agora) for r in con.execute("select * from atividade where status='aberta' order by id")]
+    ordem = sorted((i for i in abertas if i["prazo"] != "proxima"), key=lambda i: (_ORDEM[i["prazo"]], i["vence_em"] or "", i["id"]))
+    if not ordem:
+        return None
+    visiveis = ordem[:MAX_RESUMO]
+    payload = {chave: [_resumo_item(i) for i in visiveis if i["prazo"] == prazo] for prazo, chave in GRUPOS}
+    payload["contagens"] = {chave: sum(1 for i in ordem if i["prazo"] == prazo) for prazo, chave in GRUPOS}
+    payload["total"] = len(ordem)
+    return payload
+
+
 def avisos_devidos(con, agora: dt.datetime) -> list[tuple[str, str, dict]]:
     """Só leitura. -> [(tipo, chave, payload)] para `avisos.gerar_avisos` gravar em `aviso` (um por tipo+chave por dia, regra do `_novo`).
-    `atividade_hora`: com hora, já chegou (até 2 dias atrás). `atividade_hoje` e `atividade_resumo`: a partir das 07:00 de Brasília."""
+    `atividade_hora`: com hora, já chegou (até 2 dias atrás), uma vez só. `atividade_hoje`: vence hoje, a partir das 07:00 de Brasília, se foi criada antes
+    das 07:00 e a hora (se houver) ainda não passou. `atividade_resumo`: a partir das 07:00."""
     local = agora.astimezone(BRT)
     manha = local.time() >= MANHA
     devidos: list[tuple[str, str, dict]] = []
-    abertas = []
     for r in con.execute("select * from atividade where status='aberta' order by id"):
         i = _item(r, agora)
-        abertas.append(i)
         p = _resumo_item(i)
-        if r["tem_hora"]:
-            q = dt.datetime.fromisoformat(r["vence_em"])
-            if agora - JANELA_HORA <= q <= agora:
-                devidos.append(("atividade_hora", f"{r['id']}|{r['vence_em']}", p))
-        if manha and i["vence_em"] and i["vence_em"][:10] == local.date().isoformat():
+        q = dt.datetime.fromisoformat(r["vence_em"]) if r["vence_em"] else None
+        if r["tem_hora"] and agora - JANELA_HORA <= q <= agora:
+            devidos.append(("atividade_hora", f"{r['id']}|{r['vence_em']}", p))
+        if manha and i["vence_em"] and i["vence_em"][:10] == local.date().isoformat() and not (r["tem_hora"] and q <= agora) and _criada_antes_da_manha(r, local):
             devidos.append(("atividade_hoje", str(r["id"]), p))
-    if manha:
-        ordem = sorted((i for i in abertas if i["prazo"] != "proxima"), key=lambda i: (_ORDEM[i["prazo"]], i["vence_em"] or "", i["id"]))
-        if ordem:
-            visiveis = ordem[:MAX_RESUMO]
-            payload = {chave: [_resumo_item(i) for i in visiveis if i["prazo"] == prazo] for prazo, chave in GRUPOS}
-            payload["contagens"] = {chave: sum(1 for i in ordem if i["prazo"] == prazo) for prazo, chave in GRUPOS}
-            payload["total"] = len(ordem)
-            devidos.append(("atividade_resumo", local.date().isoformat(), payload))
+    resumo = montar_resumo(con, agora) if manha else None
+    if resumo:
+        devidos.append(("atividade_resumo", local.date().isoformat(), resumo))
     return devidos
 
 
 def revalidar_aviso(con, tipo: str, payload: dict) -> tuple[bool, dict]:
     """Releitura na entrega (usada por `avisos.revalidar`) -> (vale, payload_atual). hora/hoje valem se a atividade segue aberta no mesmo vencimento.
-    Resumo: tira as que já foram feitas ou canceladas; sem nenhuma restante, não vale (as além das 15 do aviso não são relidas)."""
+    Resumo: refeito com o que está aberto agora; não vale se não sobrou nada."""
     if tipo in ("atividade_hora", "atividade_hoje"):
         r = con.execute("select status, vence_em, tem_hora from atividade where id=?", (payload.get("id"),)).fetchone()
         return bool(r and r["status"] == "aberta" and _local(r["vence_em"], bool(r["tem_hora"])) == payload.get("vence_em")), payload
-    abertas = {r[0] for r in con.execute("select id from atividade where status='aberta'")}
-    atual, restante = dict(payload), 0
-    contagens = dict(payload.get("contagens") or {})
-    for _, chave in GRUPOS:
-        itens = [i for i in payload.get(chave) or []]
-        vivos = [i for i in itens if i["id"] in abertas]
-        if chave in contagens:
-            contagens[chave] -= len(itens) - len(vivos)
-        atual[chave] = vivos
-        restante += len(vivos)
-    atual["contagens"] = contagens
-    atual["total"] = payload.get("total", restante) - sum(len(payload.get(c) or []) - len(atual[c]) for _, c in GRUPOS)
-    return restante > 0, atual
+    atual = montar_resumo(con, dt.datetime.now(UTC))
+    return (atual is not None), (atual or payload)

@@ -83,3 +83,12 @@ def test_data_passada_e_erro_legivel_e_nao_grava(banco, cli_tok):
     assert r["erro"] == "requisicao_invalida" and "passou" in r["mensagem"] and _decisoes(banco) == []
     assert _c(cli, tok, "atividade_criar", texto="   ")["erro"] == "requisicao_invalida"
     assert _c(cli, tok, "atividade_listar", status="outra")["erro"] == "requisicao_invalida"
+
+
+def test_desfazer_do_adiar_com_vencimento_antigo_ja_passado_nao_promete_o_impossivel(banco, cli_tok):
+    cli, tok = cli_tok
+    c = conectar(banco)
+    c.execute("insert into atividade(texto, vence_em, tem_hora, origem, criada_em) values ('ligar pro contador','2026-10-07T13:00:00+00:00',1,'hermes','x')")
+    c.close()
+    r = _c(cli, tok, "atividade_adiar", atividade="contador", vence="2026-10-12")
+    assert "já passou" in r["desfazer"] and "atividade_adiar" in r["desfazer"] and '"2026-10-07T10:00")' not in r["desfazer"]

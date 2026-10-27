@@ -56,7 +56,15 @@ def atividade_adiar(con, agora: dt.datetime, atividade, vence) -> dict:
     antes = con.execute("select vence_em, tem_hora from atividade where id=?", (id_,)).fetchone()
     antigo = atividades._local(antes["vence_em"], bool(antes["tem_hora"]))
     item = _regra(atividades.adiar, con, agora, QUEM, ORIGEM, id_, vence)
-    return {**item, "desfazer": f'atividade_adiar({id_}, "{antigo}")' if antigo else "sem vencimento antes; atividade_cancelar e atividade_criar de novo"}
+    if not antigo:
+        desfazer = "sem vencimento antes; atividade_cancelar e atividade_criar de novo"
+    else:
+        try:
+            atividades._parse(antigo, agora)
+            desfazer = f'atividade_adiar({id_}, "{antigo}")'
+        except ValueError:
+            desfazer = f'o vencimento antigo ({antigo}) já passou: para mudar de novo, atividade_adiar({id_}, <nova data>)'
+    return {**item, "desfazer": desfazer}
 
 
 def atividade_cancelar(con, agora: dt.datetime, atividade) -> dict:
