@@ -16,7 +16,7 @@ Environment=ANEXOS_DIR=/var/lib/gabi-brain/anexos
 ExecStartPre=+/bin/sh -c 'D=/var/lib/gabi-brain/anexos-entrada; S=$D/.selo; mkdir -p $D/images $D/audio; touch $S.novo; for t in images audio; do if [ -f $S ]; then find /home/ricardo/.hermes/cache/$t -maxdepth 1 -type f -newer $S -exec cp -p -t $D/$t {} +; else find /home/ricardo/.hermes/cache/$t -maxdepth 1 -type f -exec cp -p -t $D/$t {} +; fi; done; chown -R gabibrain:gabibrain $D; chmod -R go-rwx $D; mv $S.novo $S'
 ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.anexos
 ExecStartPost=+/bin/sh -c 'find /var/lib/gabi-brain/anexos-entrada -type f -mtime +2 -delete'
-TimeoutStartSec=300
+TimeoutStartSec=600
 UMask=0077
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -26,7 +26,7 @@ PrivateDevices=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
-RestrictAddressFamilies=AF_UNIX
-IPAddressDeny=any
+# Rede aberta só porque a primeira transcrição baixa o modelo (faster-whisper); depois o serviço não precisa dela.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 CapabilityBoundingSet=
 ReadWritePaths=/var/lib/gabi-brain

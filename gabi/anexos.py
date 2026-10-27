@@ -2,7 +2,7 @@
 
 Tipo pela extensão; dedupe por sha256 (o mesmo arquivo no WhatsApp e no Telegram vira um anexo); arquivo modificado há menos de 20 s espera a próxima rodada;
 acima de 50 MB é ignorado. Guardado para sempre, sem mascarar: diretório 0700, arquivo 0600. O log só imprime contagens, nunca nome nem conteúdo.
-Consome: db (anexo). A transcrição de áudio (`gabi.transcricao`, opcional) entra como o callable `transcrever`."""
+Consome: db (anexo). A transcrição de áudio (`gabi.transcricao`, opcional) entra como o callable `transcrever`; `main` a usa se estiver disponível."""
 import argparse
 import datetime as dt
 import hashlib
@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from gabi import transcricao
 from gabi.db import conectar, migrar
 
 UTC = dt.timezone.utc
@@ -91,6 +92,21 @@ def coletar(con, agora: dt.datetime, origens: list[Path], destino: Path, transcr
     return cont
 
 
+def retranscrever(con, transcrever: Callable[[Path], str | None], destino: Path | None = None) -> int:
+    """Utilitário (a coleta não tenta de novo): preenche os áudios guardados sem texto; devolve quantos ganharam transcrição."""
+    destino = destino or Path(os.environ.get("ANEXOS_DIR") or DESTINO_PADRAO)
+    n = 0
+    for r in con.execute("select id, arquivo from anexo where tipo='audio' and transcricao is null and arquivo is not null").fetchall():
+        try:
+            texto = transcrever(destino / r["arquivo"]) or None
+        except Exception:
+            texto = None
+        if texto:
+            con.execute("update anexo set transcricao=? where id=?", (texto, r["id"]))
+            n += 1
+    return n
+
+
 def _agora() -> dt.datetime:
     return dt.datetime.now(UTC)
 
@@ -103,7 +119,7 @@ def main(argv=None) -> int:
     destino = Path(os.environ.get("ANEXOS_DIR") or DESTINO_PADRAO)
     con = conectar(Path(a.banco))
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
-    r = coletar(con, _agora(), origens, destino)
+    r = coletar(con, _agora(), origens, destino, transcrever=transcricao.carregar())
     print(f"anexos: novos={r['novos']} repetidos={r['repetidos']} ignorados={r['ignorados']} adiados={r['adiados']}")
     return 0
 
