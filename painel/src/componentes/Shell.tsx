@@ -7,7 +7,7 @@ import { FaixaSlot } from "./Faixa";
 import { CustoGabi } from "./CustoGabi";
 
 const ICONE: Record<string, LucideIcon> = {
-  hoje: CalendarDays, envios: Send, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
+  hoje: CalendarDays, envios: Send, atividades: ListChecks, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
   caixa: LayoutDashboard, gastos: Workflow, cobrar: Building2, regras: Tag,
   familia: HeartPulse, cadastros: Users, gabi: Activity,
 };

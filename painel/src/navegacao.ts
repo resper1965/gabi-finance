@@ -6,6 +6,7 @@ export const GRUPOS: Grupo[] = [
   { titulo: "Dia", areas: [
     { id: "hoje", rotulo: "Hoje", pergunta: "O que precisa de mim hoje?", abas: [["hoje", "Hoje", "O que precisa de mim hoje?"]] },
     { id: "envios", rotulo: "Envios", pergunta: "O que espera meu OK para sair?", abas: [["envios", "Envios", "O que espera meu OK para sair?"]] },
+    { id: "atividades", rotulo: "Atividades", pergunta: "O que tenho para fazer?", abas: [["atividades", "Atividades", "O que tenho para fazer?"]] },
   ] },
   { titulo: "Trabalho", areas: [
     { id: "agenda", rotulo: "Agenda", pergunta: "Onde preciso estar?", abas: [["agenda", "Agenda", "Onde preciso estar?"]] },
