@@ -111,3 +111,10 @@ def test_soul_despesas_nao_reabre_encerrada():
     t = SOUL.read_text()
     linha = next(l for l in t.splitlines() if "despesa_encerrar" in l and "→" in l)
     assert "despesa_criar" in linha and "reabrir" in linha
+
+
+def test_soul_atividades_nao_reabre_concluida():
+    # ADR-033: não existe reabrir; para voltar, cria de novo
+    t = SOUL.read_text()
+    linha = next(l for l in t.splitlines() if "atividade_concluir" in l and "→" in l)
+    assert "atividade_criar" in linha and "reabrir" in linha

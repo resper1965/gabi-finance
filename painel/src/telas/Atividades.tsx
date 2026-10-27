@@ -86,14 +86,14 @@ function Nova({ agir, ocupado, recarregar }: { agir: ReturnType<typeof useAcao>[
   );
 }
 
-/** Lista agrupada por prazo (Vencidas, Hoje, Próximas, Sem data; grupo vazio some). O Hermes avisa no Telegram na hora e de manhã. */
+/** Lista agrupada por prazo (Vencidas, Hoje, Próximas, Sem data; grupo vazio some). O brain avisa no Telegram na hora e de manhã. */
 export function Atividades() {
   const leitura = useApi<{ itens: Atividade[] }>(ROTA);
   const { ocupado, erros, agir } = useAcao();
   return (
     <Painel leitura={leitura} arquivo="atividades">
       {(dados) => (
-        <Bloco titulo="Atividades" nota="Deixe o recado ao Hermes (Telegram ou WhatsApp) ou anote aqui. Ele avisa no Telegram na hora marcada e de manhã.">
+        <Bloco titulo="Atividades" nota="Deixe o recado ao Hermes (Telegram ou WhatsApp) ou anote aqui. O brain avisa no Telegram na hora marcada e de manhã.">
           <Nova agir={agir} ocupado={ocupado} recarregar={leitura.recarregar} />
           <Aviso erro={erros.nova} />
           {dados.itens.length === 0 ? <Vazio frase="Nada para fazer." /> : GRUPOS.map(([prazo, rotulo]) => {
