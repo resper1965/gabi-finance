@@ -16,7 +16,9 @@ _SO_DIA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _norm(s: str) -> str:
-    return " ".join(unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().casefold().split())
+    """Sem acento, caixa e espaços repetidos; emoji e escrita não latina ficam (só os sinais de acento saem)."""
+    sem_acento = "".join(c for c in unicodedata.normalize("NFKD", str(s or "")) if unicodedata.category(c) != "Mn")
+    return " ".join(sem_acento.casefold().split())
 
 
 def _parse(vence_em: str | None, agora: dt.datetime) -> tuple[str | None, bool]:

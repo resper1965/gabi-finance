@@ -28,6 +28,7 @@ def _inicio_do_dia_utc(agora: dt.datetime) -> str:
     return dt.datetime(d.year, d.month, d.day, tzinfo=BRT).astimezone(dt.timezone.utc).isoformat()
 
 
+UMA_VEZ = {"atividade_hora"}  # chave = atividade + vencimento: o aviso "agora" sai uma vez só (a janela de 2 dias do produtor não pode reenviá-lo)
 SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
 DIAS_SILENCIO = 7
 HORAS_EXPORTACAO = 9 * 24
@@ -46,6 +47,8 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
         if con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and (entregue_em is null or criado_em>=?)"
                        " and not (telegram_em is not null and telegram_em is entregue_em)" + velho, args).fetchone():
             return None
+    if tipo in UMA_VEZ and con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=?", (tipo, str(chave))).fetchone():
+        return None  # a chave já leva o vencimento: avisado uma vez, nunca de novo nos dias seguintes
     ja = con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and criado_em>=?", (tipo, str(chave), _inicio_do_dia_utc(agora))).fetchone()
     if ja:
         return None

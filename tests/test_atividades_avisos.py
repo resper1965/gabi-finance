@@ -124,3 +124,17 @@ def test_descrever_pt_br(con):
     t, x = descrever("atividade_resumo", {"vencidas": [{"id": 1, "texto": "a", "vence_em": "2026-10-26"}], "hoje": [{"id": 2, "texto": "b", "vence_em": "2026-10-27"}],
                                           "sem_data": [{"id": 3, "texto": "c", "vence_em": None}], "total": 3})
     assert t == "Atividades: 1 vencida, 1 para hoje, 1 sem data" and "a" in x and "b" in x and "c" in x
+
+
+def test_aviso_na_hora_nao_repete_nos_dias_seguintes(con):
+    _criar(con, "ligar pro contador", "2026-10-28T10:00")  # 13:00 UTC de 28/10
+    for quando in (utc(28, 13, 5), utc(29, 0, 5), utc(29, 12), utc(30, 12)):
+        gerar_avisos(con, quando)
+    assert _tipos(con).count("atividade_hora") == 1
+
+
+def test_criar_com_textos_so_de_emoji_nao_confunde_um_com_o_outro(con):
+    a, b = _criar(con, "comprar 🍞"), _criar(con, "comprar 🥛")
+    assert a["id"] != b["id"] and b["ja_existia"] is False
+    assert [i["texto"] for i in atividades.abertas_por_texto(con, "🥛")] == ["comprar 🥛"]
+    assert [i["texto"] for i in atividades.abertas_por_texto(con, "contadór")] == []
