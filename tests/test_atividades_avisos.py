@@ -138,3 +138,42 @@ def test_criar_com_textos_so_de_emoji_nao_confunde_um_com_o_outro(con):
     assert a["id"] != b["id"] and b["ja_existia"] is False
     assert [i["texto"] for i in atividades.abertas_por_texto(con, "🥛")] == ["comprar 🥛"]
     assert [i["texto"] for i in atividades.abertas_por_texto(con, "contadór")] == []
+
+
+def test_para_hoje_nao_ecoa_atividade_criada_depois_das_7h(con):
+    _criar(con, "ligar pro contador", "2026-10-27", agora=utc(27, 15))  # criada às 12:00 BRT
+    gerar_avisos(con, utc(27, 16))
+    assert "atividade_hoje" not in _tipos(con) and "atividade_resumo" in _tipos(con)
+
+
+def test_para_hoje_nao_sai_se_a_hora_ja_passou(con):
+    _criar(con, "ligar cedo", "2026-10-27T06:30")  # criada 06:00 BRT, vence 06:30 BRT
+    gerar_avisos(con, utc(27, 10, 1))  # 07:01 BRT
+    assert "atividade_hora" in _tipos(con) and "atividade_hoje" not in _tipos(con)
+
+
+def test_resumo_corta_linhas_longas_para_caber_no_telegram(con):
+    for i in range(15):
+        _criar(con, f"{i:02d} " + "x" * 497)
+    gerar_avisos(con, utc(27, 15))
+    (_, p), = _avisos(con)
+    titulo, texto = descrever("atividade_resumo", p)
+    assert len(texto) < 2500 and "…" in texto
+
+
+def test_resumo_novo_fecha_o_de_ontem_nao_enviado(con):
+    _criar(con, "solta")
+    gerar_avisos(con, utc(27, 15)); gerar_avisos(con, utc(28, 15))
+    abertos = [r["chave"] for r in con.execute("select json_extract(payload,'$.chave') chave from aviso where tipo='atividade_resumo' and entregue_em is null")]
+    assert abertos == ["2026-10-28"]
+
+
+def test_resumo_segue_valendo_se_as_mostradas_foram_concluidas_e_ha_mais(con):
+    for i in range(16):
+        _criar(con, f"coisa {i:02d}")
+    gerar_avisos(con, utc(27, 15))
+    r = con.execute("select id, tipo, payload from aviso where tipo='atividade_resumo'").fetchone()
+    for i in json.loads(r["payload"])["sem_data"]:
+        atividades.concluir(con, utc(27, 15, 1), "hermes", "hermes", i["id"])
+    estado, atual = triar(con, r["id"], r["tipo"], json.loads(r["payload"]), utc(27, 15, 2))
+    assert estado == VALE and atual["total"] == 1 and [i["texto"] for i in atual["sem_data"]] == ["coisa 15"]
