@@ -1,0 +1,180 @@
+{
+ "dados": {
+  "itens": [
+   {
+    "forma": "pix",
+    "id": "aluguel",
+    "nome": "Aluguel",
+    "proximo_vencimento": null,
+    "situacao": "ativa",
+    "tipo": "fixa",
+    "valido_ate": null,
+    "valido_de": "2026-01",
+    "valor": "3500.00",
+    "vencimento": "dia:5",
+    "versao_id": "aluguel",
+    "versoes": [
+     {
+      "id": "aluguel",
+      "valido_ate": null,
+      "valido_de": "2026-01",
+      "valor": "3500.00",
+      "vencimento": "dia:5"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "internet",
+    "nome": "Internet",
+    "proximo_vencimento": "2026-10-08",
+    "situacao": "ativa",
+    "tipo": "fixa",
+    "valido_ate": null,
+    "valido_de": "2026-01",
+    "valor": "129.90",
+    "vencimento": "dia:8",
+    "versao_id": "internet",
+    "versoes": [
+     {
+      "id": "internet",
+      "valido_ate": null,
+      "valido_de": "2026-01",
+      "valor": "129.90",
+      "vencimento": "dia:8"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "escola",
+    "nome": "Escola",
+    "proximo_vencimento": "2026-10-10",
+    "situacao": "ativa",
+    "tipo": "fixa",
+    "valido_ate": null,
+    "valido_de": "2026-01",
+    "valor": "2100.00",
+    "vencimento": "dia:10",
+    "versao_id": "escola",
+    "versoes": [
+     {
+      "id": "escola",
+      "valido_ate": null,
+      "valido_de": "2026-01",
+      "valor": "2100.00",
+      "vencimento": "dia:10"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "seguro",
+    "nome": "Seguro do carro",
+    "proximo_vencimento": "2026-10-25",
+    "situacao": "ativa",
+    "tipo": "fixa",
+    "valido_ate": null,
+    "valido_de": "2026-01",
+    "valor": "450.00",
+    "vencimento": "dia:25",
+    "versao_id": "seguro",
+    "versoes": [
+     {
+      "id": "seguro",
+      "valido_ate": null,
+      "valido_de": "2026-01",
+      "valor": "450.00",
+      "vencimento": "dia:25"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "luz",
+    "nome": "Luz",
+    "proximo_vencimento": null,
+    "situacao": "ativa",
+    "tipo": "fixa",
+    "valido_ate": null,
+    "valido_de": "2026-01",
+    "valor": "287.50",
+    "vencimento": "dia:3",
+    "versao_id": "luz",
+    "versoes": [
+     {
+      "id": "luz",
+      "valido_ate": null,
+      "valido_de": "2026-01",
+      "valor": "287.50",
+      "vencimento": "dia:3"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "dentista",
+    "nome": "Dentista",
+    "proximo_vencimento": null,
+    "situacao": "ativa",
+    "tipo": "avulsa",
+    "valido_ate": "2026-11",
+    "valido_de": "2026-11",
+    "valor": "450.00",
+    "vencimento": "dia:18",
+    "versao_id": "dentista-202611",
+    "versoes": [
+     {
+      "id": "dentista-202611",
+      "valido_ate": "2026-11",
+      "valido_de": "2026-11",
+      "valor": "450.00",
+      "vencimento": "dia:18"
+     }
+    ]
+   },
+   {
+    "forma": "pix",
+    "id": "academia",
+    "nome": "Academia",
+    "proximo_vencimento": null,
+    "situacao": "encerrada",
+    "tipo": "fixa",
+    "valido_ate": "2026-08",
+    "valido_de": "2026-01",
+    "valor": "199.00",
+    "vencimento": "dia:15",
+    "versao_id": "academia",
+    "versoes": [
+     {
+      "id": "academia",
+      "valido_ate": "2026-08",
+      "valido_de": "2026-01",
+      "valor": "199.00",
+      "vencimento": "dia:15"
+     }
+    ]
+   }
+  ]
+ },
+ "dados_ate": "2026-10-08T17:00:30Z",
+ "desatualizado": false,
+ "fontes": [
+  {
+   "estado": "ok",
+   "nome": "agenda",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "notas-nibo",
+   "ultima": "2026-10-08T17:00:30Z"
+  },
+  {
+   "estado": "ok",
+   "nome": "open-finance",
+   "ultima": "2026-10-08T17:00:30Z"
+  }
+ ],
+ "proxima_rodada": "2026-10-09T09:00:00Z"
+}

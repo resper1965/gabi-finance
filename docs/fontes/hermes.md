@@ -24,6 +24,12 @@ mcp_servers:
       - decisao_responder
       - decisoes_abertas
       - decisoes_recentes
+      - despesa_criar
+      - despesa_encerrar
+      - despesa_excluir
+      - despesa_mes
+      - despesa_mudar
+      - despesas_listar
       - despesas_por_empresa
       - documentos_baixar
       - documentos_buscar

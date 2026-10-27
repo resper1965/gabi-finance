@@ -6,15 +6,12 @@ Consome: dinheiro.{planilha,repositorio,contas_pagar}, envelope, identidade.
 """
 import json
 import logging
-import re
 import sqlite3
-import unicodedata
 
 from fastapi import APIRouter, Depends, Request
 
-from gabi.dinheiro import contas_pagar as cp, gastador, planilha
-from gabi.dinheiro.compromissos import _serie
-from gabi.dinheiro.valor import formatar, para_centavos
+from gabi.dinheiro import contas_pagar as cp, despesas, gastador
+from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
 from gabi.mascara import mascarar_documento
@@ -27,16 +24,7 @@ log = logging.getLogger("gabi.cadastros")
 
 
 # ---------------- utilitários ----------------
-def _slug(nome: str) -> str:
-    s = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "-", s).strip("-") or "item"
-
-
-def _id_unico(con, tabela: str, base: str) -> str:
-    cand, n = base, 2
-    while con.execute(f"select 1 from {tabela} where id=?", (cand,)).fetchone():
-        cand, n = f"{base}-{n}", n + 1
-    return cand
+_slug, _id_unico = despesas._slug, despesas._id_unico
 
 
 def _so(corpo: dict, permitidos: set) -> None:
@@ -340,32 +328,14 @@ class Compromissos:
         return self._ser(r)
 
     def _validar(self, con, d: dict, proprio: str | None):
-        """Passa pela MESMA validação da planilha; devolve a linha normalizada ou levanta 400 com o motivo."""
-        cols = planilha.COLUNAS_COMPROMISSOS
-        apelidos = d.get("apelidos") or []
-        if not isinstance(apelidos, list) or not all(isinstance(a, str) for a in apelidos):
-            raise erro(400, "requisicao_invalida", "apelidos deve ser uma lista de textos")
-        v = {**d, "apelidos": "; ".join(apelidos), "ativo": "sim"}  # a validação das regras vale mesmo para linha desativada
-        celulas = ["" if v.get(c) is None else v.get(c) for c in cols]
-        idx = {c: i for i, c in enumerate(cols)}
-        linha, motivo = planilha._linha(idx, 2, celulas)
-        if linha is None:
-            raise erro(400, "requisicao_invalida", motivo or "linha inválida")
-        for o in con.execute("select id, valido_de, valido_ate from compromisso_linha where excluido_em is null and id<>?", (proprio or "",)):
-            if _serie(o["id"]) == _serie(linha["id"]) and planilha._meses_sobrepoe(linha, {"valido_de": o["valido_de"], "valido_ate": o["valido_ate"]}):
-                raise erro(400, "requisicao_invalida", f"os meses de validade se sobrepõem aos de {o['id']}")
-        return linha
+        """Passa pela MESMA validação da planilha (regras em `despesas`); devolve a linha normalizada ou levanta 400 com o motivo."""
+        try:
+            return despesas.validar_linha(con, d, proprio)
+        except ValueError as e:
+            raise erro(400, "requisicao_invalida", str(e))
 
     def _gravar(self, con, linha, ativo: bool, obs, inserir: bool):
-        args = (linha["nome"], linha["extrato"], json.dumps(linha["apelidos"], ensure_ascii=False), linha["vencimento"], linha["ajuste_dia_util"],
-                linha["valor_tipo"], None if linha["valor_padrao"] is None else para_centavos(round(linha["valor_padrao"], 2)), linha["forma"],
-                linha["conta"], linha["cartao"], linha["documento"], linha["pix"], int(ativo), linha["valido_de"], linha["valido_ate"], obs)
-        if inserir:
-            con.execute("insert into compromisso_linha(id, nome, extrato, apelidos, vencimento, ajuste_dia_util, valor_tipo, valor_padrao_centavos, forma, conta, cartao, "
-                        "documento, pix, ativo, valido_de, valido_ate, obs) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (linha["id"], *args))
-        else:
-            con.execute("update compromisso_linha set nome=?, extrato=?, apelidos=?, vencimento=?, ajuste_dia_util=?, valor_tipo=?, valor_padrao_centavos=?, forma=?, "
-                        "conta=?, cartao=?, documento=?, pix=?, ativo=?, valido_de=?, valido_ate=?, obs=? where id=?", (*args, linha["id"]))
+        despesas.gravar_linha(con, linha, ativo, obs, inserir)
 
     def criar(self, con, corpo, quem, tipo):
         _so(corpo, CAMPOS_COMPROMISSO)

@@ -259,3 +259,16 @@ Decisão: `docs/adr/030-gastadores.md`.
 Decisão: `docs/adr/031-reembolso-por-compra.md`.
 1. **Instalar:** `sudo ~/instalar-brain.sh` (sem migração).
 2. **Hermes:** acrescentar `financeiro_marcar_reembolso` em `~/.hermes/config.yaml` (`mcp_servers › gabi_brain › tools › include`), instalar o SOUL novo (`bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`), `sudo systemctl restart hermes-gateway` e `/new` no Telegram e no WhatsApp.
+
+## Despesas: criar, mudar, dispensar e encerrar {#despesas}
+Decisão: `docs/adr/032-despesas-crud.md`. Instalar só com autorização do Ricardo, depois do merge da branch `feat/despesas-crud`. Sem token novo: `fin` já está no token do Hermes.
+1. **Backup do banco:** `sudo cp -p /var/lib/gabi-brain/gabi.db /var/lib/gabi-brain/gabi.db.antes-despesas-$(date +%F)`.
+2. `sudo ~/instalar-brain.sh` (aplica a migração 0085 e reinicia o MCP e a API).
+3. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-despesas`.
+4. Em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (55 ferramentas: acrescenta `despesa_criar`, `despesa_encerrar`, `despesa_excluir`, `despesa_mes`, `despesa_mudar` e `despesas_listar`).
+5. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
+6. `sudo systemctl restart hermes-gateway`.
+7. `/new` no Telegram **e** no WhatsApp.
+8. **Conferir ("Pronto quando"):** encerrar a Sabrina em Caixa › A Pagar (some de A Pagar e vai para Cadastros › Despesas › Encerradas); pelo Hermes, criar uma despesa de teste, dispensar um mês e desfazer, e excluí-la (ele mostra o que muda e só grava depois do sim).
+- Encerrada não reabre: para voltar a pagar, crie uma despesa nova. No painel, encerrar pede confirmação e não tem desfazer; dispensar tem "Desfazer".
+- **Desfazer (rollback):** `git revert` do merge e `sudo ~/instalar-brain.sh`; `cp -p ~/.hermes/config.yaml.bak-antes-despesas ~/.hermes/config.yaml`, restaurar o SOUL (`SOUL.md.bak-<data>`), `sudo systemctl restart hermes-gateway` e `/new`. O banco não precisa voltar (coluna e valor de `check` novos são inofensivos); o backup `gabi.db.antes-despesas-<data>` é só garantia.

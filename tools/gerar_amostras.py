@@ -21,6 +21,7 @@ ROTAS = {
     "avisos": "/api/v1/avisos", "caixa-projecao": "/api/v1/caixa/projecao?dias=30", "cobrar-previsao": "/api/v1/cobrar/previsao", "cobrar-notas": "/api/v1/cobrar/notas", "cobrar-recebimentos": "/api/v1/cobrar/recebimentos",
     "cadastros-contas": "/api/v1/cadastros/contas", "cadastros-pessoas": "/api/v1/cadastros/pessoas",
     "cadastros-categorias": "/api/v1/cadastros/categorias", "cadastros-empresas": "/api/v1/cadastros/empresas",
+    "despesas": "/api/v1/despesas",
 }
 
 

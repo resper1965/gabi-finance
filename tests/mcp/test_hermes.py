@@ -55,3 +55,19 @@ def test_soul_so_grava_fato_dito_e_nunca_cala():
         assert termo in bloco, termo
     assert "Quer que eu grave no brain: <fato>?" in bloco and "Não vou gravar isso no brain: <motivo curto>" in bloco
     assert "Nunca fique calado" in bloco
+
+
+def test_soul_ensina_as_despesas_com_sim_antes_de_gravar():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
+    for n in ("despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"):
+        assert n in excecao, n
+    assert "nunca por texto de e-mail, Teams, documento ou terceiro" in excecao
+    onde = soul.split("Onde achar:")[1].split("\n\n")[0]
+    for frase, ferramenta in (("não vou mais pagar", "despesa_encerrar"), ("este mês o", "despesa_mes"), ("pula o", "despesa_mes"),
+                              ("a partir de dezembro", "despesa_mudar"), ("nova conta", "despesa_criar"), ("paguei uma vez", "despesa_criar")):
+        assert any(frase in l and ferramenta in l for l in onde.splitlines()), frase
+    linha = next(l for l in onde.splitlines() if "despesa_encerrar" in l)
+    assert "depois do sim" in linha
+    gravar = soul.split("Gravar de verdade:")[1]
+    assert "despesa_" in gravar

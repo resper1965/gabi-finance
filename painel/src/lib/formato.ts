@@ -15,3 +15,14 @@ export function originalEmReais(l: { valor: string; moeda?: string; valor_origin
   const orig = `${SIMBOLO[l.moeda] ?? l.moeda} ${fmt(l.valor_original)}`;
   return l.convertido === false ? `${orig} (sem conversão para reais)` : `${orig} → R$ ${fmt(l.valor)}`;
 }
+
+/** Valor digitado ("2.350,50", "800", "129.90", "R$ 1.500") → string decimal em reais com 2 casas ("2350.50"); null se não for valor.
+ *  Só mexe no texto (nunca passa por número de ponto flutuante). Com vírgula, o ponto é milhar; sem vírgula, "1.500" é milhar e "129.90" é decimal. */
+export function reaisDoTexto(texto: string): string | null {
+  let s = texto.replace(/R\$/i, "").replace(/\s/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(s);
+  if (!m) return null;
+  return `${m[1].replace(/^0+(?=\d)/, "")}.${(m[2] ?? "").padEnd(2, "0")}`;
+}

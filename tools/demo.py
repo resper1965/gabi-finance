@@ -72,6 +72,13 @@ def semear(caminho: Path) -> None:
         c.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, valor_fonte, forma, estado, dados, atualizado_em) "
                   "values (?, 'planilha', ?, ?, ?, ?, ?, 'planilha', 'pix', ?, ?, '2026-10-08T12:00:00')",
                   (cid, cid.split(":")[0], nome, venc, venc, valor, estado, json.dumps(dados)))
+    for lid, nome, venc, valor, de, ate, tipo in (  # o cadastro das despesas acima (+ uma avulsa e uma encerrada)
+            ("aluguel", "Aluguel", "dia:5", 350000, "2026-01", None, "fixa"), ("internet", "Internet", "dia:8", 12990, "2026-01", None, "fixa"),
+            ("escola", "Escola", "dia:10", 210000, "2026-01", None, "fixa"), ("seguro", "Seguro do carro", "dia:25", 45000, "2026-01", None, "fixa"),
+            ("luz", "Luz", "dia:3", 28750, "2026-01", None, "fixa"), ("dentista-202611", "Dentista", "dia:18", 45000, "2026-11", "2026-11", "avulsa"),
+            ("academia", "Academia", "dia:15", 19900, "2026-01", "2026-08", "fixa")):
+        c.execute("insert into compromisso_linha(id, nome, extrato, vencimento, valor_tipo, valor_padrao_centavos, forma, valido_de, valido_ate, tipo) "
+                  "values (?,?,?,?, 'fixo', ?, 'pix', ?,?,?)", (lid, nome, nome.upper(), venc, valor, de, ate, tipo))
     _semear_agenda(c)
     c.close()
 
