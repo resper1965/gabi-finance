@@ -2,16 +2,22 @@
 
 Regras de criar (com atividades e dependências), listar, atualizar e resolver; a API, o MCP e o painel só chamam daqui. `ValueError` = dado ou transição inválida; `LookupError` = id inexistente.
 As atividades do projeto são as de `gabi.atividades` (`projeto_id`, `depende_de_id`, `marco`). Estados: ativo, pausado, concluido, cancelado; os dois últimos não aceitam atividade nova e não reabrem.
-Cancelar o projeto cancela as atividades abertas dele. Prazo em Brasília (`AAAA-MM-DD`; passado é aceito: o projeto pode estar atrasado). Toda escrita grava `decisao`. Consome: db, gabi.atividades."""
+Cancelar o projeto cancela as atividades abertas dele. Prazo em Brasília (`AAAA-MM-DD`; passado é aceito: o projeto pode estar atrasado). Toda escrita grava `decisao`. Consome: db (projeto, projeto_pessoa, projeto_gasto, projeto_fato, anexo, lancamento), gabi.atividades.
+`ver` junta o que o Hermes e o painel mostram; dinheiro sai em string decimal de reais (`orcamento`/`saldo` nulos sem orçamento); lançamento removido ou sem valor soma 0."""
 import datetime as dt
 import re
 
 from gabi import atividades as ativs
+from gabi.dinheiro.valor import formatar
+from gabi.hoje import BRT
 from gabi.atividades import UTC, _auditar, _norm
 
 MAX_ATIVIDADES = 30
 MAX_NOME = 200
 MAX_OBJETIVO = 2000
+MAX_FATO = 1000
+PROXIMAS = 10
+FATOS_NO_RESUMO = 5
 STATUS = ("ativo", "pausado", "concluido", "cancelado")
 FINAIS = ("concluido", "cancelado")
 _DIA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -171,3 +177,101 @@ def resolver(con, projeto: str | int) -> int:
     if len(achados) > 1:
         raise ValueError("mais de um projeto combina: " + "; ".join(f"{r['id']}: {r['nome']}" for r in achados))
     return achados[0]["id"]
+
+
+def _hoje(agora: dt.datetime) -> str:
+    return agora.astimezone(BRT).date().isoformat()
+
+
+def _dia(data: str | None, agora: dt.datetime) -> str:
+    return _hoje(agora) if data in (None, "") else _prazo(data)
+
+
+def adicionar_pessoa(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, nome: str, papel: str = "", contato: str = "", pessoa_id: str | None = None) -> dict:
+    p = _ler(con, projeto_id)
+    nome = " ".join(str(nome or "").split())
+    if not nome:
+        raise ValueError("o nome da pessoa não pode ficar vazio")
+    if pessoa_id and con.execute("select 1 from pessoa where id=?", (pessoa_id,)).fetchone() is None:
+        raise ValueError(f"a pessoa '{pessoa_id}' não existe no cadastro")
+    novo = con.execute("insert into projeto_pessoa(projeto_id, nome, papel, pessoa_id, contato) values (?,?,?,?,?)",
+                       (projeto_id, nome, str(papel or "").strip(), pessoa_id or None, str(contato or "").strip())).lastrowid
+    _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): pessoa {nome[:60]} adicionada")
+    return dict(con.execute("select id, projeto_id, nome, papel, pessoa_id, contato from projeto_pessoa where id=?", (novo,)).fetchone())
+
+
+def adicionar_gasto(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, *, valor_centavos: int | None = None, descricao: str = "",
+                    data: str | None = None, lancamento_id: int | None = None) -> dict:
+    """Gasto do projeto: de um lançamento do banco (valor absoluto dele) ou manual (dinheiro vivo, pago por outra pessoa); nunca os dois."""
+    p = _ler(con, projeto_id)
+    if lancamento_id is not None and valor_centavos is not None:
+        raise ValueError("informe o lançamento ou o valor, não os dois")
+    if lancamento_id is not None:
+        lanc = con.execute("select valor_centavos, data from lancamento where id=?", (lancamento_id,)).fetchone()
+        if lanc is None:
+            raise ValueError(f"o lançamento {lancamento_id} não existe")
+        valor, dia = None, _dia(data, agora) if data else lanc["data"]
+    else:
+        if isinstance(valor_centavos, bool) or not isinstance(valor_centavos, int) or valor_centavos <= 0:
+            raise ValueError("informe o lançamento ou um valor maior que zero")
+        valor, dia = valor_centavos, _dia(data, agora)
+    novo = con.execute("insert into projeto_gasto(projeto_id, lancamento_id, descricao, valor_centavos, data, criado_em) values (?,?,?,?,?,?)",
+                       (projeto_id, lancamento_id, str(descricao or "").strip(), valor, dia, agora.astimezone(UTC).isoformat())).lastrowid
+    _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): gasto {novo} registrado")
+    return _gastos(con, projeto_id, novo)[0]
+
+
+def _gastos(con, projeto_id: int, so: int | None = None) -> list[dict]:
+    sql = ("select g.id, g.projeto_id, g.lancamento_id, g.descricao, g.data, "
+           "case when g.lancamento_id is not null then abs(coalesce(l.valor_centavos, 0)) else coalesce(g.valor_centavos, 0) end as centavos "
+           "from projeto_gasto g left join lancamento l on l.id = g.lancamento_id where g.projeto_id=? and (? is null or g.id=?) order by g.id")
+    return [{"id": r["id"], "projeto_id": r["projeto_id"], "lancamento_id": r["lancamento_id"], "descricao": r["descricao"], "data": r["data"], "valor": formatar(r["centavos"]),
+             "centavos": r["centavos"]} for r in con.execute(sql, (projeto_id, so, so))]
+
+
+def _fato(r) -> dict:
+    return {"id": r["id"], "projeto_id": r["projeto_id"], "texto": r["texto"], "data": r["data_fato"], "pessoa_nome": r["pessoa_nome"], "anexo_id": r["anexo_id"],
+            "atividade_id": r["atividade_id"], "registrado_em": r["registrado_em"], "origem": r["origem"]}
+
+
+def registrar_fato(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, texto: str, data: str | None = None, pessoa_nome: str = "",
+                   anexo_id: int | None = None, atividade_id: int | None = None) -> dict:
+    """O diário do projeto: o que o Ricardo afirmou ou confirmou, com data. Quem chama só grava depois do sim dele (regra do Hermes)."""
+    p = _ler(con, projeto_id)
+    texto = str(texto or "").strip()
+    if not texto:
+        raise ValueError("o texto do fato não pode ficar vazio")
+    if len(texto) > MAX_FATO:
+        raise ValueError(f"o texto do fato passa de {MAX_FATO} caracteres")
+    dia = _dia(data, agora)
+    if anexo_id is not None and con.execute("select 1 from anexo where id=?", (anexo_id,)).fetchone() is None:
+        raise ValueError(f"o anexo {anexo_id} não existe")
+    if atividade_id is not None and con.execute("select 1 from atividade where id=?", (atividade_id,)).fetchone() is None:
+        raise ValueError(f"a atividade {atividade_id} não existe")
+    novo = con.execute("insert into projeto_fato(projeto_id, texto, data_fato, pessoa_nome, anexo_id, atividade_id, registrado_em, origem) values (?,?,?,?,?,?,?,?)",
+                       (projeto_id, texto, dia, str(pessoa_nome or "").strip(), anexo_id, atividade_id, agora.astimezone(UTC).isoformat(), origem)).lastrowid
+    _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): fato {novo} registrado")
+    return _fato(con.execute("select * from projeto_fato where id=?", (novo,)).fetchone())
+
+
+def listar_fatos(con, projeto_id: int, texto: str = "", limite: int = 50) -> list[dict]:
+    """Mais novos primeiro; `texto` filtra sem acento nem caixa (no texto do fato e no nome da pessoa)."""
+    _ler(con, projeto_id)
+    n = _norm(texto)
+    achados = [_fato(r) for r in con.execute("select * from projeto_fato where projeto_id=? order by data_fato desc, id desc", (projeto_id,))
+               if not n or n in _norm(r["texto"]) or n in _norm(r["pessoa_nome"])]
+    return achados[:max(1, int(limite))]
+
+
+def ver(con, agora: dt.datetime, projeto_id: int) -> dict:
+    r = _ler(con, projeto_id)
+    abertas = ativs.listar(con, agora, projeto_id=projeto_id)
+    gasto = sum(g["centavos"] for g in _gastos(con, projeto_id))
+    orc = r["orcamento_centavos"]
+    return {"id": r["id"], "nome": r["nome"], "objetivo": r["objetivo"], "status": r["status"], "prazo": r["prazo"], "progresso": _progresso(con, projeto_id),
+            "proximas": [a for a in abertas if not a["bloqueada"]][:PROXIMAS], "bloqueadas": [a for a in abertas if a["bloqueada"]],
+            "atrasadas": [a for a in abertas if a["prazo"] == "vencida"],
+            "pessoas": [dict(p) for p in con.execute("select id, nome, papel, pessoa_id, contato from projeto_pessoa where projeto_id=? order by id", (projeto_id,))],
+            "orcamento": None if orc is None else formatar(orc), "gasto": formatar(gasto), "saldo": None if orc is None else formatar(orc - gasto),
+            "fatos_recentes": listar_fatos(con, projeto_id, limite=FATOS_NO_RESUMO),
+            "anexos": con.execute("select count(*) from anexo where projeto_id=?", (projeto_id,)).fetchone()[0]}
