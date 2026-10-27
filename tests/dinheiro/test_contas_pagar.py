@@ -246,3 +246,15 @@ def test_fatura_vencida_nao_paga_ha_mais_de_45_dias_e_saldo_antigo_e_nao_conta_c
     _fatura(con, cc, "recente", "2026-10-05", 528055, "PAST_DUE_UNCONFIRMED")
     _fatura(con, cc, "aberta", "2026-10-20", 80025, "OPEN")
     assert sorted(f["id"] for f in faturas_abertas(con, HOJE)) == ["aberta", "limite", "recente"]
+
+
+def test_a_pagar_traz_linha_e_mes(agenda):
+    agenda.execute("insert into compromisso_linha(id, nome, extrato, vencimento, tipo) values ('iptu','IPTU','IPTU','dia:1','avulsa')")
+    for id_, origem in (("fatura:c6:2026-10", "fatura"), ("doc:7:2026-10", "documento")):
+        agenda.execute("insert into compromisso(id, origem, linha_id, nome, vencimento, vencimento_util, valor_centavos, estado) values (?,?,NULL,'X','2026-10-20','2026-10-20',100,'aberto')",
+                       (id_, origem))
+    todos = {i["id"]: i for g in contas_a_pagar(agenda, HOJE).values() for i in g}
+    assert (todos["iptu:2026-10"]["linha_id"], todos["iptu:2026-10"]["mes"], todos["iptu:2026-10"]["tipo"]) == ("iptu", "2026-10", "avulsa")
+    assert (todos["escola:2026-11"]["linha_id"], todos["escola:2026-11"]["mes"], todos["escola:2026-11"]["tipo"]) == ("escola", "2026-11", "fixa")
+    for id_ in ("fatura:c6:2026-10", "doc:7:2026-10"):
+        assert (todos[id_]["linha_id"], todos[id_]["mes"], todos[id_]["tipo"]) == (None, None, None)

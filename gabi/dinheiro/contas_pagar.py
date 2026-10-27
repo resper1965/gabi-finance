@@ -38,15 +38,19 @@ def _cent(reais):
 
 
 def contas_a_pagar(con, hoje: dt.date, ate: dt.date | None = None) -> dict:
-    """Compromissos agrupados como o painel mostra. `ate` corta o que vence depois (nunca as atrasadas)."""
+    """Compromissos agrupados como o painel mostra. `ate` corta o que vence depois (nunca as atrasadas).
+    Ocorrência de despesa traz `linha_id`, `mes` e `tipo` (fixa/avulsa) para as ações; fatura e documento trazem `None`."""
     saida = {g: [] for g in GRUPOS}
     limite_proximas = hoje + dt.timedelta(days=7)
+    tipos = dict(con.execute("select id, tipo from compromisso_linha").fetchall())
     for r in con.execute("select * from compromisso order by vencimento_util, id"):
         d = json.loads(r["dados"] or "{}")
         vu = dt.date.fromisoformat(r["vencimento_util"])
+        despesa = r["origem"] == "planilha" and bool(r["linha_id"])
         item = {"id": r["id"], "nome": r["nome"], "vencimento": r["vencimento"], "vencimento_util": r["vencimento_util"],
                 "valor_centavos": r["valor_centavos"], "valor_fonte": r["valor_fonte"], "estado": r["estado"],
-                "motivo": r["motivo"], "forma": r["forma"]}
+                "motivo": r["motivo"], "forma": r["forma"], "linha_id": r["linha_id"] if despesa else None,
+                "mes": r["id"][-7:] if despesa else None, "tipo": tipos.get(r["linha_id"], "fixa") if despesa else None}
         e = r["estado"]
         if e == "pago":
             item.update(pago_em=d.get("pago_em"), tx_id=d.get("tx_id"), metodo=d.get("metodo"), diferenca_centavos=d.get("diferenca_centavos", _cent(d.get("diferenca"))))

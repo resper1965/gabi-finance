@@ -2109,6 +2109,333 @@
     "summary": "Criar"
    }
   },
+  "/api/v1/despesas": {
+   "get": {
+    "description": "Despesas por série (versão vigente + histórico de versões), com o próximo vencimento. Filtros: tipo (fixa|avulsa), situacao (ativa|encerrada).",
+    "operationId": "listar_api_v1_despesas_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "tipo",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tipo"
+      }
+     },
+     {
+      "in": "query",
+      "name": "situacao",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Situacao"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar"
+   },
+   "post": {
+    "description": "Cria despesa fixa (desde o mês em curso) ou avulsa (`data` AAAA-MM-DD obrigatória). Valor em `valor_padrao` (reais).",
+    "operationId": "criar_api_v1_despesas_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar"
+   }
+  },
+  "/api/v1/despesas/{id_}": {
+   "delete": {
+    "description": "Cadastro errado: exclui se nunca teve pagamento; senão encerra e devolve `encerrada: true`.",
+    "operationId": "excluir_api_v1_despesas__id___delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Excluir"
+   },
+   "patch": {
+    "description": "Muda daqui em diante: do mês em curso se não foi pago, senão do próximo; `a_partir` (AAAA-MM) vence a regra.",
+    "operationId": "mudar_api_v1_despesas__id___patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Mudar"
+   }
+  },
+  "/api/v1/despesas/{id_}/encerrar": {
+   "post": {
+    "description": "Encerra: `ultimo_mes` (AAAA-MM) ou o mês anterior ao primeiro não pago. O que não foi pago depois sai de A Pagar.",
+    "operationId": "encerrar_api_v1_despesas__id___encerrar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Encerrar"
+   }
+  },
+  "/api/v1/despesas/{id_}/mes/{mes}": {
+   "post": {
+    "description": "Valor e/ou vencimento (AAAA-MM-DD) só deste mês.",
+    "operationId": "mudar_mes_api_v1_despesas__id___mes__mes__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "mes",
+      "required": true,
+      "schema": {
+       "title": "Mes",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Mudar Mes"
+   }
+  },
+  "/api/v1/despesas/{id_}/mes/{mes}/dispensar": {
+   "delete": {
+    "description": "Desfaz a dispensa do mês: a despesa volta para A Pagar.",
+    "operationId": "desfazer_dispensa_api_v1_despesas__id___mes__mes__dispensar_delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "mes",
+      "required": true,
+      "schema": {
+       "title": "Mes",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Desfazer Dispensa"
+   },
+   "post": {
+    "description": "Este mês não tem a despesa: sai de A Pagar (mês pago é recusado).",
+    "operationId": "dispensar_api_v1_despesas__id___mes__mes__dispensar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "mes",
+      "required": true,
+      "schema": {
+       "title": "Mes",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Dispensar"
+   }
+  },
   "/api/v1/destino": {
    "get": {
     "description": "Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior.",

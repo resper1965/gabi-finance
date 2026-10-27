@@ -75,6 +75,14 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/custo` | Custo do modelo (OpenRouter) no dia e no mês contra o teto. |
 | GET | `/api/v1/decisoes/perguntas` | Perguntas do canal de decisão (padrão: todas, as mais novas primeiro; `estado=aberta` só as que esperam resposta). |
 | POST | `/api/v1/decisoes/perguntas` | Cria uma pergunta com opções numeradas (n, rotulo, efeito, parametros); `efeito` só da lista fechada (registrar_nota, marcar_conta_nao, marcar_conta_sim, criar_compromisso, atribuir_para_quem). |
+| GET | `/api/v1/despesas` | Despesas por série (versão vigente + histórico de versões), com o próximo vencimento. Filtros: tipo (fixa|avulsa), situacao (ativa|encerrada). |
+| POST | `/api/v1/despesas` | Cria despesa fixa (desde o mês em curso) ou avulsa (`data` AAAA-MM-DD obrigatória). Valor em `valor_padrao` (reais). |
+| DELETE | `/api/v1/despesas/{id_}` | Cadastro errado: exclui se nunca teve pagamento; senão encerra e devolve `encerrada: true`. |
+| PATCH | `/api/v1/despesas/{id_}` | Muda daqui em diante: do mês em curso se não foi pago, senão do próximo; `a_partir` (AAAA-MM) vence a regra. |
+| POST | `/api/v1/despesas/{id_}/encerrar` | Encerra: `ultimo_mes` (AAAA-MM) ou o mês anterior ao primeiro não pago. O que não foi pago depois sai de A Pagar. |
+| POST | `/api/v1/despesas/{id_}/mes/{mes}` | Valor e/ou vencimento (AAAA-MM-DD) só deste mês. |
+| DELETE | `/api/v1/despesas/{id_}/mes/{mes}/dispensar` | Desfaz a dispensa do mês: a despesa volta para A Pagar. |
+| POST | `/api/v1/despesas/{id_}/mes/{mes}/dispensar` | Este mês não tem a despesa: sai de A Pagar (mês pago é recusado). |
 | GET | `/api/v1/destino` | Para onde vai o dinheiro: origem, categoria e destino, com comparação ao período anterior. |
 | GET | `/api/v1/destino/agrupado` | Para onde vai o dinheiro agrupado por categoria, pessoa (para quem), gastador (quem gastou) ou fornecedor (abas Fornecedores e Por pessoa). |
 | GET | `/api/v1/documentos/propostas` | Propostas de documento no estado dado (titular ou bem novo, motivos de conferir, documento atual) e a URL base do Paperless. |
