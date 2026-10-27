@@ -177,3 +177,14 @@ def test_resumo_segue_valendo_se_as_mostradas_foram_concluidas_e_ha_mais(con):
         atividades.concluir(con, utc(27, 15, 1), "hermes", "hermes", i["id"])
     estado, atual = triar(con, r["id"], r["tipo"], json.loads(r["payload"]), utc(27, 15, 2))
     assert estado == VALE and atual["total"] == 1 and [i["texto"] for i in atual["sem_data"]] == ["coisa 15"]
+
+
+def test_bloqueada_nao_gera_aviso_na_hora_e_liberada_gera(con):
+    from gabi import projetos
+    p = projetos.criar(con, CRIACAO, "hermes", "hermes", "Carro", atividades=[{"texto": "pedir orçamento"}, {"texto": "aprovar", "vence": "2026-10-27T13:00", "depois_de": 1}])
+    gerar_avisos(con, utc(27, 16, 5))
+    assert "atividade_hora" not in _tipos(con)
+    primeira = next(a for a in atividades.listar(con, CRIACAO, projeto_id=p["id"]) if a["texto"] == "pedir orçamento")
+    atividades.concluir(con, CRIACAO, "hermes", "hermes", primeira["id"])
+    gerar_avisos(con, utc(27, 16, 10))
+    assert _tipos(con).count("atividade_hora") == 1

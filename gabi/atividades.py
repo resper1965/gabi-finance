@@ -2,7 +2,9 @@
 
 Regras de criar, listar, concluir, cancelar e adiar; a API, o MCP e o painel só chamam daqui. `ValueError` = dado ou transição inválida; `LookupError` = id inexistente.
 Datas entram e saem em Brasília (`AAAA-MM-DD` = dia todo, `AAAA-MM-DDTHH:MM` = com hora); no banco `vence_em` é UTC e `tem_hora=0` guarda 00:00 de Brasília.
-Não existe reabrir: para voltar, cria de novo. Toda escrita grava `decisao`. Consome: db (atividade, decisao)."""
+Não existe reabrir: para voltar, cria de novo. Toda escrita grava `decisao`. Consome: db (atividade, projeto, decisao).
+Projetos (ADR-034): a atividade pode ter `projeto_id`, `depende_de_id` (uma dependência) e `marco`; é `bloqueada` enquanto a atividade da qual depende está aberta (feita ou cancelada libera).
+Bloqueada não gera aviso na hora, de manhã nem entra no resumo."""
 import datetime as dt
 import re
 import unicodedata
@@ -13,6 +15,11 @@ UTC = dt.timezone.utc
 MAX_TEXTO = 500
 _COM_HORA = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
 _SO_DIA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+# `bloqueada` sai de uma subconsulta, sem coluna física: depende de alguém que ainda está aberta.
+_SEL = ("select a.*, (a.depende_de_id is not null and exists(select 1 from atividade d where d.id=a.depende_de_id and d.status='aberta')) as bloqueada "
+        "from atividade a")
 
 
 def _norm(s: str) -> str:
@@ -61,7 +68,8 @@ def _prazo(row, agora: dt.datetime) -> str:
 
 def _item(row, agora: dt.datetime) -> dict:
     return {"id": row["id"], "texto": row["texto"], "vence_em": _local(row["vence_em"], bool(row["tem_hora"])), "tem_hora": bool(row["tem_hora"]),
-            "status": row["status"], "origem": row["origem"], "criada_em": row["criada_em"], "concluida_em": row["concluida_em"], "prazo": _prazo(row, agora)}
+            "status": row["status"], "origem": row["origem"], "criada_em": row["criada_em"], "concluida_em": row["concluida_em"], "prazo": _prazo(row, agora),
+            "projeto_id": row["projeto_id"], "depende_de_id": row["depende_de_id"], "marco": bool(row["marco"]), "bloqueada": bool(row["bloqueada"])}
 
 
 def _auditar(con, agora: dt.datetime, quem: str, origem: str, o_que: str) -> None:
@@ -69,42 +77,52 @@ def _auditar(con, agora: dt.datetime, quem: str, origem: str, o_que: str) -> Non
 
 
 def _ler(con, id_: int):
-    r = con.execute("select * from atividade where id=?", (id_,)).fetchone()
+    r = con.execute(_SEL + " where a.id=?", (id_,)).fetchone()
     if r is None:
         raise LookupError(f"atividade {id_} não existe")
     return r
 
 
-def criar(con, agora: dt.datetime, quem: str, origem: str, texto: str, vence_em: str | None = None) -> dict:
+def criar(con, agora: dt.datetime, quem: str, origem: str, texto: str, vence_em: str | None = None,
+          projeto_id: int | None = None, depende_de_id: int | None = None, marco: bool = False, auditar: bool = True) -> dict:
     texto = str(texto or "").strip()
     if not texto:
         raise ValueError("o texto da atividade não pode ficar vazio")
     if len(texto) > MAX_TEXTO:
         raise ValueError(f"o texto da atividade passa de {MAX_TEXTO} caracteres")
     utc, tem_hora = _parse(vence_em, agora)
-    for r in con.execute("select * from atividade where status='aberta' and vence_em is ?", (utc,)):
+    if projeto_id is not None:
+        p = con.execute("select status from projeto where id=?", (projeto_id,)).fetchone()
+        if p is None:
+            raise LookupError(f"projeto {projeto_id} não existe")
+        if p["status"] in ("concluido", "cancelado"):
+            raise ValueError(f"o projeto {projeto_id} está {p['status']} e não aceita atividade nova")
+    if depende_de_id is not None:
+        _ler(con, depende_de_id)
+    for r in con.execute(_SEL + " where a.status='aberta' and a.vence_em is ? and a.projeto_id is ?", (utc, projeto_id)):
         if _norm(r["texto"]) == _norm(texto):
             return {**_item(r, agora), "ja_existia": True}
-    novo = con.execute("insert into atividade(texto, vence_em, tem_hora, origem, criada_em) values (?,?,?,?,?)",
-                       (texto, utc, int(tem_hora), origem, agora.astimezone(UTC).isoformat())).lastrowid
-    _auditar(con, agora, quem, origem, f"atividade {novo} criada: {texto[:80]}")
+    novo = con.execute("insert into atividade(texto, vence_em, tem_hora, origem, criada_em, projeto_id, depende_de_id, marco) values (?,?,?,?,?,?,?,?)",
+                       (texto, utc, int(tem_hora), origem, agora.astimezone(UTC).isoformat(), projeto_id, depende_de_id, int(bool(marco)))).lastrowid
+    if auditar:  # `projetos.criar` grava uma linha só para o projeto inteiro
+        _auditar(con, agora, quem, origem, f"atividade {novo} criada: {texto[:80]}")
     return {**_item(_ler(con, novo), agora), "ja_existia": False}
 
 
 _ORDEM = {"vencida": 0, "hoje": 1, "proxima": 2, "sem_data": 3}
 
 
-def listar(con, agora: dt.datetime, status: str = "aberta") -> list[dict]:
+def listar(con, agora: dt.datetime, status: str = "aberta", projeto_id: int | None = None) -> list[dict]:
     if status not in ("aberta", "feita", "cancelada"):
         raise ValueError("status deve ser aberta, feita ou cancelada")
-    itens = [_item(r, agora) for r in con.execute("select * from atividade where status=? order by id", (status,))]
+    itens = [_item(r, agora) for r in con.execute(_SEL + " where a.status=? and (? is null or a.projeto_id=?) order by a.id", (status, projeto_id, projeto_id))]
     return sorted(itens, key=lambda i: (_ORDEM[i["prazo"]], i["vence_em"] or "", i["id"]))
 
 
 def abertas_por_texto(con, trecho: str) -> list[dict]:
     t = _norm(trecho)
     agora = dt.datetime.now(UTC)
-    return [_item(r, agora) for r in con.execute("select * from atividade where status='aberta' order by id") if t and t in _norm(r["texto"])]
+    return [_item(r, agora) for r in con.execute(_SEL + " where a.status='aberta' order by a.id") if t and t in _norm(r["texto"])]
 
 
 def _fechar(con, agora, quem, origem, id_: int, estado: str, verbo: str) -> dict:
@@ -159,7 +177,7 @@ def _criada_antes_da_manha(r, local: dt.datetime) -> bool:
 
 def montar_resumo(con, agora: dt.datetime) -> dict | None:
     """O resumo do dia (vencidas, para hoje, sem data; até 15 linhas, `contagens` e `total` reais) ou None se não há nada aberto assim."""
-    abertas = [_item(r, agora) for r in con.execute("select * from atividade where status='aberta' order by id")]
+    abertas = [i for i in (_item(r, agora) for r in con.execute(_SEL + " where a.status='aberta' order by a.id")) if not i["bloqueada"]]
     ordem = sorted((i for i in abertas if i["prazo"] != "proxima"), key=lambda i: (_ORDEM[i["prazo"]], i["vence_em"] or "", i["id"]))
     if not ordem:
         return None
@@ -177,8 +195,10 @@ def avisos_devidos(con, agora: dt.datetime) -> list[tuple[str, str, dict]]:
     local = agora.astimezone(BRT)
     manha = local.time() >= MANHA
     devidos: list[tuple[str, str, dict]] = []
-    for r in con.execute("select * from atividade where status='aberta' order by id"):
+    for r in con.execute(_SEL + " where a.status='aberta' order by a.id"):
         i = _item(r, agora)
+        if i["bloqueada"]:
+            continue
         p = _resumo_item(i)
         q = dt.datetime.fromisoformat(r["vence_em"]) if r["vence_em"] else None
         if r["tem_hora"] and agora - JANELA_HORA <= q <= agora:
@@ -195,7 +215,7 @@ def revalidar_aviso(con, tipo: str, payload: dict) -> tuple[bool, dict]:
     """Releitura na entrega (usada por `avisos.revalidar`) -> (vale, payload_atual). hora/hoje valem se a atividade segue aberta no mesmo vencimento.
     Resumo: refeito com o que está aberto agora; não vale se não sobrou nada."""
     if tipo in ("atividade_hora", "atividade_hoje"):
-        r = con.execute("select status, vence_em, tem_hora from atividade where id=?", (payload.get("id"),)).fetchone()
-        return bool(r and r["status"] == "aberta" and _local(r["vence_em"], bool(r["tem_hora"])) == payload.get("vence_em")), payload
+        r = con.execute(_SEL + " where a.id=?", (payload.get("id"),)).fetchone()
+        return bool(r and r["status"] == "aberta" and not r["bloqueada"] and _local(r["vence_em"], bool(r["tem_hora"])) == payload.get("vence_em")), payload
     atual = montar_resumo(con, dt.datetime.now(UTC))
     return (atual is not None), (atual or payload)

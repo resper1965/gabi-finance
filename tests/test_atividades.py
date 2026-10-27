@@ -99,3 +99,14 @@ def test_adiar_so_aberta_e_valida_futuro(con):
 def test_abertas_por_texto_ignora_acento_e_caixa(con):
     _criar(con, "Ligar pro Contador"); _criar(con, "pagar a luz")
     assert [i["texto"] for i in atividades.abertas_por_texto(con, "contadór")] == ["Ligar pro Contador"]
+
+
+def test_mesmo_texto_em_projetos_diferentes_nao_duplica(con):
+    from gabi import projetos
+    a = projetos.criar(con, AGORA, "hermes", "hermes", "A")["id"]
+    b = projetos.criar(con, AGORA, "hermes", "hermes", "B")["id"]
+    x = atividades.criar(con, AGORA, "hermes", "hermes", "ligar", projeto_id=a)
+    y = atividades.criar(con, AGORA, "hermes", "hermes", "ligar", projeto_id=b)
+    z = atividades.criar(con, AGORA, "hermes", "hermes", "ligar", projeto_id=a)
+    assert x["id"] != y["id"] and z["id"] == x["id"] and z["ja_existia"] is True
+    assert atividades.criar(con, AGORA, "hermes", "hermes", "ligar")["ja_existia"] is False
