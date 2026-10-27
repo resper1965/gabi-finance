@@ -11,13 +11,11 @@ instalar = `sudo ~/instalar-brain.sh` (copia main para /opt). Toda escrita manua
 
 ## 1. Item 3 — CRUD de despesas (branch `feat/despesas-crud`, NÃO mergeada, NÃO instalada)
 - Spec `docs/superpowers/specs/2026-10-26-despesas-crud-design.md`, plano `docs/superpowers/plans/2026-10-26-despesas-crud.md` (8 tasks, todas feitas), ADR-032.
-- Revisão final achou 3 pontos; correção EM ANDAMENTO no momento deste handoff (arquivos modificados sem commit podem estar na branch):
-  1. `mudar` ignorava meses pagos adiantado → podia criar ocorrência aberta num mês já pago (pagamento em dobro); `a_partir` num mês pago reescrevia valor pago.
-     Correção: começar depois do último mês pago; `a_partir` em mês pago → ValueError.
-  2. `dispensar_mes`/`desfazer_dispensa`/`mudar_mes` em mês passado (atrasado) não funcionavam → recusar mês anterior ao corrente; painel esconde essas ações em atrasadas.
-  3. Recálculo que falha depois do commit fazia o Hermes repetir `despesa_criar` e duplicar → devolver sucesso com `aviso`.
-- Próximo: conferir se a correção foi commitada (`git log`; mensagem `fix(despesas): mudar respeita meses pagos adiantado...`); se não, terminar com TDD;
-  rodar `.venv/bin/pytest -q` e `cd painel && npx vitest run && npm run build`; pedir ok ao Ricardo; então merge na main, backup
+- Revisão final achou 3 pontos, TODOS CORRIGIDOS no commit `ace392a` (pytest 2932 passed; vitest 180 passed; build ok):
+  1. `mudar` começa depois do último mês pago (inclusive pago adiantado); `a_partir` em mês pago → ValueError. Nunca mexe em ocorrência paga.
+  2. `dispensar_mes`/`desfazer_dispensa`/`mudar_mes` recusam mês anterior ao corrente; painel esconde essas ações em atrasadas.
+  3. Recálculo que falha depois do commit devolve sucesso com `aviso` (Hermes não duplica ao repetir).
+- Próximo: rodar `.venv/bin/pytest -q` e `cd painel && npx vitest run && npm run build`; pedir ok ao Ricardo; então merge na main, backup
   `gabi.db.antes-despesas-<data>`, `sudo ~/instalar-brain.sh` (migração 0085), runbook `#despesas` (include do Hermes com as 6 ferramentas
   `despesas_listar despesa_criar despesa_mudar despesa_mes despesa_encerrar despesa_excluir`, SOUL, restart `hermes-gateway`, `/new` no Telegram e WhatsApp).
 - Decisões: encerrar não tem reabrir (para voltar, criar nova); encerrar no painel pede confirmação e não tem desfazer; dispensar tem desfazer.
