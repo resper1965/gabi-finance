@@ -104,3 +104,10 @@ def test_script_sem_soul_previo_instala_sem_backup(tmp_path):
 def test_script_nao_usa_sudo_nem_reinicia_nada():
     exec_ = [l for l in SCRIPT.read_text().splitlines() if l.strip() and not l.lstrip().startswith(("#", "echo"))]
     assert not any("sudo" in l or "systemctl" in l for l in exec_)
+
+
+def test_soul_despesas_nao_reabre_encerrada():
+    # ADR-032: não existe reabrir; para voltar, cria de novo
+    t = SOUL.read_text()
+    linha = next(l for l in t.splitlines() if "despesa_encerrar" in l and "→" in l)
+    assert "despesa_criar" in linha and "reabrir" in linha
