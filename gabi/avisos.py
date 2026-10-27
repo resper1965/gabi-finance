@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from gabi import atividades
+from gabi import atividades, projetos
 from gabi.db import conectar, migrar
 from gabi.dinheiro.conciliacao import CONFIRMADO
 from gabi.dinheiro.valor import formatar
@@ -29,7 +29,7 @@ def _inicio_do_dia_utc(agora: dt.datetime) -> str:
 
 
 UMA_VEZ = {"atividade_hora"}  # chave = atividade + vencimento: o aviso "agora" sai uma vez só (a janela de 2 dias do produtor não pode reenviá-lo)
-SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
+SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou", "projeto_parado"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
 DIAS_SILENCIO = 7
 HORAS_EXPORTACAO = 9 * 24
 
@@ -125,6 +125,8 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     if tipo in TIPOS_ATIVIDADE:
         vale, atual = atividades.revalidar_aviso(con, tipo, payload)
         return (VALE if vale else RESOLVIDO), atual
+    if tipo == "projeto_parado":
+        return (VALE if projetos.revalidar_aviso(con, payload) else RESOLVIDO), payload
     return VALE, payload
 
 
@@ -142,7 +144,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
 
 
 TIPOS_ATIVIDADE = ("atividade_hora", "atividade_hoje", "atividade_resumo")
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", *TIPOS_ATIVIDADE)
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", "projeto_parado", *TIPOS_ATIVIDADE)
 ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -424,6 +426,8 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo("lancamento_sem_conversao", hoje.isoformat(), {"quantidade": n})
     for tipo, chave, p in atividades.avisos_devidos(con, agora):
         novo(tipo, chave, p)
+    for p in projetos.parados(con, agora):
+        novo("projeto_parado", p["id"], p)
     return criados
 
 

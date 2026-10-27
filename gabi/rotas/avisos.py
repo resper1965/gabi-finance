@@ -144,6 +144,9 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return _descrever_email(tipo, p)
     if tipo.startswith("atividade_"):
         return _descrever_atividade(tipo, p)
+    if tipo == "projeto_parado":
+        n = p.get("parado_ha_dias") or 0
+        return f"Projeto parado: {p.get('nome', '?')}", f"sem movimento há {n} {'dia' if n == 1 else 'dias'}"
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

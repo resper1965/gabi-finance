@@ -308,3 +308,31 @@ def anexar(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, ane
                                (paperless_id, agora.astimezone(UTC).isoformat(), projeto_id)).lastrowid
             _auditar(con, agora, quem, origem, f"projeto {projeto_id} ({p['nome'][:40]}): documento {paperless_id} do Paperless ligado")
     return dict(con.execute("select id, tipo, arquivo, paperless_id, transcricao, recebido_em, projeto_id from anexo where id=?", (alvo,)).fetchone())
+
+
+def _ultimo_movimento(con, projeto_id: int, criado_em: str) -> dt.datetime:
+    """A data mais recente entre a criação do projeto e o que mexeu nele: atividade criada ou concluída, fato registrado, anexo recebido."""
+    datas = [criado_em]
+    for sql in ("select max(criada_em), max(concluida_em) from atividade where projeto_id=?", "select max(registrado_em) from projeto_fato where projeto_id=?",
+                "select max(recebido_em) from anexo where projeto_id=?"):
+        datas += [d for d in con.execute(sql, (projeto_id,)).fetchone() if d]
+    return max(dt.datetime.fromisoformat(d).astimezone(UTC) for d in datas)
+
+
+def parados(con, agora: dt.datetime, dias: int = 7) -> list[dict]:
+    """Projetos ativos sem movimento há `dias` ou mais -> [{"id","nome","parado_ha_dias","ultimo_em"}] (`ultimo_em` serve à revalidação, sem relógio)."""
+    achados = []
+    for r in con.execute("select id, nome, criado_em from projeto where status='ativo' order by id"):
+        ultimo = _ultimo_movimento(con, r["id"], r["criado_em"])
+        parado = (agora.astimezone(UTC) - ultimo).days
+        if parado >= dias:
+            achados.append({"id": r["id"], "nome": r["nome"], "parado_ha_dias": parado, "ultimo_em": ultimo.isoformat()})
+    return achados
+
+
+def revalidar_aviso(con, payload: dict) -> bool:
+    """Na entrega: vale se o projeto segue ativo e não teve movimento depois do que gerou o aviso."""
+    r = con.execute("select status, criado_em from projeto where id=?", (payload.get("id"),)).fetchone()
+    if r is None or r["status"] != "ativo":
+        return False
+    return _ultimo_movimento(con, payload["id"], r["criado_em"]) <= dt.datetime.fromisoformat(payload["ultimo_em"])
