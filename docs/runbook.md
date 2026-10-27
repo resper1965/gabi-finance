@@ -277,7 +277,7 @@ Decisão: `docs/adr/032-despesas-crud.md`. Instalar só com autorização do Ric
 Decisão: `docs/adr/033-atividades.md`. Instalar só com autorização do Ricardo, depois do merge da branch `feat/atividades`. **Token novo escopo:** `atividades` (o `fin` não basta).
 1. **Backup do banco:** `sudo cp -p /var/lib/gabi-brain/gabi.db /var/lib/gabi-brain/gabi.db.antes-atividades-$(date +%F)`.
 2. `sudo ~/instalar-brain.sh` (aplica a migração 0086 e reinicia o MCP e a API; os avisos novos saem no próximo ciclo do `gabi-brain-avisos.timer`, sem timer novo).
-3. **Escopo no token do Hermes:** `cd ~/gabi-brain && sudo .venv/bin/python -m gabi.mcp.tokens listar` (veja o id do token do Hermes e os escopos atuais); depois `sudo .venv/bin/python -m gabi.mcp.tokens escopos <id> <os atuais>,atividades`. O segredo não muda.
+3. **Escopo no token do Hermes:** `cd /opt/gabi-brain && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens listar` (veja o id do token do Hermes e os escopos atuais); depois, na mesma pasta, `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens escopos <id> <os atuais>,atividades`. O segredo não muda.
 4. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-atividades`.
 5. Em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (60 ferramentas: acrescenta `atividade_adiar`, `atividade_cancelar`, `atividade_concluir`, `atividade_criar` e `atividade_listar`).
 6. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
