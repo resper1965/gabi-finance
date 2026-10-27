@@ -7,7 +7,7 @@ const amostra = (n: string) => JSON.parse(readFileSync(join(__dirname, "amostras
 const ROTAS: [RegExp, string][] = [
   [/\/avisos/, "avisos"], [/\/caixa\/projecao/, "caixa-projecao"], [/\/cobrar\/a-receber$/, "cobrar-a-receber"], [/\/cobrar\/previsao/, "cobrar-previsao"], [/\/cobrar\/recebimentos/, "cobrar-recebimentos"], [/\/cobrar\/notas/, "cobrar-notas"],
   [/\/categorias\/equivalencias\/pendentes/, "equivalencias-pendentes"],
-  [/\/caixa\/resumo/, "caixa-resumo"], [/\/caixa\/semanas/, "caixa-semanas"], [/\/contas-pagar/, "contas-pagar"],
+  [/\/caixa\/resumo/, "caixa-resumo"], [/\/caixa\/semanas/, "caixa-semanas"], [/\/contas-pagar/, "contas-pagar"], [/\/despesas/, "despesas"],
   [/\/lancamentos.*pendente=para_quem/, "lancamentos-pendentes"], [/\/lancamentos/, "lancamentos"],
   [/\/destino\/agrupado.*por=pessoa/, "destino-pessoa"], [/\/destino\/agrupado/, "destino-fornecedor"], [/\/destino/, "destino"],
   [/\/cartoes/, "cartoes"], [/\/parcelas/, "parcelas"], [/\/assinaturas/, "assinaturas"], [/\/sugestoes/, "sugestoes"], [/\/regras/, "regras"],
