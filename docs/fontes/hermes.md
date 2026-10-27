@@ -15,6 +15,7 @@ mcp_servers:
       include:
       - agenda_financeira
       - agenda_listar
+      - anexo_recentes
       - assinatura_marcar
       - assinaturas_listar
       - atividade_adiar
@@ -67,6 +68,15 @@ mcp_servers:
       - financeiro_recorrentes
       - financeiro_registrar_a_receber
       - financeiro_saldo
+      - projeto_anexar
+      - projeto_atualizar
+      - projeto_criar
+      - projeto_fato
+      - projeto_fatos
+      - projeto_gasto
+      - projeto_listar
+      - projeto_pessoa
+      - projeto_ver
       - propor_evento
       - propor_teams
       - regras_listar

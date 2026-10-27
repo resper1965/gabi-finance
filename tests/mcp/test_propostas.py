@@ -48,7 +48,7 @@ def test_lista_tem_as_ferramentas_novas_e_nenhuma_destrutiva(cli2, tokens2):
     nomes = {t["name"] for t in rpc(cli2, tokens2["fin"], "tools/list").json()["result"]["tools"]}
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar", "decidir"}
-    for n in nomes - {"familia_atualizar_contato", "email_remover_regra_lixo", "despesa_criar", "despesa_excluir", "atividade_criar"}:  # escrita reversível a pedido do Ricardo (contato com Desfazer; Onda 3: lixeira, regra de lixo, a receber; ADR-032: despesas; ADR-033: atividade_criar)
+    for n in nomes - {"familia_atualizar_contato", "email_remover_regra_lixo", "despesa_criar", "despesa_excluir", "atividade_criar", "projeto_criar", "projeto_atualizar"}:  # escrita reversível a pedido do Ricardo (contato com Desfazer; Onda 3: lixeira, regra de lixo, a receber; ADR-032: despesas; ADR-033: atividade_criar)
         assert not (set(n.replace("contas_a_pagar", "contas").split("_")) & proibidas), n
     assert set(ESCOPOS_FERRAMENTAS) == nomes  # toda ferramenta tem escopo declarado
 

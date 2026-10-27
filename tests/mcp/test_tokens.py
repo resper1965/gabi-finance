@@ -81,7 +81,7 @@ def test_listar_nunca_expoe_hash_nem_token(con):
 
 
 def test_escopos_do_plano():
-    assert ESCOPOS == {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel", "contatos", "atividades"}
+    assert ESCOPOS == {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel", "contatos", "atividades", "projetos"}
 
 
 def test_revogar_tudo_da_api_invalida_os_tokens(con):
