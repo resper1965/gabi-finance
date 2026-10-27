@@ -48,6 +48,27 @@ def _descrever_email(tipo: str, p: dict) -> tuple[str, str]:
     return tipo, json.dumps(p, ensure_ascii=False)
 
 
+def _hhmm(iso) -> str | None:
+    return str(iso)[11:16] if isinstance(iso, str) and len(iso) >= 16 else None
+
+
+def _descrever_atividade(tipo: str, p: dict) -> tuple[str, str]:
+    """O texto da atividade é do Ricardo (vai só para os canais dele); nunca para log."""
+    if tipo == "atividade_hora":
+        return f"Atividade agora: {p.get('texto', '?')}", f"marcada para {_hhmm(p.get('vence_em')) or 'agora'}"
+    if tipo == "atividade_hoje":
+        hora = _hhmm(p.get("vence_em"))
+        return f"Atividade para hoje: {p.get('texto', '?')}", f"vence hoje às {hora}" if hora else "vence hoje"
+    c = p.get("contagens") or {k: len(p.get(k) or []) for k in ("vencidas", "hoje", "sem_data")}
+    partes = [f"{c['vencidas']} {'vencida' if c['vencidas'] == 1 else 'vencidas'}" if c.get("vencidas") else "", f"{c['hoje']} para hoje" if c.get("hoje") else "",
+              f"{c['sem_data']} sem data" if c.get("sem_data") else ""]
+    linhas = [f"{rot}: {i.get('texto', '?')}" + (f" ({_ddmm(i['vence_em'])})" if i.get("vence_em") else "")
+              for rot, chave in (("vencida", "vencidas"), ("hoje", "hoje"), ("sem data", "sem_data")) for i in p.get(chave) or []]
+    mostradas = len(linhas)
+    mais = f"; e mais {p['total'] - mostradas}" if isinstance(p.get("total"), int) and p["total"] > mostradas else ""
+    return "Atividades: " + ", ".join(x for x in partes if x), "; ".join(linhas) + mais
+
+
 def descrever(tipo: str, p: dict) -> tuple[str, str]:
     if tipo == "vence_em_breve":
         itens = p.get("itens") or []
@@ -116,6 +137,8 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
         return f"Reconectar a agenda {p.get('conta', '?')}", "a credencial foi recusada ou não está configurada; a agenda não está sendo lida"
     if tipo.startswith("email_"):
         return _descrever_email(tipo, p)
+    if tipo.startswith("atividade_"):
+        return _descrever_atividade(tipo, p)
     return tipo, json.dumps(p, ensure_ascii=False)
 
 

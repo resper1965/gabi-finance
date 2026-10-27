@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from gabi import atividades
 from gabi.db import conectar, migrar
 from gabi.dinheiro.conciliacao import CONFIRMADO
 from gabi.dinheiro.valor import formatar
@@ -114,6 +115,9 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
         return VALE, payload
     if tipo == "documento_vence":
         return _documento_vence_estado(con, payload), payload
+    if tipo in TIPOS_ATIVIDADE:
+        vale, atual = atividades.revalidar_aviso(con, tipo, payload)
+        return (VALE if vale else RESOLVIDO), atual
     return VALE, payload
 
 
@@ -130,7 +134,8 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
     return estado, atual
 
 
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence")
+TIPOS_ATIVIDADE = ("atividade_hora", "atividade_hoje", "atividade_resumo")
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", *TIPOS_ATIVIDADE)
 ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -410,6 +415,8 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     n = con.execute("select count(*) from lancamento where convertido=0").fetchone()[0]
     if n:  # só a contagem: nunca valor nem descrição
         novo("lancamento_sem_conversao", hoje.isoformat(), {"quantidade": n})
+    for tipo, chave, p in atividades.avisos_devidos(con, agora):
+        novo(tipo, chave, p)
     return criados
 
 
