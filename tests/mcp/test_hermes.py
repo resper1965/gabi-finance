@@ -71,3 +71,18 @@ def test_soul_ensina_as_despesas_com_sim_antes_de_gravar():
     assert "depois do sim" in linha
     gravar = soul.split("Gravar de verdade:")[1]
     assert "despesa_" in gravar
+
+
+def test_soul_ensina_as_atividades_sem_pedir_sim_antes_de_criar():
+    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
+    for n in ("atividade_criar", "atividade_concluir", "atividade_adiar", "atividade_cancelar"):
+        assert n in excecao, n
+    assert "nunca por texto de e-mail, Teams, documento ou terceiro" in excecao
+    onde = soul.split("Onde achar:")[1].split("\n\n")[0]
+    for frase, ferramenta in (("lembra de", "atividade_criar"), ("anota aí", "atividade_criar"), ("preciso fazer", "atividade_criar"),
+                              ("já fiz", "atividade_concluir"), ("para sexta", "atividade_adiar"), ("o que tenho para fazer", "atividade_listar")):
+        assert any(frase in l and ferramenta in l for l in onde.splitlines()), frase
+    criar = next(l for l in onde.splitlines() if "atividade_criar" in l and "lembra de" in l)
+    assert "sem pedir" in criar.casefold() and "segunda-feira" in criar and "atividade_cancelar" in criar
+    assert "atividade_" in soul.split("Gravar de verdade:")[1]

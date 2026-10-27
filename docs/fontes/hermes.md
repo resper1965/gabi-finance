@@ -17,6 +17,11 @@ mcp_servers:
       - agenda_listar
       - assinatura_marcar
       - assinaturas_listar
+      - atividade_adiar
+      - atividade_cancelar
+      - atividade_concluir
+      - atividade_criar
+      - atividade_listar
       - avisos_abertos
       - bens_listar
       - classificar_lancamento

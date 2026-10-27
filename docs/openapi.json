@@ -402,6 +402,174 @@
     "summary": "Assinatura Patch"
    }
   },
+  "/api/v1/atividades": {
+   "get": {
+    "description": "Atividades por status (aberta, feita ou cancelada), vencidas primeiro, com o prazo (vencida, hoje, proxima, sem_data).",
+    "operationId": "listar_api_v1_atividades_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "default": "aberta",
+       "title": "Status",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Listar"
+   },
+   "post": {
+    "description": "Cria uma atividade: `texto` e, opcional, `vence_em` (AAAA-MM-DD ou AAAA-MM-DDTHH:MM). Igual a uma aberta devolve a existente (`ja_existia`).",
+    "operationId": "criar_api_v1_atividades_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar"
+   }
+  },
+  "/api/v1/atividades/{id_}": {
+   "patch": {
+    "description": "Adia: novo `vence_em` (AAAA-MM-DD ou AAAA-MM-DDTHH:MM), só de atividade aberta e no futuro.",
+    "operationId": "adiar_api_v1_atividades__id___patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Adiar"
+   }
+  },
+  "/api/v1/atividades/{id_}/cancelar": {
+   "post": {
+    "description": "Cancela (excluir da lista); atividade já feita não pode ser cancelada.",
+    "operationId": "cancelar_api_v1_atividades__id___cancelar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Cancelar"
+   }
+  },
+  "/api/v1/atividades/{id_}/concluir": {
+   "post": {
+    "description": "Marca como feita (repetir não muda nada; não há reabrir).",
+    "operationId": "concluir_api_v1_atividades__id___concluir_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Concluir"
+   }
+  },
   "/api/v1/avisos": {
    "get": {
     "description": "Avisos abertos (não lidos) do gabi.brain, os mais novos primeiro, com título e texto em pt-BR.",
