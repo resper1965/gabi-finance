@@ -60,6 +60,9 @@ function Cabecalho({ cor, titulo, sub, direita }: { cor: string; titulo: string;
 
 const alvo = (b: Item): DespesaAlvo => ({ linha_id: b.linha_id!, nome: b.nome, valor: b.valor, mes: b.mes, vencimento: b.vencimento });
 const MENU: [ModoDespesa | "dispensar" | "encerrar", string][] = [["mes", "Editar este mês"], ["dispensar", "Dispensar este mês"], ["daqui", "Mudar daqui em diante"], ["encerrar", "Encerrar"]];
+/** Mês em curso (AAAA-MM) em Brasília. Mês já passado não tem "Editar/Dispensar este mês": a API recusa (a rodada só gera o mês em curso e o seguinte). */
+const mesAtual = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date());
+const SO_DO_MES = new Set(["mes", "dispensar"]);
 
 /** Linha de A Pagar. Despesa (item com `linha_id`; fatura e documento avulso não têm) ganha o menu Ações: dispensar tem "Desfazer" no toast;
  *  encerrar pede confirmação e não tem desfazer (não há reabrir; para voltar a pagar, cria-se uma despesa nova); editar o mês e mudar daqui em diante abrem o formulário na linha. */
@@ -106,7 +109,7 @@ function Linha({ g, b, paga, recarregar }: { g: keyof Grupos; b: Item; paga: (i:
             <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Ações de ${b.nome}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>Ações ▾</button>
             {menu && (
               <div role="menu" aria-label={`Ações de ${b.nome}`} style={{ position: "absolute", right: 0, top: "100%", zIndex: 5, display: "flex", flexDirection: "column", minWidth: 200, background: "var(--color-surface)", border: "1px solid var(--line3)", boxShadow: "var(--shadow-md)" }}>
-                {MENU.map(([k, r]) => <button key={k} role="menuitem" className="btn btn-secondary" style={{ border: 0, justifyContent: "flex-start", textAlign: "left" }} onClick={() => escolher(k)}>{r}</button>)}
+                {MENU.filter(([k]) => !(SO_DO_MES.has(k) && b.mes && b.mes < mesAtual())).map(([k, r]) => <button key={k} role="menuitem" className="btn btn-secondary" style={{ border: 0, justifyContent: "flex-start", textAlign: "left" }} onClick={() => escolher(k)}>{r}</button>)}
               </div>)}
           </span>)}
       </div>

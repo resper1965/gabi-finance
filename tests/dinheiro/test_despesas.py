@@ -408,3 +408,64 @@ def test_mudar_com_versao_nova_tira_a_ocorrencia_antiga(con):
     despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "250.00"})
     assert {r[0] for r in con.execute("select id from compromisso where id like '%:2026-11'")} == {"luz-202611:2026-11"}
     assert _comp(con, "luz:2026-10")[2] == "pago"
+
+
+# ---------------- revisão: pago adiantado, mês passado, recálculo que falha ----------------
+def test_mudar_padrao_pula_meses_pagos_adiantado(con):
+    _luz(con, desde_sempre=True)
+    _pagar(con, "luz", "2026-10")
+    _pagar(con, "luz", "2026-11")  # novembro pago adiantado
+    r = despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "250.00"})
+    assert r["a_partir"] == "2026-12" and r["nova_versao"] is True and r["versao_id"] == "luz-202612"
+    assert con.execute("select valido_ate from compromisso_linha where id='luz'").fetchone()[0] == "2026-11"
+    nov = con.execute("select id, estado from compromisso where origem='planilha' and id like '%:2026-11'").fetchall()
+    assert [tuple(x) for x in nov] == [("luz:2026-11", "pago")]  # nada em aberto em novembro: não paga duas vezes
+
+
+def test_mudar_padrao_pago_adiantado_sem_pagar_o_mes(con):
+    _luz(con, desde_sempre=True)
+    _pagar(con, "luz", "2026-11")  # outubro em aberto, novembro pago adiantado
+    assert despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "250.00"})["a_partir"] == "2026-12"
+
+
+@pytest.mark.parametrize("a_partir", ["2026-10", "2026-11"])
+def test_mudar_a_partir_em_ou_antes_de_mes_pago_recusa(con, a_partir):
+    _luz(con, desde_sempre=True)
+    _pagar(con, "luz", "2026-11")
+    with pytest.raises(ValueError, match="já há pagamento em 2026-11; mude a partir de 2026-12"):
+        despesas.mudar(con, AGORA3, "r", "painel", "luz", {"valor_padrao": "250.00"}, a_partir=a_partir)
+    assert _comp(con, "luz:2026-11")[0] == 20000 and _comp(con, "luz:2026-11")[2] == "pago"
+    assert [v["id"] for v in despesas.serie_de(con, "luz")] == ["luz"]
+    assert con.execute("select valor_padrao_centavos from compromisso_linha where id='luz'").fetchone()[0] == 20000
+
+
+def test_mes_passado_recusado_em_dispensar_desfazer_e_mudar_mes(con):
+    _luz(con, desde_sempre=True)
+    _ocorrencia(con, "luz:2026-09", "atrasado")
+    con.execute("insert into valor_do_mes(mes, compromisso, tipo) values ('2026-09','luz','dispensado')")
+    for fn, args in ((despesas.dispensar_mes, ()), (despesas.desfazer_dispensa, ()), (despesas.mudar_mes, ("999.00",))):
+        with pytest.raises(ValueError, match="mês 2026-09 já passou; para tirar de A Pagar use encerrar"):
+            fn(con, AGORA3, "r", "painel", "luz", "2026-09", *args)
+    assert _comp(con, "luz:2026-09")[:] == (20000, "2026-09-10", "atrasado")
+    assert con.execute("select count(*) from decisao").fetchone()[0] == 1  # só a criação
+
+
+def _recalculo_quebrado(monkeypatch):
+    def quebra(*a, **k):
+        raise RuntimeError("rodada caiu")
+    monkeypatch.setattr(despesas.cp, "atualizar_compromissos", quebra)
+
+
+def test_recalculo_que_falha_nao_desfaz_a_escrita(con, monkeypatch, caplog):
+    _recalculo_quebrado(monkeypatch)
+    item = _fixa(con)
+    assert item["id"] == "escola" and item["aviso"] == despesas.AVISO_RECALCULO
+    assert con.execute("select count(*) from compromisso_linha").fetchone()[0] == 1
+    assert "rodada caiu" in caplog.text
+    r = despesas.mudar(con, AGORA, "r", "painel", "escola", {"valor_padrao": "10.00"})
+    assert r["aviso"] == despesas.AVISO_RECALCULO and r["valor"] == "10.00"
+    assert despesas.encerrar(con, AGORA, "r", "painel", "escola")["aviso"] == despesas.AVISO_RECALCULO
+
+
+def test_recalculo_ok_sem_aviso(con):
+    assert "aviso" not in _fixa(con)

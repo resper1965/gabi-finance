@@ -1,10 +1,12 @@
 """Despesas (fixas e avulsas): regras de criar, listar, mudar, dispensar, encerrar e excluir sobre `compromisso_linha`. Chamado pela API, pelo painel e pelo MCP.
 
-`ValueError` = dado inválido; `LookupError` = série não encontrada. Toda escrita grava `decisao` e recalcula A Pagar.
+`ValueError` = dado inválido; `LookupError` = série não encontrada. Toda escrita grava `decisao` e recalcula A Pagar; se só o recálculo
+falhar, a escrita (já gravada) volta com `aviso` em vez de erro, para o Hermes não repetir e duplicar.
 Consome: dinheiro.{planilha,compromissos,contas_pagar,repositorio,valor}.
 """
 import datetime as dt
 import json
+import logging
 import re
 import sqlite3
 import unicodedata
@@ -15,6 +17,8 @@ from gabi.dinheiro.compromissos import _serie
 from gabi.dinheiro.valor import formatar, para_centavos
 from gabi.hoje import BRT
 
+log = logging.getLogger(__name__)
+AVISO_RECALCULO = "recálculo de A Pagar pendente; entra na próxima rodada"
 CAMPOS = {"nome", "extrato", "apelidos", "vencimento", "ajuste_dia_util", "valor_tipo", "valor_padrao", "forma", "conta", "cartao", "pix"}
 
 
@@ -93,8 +97,8 @@ def _gravar_nova(con, agora, quem, origem, dado: dict, tipo: str, hoje: dt.date)
     except Exception:
         con.execute("rollback")
         raise
-    cp.atualizar_compromissos(con, hoje, agora)
-    return _item(con, hoje, _serie(linha["id"]))
+    aviso = _recalcular(con, agora)
+    return {**_item(con, hoje, _serie(linha["id"])), **aviso}
 
 
 def criar_fixa(con, agora: dt.datetime, quem: str, origem: str, campos: dict) -> dict:
@@ -216,8 +220,19 @@ def limpar_nao_pagas(con, serie: str, meses: Callable[[str], bool]) -> int:
     return n
 
 
-def _escrever(con, agora: dt.datetime, quem: str, origem: str, o_que: str, faz: Callable[[], None]) -> None:
-    """`faz` + decisão numa transação só; depois recalcula A Pagar."""
+def _recalcular(con, agora: dt.datetime) -> dict:
+    """Recalcula A Pagar depois do commit. Falha aqui não desfaz nem esconde a escrita já gravada: loga e devolve `{"aviso": ...}`
+    (senão o chamador vê erro e repete, duplicando a despesa). A próxima rodada recalcula."""
+    try:
+        cp.atualizar_compromissos(con, agora.astimezone(BRT).date(), agora)
+    except Exception:
+        log.exception("despesas: recálculo de A Pagar falhou depois de gravar")
+        return {"aviso": AVISO_RECALCULO}
+    return {}
+
+
+def _escrever(con, agora: dt.datetime, quem: str, origem: str, o_que: str, faz: Callable[[], None]) -> dict:
+    """`faz` + decisão numa transação só; depois recalcula A Pagar. Devolve `{"aviso": ...}` se só o recálculo falhou, senão `{}`."""
     con.execute("begin")
     try:
         faz()
@@ -226,7 +241,7 @@ def _escrever(con, agora: dt.datetime, quem: str, origem: str, o_que: str, faz: 
     except Exception:
         con.execute("rollback")
         raise
-    cp.atualizar_compromissos(con, agora.astimezone(BRT).date(), agora)
+    return _recalcular(con, agora)
 
 
 def _como_dado(v) -> dict:
@@ -239,7 +254,8 @@ def _como_dado(v) -> dict:
 
 
 def mudar(con, agora: dt.datetime, quem: str, origem: str, id_: str, campos: dict, a_partir: str | None = None) -> dict:
-    """Muda a despesa daqui em diante. `m` = `a_partir` (nunca mês passado) ou `mes_inicial`. A versão que vale em `m` é
+    """Muda a despesa daqui em diante. `m` = `a_partir` (nunca mês passado nem em/antes de mês já pago) ou `mes_inicial`, pulando os
+    meses pagos adiantado (o mês seguinte ao último pago). A versão que vale em `m` é
     editada se começa em `m`; senão termina no mês anterior e nasce `serie-AAAAMM` com os campos novos. Série que só
     começa depois de `m` (futura, sem pagamento) é editada na própria linha."""
     hoje = agora.astimezone(BRT).date()
@@ -250,12 +266,17 @@ def mudar(con, agora: dt.datetime, quem: str, origem: str, id_: str, campos: dic
         raise ValueError("nome é obrigatório")
     serie = _serie(id_)
     vs = serie_de(con, serie)
+    mes_hoje = hoje.strftime("%Y-%m")
+    pagos = _meses_pagos(con, _todas_as_versoes(con, serie))
     if a_partir is not None:
         m = _mes_valido(a_partir, "a_partir")
-        if m < hoje.strftime("%Y-%m"):
+        if m < mes_hoje:
             raise ValueError(f"meses passados não mudam (a_partir {m})")
+        if any(p >= m for p in pagos):
+            ult = max(pagos)
+            raise ValueError(f"já há pagamento em {ult}; mude a partir de {_somar_mes(ult, 1)}")
     else:
-        m = mes_inicial(con, serie, hoje)
+        m = max([mes_inicial(con, serie, hoje), *(_somar_mes(p, 1) for p in pagos if p >= mes_hoje)])
     v = _vigente(con, serie, m)
     futura = None if v else next((x for x in vs if (x["valido_de"] or "") > m), None)
     if v is None and futura is None:
@@ -284,8 +305,15 @@ def mudar(con, agora: dt.datetime, quem: str, origem: str, id_: str, campos: dic
         con.execute("update valor_do_mes set compromisso=? where compromisso=? and mes>=? and tipo in ('valor','dispensado')", (novo_id, v["id"], m))
 
     mudou = ", ".join(sorted(campos)) or "nada"
-    _escrever(con, agora, quem, origem, f"despesa {serie} mudada a partir de {m}" + (f" (nova versão {novo_id})" if nova_versao else "") + f": {mudou}", faz)
-    return {**_item(con, hoje, serie), "a_partir": m, "nova_versao": nova_versao}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {serie} mudada a partir de {m}" + (f" (nova versão {novo_id})" if nova_versao else "") + f": {mudou}", faz)
+    return {**_item(con, hoje, serie), "a_partir": m, "nova_versao": nova_versao, **aviso}
+
+
+def _mes_nao_passado(agora: dt.datetime, mes: str) -> str:
+    """`valor_do_mes` só alcança os meses que a rodada gera (o em curso e o seguinte): mês passado é recusado."""
+    if _mes_valido(mes) < agora.astimezone(BRT).strftime("%Y-%m"):
+        raise ValueError(f"mês {mes} já passou; para tirar de A Pagar use encerrar")
+    return mes
 
 
 def _versao_do_mes(con, id_: str, mes: str):
@@ -300,7 +328,7 @@ def mudar_mes(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes: st
     Mês já pago não muda."""
     if valor is None and vencimento is None:
         raise ValueError("informe o valor ou o vencimento do mês")
-    v = _versao_do_mes(con, id_, mes)
+    v = _versao_do_mes(con, id_, _mes_nao_passado(agora, mes))
     if mes_pago(con, _serie(id_), mes):
         raise ValueError("mês já pago")
     centavos = None
@@ -326,13 +354,13 @@ def mudar_mes(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes: st
                 con.execute("update valor_do_mes set vencimento=? where id=?", (vencimento, vid))
 
     o_que = " e ".join(x for x in (valor is not None and f"valor {formatar(centavos)}", vencimento is not None and f"vencimento {vencimento}") if x)
-    _escrever(con, agora, quem, origem, f"despesa {_serie(id_)} em {mes}: {o_que}", faz)
-    return {**_item(con, agora.astimezone(BRT).date(), _serie(id_)), "mes": mes}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {_serie(id_)} em {mes}: {o_que}", faz)
+    return {**_item(con, agora.astimezone(BRT).date(), _serie(id_)), "mes": mes, **aviso}
 
 
 def dispensar_mes(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes: str) -> dict:
-    """Este mês não tem a despesa: grava `valor_do_mes` `dispensado` e tira a ocorrência não paga de A Pagar."""
-    v = _versao_do_mes(con, id_, mes)
+    """Este mês não tem a despesa: grava `valor_do_mes` `dispensado` e tira a ocorrência não paga de A Pagar. Mês passado é recusado."""
+    v = _versao_do_mes(con, id_, _mes_nao_passado(agora, mes))
     serie = _serie(id_)
     if mes_pago(con, serie, mes):
         raise ValueError("mês já pago")
@@ -342,22 +370,22 @@ def dispensar_mes(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes
             con.execute("insert into valor_do_mes(mes, compromisso, tipo, origem) values (?,?,'dispensado',?)", (mes, v["id"], origem))
         limpar_nao_pagas(con, serie, lambda ym: ym == mes)
 
-    _escrever(con, agora, quem, origem, f"despesa {serie} dispensada em {mes}", faz)
-    return {**_item(con, agora.astimezone(BRT).date(), serie), "mes": mes, "dispensado": True}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {serie} dispensada em {mes}", faz)
+    return {**_item(con, agora.astimezone(BRT).date(), serie), "mes": mes, "dispensado": True, **aviso}
 
 
 def desfazer_dispensa(con, agora: dt.datetime, quem: str, origem: str, id_: str, mes: str) -> dict:
     serie = _serie(id_)
     ids = _todas_as_versoes(con, serie)
-    _mes_valido(mes)
+    _mes_nao_passado(agora, mes)
     if not con.execute(f"select 1 from valor_do_mes where tipo='dispensado' and mes=? and compromisso in ({','.join('?' * len(ids))})", (mes, *ids)).fetchone():
         raise LookupError(f"despesa {serie} não está dispensada em {mes}")
 
     def faz():
         con.execute(f"delete from valor_do_mes where tipo='dispensado' and mes=? and compromisso in ({','.join('?' * len(ids))})", (mes, *ids))
 
-    _escrever(con, agora, quem, origem, f"despesa {serie} volta em {mes} (dispensa desfeita)", faz)
-    return {**_item(con, agora.astimezone(BRT).date(), serie), "mes": mes, "dispensado": False}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {serie} volta em {mes} (dispensa desfeita)", faz)
+    return {**_item(con, agora.astimezone(BRT).date(), serie), "mes": mes, "dispensado": False, **aviso}
 
 
 def encerrar(con, agora: dt.datetime, quem: str, origem: str, id_: str, ultimo_mes: str | None = None) -> dict:
@@ -385,8 +413,8 @@ def encerrar(con, agora: dt.datetime, quem: str, origem: str, id_: str, ultimo_m
                 con.execute("update compromisso_linha set valido_ate=? where id=?", (u, v["id"]))
         limpar_nao_pagas(con, serie, lambda ym: ym > u)
 
-    _escrever(con, agora, quem, origem, f"despesa {serie} encerrada; último mês {u}", faz)
-    return {"id": serie, "ultimo_mes": u}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {serie} encerrada; último mês {u}", faz)
+    return {"id": serie, "ultimo_mes": u, **aviso}
 
 
 def excluir(con, agora: dt.datetime, quem: str, origem: str, id_: str) -> dict:
@@ -394,7 +422,8 @@ def excluir(con, agora: dt.datetime, quem: str, origem: str, id_: str) -> dict:
     serie = _serie(id_)
     vs = serie_de(con, serie)
     if _teve_pagamento(con, _todas_as_versoes(con, serie)):
-        return {"id": serie, "excluida": False, "encerrada": True, "ultimo_mes": encerrar(con, agora, quem, origem, serie)["ultimo_mes"]}
+        enc = encerrar(con, agora, quem, origem, serie)
+        return {"id": serie, "excluida": False, "encerrada": True, **{k: enc[k] for k in ("ultimo_mes", "aviso") if k in enc}}
     quando = agora.astimezone(dt.timezone.utc).isoformat()
 
     def faz():
@@ -402,5 +431,5 @@ def excluir(con, agora: dt.datetime, quem: str, origem: str, id_: str) -> dict:
             con.execute("update compromisso_linha set excluido_em=? where id=?", (quando, v["id"]))
         limpar_nao_pagas(con, serie, lambda ym: True)
 
-    _escrever(con, agora, quem, origem, f"despesa {serie} excluída", faz)
-    return {"id": serie, "excluida": True, "encerrada": False}
+    aviso = _escrever(con, agora, quem, origem, f"despesa {serie} excluída", faz)
+    return {"id": serie, "excluida": True, "encerrada": False, **aviso}

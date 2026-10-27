@@ -155,3 +155,10 @@ def test_sem_escopo_fin_recusa(banco, cli_tok):
     for ferramenta, args in (("despesas_listar", {}), ("despesa_criar", {"nome": "X", "valor": "1,00", "dia": 1})):
         assert chamar(cli, tok["docs"], ferramenta, **args)["erro"] == "sem_escopo"
     assert _decisoes(banco) == []
+
+
+def test_mes_passado_recusado(banco, cli_tok):
+    cli, tok = cli_tok  # AGORA = 08/10/2026
+    _c(cli, tok, "despesa_criar", nome="Sabrina", valor="1500,00", dia=20)
+    r = _c(cli, tok, "despesa_mes", despesa="sabrina", mes="2026-09", dispensar=True)
+    assert r["erro"] == "requisicao_invalida" and "já passou" in r["mensagem"]

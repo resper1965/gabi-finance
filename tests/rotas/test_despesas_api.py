@@ -140,3 +140,11 @@ def test_excluir_com_pagamento_vira_encerrar(cli, banco):
 def test_404_nao_encontrado(cli, metodo, url, corpo):
     r = req(cli, metodo, url, corpo)
     assert r.status_code == 404 and r.json()["erro"] == "nao_encontrado"
+
+
+def test_mes_passado_400(cli):
+    _escola(cli)  # hoje = 08/10/2026
+    for metodo, url, corpo in (("POST", "/api/v1/despesas/escola/mes/2026-09/dispensar", None), ("DELETE", "/api/v1/despesas/escola/mes/2026-09/dispensar", None),
+                               ("POST", "/api/v1/despesas/escola/mes/2026-09", {"valor": "1.00"})):
+        r = req(cli, metodo, url, corpo)
+        assert r.status_code == 400 and r.json()["erro"] == "requisicao_invalida" and "já passou" in r.json()["mensagem"], (metodo, url, r.text)

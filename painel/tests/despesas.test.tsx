@@ -126,3 +126,21 @@ test("Cadastros › Despesas: encerrar confirma e chama POST /encerrar; editar m
   await waitFor(() => expect(achar(chamadas, "PATCH", "/api/v1/despesas/escola")).toBeTruthy());
   expect(achar(chamadas, "PATCH", "/api/v1/despesas/escola")!.corpo).toEqual({ vencimento: "dia:12" });
 });
+
+test("atrasada de mês passado não oferece Editar/Dispensar este mês (só Mudar daqui em diante e Encerrar)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-26T12:00:00-03:00"));
+  try {
+    const env = amostra("contas-pagar");
+    const velha = { ...env.dados.atrasadas[0], id: "aluguel:2026-09", mes: "2026-09", vencimento: "2026-09-05", vencimento_util: "2026-09-05" };
+    apiFalsa({ "contas-pagar": { ...env, dados: { ...env.dados, atrasadas: [velha] } } });
+    montar();
+    await acoes("Aluguel");
+    const itens = screen.getAllByRole("menuitem").map((b) => b.textContent);
+    expect(itens).toEqual(["Mudar daqui em diante", "Encerrar"]);
+    fireEvent.click(await screen.findByRole("button", { name: "Ações de Escola" }));
+    expect(screen.getAllByRole("menuitem", { name: "Dispensar este mês" }).length).toBeGreaterThan(0);  // mês em curso continua com tudo
+  } finally {
+    vi.useRealTimers();
+  }
+});
