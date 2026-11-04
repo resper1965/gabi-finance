@@ -81,6 +81,68 @@ def test_evento_chave_invalida_nao_chama():
     assert http.chamadas == []
 
 
+# ---------------- convite (accept, tentativelyAccept, decline) ----------------
+def test_convite_aceitar_talvez_recusar_chamam_a_url_certa():
+    for resposta, acao in (("aceitar", "accept"), ("talvez", "tentativelyAccept"), ("recusar", "decline")):
+        gr, http = _graph([(202, None)])
+        assert gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", resposta, None) == {"externo_id": "AAMkEVT="}
+        metodo, url, corpo, cab = http.chamadas[0]
+        assert metodo == "POST" and url == f"https://graph.microsoft.com/v1.0/users/resper%40ness.com.br/events/AAMkEVT%3D/{acao}"
+        assert cab["Authorization"] == "Bearer TOK1" and cab["Content-Type"] == "application/json"
+        assert json.loads(corpo) == {"sendResponse": True}
+        assert len(http.chamadas) == 1
+
+
+def test_convite_de_serie_usa_o_serie_id():
+    gr, http = _graph([(202, None)])
+    assert gr.convite_responder(CONTA, CHAVE, "OCORRENCIA_1", "aceitar", "SERIE/1+x") == {"externo_id": "SERIE/1+x"}
+    assert http.chamadas[0][1] == "https://graph.microsoft.com/v1.0/users/resper%40ness.com.br/events/SERIE%2F1%2Bx/accept"
+
+
+def test_convite_202_sem_corpo_e_sucesso():
+    gr, _ = _graph([(202, None)])
+    assert gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", "recusar", None) == {"externo_id": "AAMkEVT="}
+    gr, _ = _graph([(200, {})])
+    assert gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", "talvez", None) == {"externo_id": "AAMkEVT="}
+
+
+def test_convite_404_e_409_levantam_status():
+    for status in (404, 409, 500, 503):
+        gr, http = _graph([(status, {"error": {"message": "Reunião <b>X</b> ana@x.com"}})])
+        with pytest.raises(ErroGraphNess) as e:
+            gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", "aceitar", None)
+        assert isinstance(e.value, g._ErroStatus) and e.value.status == status
+        assert str(e.value) == f"convite_responder -> {status}"
+        assert len(http.chamadas) == 1
+
+
+def test_convite_id_invalido_e_conta_nao_autorizada():
+    gr, http = _graph([])
+    for evento_id, serie_id in (("", None), ("a b", None), ("../x", None), ("a?b", None), ("x" * 301, None), (None, None), (7, None),
+                                ("AAMkEVT=", "a/../b c"), ("AAMkEVT=", 7), ("", ""), ("AAMkEVT=\n", None)):
+        with pytest.raises(ErroGraphNess, match="^evento inválido$"):
+            gr.convite_responder(CONTA, CHAVE, evento_id, "aceitar", serie_id)
+    for resposta in ("accept", "sim", "", None, "ACEITAR"):
+        with pytest.raises(ErroGraphNess, match="^evento inválido$"):
+            gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", resposta, None)
+    with pytest.raises(ErroGraphNess, match="^conta não autorizada$"):
+        gr.convite_responder("outro@ness.com.br", CHAVE, "AAMkEVT=", "aceitar", None)
+    assert http.chamadas == []
+
+
+def test_convite_401_renova_token_uma_vez():
+    tok = TokenFalso()
+    gr, http = _graph([(401, {}), (202, None)], token=tok)
+    assert gr.convite_responder(CONTA, CHAVE, "AAMkEVT=", "aceitar", None) == {"externo_id": "AAMkEVT="}
+    assert tok.invalidacoes == 1 and len(http.chamadas) == 2
+
+
+def test_pedir_continua_exigindo_corpo_nos_outros_envios():
+    gr, _ = _graph([(202, None)])
+    with pytest.raises(ErroGraphNess, match="resposta inválida do Graph"):
+        gr.evento_criar(CONTA, CHAVE, _evento())
+
+
 # ---------------- conta ----------------
 def test_conta_fora_da_lista():
     gr, http = _graph([], token_teams=DelegadoFalso())
@@ -256,8 +318,13 @@ def test_envios_so_tem_os_verbos_e_urls_previstos():
     assert verbos == {"GET", "POST"}
     for proibido in ("/sendMail", "/reply", "/forward", "DELETE", "PATCH", '/chats"', "PUT"):
         assert proibido not in texto
+    for acao in ('"accept"', '"tentativelyAccept"', '"decline"'):  # respostas a convite: só estas três ações
+        assert acao in texto
+    assert set(re.findall(r'"(accept|tentativelyAccept|decline|forward|reply|replyAll|cancel|dismissReminder|snoozeReminder)"', texto)) == {
+        "accept", "tentativelyAccept", "decline"}
     publicos = {n for n in vars(ge) if not n.startswith("_") and callable(getattr(ge, n)) and getattr(getattr(ge, n), "__module__", "") == ge.__name__}
-    assert publicos == {"TokenDelegado", "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}
+    assert publicos == {"TokenDelegado", "evento_criar", "convite_responder", "teams_equipes", "teams_canais", "teams_chat_enviar",
+                        "teams_canal_enviar"}
 
 
 def test_escrita_nao_repete():

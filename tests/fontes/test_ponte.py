@@ -483,6 +483,13 @@ class _FalsoGraph:
     def evento_criar(self, conta, chave, evento):
         return {"externo_id": 7} if conta == "malformada@x.com" else {"externo_id": "AAMkEVT=", "eco": evento["titulo"] == "T"}
 
+    def convite_responder(self, conta, chave, evento_id, resposta, serie_id):
+        if conta == "malformada@x.com":
+            return {"externo_id": 7}
+        if conta == "vazia@x.com":
+            return {}
+        return {"externo_id": f"{serie_id or evento_id}-{resposta}-{chave}"}
+
     def teams_equipes(self, conta):
         return [{"id": "e1"}] if conta == "malformada@x.com" else [{"id": "e1", "nome": "Comercial"}]
 
@@ -511,7 +518,7 @@ def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
                                                   "enviados_recentes", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
                                                   "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
-                                                  "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"})
+                                                  "evento_criar", "convite_responder", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"})
     assert ERROS["graph_ness"] is ErroGraphNess
     with pytest.raises(ErroGraphNess, match="metodo_proibido"):
         Ponte(sock_graph, "graph_ness")._chamar("enviar")
@@ -555,6 +562,17 @@ def test_ponte_graph_envios_cruzam_e_validam_forma(sock_graph):
                    lambda: p.teams_canal_enviar("malformada@x.com", "e1", "19:c", "oi")):
         with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
             chamar()
+
+
+def test_ponte_graph_permite_convite_responder(sock_graph):
+    assert "convite_responder" in PERMITIDOS["graph_ness"]
+    p = PonteGraph(sock_graph)
+    assert p.convite_responder("resper@ness.com.br", "0123456789abcdefghijklmnop", "EV1", "aceitar", None) == {
+        "externo_id": "EV1-aceitar-0123456789abcdefghijklmnop"}
+    assert p.convite_responder("resper@ness.com.br", "k", "EV1", "recusar", "SER1") == {"externo_id": "SER1-recusar-k"}
+    for conta in ("malformada@x.com", "vazia@x.com"):
+        with pytest.raises(ErroGraphNess, match="resposta inválida do serviço de fontes"):
+            p.convite_responder(conta, "k", "EV1", "aceitar", None)
 
 
 def test_ponte_graph_nao_configurada(tmp_path):

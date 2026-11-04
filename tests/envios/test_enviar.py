@@ -4,7 +4,7 @@ import json
 import pytest
 
 from tests.envios.test_ciclo import _estado, _ligar
-from tests.envios.test_propostas import AGORA, NESS, _agenda, _codigo, _evento, _teams, con  # noqa: F401
+from tests.envios.test_propostas import AGORA, NESS, _agenda, _codigo, _convite, _evento, _teams, con  # noqa: F401
 
 from gabi.envios import propostas as p
 from gabi.envios.enviar import enviar
@@ -27,6 +27,9 @@ class Falso:
 
     def evento_criar(self, conta, chave, evento):
         return self._fazer("evento_criar", conta, chave, evento)
+
+    def convite_responder(self, conta, chave, evento_id, resposta, serie_id):
+        return self._fazer("convite_responder", conta, chave, evento_id, resposta, serie_id)
 
     def teams_chat_enviar(self, conta, chat_id, texto):
         return self._fazer("teams_chat_enviar", conta, chat_id, texto)
@@ -252,3 +255,104 @@ def test_auditoria_e_stderr_sem_conteudo(con, capsys):
     assert len(auditoria) == 4  # reservar + concluir de cada uma, sem linha duplicada
     assert auditoria[1].endswith("incerto") and auditoria[3].endswith("incerto")
     assert all("Segredo" not in a and "Secreto" not in a and "Ana" not in a for a in auditoria)
+
+
+# ---- convite_resposta ----
+
+def _proposta_convite(con, resposta="aceitar", serie=None):
+    _agenda(con)
+    _ligar(con)
+    return p.criar_convite_resposta(con, AGORA, conta=NESS, evento_id=_convite(con, serie=serie), resposta=resposta)
+
+
+def test_convite_resposta_ok_enviada_com_externo_id(con):
+    r = _proposta_convite(con, "recusar")
+    google, graph = Falso(), Falso(resp={"externo_id": "AAMk-1"})
+    assert enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, google, graph) == {"id": r["id"], "estado": "enviada"}
+    l = _estado(con, r["id"])
+    assert l["estado"] == "enviada" and l["externo_id"] == "AAMk-1" and l["enviada_em"]
+    assert google.chamadas == [] and graph.chamadas == [("convite_responder", NESS, l["chave"], "AAMk-1", "recusar", None)]
+
+
+def test_convite_resposta_de_serie_leva_o_serie_id(con):
+    r = _proposta_convite(con, serie="AAMk-serie")
+    graph = Falso()
+    enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert graph.chamadas[0][-1] == "AAMk-serie" and graph.chamadas[0][3] == "AAMk-1"
+
+
+@pytest.mark.parametrize("status", ["404", "409"])
+def test_convite_resposta_404_409_falhou_convite_obsoleto(con, status):
+    r = _proposta_convite(con)
+    graph = Falso(erro=RuntimeError(f"ErroGraphNess: convite_responder -> {status}"))
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "convite_obsoleto"}
+    assert len(graph.chamadas) == 1 and _estado(con, r["id"])["motivo"] == "convite_obsoleto"
+
+
+def test_convite_resposta_500_incerto_sem_repetir(con):
+    r = _proposta_convite(con)
+    graph = Falso(erro=RuntimeError("convite_responder -> 500"))
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert out == {"id": r["id"], "estado": "incerto", "motivo": "provedor_500"}
+    assert len(graph.chamadas) == 1
+    assert _codigo(enviar, con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph).codigo == "conflito"
+    assert len(graph.chamadas) == 1
+
+
+def test_convite_resposta_403_falhou_provedor_403(con):
+    r = _proposta_convite(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError("convite_responder -> 403")))
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "provedor_403"}
+
+
+def test_404_em_outro_tipo_continua_provedor_404(con):
+    _ligar(con)
+    r = _chat(con)
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError("POST /chats/c1/messages -> 404")))
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "provedor_404"}
+
+
+def test_convite_resposta_sem_graph_fonte_indisponivel(con):
+    r = _proposta_convite(con)
+    google = Falso()
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, google, None)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "fonte_indisponivel"} and google.chamadas == []
+
+
+def test_convite_resposta_depois_de_falhou_pode_propor_e_enviar_de_novo(con):
+    r = _proposta_convite(con)
+    ev = json.loads(_estado(con, r["id"])["conteudo"])["evento_id"]
+    enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError("convite_responder -> 409")))
+    r2 = p.criar_convite_resposta(con, AGORA, conta=NESS, evento_id=ev, resposta="talvez")
+    assert enviar(con, r2["id"], _hash(con, r2["id"]), "ricardo", AGORA, None, Falso())["estado"] == "enviada"
+
+
+# ---- recheck local antes do Graph (convite remarcado, respondido no Outlook ou apagado) ----
+
+@pytest.mark.parametrize("mudanca", [
+    "update agenda_evento set inicio_utc='2026-10-22T20:00:00+00:00', fim_utc='2026-10-22T21:00:00+00:00'",  # remarcado
+    "update agenda_evento set fim_utc='2026-10-22T19:30:00+00:00'",  # só o fim mudou
+    "update agenda_evento set resposta='accepted'",  # respondido no Outlook
+    "delete from agenda_evento",  # apagado
+])
+def test_convite_obsoleto_no_clique_falhou_sem_chamar_o_graph(con, mudanca):
+    r = _proposta_convite(con, "recusar")
+    con.execute(mudanca)
+    graph = Falso()
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "convite_obsoleto"}
+    assert graph.chamadas == []
+    l = _estado(con, r["id"])
+    assert l["estado"] == "falhou" and l["motivo"] == "convite_obsoleto" and l["decidida_em"] and l["enviada_em"] is None
+    audit = [x[0] for x in con.execute("select o_que from decisao where origem='envios' order by id")]
+    assert audit[-1] == f"Envio {r['id']} (convite_resposta, {NESS}): falhou"
+    assert _codigo(enviar, con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph).codigo == "conflito"  # fechado: não reabre
+    assert graph.chamadas == []
+
+
+def test_convite_inalterado_no_clique_segue_enviando(con):
+    r = _proposta_convite(con)
+    graph = Falso()
+    assert enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)["estado"] == "enviada"
+    assert len(graph.chamadas) == 1

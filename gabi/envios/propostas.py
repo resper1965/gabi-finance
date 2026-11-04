@@ -1,5 +1,5 @@
 """Criação e ciclo de vida das propostas de envio (evento de agenda, mensagem do Teams) que só saem depois do "Enviar" do dono no painel.
-Consome: parametro (envios.escrita, envios.contas_agenda), agenda_fonte, teams_fonte, teams_conversa, contato_google e contato_google_email. Grava: envio_proposta (migração 0076).
+Consome: parametro (envios.escrita, envios.contas_agenda), agenda_fonte, agenda_evento (convites), teams_fonte, teams_conversa, contato_google e contato_google_email. Grava: envio_proposta (migração 0076).
 Sem rede e sem envio: aqui só se valida, resolve nomes e grava o conteúdo canônico. Título, texto, nome e e-mail nunca vão para log nem para mensagem de erro: as falhas são códigos fixos (ErroEnvio.codigo)."""
 import base64
 import datetime as dt
@@ -121,11 +121,14 @@ def _canonico(obj: dict) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _gravar(con, agora: dt.datetime, tipo: str, conta: str, obj: dict, vence: dt.datetime) -> dict:
+def _gravar(con, agora: dt.datetime, tipo: str, conta: str, obj: dict, vence: dt.datetime, antes=None) -> dict:
+    """`antes(con)` roda na mesma transação, antes do insert (checagem de duplicata sem corrida)."""
     conteudo = _canonico(obj)
     chave = base64.b32hexencode(secrets.token_bytes(16)).decode().lower().rstrip("=")
     criada, vence_em = _utc(agora), _utc(vence)
     with transacao(con, imediata=True):
+        if antes is not None:
+            antes(con)
         cur = con.execute("insert into envio_proposta(tipo, conta, conteudo, hash, chave, criada_em, vence_em) values (?,?,?,?,?,?,?)",
                           (tipo, conta, conteudo, hashlib.sha256(conteudo.encode()).hexdigest(), chave, criada, vence_em))
     return {"id": cur.lastrowid, "estado": "pendente", "vence_em": vence_em}
@@ -193,6 +196,54 @@ def criar_teams_canal(con, agora: dt.datetime, *, conta, equipe_id, canal_id, eq
     return r
 
 
+RESPOSTAS_CONVITE = ("aceitar", "talvez", "recusar")
+
+
+def _hora(d: dt.datetime) -> str:
+    return f"{d.hour}h" if d.minute == 0 else f"{d.hour}h{d.minute:02d}"
+
+
+def _sem_duplicata(evento_id: int, serie_id: str | None, agora: dt.datetime):
+    """Uma proposta aberta por convite: casa pela série (responder uma ocorrência responde a série toda) ou, avulso, pelo evento."""
+    def checar(con):
+        _vencer(con, agora)  # pendente vencida não bloqueia nova proposta
+        campo, valor = ("$.serie_id", serie_id) if serie_id else ("$.evento_id", evento_id)
+        if con.execute("select 1 from envio_proposta where tipo='convite_resposta' and estado in ('pendente','enviando') "
+                       "and json_extract(conteudo, ?)=?", (campo, valor)).fetchone():
+            raise ErroEnvio("proposta_duplicada")
+    return checar
+
+
+def criar_convite_resposta(con, agora: dt.datetime, *, conta, evento_id, resposta) -> dict:
+    """Proposta de responder a um convite recebido (aceitar/talvez/recusar). Só convite pendente (needsAction), com hora, futuro e da conta;
+    no máximo uma proposta aberta (pendente/enviando) por convite (série inteira, quando for série). Do organizador guarda só o nome, nunca e-mail."""
+    if resposta not in RESPOSTAS_CONVITE or isinstance(evento_id, bool) or not isinstance(evento_id, int):
+        raise _invalida()
+    c = (conta or "").strip().lower()
+    prov = provedor_da_conta(con, c) if c in contas_agenda(con) else None
+    if prov is None:
+        raise ErroEnvio("conta_nao_permitida")
+    ev = con.execute("select e.id, e.externo_id, e.inicio_utc, e.fim_utc, e.dia_inteiro, e.titulo, e.resposta, e.organizador_nome, e.serie_id "
+                     "from agenda_evento e join agenda_fonte f on f.id=e.fonte_id where e.id=? and lower(f.conta)=? and f.estado='sim'",
+                     (evento_id, c)).fetchone()
+    if ev is None:
+        raise _invalida()
+    ini, fim = dt.datetime.fromisoformat(ev["inicio_utc"].replace("Z", "+00:00")), dt.datetime.fromisoformat(ev["fim_utc"].replace("Z", "+00:00"))
+    if ini <= agora:
+        raise ErroEnvio("inicio_passado")
+    if ev["dia_inteiro"] or ev["resposta"] != "needsAction":
+        raise ErroEnvio("convite_nao_pendente")
+    from gabi.agenda import convites  # convites importa este módulo
+    conflita = next((x["conflita_com"] for x in convites.pendentes(con, agora) if x["evento_id"] == ev["id"]), [])
+    titulo = ev["titulo"] or "(sem título)"
+    obj = {"conta": c, "provedor": prov, "evento_id": ev["id"], "externo_id": ev["externo_id"], "serie_id": ev["serie_id"], "titulo": titulo,
+           "inicio_utc": _utc(ini), "fim_utc": _utc(fim), "organizador_nome": ev["organizador_nome"], "resposta": resposta, "conflita_com": conflita}
+    r = _gravar(con, agora, "convite_resposta", c, obj, min(agora + dt.timedelta(hours=24), ini), antes=_sem_duplicata(ev["id"], ev["serie_id"], agora))
+    li, lf = ini.astimezone(_SP), fim.astimezone(_SP)
+    r["resumo"] = f"Responder '{titulo}' {_DIAS[li.weekday()]} {_hora(li)}–{_hora(lf)}: {resposta}"
+    return r
+
+
 # ---- ciclo de vida: listar, vencer, recusar, reservar, concluir ----
 
 _COLUNAS = "id, tipo, conta, conteudo, hash, estado, motivo, criada_em, vence_em, decidida_em, enviada_em"
@@ -238,8 +289,25 @@ def recusar(con, id: int, quem: str, agora: dt.datetime) -> None:
         raise ErroEnvio(erro)
 
 
+def _convite_obsoleto(con, l) -> bool:
+    """O convite da proposta ainda é o que o dono viu? Linha sumida, fonte desligada, já respondido (no Outlook ou antes) ou horário diferente = obsoleto.
+    Qualquer coisa ilegível também é obsoleto (falha fechada)."""
+    try:
+        c = json.loads(l["conteudo"])
+        ev = con.execute("select e.resposta, e.inicio_utc, e.fim_utc from agenda_evento e join agenda_fonte f on f.id=e.fonte_id "
+                         "where e.id=? and lower(f.conta)=? and f.estado='sim'", (c["evento_id"], l["conta"])).fetchone()
+        if ev is None or ev["resposta"] != "needsAction":
+            return True
+        mesmo = [dt.datetime.fromisoformat(a.replace("Z", "+00:00")) == dt.datetime.fromisoformat(b.replace("Z", "+00:00"))
+                 for a, b in ((ev["inicio_utc"], c["inicio_utc"]), (ev["fim_utc"], c["fim_utc"]))]
+        return not all(mesmo)
+    except Exception:  # noqa: BLE001 - falha fechada: na dúvida, não responde
+        return True
+
+
 def reservar(con, id: int, hash: str, quem: str, agora: dt.datetime) -> dict:
-    """Transição atômica pendente → enviando, com as checagens na ordem do spec. Vencida e conta_nao_permitida gravam o estado e só depois levantam."""
+    """Transição atômica pendente → enviando, com as checagens na ordem do spec. Vencida, conta_nao_permitida e convite_obsoleto (convite_resposta cujo
+    convite mudou na agenda local) gravam o estado e só depois levantam."""
     with transacao(con, imediata=True):
         l = con.execute("select * from envio_proposta where id=?", (id,)).fetchone()
         erro = None
@@ -255,13 +323,19 @@ def reservar(con, id: int, hash: str, quem: str, agora: dt.datetime) -> dict:
         elif not escrita_ligada(con):
             erro = "envios_desligados"
         else:
-            permitida = (l["conta"] in contas_agenda(con) and provedor_da_conta(con, l["conta"]) is not None) if l["tipo"] == "evento" \
+            permitida = (l["conta"] in contas_agenda(con) and provedor_da_conta(con, l["conta"]) is not None) if l["tipo"] in ("evento", "convite_resposta") \
                 else l["conta"] in contas_teams(con)
             if not permitida:
                 con.execute("update envio_proposta set estado='falhou', motivo='conta_nao_permitida', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
                             (_utc(agora), quem, id))
                 auditar(con, quem, agora, _texto_auditoria(l, "falhou"))
                 erro = "conta_nao_permitida"
+            elif l["tipo"] == "convite_resposta" and _convite_obsoleto(con, l):
+                # o Graph não acusa remarcação (mesmo id) nem resposta repetida: confere a agenda local ANTES de qualquer chamada; nada sai
+                con.execute("update envio_proposta set estado='falhou', motivo='convite_obsoleto', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
+                            (_utc(agora), quem, id))
+                auditar(con, quem, agora, _texto_auditoria(l, "falhou"))
+                erro = "convite_obsoleto"
             elif con.execute("update envio_proposta set estado='enviando', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
                              (_utc(agora), quem, id)).rowcount == 0:
                 erro = "conflito"

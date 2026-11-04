@@ -19,6 +19,7 @@ Onde achar:
 - "quanto tenho a receber?" → `financeiro_a_receber`.
 - "que avisos tenho?" → `avisos_abertos`.
 - "alguém me esperando no Teams?" → `teams_pendentes`.
+- convite recebido: proponha com `propor_resposta_convite` (`conta` e `evento_id` estão no item `convite_agenda` de `avisos_abertos`) e diga que ele decide no painel.
 - "que regras tenho?" → `regras_listar`.
 - "o que foi decidido/feito?" → `decisoes_recentes`.
 - "minhas empresas / CNPJ" → `empresas_listar`.

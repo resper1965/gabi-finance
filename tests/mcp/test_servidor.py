@@ -18,7 +18,7 @@ LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_conta
 NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "documentos_texto", "classificar_lancamento", "regras_sugerir"}
 NOVAS_FASE3 = {"agenda_listar", "email_ler", "email_listar", "resumo_manha"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
-NOVAS_ENVIOS = {"propor_evento", "propor_teams"}  # só propõem; o envio sai do botão Enviar do painel
+NOVAS_ENVIOS = {"propor_evento", "propor_teams", "propor_resposta_convite"}  # só propõem; o envio sai do botão Enviar do painel
 NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                  "documentos_consultar", "documentos_vencimentos", "bens_listar", "familia_registrar_pessoa", "familia_registrar_pet"}
 NOVAS_VER = {"contatos_buscar", "financeiro_a_receber", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
@@ -116,13 +116,13 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_70_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_e_dos_projetos():
-    assert len(ESCOPOS_FERRAMENTAS) == 70
+def test_sobram_exatamente_as_71_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_e_dos_projetos():
+    assert len(ESCOPOS_FERRAMENTAS) == 71
     assert sorted(ESCOPOS_FERRAMENTAS) == sorted(NOVAS_PROJETOS | set(["agenda_financeira", "agenda_listar", "assinatura_marcar", "assinaturas_listar", "atividade_adiar", "atividade_cancelar", "atividade_concluir", "atividade_criar", "atividade_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
                                            "despesa_criar", "despesa_encerrar", "despesa_excluir", "despesa_mes", "despesa_mudar", "despesas_listar", "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_ler", "email_listar", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "empresas_listar", "familia_atualizar_contato",
                                            "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
                                            "financeiro_a_receber", "financeiro_cancelar_a_receber", "financeiro_contas_a_pagar", "financeiro_indicar_gastador", "financeiro_lancamentos", "financeiro_marcar_gasto", "financeiro_marcar_reembolso", "financeiro_para_onde_vai", "financeiro_previsao",
-                                           "financeiro_recorrentes", "financeiro_registrar_a_receber", "financeiro_saldo", "propor_evento", "propor_teams", "regras_listar", "regras_sugerir", "resumo_manha", "teams_pendentes"]))
+                                           "financeiro_recorrentes", "financeiro_registrar_a_receber", "financeiro_saldo", "propor_evento", "propor_resposta_convite", "propor_teams", "regras_listar", "regras_sugerir", "resumo_manha", "teams_pendentes"]))
 
 
 def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):

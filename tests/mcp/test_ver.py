@@ -180,6 +180,17 @@ def test_avisos_abertos(con):
     assert r["itens"][1]["entregue"] is True and (r["itens"][1]["titulo"], r["itens"][1]["texto"]) == descrever("banco_desatualizado", p)
 
 
+def test_avisos_convite_agenda_traz_evento_id_e_conta_e_os_outros_nao(con):
+    p = {"chave": "serie:S1", "evento_id": 42, "conta": "resper@ness.com.br", "serie_id": "S1", "titulo": "Comitê", "inicio_utc": "2026-10-09T18:00:00+00:00",
+         "texto": "Comitê · sex 15h–16h · de Ana · sem conflito"}
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('convite_agenda',?,'2026-10-08T12:00:00+00:00')", (json.dumps(p),))
+    con.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada',?,'2026-10-08T11:00:00+00:00')", (json.dumps({"motivo": "caiu", "evento_id": 7}),))
+    conv, outro = avisos(con, AGORA)["itens"]
+    assert conv["tipo"] == "convite_agenda" and conv["evento_id"] == 42 and conv["conta"] == "resper@ness.com.br"
+    assert set(conv) == {"id", "tipo", "titulo", "texto", "criado_em", "entregue", "entregue_em", "evento_id", "conta"}
+    assert set(outro) == {"id", "tipo", "titulo", "texto", "criado_em", "entregue", "entregue_em"}
+
+
 def test_aviso_ilegivel_vira_titulo_do_tipo(con):
     con.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada','{nao é json','2026-10-08T12:00:00+00:00')")
     assert avisos(con, AGORA)["itens"][0]["titulo"] == "rodada_parada" and avisos(con, AGORA)["itens"][0]["texto"] == ""

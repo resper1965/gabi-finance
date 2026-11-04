@@ -175,3 +175,120 @@ def test_escrita_ligada_so_com_ligado(con):
     assert p.escrita_ligada(con) is True
     con.execute("update parametro set valor='true' where chave='envios.escrita'")
     assert p.escrita_ligada(con) is False
+
+
+# ---- convite_resposta ----
+
+def _convite(con, ext="AAMk-1", ini="2026-10-22T18:00:00+00:00", fim="2026-10-22T19:00:00+00:00", titulo="Comitê", resposta="needsAction",
+             dia_inteiro=0, livre=0, org="Ana Souza", serie=None, conta=NESS):
+    fonte = con.execute("select id from agenda_fonte where conta=?", (conta,)).fetchone()[0]
+    return con.execute(
+        "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, livre, resposta, organizador_nome, serie_id)"
+        " values (?,?,?,?,?,?,?,?,?,?,?,?)", (fonte, ext, ini, fim, ini[:10], fim[:10], dia_inteiro, titulo, livre, resposta, org, serie)).lastrowid
+
+
+def _responder(con, evento_id, resposta="aceitar", conta=NESS, agora=AGORA):
+    return p.criar_convite_resposta(con, agora, conta=conta, evento_id=evento_id, resposta=resposta)
+
+
+def test_criar_convite_resposta_grava_conteudo_e_conflito(con):
+    _agenda(con)
+    ev = _convite(con, serie="AAMk-serie")
+    _convite(con, ext="AAMk-2", titulo="Almoço", resposta="accepted", org=None, ini="2026-10-22T18:30:00+00:00", fim="2026-10-22T20:00:00+00:00")
+    r = _responder(con, ev, "talvez")
+    assert set(r) == {"id", "estado", "vence_em", "resumo"} and r["estado"] == "pendente"
+    assert r["vence_em"] == "2026-10-22T18:00:00Z"  # o início vem antes de agora+24h
+    assert r["resumo"] == "Responder 'Comitê' qui 15h–16h: talvez"
+    l = con.execute("select * from envio_proposta where id=?", (r["id"],)).fetchone()
+    assert l["tipo"] == "convite_resposta" and l["conta"] == NESS and l["vence_em"] == r["vence_em"]
+    assert json.loads(l["conteudo"]) == {"conta": NESS, "provedor": "graph", "evento_id": ev, "externo_id": "AAMk-1", "serie_id": "AAMk-serie",
+                                         "titulo": "Comitê", "inicio_utc": "2026-10-22T18:00:00Z", "fim_utc": "2026-10-22T19:00:00Z",
+                                         "organizador_nome": "Ana Souza", "resposta": "talvez", "conflita_com": ["Almoço"]}
+    assert l["hash"] == hashlib.sha256(l["conteudo"].encode()).hexdigest()
+    assert re.fullmatch(r"[0-9a-v]{26}", l["chave"])
+
+
+def test_convite_resposta_vence_em_24h_se_inicio_e_depois(con):
+    _agenda(con)
+    ev = _convite(con, ini="2026-10-26T13:30:00+00:00", fim="2026-10-26T14:00:00+00:00")
+    r = _responder(con, ev, "recusar")
+    assert r["vence_em"] == "2026-10-23T12:00:00Z" and r["resumo"] == "Responder 'Comitê' seg 10h30–11h: recusar"
+    assert json.loads(con.execute("select conteudo from envio_proposta").fetchone()[0])["conflita_com"] == []
+
+
+def test_convite_resposta_conta_nao_permitida(con):
+    _agenda(con)
+    ev = _convite(con)
+    con.execute("update parametro set valor='[]' where chave='envios.contas_agenda'")
+    assert _codigo(_responder, con, ev).codigo == "conta_nao_permitida"
+    assert _codigo(_responder, con, ev, conta="outra@x.com").codigo == "conta_nao_permitida"
+
+
+def test_convite_resposta_evento_de_outra_conta_ou_inexistente(con):
+    _agenda(con)
+    _agenda(con, conta="b@x.com")  # agora só b@x.com está na lista
+    ev = _convite(con)  # evento da conta NESS
+    assert _codigo(_responder, con, ev, conta="b@x.com").codigo == "requisicao_invalida"
+    assert _codigo(_responder, con, 9999, conta="b@x.com").codigo == "requisicao_invalida"
+
+
+@pytest.mark.parametrize("kw", [dict(resposta="sim"), dict(resposta=None), dict(evento_id="1"), dict(evento_id=True)])
+def test_convite_resposta_requisicao_invalida(con, kw):
+    _agenda(con)
+    ev = _convite(con)
+    a = dict(evento_id=ev, resposta="aceitar")
+    a.update(kw)
+    assert _codigo(p.criar_convite_resposta, con, AGORA, conta=NESS, **a).codigo == "requisicao_invalida"
+    assert con.execute("select count(*) from envio_proposta").fetchone()[0] == 0
+
+
+def test_convite_resposta_evento_passado(con):
+    _agenda(con)
+    ev = _convite(con, ini="2026-10-22T11:00:00+00:00", fim="2026-10-22T13:00:00+00:00")
+    assert _codigo(_responder, con, ev).codigo == "inicio_passado"
+
+
+@pytest.mark.parametrize("kw", [dict(resposta=None), dict(resposta="accepted"), dict(resposta="declined"), dict(dia_inteiro=1)])
+def test_convite_resposta_nao_pendente(con, kw):
+    """Organizador (resposta nula), já respondido ou dia inteiro."""
+    _agenda(con)
+    ev = _convite(con, **kw)
+    assert _codigo(_responder, con, ev).codigo == "convite_nao_pendente"
+    assert con.execute("select count(*) from envio_proposta").fetchone()[0] == 0
+
+
+def test_convite_resposta_duplicada_enquanto_pendente_ou_enviando(con):
+    _agenda(con)
+    ev = _convite(con)
+    r = _responder(con, ev)
+    assert _codigo(_responder, con, ev, "recusar").codigo == "proposta_duplicada"
+    con.execute("update envio_proposta set estado='enviando' where id=?", (r["id"],))
+    assert _codigo(_responder, con, ev).codigo == "proposta_duplicada"
+    outro = _convite(con, ext="AAMk-3")
+    assert _responder(con, outro)["estado"] == "pendente"  # outro convite não é duplicata
+
+
+def test_convite_resposta_duplicada_casa_pela_serie(con):
+    _agenda(con)
+    a = _convite(con, serie="S1")
+    b = _convite(con, ext="AAMk-2", ini="2026-10-23T18:00:00+00:00", fim="2026-10-23T19:00:00+00:00", serie="S1")
+    _responder(con, a)
+    assert _codigo(_responder, con, b, "recusar").codigo == "proposta_duplicada"  # outra ocorrência da mesma série
+    c = _convite(con, ext="AAMk-3", ini="2026-10-24T18:00:00+00:00", fim="2026-10-24T19:00:00+00:00", serie="S2")
+    assert _responder(con, c)["estado"] == "pendente"  # outra série não é duplicata
+    d = _convite(con, ext="AAMk-4", ini="2026-10-25T18:00:00+00:00", fim="2026-10-25T19:00:00+00:00")
+    assert _responder(con, d)["estado"] == "pendente"  # avulso continua 1 a 1
+
+
+def test_convite_resposta_depois_de_falhou_recusada_ou_vencida_pode_propor_de_novo(con):
+    _agenda(con)
+    ev = _convite(con, ini="2026-10-26T13:30:00+00:00", fim="2026-10-26T14:00:00+00:00")
+    r1 = _responder(con, ev)
+    con.execute("update envio_proposta set estado='falhou', motivo='convite_obsoleto' where id=?", (r1["id"],))
+    r2 = _responder(con, ev, "recusar")
+    p.recusar(con, r2["id"], "ricardo", AGORA)
+    r3 = _responder(con, ev, "talvez")
+    depois = AGORA + dt.timedelta(hours=25)  # r3 venceu (24h), mesmo sem ninguém ter listado
+    r4 = _responder(con, ev, agora=depois)
+    assert len({r1["id"], r2["id"], r3["id"], r4["id"]}) == 4
+    assert con.execute("select estado from envio_proposta where id=?", (r3["id"],)).fetchone()[0] == "vencida"

@@ -2919,6 +2919,61 @@
     "summary": "Listar Envios"
    }
   },
+  "/api/v1/envios/convites": {
+   "get": {
+    "description": "Convites de agenda recebidos e ainda sem resposta (série: só a próxima ocorrência), com conflitos e o id da proposta aberta (pendente ou enviando), se houver.",
+    "operationId": "listar_convites_api_v1_envios_convites_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar Convites"
+   }
+  },
+  "/api/v1/envios/convites/{evento_id}/propor": {
+   "post": {
+    "description": "Cria a proposta de resposta (aceitar, talvez ou recusar) a um convite pendente; nada é enviado até o \"Enviar\".",
+    "operationId": "propor_resposta_convite_api_v1_envios_convites__evento_id__propor_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "evento_id",
+      "required": true,
+      "schema": {
+       "title": "Evento Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Propor Resposta Convite"
+   }
+  },
   "/api/v1/envios/{envio_id}/enviar": {
    "post": {
     "description": "Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto).",

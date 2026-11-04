@@ -1,6 +1,7 @@
-"""Envios aprovados no Graph da ness (ADR-024): CRIAR EVENTO na agenda (token de aplicativo, `Calendars.ReadWrite`; o Exchange manda os convites) e,
-com token DELEGADO do Ricardo, listar equipes e canais do Teams, escrever em chat que já existe e postar em canal. Nada mais: não cria chat, não
-manda e-mail, não responde, não encaminha, não altera nem apaga (uma varredura fixa os verbos e as URLs deste arquivo). Fica fora de
+"""Envios aprovados no Graph da ness (ADR-024): CRIAR EVENTO na agenda e RESPONDER A CONVITE recebido (accept, tentativelyAccept, decline;
+token de aplicativo, `Calendars.ReadWrite`; o Exchange manda os convites e as respostas) e, com token DELEGADO do Ricardo, listar equipes e canais
+do Teams, escrever em chat que já existe e postar em canal. Nada mais: não cria chat, não manda e-mail, não responde e-mail nem encaminha, não
+altera nem apaga (uma varredura fixa os verbos e as URLs deste arquivo). Fica fora de
 `graph_ness.py` para que a trava de leitura daquele arquivo continue valendo. O texto do Teams sai como `contentType: text`, intacto (nunca HTML).
 O refresh token delegado vem de GRAPH_NESS_TEAMS_REFRESH; o novo que a Microsoft devolve fica só em memória. Título, texto, nomes, e-mails,
 token e corpo de resposta nunca entram em erro, log ou repr: erros são códigos fixos ou `operacao -> status`.
@@ -16,6 +17,8 @@ ESCOPO_TEAMS = ("https://graph.microsoft.com/ChatMessage.Send https://graph.micr
                 "https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All offline_access")
 _CHAVE = re.compile(r"^[0-9a-v]{26}$")  # chave da proposta: 26 caracteres base32hex minúsculos (vira `transactionId`)
 _ID_TEAMS = re.compile(r"^[0-9A-Za-z:@._-]{1,200}$")  # id de equipe (GUID) ou de canal ("19:...@thread.tacv2"): nunca "/" nem espaço
+_ID_EVENTO = re.compile(r"^[A-Za-z0-9_=+/-]{1,300}$")  # id de evento do Graph (base64): vai ao caminho sempre por quote(safe="")
+_ACAO_CONVITE = {"aceitar": "accept", "talvez": "tentativelyAccept", "recusar": "decline"}
 _UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 MAX_TEXTO = 4000
 MAX_PAGINAS = 20
@@ -100,7 +103,16 @@ def _texto(v) -> str:
 
 
 def _pedir(fonte, token, metodo: str, url: str, corpo: dict | None, operacao: str) -> dict:
-    """Chamada autenticada só ao host do Graph; um 401 invalida o token e repete UMA vez. Status >= 300 vira `operacao -> status`, sem corpo."""
+    """Chamada autenticada só ao host do Graph; um 401 invalida o token e repete UMA vez. Status >= 300 vira `operacao -> status`, sem corpo.
+    Exige corpo JSON objeto na resposta (a resposta a convite, que volta 202 vazia, usa `_pedir_vazio`)."""
+    resp = _pedir_vazio(fonte, token, metodo, url, corpo, operacao)
+    if not isinstance(resp, dict):
+        raise ErroGraphNess("resposta inválida do Graph")
+    return resp
+
+
+def _pedir_vazio(fonte, token, metodo: str, url: str, corpo: dict | None, operacao: str):
+    """Como `_pedir`, mas um 2xx vale com qualquer corpo (inclusive nenhum); devolve o que veio, sem conferir a forma."""
     if not url.startswith(HOST):
         raise ErroGraphNess("link inválido")
     dados = None if corpo is None else json.dumps(corpo, ensure_ascii=False).encode()
@@ -113,8 +125,6 @@ def _pedir(fonte, token, metodo: str, url: str, corpo: dict | None, operacao: st
         break
     if status >= 300:
         raise _ErroStatus(f"{operacao} -> {status}", status)
-    if not isinstance(resp, dict):
-        raise ErroGraphNess("resposta inválida do Graph")
     return resp
 
 
@@ -151,6 +161,19 @@ def evento_criar(fonte, conta, chave, evento) -> dict:
         corpo["onlineMeetingProvider"] = "teamsForBusiness"
     url = f"{BASE}/users/{urllib.parse.quote(conta, safe='')}/events"
     return _externo(_pedir(fonte, fonte._token, "POST", url, corpo, "evento_criar"))
+
+
+def convite_responder(fonte, conta, evento_id, resposta, serie_id) -> dict:
+    """Responde ao convite na agenda da conta (accept/tentativelyAccept/decline) com `sendResponse` e sem comentário; se o convite é de uma série,
+    responde a série (`serie_id`). O Graph devolve 202 sem corpo. Devolve {"externo_id": id respondido}."""
+    conta = _conta(fonte, conta)
+    acao = _ACAO_CONVITE.get(resposta) if isinstance(resposta, str) else None
+    alvo = serie_id or evento_id
+    if acao is None or not isinstance(alvo, str) or not _ID_EVENTO.fullmatch(alvo):
+        raise ErroGraphNess("evento inválido")
+    url = f"{BASE}/users/{urllib.parse.quote(conta, safe='')}/events/{urllib.parse.quote(alvo, safe='')}/{acao}"
+    _pedir_vazio(fonte, fonte._token, "POST", url, {"sendResponse": True}, "convite_responder")
+    return {"externo_id": alvo}
 
 
 def _lista(fonte, token, url: str, operacao: str) -> list[dict]:

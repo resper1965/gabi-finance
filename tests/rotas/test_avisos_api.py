@@ -110,3 +110,9 @@ def test_descrever_banco_desatualizado():
     from gabi.rotas.avisos import descrever
     titulo, texto = descrever("banco_desatualizado", {"banco": "Itaú", "desde": "2026-10-19T18:10:00Z"})
     assert titulo == "Itaú sem atualizar há mais de 24 h" and "19/10 15:10" in texto
+
+
+def test_lista_mostra_convite_de_agenda_com_titulo_convite(cli, banco):
+    _aviso(banco, "convite_agenda", {"chave": "1:x", "evento_id": 1, "titulo": "Alinhamento", "inicio_utc": "2026-11-05T18:00:00+00:00", "texto": "Alinhamento · qui 15h–16h · sem conflito"})
+    it = cli.get("/api/v1/avisos", headers=BOSS).json()["dados"]["itens"][0]
+    assert it["titulo"] == "Convite: Alinhamento" and it["texto"].endswith(" · painel › Envios")

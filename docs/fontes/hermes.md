@@ -78,6 +78,7 @@ mcp_servers:
       - projeto_pessoa
       - projeto_ver
       - propor_evento
+      - propor_resposta_convite
       - propor_teams
       - regras_listar
       - regras_sugerir

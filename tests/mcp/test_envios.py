@@ -176,5 +176,49 @@ def test_envios_no_hermes():
 def test_docstrings_dizem_que_so_propoem(cli3, tok):
     from tests.mcp.test_servidor import rpc
     desc = {t["name"]: t["description"] for t in rpc(cli3, tok["envios"], "tools/list").json()["result"]["tools"]}
-    for n in ("propor_evento", "propor_teams"):
+    for n in ("propor_evento", "propor_teams", "propor_resposta_convite"):
         assert desc[n].startswith("PROPÕE") and "o envio só sai quando o Ricardo clica Enviar no painel" in desc[n]
+
+
+# ---- propor_resposta_convite ----
+def _convite(banco, **kw):
+    from tests.envios.test_propostas import _convite as inserir
+    c = conectar(banco)
+    try:
+        return inserir(c, **kw)
+    finally:
+        c.close()
+
+
+def test_propor_resposta_convite_cria_pendente_com_link(cli3, banco3, tok):
+    conectar(banco3).execute("insert into parametro(chave, valor) values ('painel.url', ?)", (json.dumps("https://painel.exemplo"),))
+    ev = _convite(banco3, ini="2026-10-09T18:00:00+00:00", fim="2026-10-09T19:00:00+00:00")
+    d = chamar(cli3, tok["envios"], "propor_resposta_convite", conta=NESS, evento_id=ev, resposta="aceitar")["dados"]
+    assert d["estado"] == "pendente" and d["link"] == "https://painel.exemplo#envios" and d["resumo"].startswith("Responder 'Comitê'")
+    [p] = _propostas(banco3)
+    assert (p["tipo"], p["estado"]) == ("convite_resposta", "pendente")
+
+
+def test_propor_resposta_convite_organizador_ou_respondido_recusa(cli3, banco3, tok):
+    ev = _convite(banco3, ini="2026-10-09T18:00:00+00:00", fim="2026-10-09T19:00:00+00:00", resposta="organizer")
+    r = chamar(cli3, tok["envios"], "propor_resposta_convite", conta=NESS, evento_id=ev, resposta="aceitar")
+    assert r["erro"] == "convite_nao_pendente" and r["mensagem"] == "esse convite já foi respondido ou é seu"
+    assert _propostas(banco3) == []
+
+
+def test_propor_resposta_convite_conta_fora_da_lista(cli3, banco3, tok):
+    ev = _convite(banco3, ini="2026-10-09T18:00:00+00:00", fim="2026-10-09T19:00:00+00:00")
+    assert chamar(cli3, tok["envios"], "propor_resposta_convite", conta="outra@x.com", evento_id=ev, resposta="aceitar")["erro"] == "conta_nao_permitida"
+
+
+def test_propor_resposta_convite_passado(cli3, banco3, tok):
+    ev = _convite(banco3, ini="2026-10-01T18:00:00+00:00", fim="2026-10-01T19:00:00+00:00")
+    assert chamar(cli3, tok["envios"], "propor_resposta_convite", conta=NESS, evento_id=ev, resposta="aceitar")["erro"] == "inicio_passado"
+
+
+def test_propor_resposta_convite_duplicada(cli3, banco3, tok):
+    ev = _convite(banco3, ini="2026-10-09T18:00:00+00:00", fim="2026-10-09T19:00:00+00:00")
+    assert "dados" in chamar(cli3, tok["envios"], "propor_resposta_convite", conta=NESS, evento_id=ev, resposta="aceitar")
+    r = chamar(cli3, tok["envios"], "propor_resposta_convite", conta=NESS, evento_id=ev, resposta="recusar")
+    assert r["erro"] == "proposta_duplicada" and r["mensagem"] == "já existe uma proposta para esse convite no painel"
+    assert len(_propostas(banco3)) == 1

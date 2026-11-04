@@ -146,3 +146,23 @@ def test_auditoria_sem_conteudo(con):
     for proibido in ("Segredo", "sigiloso", "ana@x.com", "Reunião"):
         assert proibido not in todo
     assert str(r["id"]) in todo and NESS in todo
+
+
+def test_reservar_convite_resposta_conta_fora_da_lista_vira_falhou(con):
+    from tests.envios.test_propostas import _convite
+    _agenda(con)
+    _ligar(con)
+    r = p.criar_convite_resposta(con, AGORA, conta=NESS, evento_id=_convite(con), resposta="aceitar")
+    h = _estado(con, r["id"])["hash"]
+    con.execute("update parametro set valor='[]' where chave='envios.contas_agenda'")
+    assert _codigo(p.reservar, con, r["id"], h, "ricardo", AGORA).codigo == "conta_nao_permitida"
+    l = _estado(con, r["id"])
+    assert l["estado"] == "falhou" and l["motivo"] == "conta_nao_permitida"
+
+
+def test_reservar_convite_resposta_conta_na_lista_ok(con):
+    from tests.envios.test_propostas import _convite
+    _agenda(con)
+    _ligar(con)
+    r = p.criar_convite_resposta(con, AGORA, conta=NESS, evento_id=_convite(con), resposta="aceitar")
+    assert p.reservar(con, r["id"], _estado(con, r["id"])["hash"], "ricardo", AGORA)["estado"] == "enviando"
