@@ -596,6 +596,25 @@ def _hora(campo, dia_inteiro: bool):
     return {"date": texto[:10]} if dia_inteiro else {"dateTime": texto[:19] + "Z"}
 
 
+_RESPOSTA = {"notResponded": "needsAction", "none": "needsAction", "accepted": "accepted", "tentativelyAccepted": "tentative", "declined": "declined"}
+
+
+def _resposta(item: dict) -> str | None:
+    """Minha resposta ao convite; None se eu sou o organizador ou o Graph não disse."""
+    if item.get("isOrganizer") is True:
+        return None
+    r = item.get("responseStatus")
+    return _RESPOSTA.get(r.get("response")) if isinstance(r, dict) and isinstance(r.get("response"), str) else None
+
+
+def _organizador_nome(item: dict) -> str | None:
+    """Só o nome do organizador; o endereço (e os dos demais participantes) nunca é guardado."""
+    o = item.get("organizer")
+    e = o.get("emailAddress") if isinstance(o, dict) else None
+    nome = e.get("name") if isinstance(e, dict) else None
+    return nome if isinstance(nome, str) and nome else None
+
+
 def _evento(item: dict) -> dict:
     dia = item.get("isAllDay") is True
     participantes = item.get("attendees")
@@ -607,7 +626,8 @@ def _evento(item: dict) -> dict:
             "participantes_qtd": len(participantes) if isinstance(participantes, list) else 0,
             "status": "confirmed", "etag": texto(item.get("@odata.etag")), "atualizado_origem": texto(item.get("lastModifiedDateTime")),
             "privado": item.get("sensitivity") in ("private", "confidential"),
-            "ical_uid": texto(item.get("iCalUId")) or None, "livre": item.get("showAs") == "free"}
+            "ical_uid": texto(item.get("iCalUId")) or None, "livre": item.get("showAs") == "free",
+            "resposta": _resposta(item), "organizador_nome": _organizador_nome(item), "serie_id": texto(item.get("seriesMasterId")) or None}
 
 
 def _recusado_por_mim(item: dict) -> bool:

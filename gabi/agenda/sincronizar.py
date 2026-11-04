@@ -79,16 +79,18 @@ def sincronizar_fonte(con, fonte_id: int, listar: Callable, agora: str) -> dict:
         titulo = PRIVADO if (ocultar and e.get("privado")) else e.get("titulo")
         linhas.append((fonte_id, e["externo_id"], j.inicio_utc, j.fim_utc, j.dia_local, j.dia_fim_local, int(j.dia_inteiro), titulo,
                        e.get("link_reuniao"), int(e.get("participantes_qtd") or 0), e.get("status"), e.get("etag"),
-                       e.get("atualizado_origem"), int(bool(e.get("privado"))), e.get("ical_uid"), int(bool(e.get("livre")))))
+                       e.get("atualizado_origem"), int(bool(e.get("privado"))), e.get("ical_uid"), int(bool(e.get("livre"))),
+                       e.get("resposta"), e.get("organizador_nome"), e.get("serie_id")))
     apagados = 0
     with transacao(con, imediata=True):
         con.executemany(
             "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, link_reuniao,"
-            " participantes_qtd, status, etag, atualizado_origem, privado, ical_uid, livre) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            " participantes_qtd, status, etag, atualizado_origem, privado, ical_uid, livre, resposta, organizador_nome, serie_id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " on conflict(fonte_id, externo_id) do update set inicio_utc=excluded.inicio_utc, fim_utc=excluded.fim_utc,"
             " dia_local=excluded.dia_local, dia_fim_local=excluded.dia_fim_local, dia_inteiro=excluded.dia_inteiro, titulo=excluded.titulo,"
             " link_reuniao=excluded.link_reuniao, participantes_qtd=excluded.participantes_qtd, status=excluded.status, etag=excluded.etag,"
-            " atualizado_origem=excluded.atualizado_origem, privado=excluded.privado, ical_uid=excluded.ical_uid, livre=excluded.livre", linhas)
+            " atualizado_origem=excluded.atualizado_origem, privado=excluded.privado, ical_uid=excluded.ical_uid, livre=excluded.livre,"
+            " resposta=excluded.resposta, organizador_nome=excluded.organizador_nome, serie_id=excluded.serie_id", linhas)
         for ext in res.cancelados:
             apagados += con.execute("delete from agenda_evento where fonte_id=? and externo_id=?", (fonte_id, ext)).rowcount
         if completa:  # a janela desliza: o que não veio na recarga (sumiu, ou saiu da janela) é apagado

@@ -423,3 +423,31 @@ def test_graph_get_503_persistente_vira_erro_depois_de_tres_chamadas():
     with pytest.raises(ErroGraphNess, match="-> 503"):
         gr._get(g.BASE + "/users/x/y")
     assert len(http.chamadas) == 3
+
+
+def _item(**kw):
+    return {"id": "X", "start": {"dateTime": "2026-10-13T13:00:00.0000000"}, "end": {"dateTime": "2026-10-13T14:00:00.0000000"}, **kw}
+
+
+@pytest.mark.parametrize("graph,esperado", [
+    ({"response": "notResponded"}, "needsAction"), ({"response": "none"}, "needsAction"), ({"response": "accepted"}, "accepted"),
+    ({"response": "tentativelyAccepted"}, "tentative"), ({"response": "declined"}, "declined"), ({"response": "organizer"}, None)])
+def test_evento_graph_mapeia_resposta(graph, esperado):
+    assert g._evento(_item(responseStatus=graph))["resposta"] == esperado
+
+
+def test_evento_graph_resposta_organizador_ou_ausente():
+    assert g._evento(_item(responseStatus={"response": "accepted"}, isOrganizer=True))["resposta"] is None
+    assert g._evento(_item())["resposta"] is None
+
+
+def test_evento_graph_organizador_so_o_nome():
+    ev = g._evento(_item(organizer={"emailAddress": {"name": "Maria", "address": "maria@x.com"}}))
+    assert ev["organizador_nome"] == "Maria"
+    assert "maria@x.com" not in repr(ev) and not any("@" in k for k in ev)
+    assert g._evento(_item())["organizador_nome"] is None
+
+
+def test_evento_graph_serie():
+    assert g._evento(_item(seriesMasterId="S1"))["serie_id"] == "S1"
+    assert g._evento(_item())["serie_id"] is None

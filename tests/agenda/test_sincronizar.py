@@ -276,3 +276,15 @@ def test_erro_do_graph_aparece_tipado_e_reconecta_no_401(con):
     f2 = _fonte_graph(con, cal="outro")
     r = sincronizar(con, Falso(), AGORA, listar_graph=Falso(RuntimeError("segredo"), RuntimeError("segredo")))
     assert r[f] == {"erro": "RuntimeError"} and r[f2] == {"erro": "RuntimeError"}
+
+
+def test_sincronizar_grava_os_tres_campos_e_atualiza_no_upsert(con):
+    f = _fonte(con)
+    novos = dict(resposta="needsAction", organizador_nome="Maria", serie_id="S1")
+    cli = Falso(ResultadoEventos([_ev("a", **novos), _ev("g")], [], "T1", False),
+                ResultadoEventos([_ev("a", **{**novos, "resposta": "accepted"})], [], "T2", False))
+    sincronizar_fonte(con, f, cli, AGORA)
+    q = lambda i: tuple(con.execute("select resposta, organizador_nome, serie_id from agenda_evento where externo_id=?", (i,)).fetchone())  # noqa: E731
+    assert q("a") == ("needsAction", "Maria", "S1") and q("g") == (None, None, None)
+    sincronizar_fonte(con, f, cli, AGORA)
+    assert q("a") == ("accepted", "Maria", "S1")
