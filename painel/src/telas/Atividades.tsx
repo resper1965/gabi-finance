@@ -5,7 +5,7 @@ import { Bloco } from "../componentes/Bloco";
 import { Vazio } from "../componentes/Estados";
 import { Painel } from "../componentes/Painel";
 import { api } from "../lib/api";
-import { dataCurta } from "../lib/formato";
+import { diaSP as dia, quandoVence } from "../lib/formato";
 import { Aviso, useAcao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
@@ -15,12 +15,7 @@ const ROTA = "/api/v1/atividades";
 const GRUPOS: [Prazo, string][] = [["vencida", "Vencidas"], ["hoje", "Hoje"], ["proxima", "Próximas"], ["sem_data", "Sem data"]];
 const suave = { color: "var(--ink2)" } as const;
 
-/** Data de hoje (ou de amanhã) no relógio do navegador, `AAAA-MM-DD`. */
-const dia = (mais = 0) => {
-  const d = new Date(); d.setDate(d.getDate() + mais);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-const quando = (a: Atividade) => (a.vence_em ? `${dataCurta(a.vence_em)}${a.tem_hora ? ` às ${a.vence_em.slice(11, 16)}` : ""}` : "");
+const quando = (a: Atividade) => quandoVence(a.vence_em, a.tem_hora);
 
 function Linha({ a, agir, ocupado, erro, recarregar }: { a: Atividade; agir: ReturnType<typeof useAcao>["agir"]; ocupado: boolean; erro?: string; recarregar: () => Promise<void> }) {
   const [aberto, setAberto] = useState<"adiar" | "excluir" | null>(null);

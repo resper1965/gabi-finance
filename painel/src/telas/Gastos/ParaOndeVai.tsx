@@ -3,7 +3,7 @@ import { Bloco } from "../../componentes/Bloco";
 import { Painel } from "../../componentes/Painel";
 import { useCelular } from "../../componentes/Shell";
 import { Valor } from "../../componentes/Valor";
-import { corDestino, type Fluxo, type No } from "../../graficos/Sankey";
+import { corDestino, type Fluxo, type No } from "../../graficos/fluxo";
 import { useFiltros } from "../../lib/filtros";
 import { dataCurta, num } from "../../lib/formato";
 import { useApi } from "../../lib/useApi";

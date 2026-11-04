@@ -3,7 +3,8 @@ import { act, render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { ToastProvider } from "../src/lib/toast";
 import { FiltrosProvider } from "../src/lib/filtros";
 import { CadastrosAgenda } from "../src/telas/CadastrosAgenda";
-import { Agenda, diaLocal } from "../src/telas/Trabalho/Agenda";
+import { Agenda } from "../src/telas/Trabalho/Agenda";
+import { diaSP } from "../src/lib/formato";
 import { Hoje } from "../src/telas/Trabalho/Hoje";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
@@ -134,9 +135,9 @@ test("quem não é o dono vê uma mensagem só", async () => {
 
 test("a tela Agenda mostra dia inteiro, horário local, fonte e privado", async () => {
   fake({ agenda: { conflitos: [], eventos: [
-    { id: 1, titulo: "Viagem", inicio_local: null, fim_local: null, dia_local: diaLocal(0), dia_fim_local: diaLocal(0), dia_inteiro: true, link_reuniao: null, fonte: "a@x.com", privado: false },
-    { id: 2, titulo: "Reunião IONIC", inicio_local: "2026-10-12T14:00:00-03:00", fim_local: "2026-10-12T15:00:00-03:00", dia_local: diaLocal(0), dia_fim_local: diaLocal(0), dia_inteiro: false, link_reuniao: null, fonte: "b@x.com", privado: false },
-    { id: 3, titulo: "Médico", inicio_local: "2026-10-12T22:30:00-03:00", fim_local: "2026-10-12T23:30:00-03:00", dia_local: diaLocal(0), dia_fim_local: diaLocal(0), dia_inteiro: false, link_reuniao: null, fonte: "a@x.com", privado: true }] } });
+    { id: 1, titulo: "Viagem", inicio_local: null, fim_local: null, dia_local: diaSP(0), dia_fim_local: diaSP(0), dia_inteiro: true, link_reuniao: null, fonte: "a@x.com", privado: false },
+    { id: 2, titulo: "Reunião IONIC", inicio_local: "2026-10-12T14:00:00-03:00", fim_local: "2026-10-12T15:00:00-03:00", dia_local: diaSP(0), dia_fim_local: diaSP(0), dia_inteiro: false, link_reuniao: null, fonte: "b@x.com", privado: false },
+    { id: 3, titulo: "Médico", inicio_local: "2026-10-12T22:30:00-03:00", fim_local: "2026-10-12T23:30:00-03:00", dia_local: diaSP(0), dia_fim_local: diaSP(0), dia_inteiro: false, link_reuniao: null, fonte: "a@x.com", privado: true }] } });
   montar(<Agenda />);
   const viagem = (await screen.findByText(/Viagem/)).closest("li")!;
   expect(viagem.textContent).toContain("dia inteiro");
@@ -151,11 +152,11 @@ test("a tela Agenda mostra dia inteiro, horário local, fonte e privado", async 
 const ev = (id: number, titulo: string, dia: string, fim = dia, extra: Record<string, unknown> = {}) => ({ id, titulo, inicio_local: `${dia}T10:00:00-03:00`, fim_local: `${fim}T11:00:00-03:00`, dia_local: dia, dia_fim_local: fim, dia_inteiro: false, link_reuniao: null, fonte: "a@x.com", privado: false, ...extra });
 
 test("a tela Agenda pede os próximos 7 dias por padrão e agrupa por dia", async () => {
-  const c = fake({ agenda: { conflitos: [], eventos: [ev(1, "Reunião A", diaLocal(0)), ev(2, "Plantão", diaLocal(0), diaLocal(1)), ev(3, "Almoço", diaLocal(3))] } });
+  const c = fake({ agenda: { conflitos: [], eventos: [ev(1, "Reunião A", diaSP(0)), ev(2, "Plantão", diaSP(0), diaSP(1)), ev(3, "Almoço", diaSP(3))] } });
   montar(<Agenda />);
   expect(await screen.findByText(/Reunião A/)).toBeTruthy();
   const url = c.find((x) => /\/api\/v1\/agenda\?/.test(x.url))!.url;
-  expect(url).toBe(`/api/v1/agenda?de=${diaLocal(0)}&ate=${diaLocal(6)}`);
+  expect(url).toBe(`/api/v1/agenda?de=${diaSP(0)}&ate=${diaSP(6)}`);
   expect(screen.getAllByRole("heading", { level: 4 }).length).toBe(7);          // um bloco por dia, mesmo sem compromisso
   expect(screen.getAllByText(/Plantão/).length).toBe(2);                         // cruza a meia-noite: aparece nos dois dias
   expect(screen.getAllByText(/Sem compromissos/).length).toBe(4);                // dias 2, 4, 5 e 6... (0, 1 e 3 têm evento)
@@ -165,7 +166,7 @@ test("escolher Amanhã pede só o dia de amanhã", async () => {
   const c = fake({ agenda: { conflitos: [], eventos: [] } });
   montar(<Agenda />);
   fireEvent.click(await screen.findByRole("button", { name: "Amanhã" }));
-  await waitFor(() => expect(c.some((x) => x.url === `/api/v1/agenda?de=${diaLocal(1)}&ate=${diaLocal(1)}`)).toBe(true));
+  await waitFor(() => expect(c.some((x) => x.url === `/api/v1/agenda?de=${diaSP(1)}&ate=${diaSP(1)}`)).toBe(true));
   expect(screen.getByRole("button", { name: "Amanhã" }).getAttribute("aria-pressed")).toBe("true");
 });
 

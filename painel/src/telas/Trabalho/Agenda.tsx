@@ -1,22 +1,18 @@
 import { useState } from "react";
 import { Painel } from "../../componentes/Painel";
 import { useApi } from "../../lib/useApi";
-import { dataCurta } from "../../lib/formato";
+import { dataCurta, diaSP } from "../../lib/formato";
 import { Bloco, quando, type Evento } from "./Hoje";
 
 interface Dados { eventos: Evento[]; conflitos: { evento_a: number; evento_b: number; sugestao_inicio: string }[] }
 
-const FUSO = "America/Sao_Paulo";
-const DIA_MS = 86_400_000;
-/** "AAAA-MM-DD" de hoje + `n` dias no fuso de Brasília (sem passar pelo fuso do navegador). */
-export const diaLocal = (n: number) => new Intl.DateTimeFormat("sv-SE", { timeZone: FUSO }).format(new Date(Date.now() + n * DIA_MS));
 const OPCOES: [string, string, number, number][] = [["hoje", "Hoje", 0, 0], ["amanha", "Amanhã", 1, 1], ["semana", "Próximos 7 dias", 0, 6]];
 
 /** Agenda: compromissos por dia (evento que cruza a meia-noite aparece nos dois dias) e conflitos. A sugestão de horário é só uma PROPOSTA; nada é enviado a ninguém sem a sua confirmação. */
 export function Agenda() {
   const [escolha, setEscolha] = useState("semana");
   const [, , de, ate] = OPCOES.find((o) => o[0] === escolha)!;
-  const dias = Array.from({ length: ate - de + 1 }, (_, i) => diaLocal(de + i));
+  const dias = Array.from({ length: ate - de + 1 }, (_, i) => diaSP(de + i));
   const leitura = useApi<Dados>(`/api/v1/agenda?de=${dias[0]}&ate=${dias[dias.length - 1]}`);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

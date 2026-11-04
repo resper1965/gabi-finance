@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Marca } from "../componentes/Shell";
 import { Painel } from "../componentes/Painel";
 import { api } from "../lib/api";
-import { dataCurta } from "../lib/formato";
+import { dataCurta, formatarBRL } from "../lib/formato";
 import { useToast } from "../lib/toast";
 import { useApi } from "../lib/useApi";
 
@@ -12,7 +12,7 @@ interface Sug { id: number; tipo: string; payload: { padrao?: string; acao?: Rec
 interface Item { id: number | string; nome: string }
 
 const DIAS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
-const reais = (c: number) => `R$ ${(c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const reais = (c: number) => formatarBRL((c / 100).toFixed(2));
 /** "só se: conta 1, 2 · de R$ 10,00 a R$ 50,00 · sáb, dom" (vazio quando a regra não tem condição). */
 export function textoCondicao(c?: Condicao | null): string {
   if (!c) return "";

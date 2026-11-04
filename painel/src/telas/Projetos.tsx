@@ -5,7 +5,7 @@ import { Bloco } from "../componentes/Bloco";
 import { Vazio } from "../componentes/Estados";
 import { Painel } from "../componentes/Painel";
 import { api } from "../lib/api";
-import { dataCurta } from "../lib/formato";
+import { dataCurta, formatarBRL as brl, quandoVence } from "../lib/formato";
 import { Aviso, useAcao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
@@ -26,8 +26,7 @@ const arquivo = (id: number) => `/api/v1/anexos/${id}/arquivo`;
 const suave = { color: "var(--ink2)" } as const;
 const chip = (ativo: boolean) => ({ height: 32, padding: "0 12px", border: "1px solid var(--line3)", background: ativo ? "var(--sel-bg, var(--raised))" : "transparent", color: "var(--color-text)", font: "600 12.5px var(--font-body)", cursor: "pointer" }) as const;
 const campo = { display: "flex", flexDirection: "column", gap: 3, fontSize: 13 } as const;
-const brl = (s: string) => `${s.startsWith("-") ? "-" : ""}R$ ${Math.abs(Number(s)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const quando = (a: Atividade) => (a.vence_em ? `${dataCurta(a.vence_em)}${a.tem_hora ? ` às ${a.vence_em.slice(11, 16)}` : ""}` : "");
+const quando = (a: Atividade) => quandoVence(a.vence_em, a.tem_hora);
 const STATUS: Record<string, string> = { ativo: "Ativo", pausado: "Pausado", concluido: "Concluído", cancelado: "Cancelado" };
 
 /** Lista de um status; clicar abre o detalhe. */

@@ -10,6 +10,7 @@ import { api } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { Aviso, useAcao } from "../lib/useAcao";
 import { urlSegura } from "../lib/url";
+import { diaSP } from "../lib/formato";
 import { useApi } from "../lib/useApi";
 
 interface Numero { nome: string; valor: string }
@@ -47,14 +48,12 @@ const ROTULO_DATA: Record<string, string> = { emissao: "emissão", validade: "va
 
 /** AAAA-MM-DD (ou ISO) para dd/mm/aaaa. */
 const dataBR = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
-const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 /** A última data entre validade, fim de vigência e vencimento (ou null). */
 const venceEm = (d: { datas: Data[] }) => d.datas.filter((x) => DATAS_VENCE.includes(x.tipo)).map((x) => x.data).sort().pop() ?? null;
-/** "vencido" (antes de hoje), "atencao" (até 60 dias) ou null; datas no fuso local. */
+/** "vencido" (antes de hoje), "atencao" (até 60 dias) ou null; datas no fuso de São Paulo. */
 const situacao = (data: string | null): "vencido" | "atencao" | null => {
   if (!data) return null;
-  const hoje = new Date(); const limite = new Date(); limite.setDate(limite.getDate() + 60);
-  return data < isoLocal(hoje) ? "vencido" : data <= isoLocal(limite) ? "atencao" : null;
+  return data < diaSP() ? "vencido" : data <= diaSP(60) ? "atencao" : null;
 };
 function Situacao({ s }: { s: "vencido" | "atencao" | null }) {
   if (!s) return null;

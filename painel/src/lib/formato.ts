@@ -26,3 +26,25 @@ export function reaisDoTexto(texto: string): string | null {
   if (!m) return null;
   return `${m[1].replace(/^0+(?=\d)/, "")}.${(m[2] ?? "").padEnd(2, "0")}`;
 }
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+/** "1234.5" → "R$ 1.234,50" (espaço normal no lugar do NBSP); "—" se não for número. A API manda strings decimais: aqui só se formata. */
+export function formatarBRL(v: string | number): string {
+  const n = Number(v);
+  return Number.isFinite(n) ? BRL.format(n).replace(/\u00a0/g, " ") : "—";
+}
+
+/** "HH:MM" de "AAAA-MM-DDTHH:MM..." (sem passar por Date); null se não casar o padrão. */
+export const horaDe = (iso: string): string | null => /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(iso)?.[1] ?? null;
+
+const FUSO = "America/Sao_Paulo";
+const DIA_MS = 86_400_000;
+/** "AAAA-MM-DD" de hoje + `n` dias no fuso de Brasília (sem passar pelo fuso do navegador). */
+export const diaSP = (n = 0): string => new Intl.DateTimeFormat("sv-SE", { timeZone: FUSO }).format(new Date(Date.now() + n * DIA_MS));
+
+/** "08/10" ou "08/10 às 09:30" de um prazo de atividade ("" sem data). */
+export function quandoVence(vence_em: string | null, tem_hora: boolean): string {
+  if (!vence_em) return "";
+  const h = tem_hora ? horaDe(vence_em) : null;
+  return h ? `${dataCurta(vence_em)} às ${h}` : dataCurta(vence_em);
+}
