@@ -323,11 +323,11 @@ def test_410_incremental_vira_recarga():
         gr.listar_eventos(CONTA, "primary", None, JANELA)
 
 
-def test_429_nao_e_repetido():
-    gr, http = _graph([(429, {})])
+def test_429_e_repetido_duas_vezes_e_depois_vira_erro():
+    gr, http = _graph([(429, {})] * 3)
     with pytest.raises(ErroGraphNess, match="-> 429"):
         gr.listar_eventos(CONTA, "primary", None, JANELA)
-    assert len(http.chamadas) == 1
+    assert len(http.chamadas) == 3
 
 
 def test_eventos_pagina_sem_fim_e_link_de_outro_host():
@@ -410,3 +410,16 @@ def test_get_trata_3xx_como_erro():
     gr, _ = _graph([(302, {})])
     with pytest.raises(ErroGraphNess, match="-> 302"):
         gr._get(g.BASE + "/users/x/y")
+
+
+def test_graph_get_repete_503():
+    gr, http = _graph([(503, {}), (200, {"value": [1]})])
+    assert gr._get(g.BASE + "/users/x/y") == {"value": [1]}
+    assert len(http.chamadas) == 2
+
+
+def test_graph_get_503_persistente_vira_erro_depois_de_tres_chamadas():
+    gr, http = _graph([(503, {})] * 3)
+    with pytest.raises(ErroGraphNess, match="-> 503"):
+        gr._get(g.BASE + "/users/x/y")
+    assert len(http.chamadas) == 3

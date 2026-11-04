@@ -34,3 +34,35 @@ def test_redirecionamento_https_para_http_tira_credencial():
 def test_clientes_nao_usam_urlopen_direto():
     maus = [f.name for f in FONTES.glob("*.py") if f.name != "graph_ness.py" and "urllib.request.urlopen(" in f.read_text()]
     assert maus == []
+
+
+def _fila(*status):
+    fila = list(status)
+    chamadas = []
+
+    def fazer():
+        chamadas.append(1)
+        return fila.pop(0), {}
+    return fazer, chamadas
+
+
+def test_com_retry_repete_429_e_para_no_ok():
+    from gabi.fontes._http import com_retry
+    fazer, chamadas = _fila(429, 503, 200)
+    esperas = []
+    assert com_retry(fazer, dorme=esperas.append)[0] == 200
+    assert esperas == [2, 5] and len(chamadas) == 3
+
+
+def test_com_retry_desiste_depois_de_duas():
+    from gabi.fontes._http import com_retry
+    fazer, chamadas = _fila(503, 503, 503)
+    assert com_retry(fazer, dorme=lambda s: None)[0] == 503
+    assert len(chamadas) == 3
+
+
+def test_com_retry_nao_repete_404():
+    from gabi.fontes._http import com_retry
+    fazer, chamadas = _fila(404)
+    assert com_retry(fazer, dorme=lambda s: None)[0] == 404
+    assert len(chamadas) == 1

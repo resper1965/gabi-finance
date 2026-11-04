@@ -9,6 +9,7 @@ import urllib.parse
 from dataclasses import asdict, dataclass, field
 from typing import Callable
 
+from gabi.fontes._http import com_retry
 from gabi.fontes.google_oauth import (ErroGoogleOAuth, TokenOAuth, _http_real, chamar, conta_valida, credenciais_do_ambiente)
 
 ESCOPO = "https://www.googleapis.com/auth/calendar.readonly"
@@ -28,10 +29,12 @@ class ResultadoEventos:
 
 def _pegar(http, token, conta: str, url: str):
     """GET com o token da conta; um 401 invalida o access token em cache e repete UMA vez com token novo."""
-    status, resp = chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
+    def uma():
+        return com_retry(lambda: chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"}))
+    status, resp = uma()
     if status == 401 and hasattr(token, "invalidar"):
         token.invalidar(conta)
-        status, resp = chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
+        status, resp = uma()
     return status, resp
 
 

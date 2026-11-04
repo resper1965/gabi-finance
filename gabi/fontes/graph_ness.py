@@ -15,6 +15,7 @@ import urllib.request
 from dataclasses import asdict
 from typing import Callable
 
+from gabi.fontes._http import com_retry
 from gabi.fontes.google_agenda import ResultadoEventos
 from gabi.fontes.google_contatos import MAX_EMAILS, _EMAIL
 from gabi.fontes.google_email import (MAX_CARGA_MSGS, MAX_ENDERECOS, MAX_ENDERECOS_CONSULTA, MAX_ENVIADOS_MSGS, MAX_IDS_POR_CHAMADA, TAM_ASSUNTO,
@@ -150,7 +151,7 @@ class GraphNess:
         caminho = urllib.parse.urlsplit(url).path
         for tentativa in (1, 2):
             cab = {"Authorization": f"Bearer {self._token()}", **(extra or {})}
-            status, resp = _chamar(self._http, "GET", url, None, cab)
+            status, resp = com_retry(lambda: _chamar(self._http, "GET", url, None, cab))
             if status == 401 and tentativa == 1 and hasattr(self._token, "invalidar"):
                 self._token.invalidar()
                 continue

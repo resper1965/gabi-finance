@@ -16,6 +16,7 @@ from email.utils import parseaddr
 from html.parser import HTMLParser
 from typing import Callable
 
+from gabi.fontes._http import com_retry
 from gabi.fontes.google_oauth import (ErroGoogleOAuth, TokenOAuth, _http_real, chamar, conta_valida, credenciais_do_ambiente)
 
 ESCOPO = "https://www.googleapis.com/auth/gmail.modify"
@@ -46,10 +47,14 @@ def _pegar(http, token, conta: str, metodo: str, url: str):
     """Requisição com o token da conta; um 401 invalida o access token em cache e repete UMA vez com token novo."""
     corpo = {} if metodo == "POST" else None
     cab = {"Authorization": f"Bearer {token(conta)}"}
-    status, resp = chamar(http, metodo, url, corpo, cab)
+    def uma(cab):
+        if metodo == "GET":  # leitura repete em 429/5xx; POST segue com uma tentativa
+            return com_retry(lambda: chamar(http, metodo, url, corpo, cab))
+        return chamar(http, metodo, url, corpo, cab)
+    status, resp = uma(cab)
     if status == 401 and hasattr(token, "invalidar"):
         token.invalidar(conta)
-        status, resp = chamar(http, metodo, url, corpo, {"Authorization": f"Bearer {token(conta)}"})
+        status, resp = uma({"Authorization": f"Bearer {token(conta)}"})
     return status, resp
 
 

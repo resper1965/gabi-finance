@@ -30,3 +30,13 @@ def _migrar_rapido(con, pasta):
 
 
 _db.migrar = _migrar_rapido
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _sem_espera_de_retry(monkeypatch):
+    """O retry de leitura (2 s, 5 s) nunca dorme de verdade nos testes; quem testa a espera injeta `dorme`."""
+    from gabi.fontes import _http
+    monkeypatch.setattr(_http, "dormir", lambda s: None)

@@ -135,7 +135,7 @@ def test_401_duas_vezes_e_erro_tipado_sem_segredo():
 @pytest.mark.parametrize("status", [400, 403, 404, 429, 500])
 def test_erro_http_e_tipado_sem_corpo(status):
     with pytest.raises(ErroGoogleOAuth) as e:
-        ga.listar_eventos("a@gmail.com", "primary", None, JANELA, Token(), http=_http([(status, {"error": SEGREDO})], []))
+        ga.listar_eventos("a@gmail.com", "primary", None, JANELA, Token(), http=_http([(status, {"error": SEGREDO})] * 3, []))  # 3: a leitura repete 429/5xx
     assert SEGREDO not in str(e.value) and str(status) in str(e.value)
 
 

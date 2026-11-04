@@ -6,6 +6,7 @@ import re
 import urllib.parse
 from typing import Callable
 
+from gabi.fontes._http import com_retry
 from gabi.fontes.google_oauth import (  # noqa: F401  (nomes reexportados: ponte, testes e escuta ainda os importam daqui)
     ErroGoogleOAuth, FOLGA_S, TOKEN_URL, TokenOAuth, _http_real, chamar as _chamar, conta_valida as _conta_valida,
     credenciais_do_ambiente, nome_da_variavel)
@@ -44,10 +45,12 @@ def listar_contatos(conta: str, token: Callable[[str], str], http=_http_real) ->
         if pagina:
             q["pageToken"] = pagina
         url = URL_CONTATOS + "?" + urllib.parse.urlencode(q, safe=",")
-        status, resp = _chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
+        def uma():
+            return com_retry(lambda: _chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"}))
+        status, resp = uma()
         if status == 401 and hasattr(token, "invalidar"):  # access token vencido/revogado: uma nova tentativa com token novo
             token.invalidar(conta)
-            status, resp = _chamar(http, "GET", url, None, {"Authorization": f"Bearer {token(conta)}"})
+            status, resp = uma()
         if status >= 400:
             raise ErroGoogleContatos(f"people.connections.list -> {status}")
         if not isinstance(resp, dict):

@@ -1,5 +1,6 @@
 """HTTP mínimo compartilhado pelos clientes novos: (metodo, url, corpo, cabecalhos) -> (status, json). Nunca registra cabeçalhos (R5)."""
 import json
+import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
@@ -36,3 +37,20 @@ def http_real(metodo, url, corpo=None, cabecalhos=None):
             return e.code, {"error": {"message": e.reason}}
     except OSError as e:
         raise ConnectionError(f"fonte indisponível: {type(e).__name__}") from None
+
+
+REPETIR = {429, 502, 503, 504}
+dormir = time.sleep  # os testes trocam por um no-op (conftest); com_retry lê daqui na hora da chamada
+
+
+def com_retry(fazer, *, dorme=None, esperas=(2, 5)):
+    """Só para LEITURA: repete `fazer()` (-> (status, resp)) enquanto o status ∈ REPETIR, esperando 2 s e depois 5 s; devolve o último resultado.
+    Escrita não passa por aqui (repetir um POST pode duplicar o efeito)."""
+    dorme = dorme or dormir
+    status, resp = fazer()
+    for espera in esperas:
+        if status not in REPETIR:
+            break
+        dorme(espera)
+        status, resp = fazer()
+    return status, resp

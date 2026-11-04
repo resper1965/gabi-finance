@@ -258,3 +258,10 @@ def test_envios_so_tem_os_verbos_e_urls_previstos():
         assert proibido not in texto
     publicos = {n for n in vars(ge) if not n.startswith("_") and callable(getattr(ge, n)) and getattr(getattr(ge, n), "__module__", "") == ge.__name__}
     assert publicos == {"TokenDelegado", "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}
+
+
+def test_escrita_nao_repete():
+    gr, http = _graph([(503, {})], token_teams=DelegadoFalso())
+    with pytest.raises(ErroGraphNess):
+        gr.teams_chat_enviar(CONTA, "19:a@thread.v2", "oi")
+    assert len(http.chamadas) == 1

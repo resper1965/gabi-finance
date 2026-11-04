@@ -331,3 +331,12 @@ def test_mensagem_ignora_anexo_de_texto():
     r, _ = _corpo(_full([{"mimeType": "text/plain", "body": {"data": _b64("corpo")}},
                          {"mimeType": "text/plain", "filename": "notas.txt", "body": {"data": _b64("anexo")}}]))
     assert r == {"corpo": "corpo", "cortado": False}
+
+
+def test_get_repete_503_e_post_nao_repete():
+    f = Falso({("GET", "/profile"): [(503, {}), (200, {"historyId": "1"})], ("GET", "/messages"): [(200, {})]})
+    assert ge.listar_novos("a@x.com", None, 14, Token(), http=f).mensagens == []
+    assert [c[0] for c in f.chamadas].count("GET") == 3  # profile 503, profile 200, messages
+    f = Falso({("POST", "/messages/{id}/trash"): [(503, {})]})
+    assert ge.lixeira("a@x.com", [ID(1)], Token(), http=f) == {ID(1): "erro"}
+    assert len(f.chamadas) == 1
