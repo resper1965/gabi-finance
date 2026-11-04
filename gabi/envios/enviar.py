@@ -1,5 +1,5 @@
 """Executor do envio: depois do "Enviar" do dono, reserva a proposta, faz UMA chamada ao provedor e fecha em enviada, falhou ou incerto.
-Consome: envio_proposta (via propostas.reservar/concluir, que já auditam em `decisao`), Google (evento_criar) e Graph da ness (evento_criar,
+Consome: envio_proposta (via propostas.reservar/concluir, que já auditam em `decisao`), Google (evento_criar) e Graph da ness (evento_criar, convite_responder,
 teams_chat_enviar, teams_canal_enviar) pela ponte. Grava: o estado final da proposta; trava em <pasta do banco>/locks/envios.lock.
 Nunca repete: 5xx e erro sem status HTTP nem código conhecido viram incerto (o provedor pode ter recebido); 4xx e recusas certas viram falhou. Motivos são códigos fixos; a mensagem do provedor
 não vai para log, stderr nem `decisao`."""
@@ -47,11 +47,14 @@ def trava(banco: Path):
         f.close()  # fechar libera a trava, mesmo em erro
 
 
-def _motivo(erro: Exception) -> tuple[str, str]:
-    """(estado, motivo) a partir só da mensagem (a ponte preserva a mensagem, não o atributo .status). 4xx = falhou; 5xx = incerto."""
+def _motivo(erro: Exception, tipo: str | None = None) -> tuple[str, str]:
+    """(estado, motivo) a partir só da mensagem (a ponte preserva a mensagem, não o atributo .status). 4xx = falhou; 5xx = incerto.
+    Num convite_resposta, 404/409 = o convite mudou ou sumiu: falhou com convite_obsoleto (pode-se propor de novo)."""
     msg = str(erro)
     m = _STATUS.search(msg)
     if m:
+        if tipo == "convite_resposta" and m.group(1) in ("404", "409"):
+            return "falhou", "convite_obsoleto"
         # 5xx num POST pode ter sido aceito (Graph/Teams sem idempotência): incerto, nunca repetido
         return ("incerto" if m.group(1).startswith("5") else "falhou"), f"provedor_{m.group(1)}"
     for texto in (msg, _TIPO.sub("", msg, count=1)):
@@ -67,6 +70,10 @@ def _chamar(l: dict, conteudo: dict, google, graph) -> dict | None:
         if prov is None:
             return None
         return prov.evento_criar(l["conta"], l["chave"], conteudo)
+    if l["tipo"] == "convite_resposta":
+        if conteudo.get("provedor") != "graph" or graph is None:
+            return None
+        return graph.convite_responder(l["conta"], l["chave"], conteudo["externo_id"], conteudo["resposta"], conteudo["serie_id"])
     if graph is None:
         return None
     if l["tipo"] == "teams_chat":
@@ -85,7 +92,7 @@ def enviar(con, proposta_id: int, hash: str, quem: str, agora: dt.datetime, goog
         try:
             r = _chamar(l, conteudo, google, graph)
         except Exception as e:  # noqa: BLE001 - uma tentativa só; o erro vira código fixo
-            estado, motivo = _motivo(e)
+            estado, motivo = _motivo(e, l["tipo"])
         else:
             if r is None:
                 estado, motivo = "falhou", "fonte_indisponivel"
