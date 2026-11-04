@@ -97,6 +97,8 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | GET | `/api/v1/documentos/titulares` | Pessoas (com contato) e bens ativos, cada um com os documentos ativos (números completos), e a URL base do Paperless. |
 | GET | `/api/v1/documentos/vencimentos` | Documentos cuja última data (validade, fim de vigência, vencimento) cai nos próximos `meses` ou venceu há até 30 dias. |
 | GET | `/api/v1/envios` | Propostas de envio (estado=pendente ou decididas) com o conteúdo legível e se a escrita está ligada. |
+| GET | `/api/v1/envios/convites` | Convites de agenda recebidos e ainda sem resposta, com conflitos e o id da proposta aberta (pendente ou enviando), se houver. |
+| POST | `/api/v1/envios/convites/{evento_id}/propor` | Cria a proposta de resposta (aceitar, talvez ou recusar) a um convite pendente; nada é enviado até o "Enviar". |
 | POST | `/api/v1/envios/{envio_id}/enviar` | Envia a proposta pendente (uma única tentativa) se o `hash` bater com o que o dono viu; devolve o estado final (enviada, falhou ou incerto). |
 | POST | `/api/v1/envios/{envio_id}/recusar` | Recusa a proposta pendente; nada é enviado. |
 | GET | `/api/v1/familia/fichas` | Quem está no cadastro, sem número de documento. |
@@ -201,6 +203,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | `projeto_pessoa` | `projetos` | contato, nome, papel, projeto | Registra uma pessoa do projeto ("o mecânico Seu Jorge, 11 99999-0000"): `nome`, `papel` (mecânico, advogada...) e `contato` opcionais. Mostre o que vai gravar e só chame depois do sim dele. Nome e contato são do Ricardo: não mascare. |
 | `projeto_ver` | `projetos` | projeto | "Como está o projeto X?": `projeto` = id ou trecho do nome (mais de um → `ambiguo` com as opções; mostre e pergunte qual). Traz objetivo, status, prazo, progresso, `proximas` atividades, `bloqueadas` (esperam outra), `atrasadas`, pessoas, orçamento/gasto/saldo (`null` sem orçamento), os 5 últimos fatos e a contagem de anexos. Só leitura. |
 | `propor_evento` | `envios` | conta, convidados, descricao, duracao_min, inicio, online, titulo | PROPÕE um evento na agenda (conta liberada, `inicio` ISO de Brasília, duração 5 a 720 min, 1 a 30 convidados por e-mail ou nome de contato). |
+| `propor_resposta_convite` | `envios` | conta, evento_id, resposta | PROPÕE responder a um convite de agenda recebido (`evento_id` do agenda_listar/avisos; `resposta`: aceitar, talvez ou recusar). Só convite pendente, futuro e de conta liberada. |
 | `propor_teams` | `envios` | canal, chat_com, equipe, texto | PROPÕE uma mensagem no Teams da ness (texto simples, 1 a 4000 caracteres). Exatamente um destino: `chat_com` (nome da conversa) ou `equipe` + `canal`. |
 | `regras_listar` | `fin` | texto | Regras de classificação do dinheiro (padrão, ação, se está ativa e quantos lançamentos casam); `texto` filtra pelo padrão, sem acento nem caixa. Só leitura. |
 | `regras_sugerir` | `propostas` | categoria_id, empresa_id, motivo, padrao, para_quem_id | PROPÕE uma regra de classificação (padrão em regex + ação). Cria só sugestão pendente; a regra só liga quando o Ricardo aprova no painel. |
