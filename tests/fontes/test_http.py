@@ -25,6 +25,12 @@ def test_redirecionamento_mesmo_host_mantem():
     assert novo.get_header("Authorization") == "Bearer s" and novo.get_header("Apitoken") == "t"
 
 
+def test_redirecionamento_https_para_http_tira_credencial():
+    novo = _novo("http://a.example/y")
+    nomes = {n.lower() for n in novo.headers} | {n.lower() for n in novo.unredirected_hdrs}
+    assert not nomes & {"authorization", "apitoken", "x-api-key", "x-auth-foo"}
+
+
 def test_clientes_nao_usam_urlopen_direto():
     maus = [f.name for f in FONTES.glob("*.py") if f.name != "graph_ness.py" and "urllib.request.urlopen(" in f.read_text()]
     assert maus == []

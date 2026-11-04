@@ -13,7 +13,7 @@ class SemCredencialEntreHosts(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         novo = super().redirect_request(req, fp, code, msg, headers, newurl)
-        if novo is not None and urlsplit(novo.full_url).netloc != urlsplit(req.full_url).netloc:
+        if novo is not None and urlsplit(novo.full_url)[:2] != urlsplit(req.full_url)[:2]:  # (esquema, host): https->http também tira
             for dic in (novo.headers, novo.unredirected_hdrs):
                 for nome in [n for n in dic if n.lower() in _CABECALHOS_CREDENCIAL or n.lower().startswith("x-auth")]:
                     del dic[nome]
