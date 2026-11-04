@@ -366,6 +366,11 @@ class GraphNess:
         from gabi.fontes import graph_ness_envios
         return graph_ness_envios.evento_criar(self, conta, chave, evento)
 
+    def convite_responder(self, conta: str, chave: str, evento_id: str, resposta: str, serie_id: str | None) -> dict:
+        """Responde ao convite (aceitar/talvez/recusar; token de app); `chave` só iguala a chamada à do `evento_criar` e não vai ao Graph."""
+        from gabi.fontes import graph_ness_envios
+        return graph_ness_envios.convite_responder(self, conta, evento_id, resposta, serie_id)
+
     def teams_equipes(self, conta: str) -> list[dict]:
         """[{id, nome}] das equipes da conta (token delegado)."""
         from gabi.fontes import graph_ness_envios

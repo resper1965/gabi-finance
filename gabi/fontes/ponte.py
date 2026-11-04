@@ -29,8 +29,8 @@ PERMITIDOS = {
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
                              "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
                              "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
-                             # ADR-024: criar evento e escrever no Teams só com proposta aprovada (graph_ness_envios)
-                             "evento_criar", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}),
+                             # ADR-024: criar evento, responder convite e escrever no Teams só com proposta aprovada (graph_ness_envios)
+                             "evento_criar", "convite_responder", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}),
     "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem"}),  # Onda 2: `mensagem` só lê o corpo
     "nibo": frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"}),  # ADR-023: só o que notas_importar lê; o lote (escrita) saiu
 }
@@ -225,7 +225,7 @@ class PonteAgenda:
 
 
 class PonteGraph:
-    """Graph da ness no serviço de fontes (único com rede e segredos): leitura, escrita de contatos e os envios aprovados (evento e Teams). Lista fixa de métodos."""
+    """Graph da ness no serviço de fontes (único com rede e segredos): leitura, escrita de contatos e os envios aprovados (evento, resposta a convite e Teams). Lista fixa de métodos."""
 
     def __init__(self, caminho):
         self._ponte = Ponte(caminho, "graph_ness")
@@ -311,6 +311,9 @@ class PonteGraph:
 
     def evento_criar(self, conta: str, chave: str, evento: dict) -> dict:
         return self._externo("evento_criar", conta, chave, evento)
+
+    def convite_responder(self, conta: str, chave: str, evento_id: str, resposta: str, serie_id: str | None) -> dict:
+        return self._externo("convite_responder", conta, chave, evento_id, resposta, serie_id)
 
     def teams_equipes(self, conta: str) -> list[dict]:
         return self._id_nome("teams_equipes", conta)
