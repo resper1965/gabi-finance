@@ -4,6 +4,7 @@ Só criar agendamento a pagar ao sócio, anexar arquivo e baixar o pagamento; na
 import json
 import urllib.error
 import urllib.request
+from gabi.fontes._http import abrir
 import uuid
 from urllib.parse import quote
 
@@ -16,7 +17,7 @@ def _multipart_real(url, nome, conteudo, cabecalhos):
         + conteudo + f"\r\n--{limite}--\r\n".encode()
     req = urllib.request.Request(url, data=corpo, method="POST", headers={**cabecalhos, "Content-Type": f"multipart/form-data; boundary={limite}"})
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with abrir(req, timeout=120) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
         return e.code, {"message": e.reason}

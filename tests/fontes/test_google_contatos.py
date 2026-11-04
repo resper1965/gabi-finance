@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from gabi.fontes import google_contatos as gc
+from gabi.fontes import google_oauth as go
 from gabi.fontes.google_contatos import (ESCOPO, ErroGoogleContatos, GoogleContatos, TokenOAuth, listar_contatos,
                                           google_contatos_do_ambiente)
 from gabi.fontes.ponte import ERROS, PERMITIDOS, Ponte, PonteContatos, Servidor
@@ -167,14 +168,14 @@ class _Resp:
 def test_http_real_falha_de_rede_levanta_fora_do_except_sem_contexto_e_sem_segredo(monkeypatch):
     def urlopen(req, timeout=None):
         raise urllib.error.URLError(f"falhou com {SEGREDO}")
-    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(go, "abrir", urlopen)
     with pytest.raises(ErroGoogleContatos) as e:
         gc._http_real("GET", "https://x/", None, {"Authorization": f"Bearer {SEGREDO}"})
     assert e.value.__context__ is None and e.value.__cause__ is None and SEGREDO not in str(e.value)
 
 
 def test_http_real_json_invalido_tambem_sem_contexto(monkeypatch):
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Resp(200, b"nao e json " + SEGREDO.encode()))
+    monkeypatch.setattr(go, "abrir", lambda req, timeout=None: _Resp(200, b"nao e json " + SEGREDO.encode()))
     with pytest.raises(ErroGoogleContatos) as e:
         gc._http_real("GET", "https://x/")
     assert e.value.__context__ is None and SEGREDO not in str(e.value)
@@ -193,7 +194,7 @@ def test_http_real_http_error_fecha_sem_ler_o_corpo(monkeypatch):
 
     def urlopen(req, timeout=None):
         raise Erro("https://x/", 403, "proibido", {}, None)
-    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(go, "abrir", urlopen)
     assert gc._http_real("GET", "https://x/") == (403, {})
     assert estado == {"lido": False, "fechado": True}
 

@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from gabi.fontes._http import abrir
 from typing import Callable
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -27,7 +28,7 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
     req = urllib.request.Request(url, data=dados, method=metodo, headers=cabecalhos or {})
     falha = None
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with abrir(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
         codigo = e.code

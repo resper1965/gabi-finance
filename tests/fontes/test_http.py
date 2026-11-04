@@ -1,0 +1,30 @@
+import pathlib
+import urllib.request
+
+from gabi.fontes._http import SemCredencialEntreHosts
+
+FONTES = pathlib.Path(__file__).resolve().parents[2] / "gabi" / "fontes"
+CABECALHOS = {"Authorization": "Bearer s", "ApiToken": "t", "X-Api-Key": "k", "X-Auth-Foo": "f", "Accept": "x"}
+
+
+def _novo(destino):
+    req = urllib.request.Request("https://a.example/", headers=CABECALHOS)
+    req.add_unredirected_header("Authorization", "Bearer u")
+    return SemCredencialEntreHosts().redirect_request(req, None, 302, "Found", {}, destino)
+
+
+def test_redirecionamento_outro_host_tira_credencial():
+    novo = _novo("https://outro.example/x")
+    nomes = {n.lower() for n in novo.headers} | {n.lower() for n in novo.unredirected_hdrs}
+    assert not nomes & {"authorization", "apitoken", "x-api-key", "x-auth-foo"}
+    assert novo.get_header("Accept") == "x"
+
+
+def test_redirecionamento_mesmo_host_mantem():
+    novo = _novo("https://a.example/y")
+    assert novo.get_header("Authorization") == "Bearer s" and novo.get_header("Apitoken") == "t"
+
+
+def test_clientes_nao_usam_urlopen_direto():
+    maus = [f.name for f in FONTES.glob("*.py") if f.name != "graph_ness.py" and "urllib.request.urlopen(" in f.read_text()]
+    assert maus == []

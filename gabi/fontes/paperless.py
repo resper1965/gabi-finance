@@ -8,6 +8,7 @@ import json
 import secrets
 import urllib.error
 import urllib.request
+from gabi.fontes._http import abrir
 from typing import Callable
 from urllib.parse import urlencode
 
@@ -31,7 +32,7 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
     dados = corpo if isinstance(corpo, bytes) else (json.dumps(corpo).encode() if corpo is not None else None)  # bytes = multipart já montado
     req = urllib.request.Request(url, data=dados, method=metodo, headers={"Content-Type": "application/json", **(cabecalhos or {})})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with abrir(req, timeout=60) as r:
             bruto = r.read()
             return r.status, (json.loads(bruto) if "json" in (r.headers.get("Content-Type") or "") else bruto)
     except urllib.error.HTTPError as e:
@@ -62,6 +63,8 @@ class Paperless:
                 raise ErroPaperless(f"GET {caminho.split('?')[0]} -> {status}", status)
             yield from resp["results"]
             url = resp.get("next")
+            if url and not url.startswith(self.base + "/"):  # next só no mesmo servidor: o token vai junto
+                raise ErroPaperless("Paperless: link inválido de próxima página")
 
     def docs(self, *, limite: int | None = None, **filtros) -> list[dict]:
         """Documentos (todas as páginas, ou só os `limite` primeiros), com os filtros do Paperless como argumentos (ex.: tags__id__all=3, page_size=100)."""

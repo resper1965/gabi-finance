@@ -15,6 +15,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import urllib.error
 import urllib.request
+from gabi.fontes._http import abrir
 
 from gabi.visao_pdf import paginas as _paginas_pdf
 
@@ -87,7 +88,7 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
     dados = json.dumps(corpo).encode() if corpo is not None else None
     req = urllib.request.Request(url, data=dados, method=metodo, headers={"Content-Type": "application/json", **(cabecalhos or {})})
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with abrir(req, timeout=120) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
         return e.code, {}  # o corpo do erro não é lido: pode ecoar a chave

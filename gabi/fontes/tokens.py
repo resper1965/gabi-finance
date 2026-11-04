@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from gabi.fontes._http import abrir
 from pathlib import Path
 from typing import Callable
 
@@ -25,7 +26,7 @@ def _form_real(url: str, campos: dict) -> tuple[int, dict]:
     req = urllib.request.Request(url, data=urllib.parse.urlencode(campos).encode(), method="POST",
                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with abrir(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
         try:

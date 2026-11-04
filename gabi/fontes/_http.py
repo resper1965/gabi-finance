@@ -2,13 +2,32 @@
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
+
+
+_CABECALHOS_CREDENCIAL = ("authorization", "apitoken", "x-api-key")
+
+
+class SemCredencialEntreHosts(urllib.request.HTTPRedirectHandler):
+    """Redirecionamento para outro host não leva a credencial (o urllib copiaria os cabeçalhos)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        novo = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if novo is not None and urlsplit(novo.full_url).netloc != urlsplit(req.full_url).netloc:
+            for dic in (novo.headers, novo.unredirected_hdrs):
+                for nome in [n for n in dic if n.lower() in _CABECALHOS_CREDENCIAL or n.lower().startswith("x-auth")]:
+                    del dic[nome]
+        return novo
+
+
+abrir = urllib.request.build_opener(SemCredencialEntreHosts).open
 
 
 def http_real(metodo, url, corpo=None, cabecalhos=None):
     dados = json.dumps(corpo).encode() if corpo is not None else None
     req = urllib.request.Request(url, data=dados, method=metodo, headers={"Content-Type": "application/json", **(cabecalhos or {})})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with abrir(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
         try:

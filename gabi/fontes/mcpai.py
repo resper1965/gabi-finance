@@ -8,6 +8,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from gabi.fontes._http import abrir
 from typing import Callable
 
 BASE = "https://api.mcp.ai/api/openfinance"
@@ -49,7 +50,7 @@ class ErroMcpAi(Exception):
 def _post_http(url: str, corpo: dict, cabecalhos: dict):
     req = urllib.request.Request(url, json.dumps(corpo).encode("utf-8"), cabecalhos, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with abrir(req, timeout=120) as r:
             return r.status, json.loads(r.read().decode("utf-8") or "{}"), dict(r.headers)
     except urllib.error.HTTPError as e:
         try:

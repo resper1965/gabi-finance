@@ -78,3 +78,15 @@ def test_restringir_envia_set_permissions_so_do_dono():
 def test_sem_permissao_devolve_false():
     cli, _ = _cli(docs=[{"id": 1, "tags": []}], usuarios_visiveis={"ricardo": 9}, negar_permissoes=True)
     assert cli.restringir(1, "ricardo") is False
+
+
+def test_paperless_next_de_outro_host_recusado():
+    chamadas = []
+
+    def http(metodo, url, corpo=None, cab=None):
+        chamadas.append(url)
+        return 200, {"results": [], "next": "https://mau.example/api/documents/?page=2"}
+
+    with pytest.raises(ErroPaperless, match="link inválido"):
+        Paperless("https://p.example", "tok", http=http).docs()
+    assert not any("mau.example" in u for u in chamadas)

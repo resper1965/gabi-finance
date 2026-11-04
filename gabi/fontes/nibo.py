@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import urllib.error
 import urllib.request
+from gabi.fontes._http import abrir
 from typing import Callable, Iterator
 from urllib.parse import quote, urlencode
 
@@ -27,7 +28,7 @@ def _http_real(metodo, url, corpo=None, cabecalhos=None):
     dados = json.dumps(corpo).encode() if corpo is not None else None
     req = urllib.request.Request(url, data=dados, method=metodo, headers={"Content-Type": "application/json", **(cabecalhos or {})})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with abrir(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b"null")
     except urllib.error.HTTPError as e:
         try:
@@ -44,7 +45,7 @@ HOST_ARQUIVOS = "https://arquivos.nibo.com.br/"
 def _http_arquivo_real(url, cabecalhos):
     req = urllib.request.Request(url, headers=cabecalhos)
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with abrir(req, timeout=120) as r:
             return r.status, r.read()
     except urllib.error.HTTPError as e:
         return e.code, b""
