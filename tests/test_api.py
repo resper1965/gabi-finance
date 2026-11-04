@@ -103,6 +103,16 @@ def test_revogar_tudo_ok_revoga_e_registra_decisao(cli, banco):
     assert d["quem"] == "boss@x.com" and "revogar" in d["o_que"].lower()
 
 
+def test_revogar_tudo_atomico(cli, banco):
+    con = conectar(banco)
+    for i in range(2):
+        con.execute("insert into token_agente(nome, escopo, hash, criado_em) values (?, 'fin', ?, '2026-10-08')", (f"t{i}", f"h{i}"))
+    con.execute("create trigger falha_decisao before insert on decisao begin select raise(abort, 'falha simulada'); end")
+    with pytest.raises(Exception):
+        cli.post("/api/revogar-tudo", headers=BOSS, json={"confirmo": True})
+    assert con.execute("select count(*) from token_agente where revogado_em is null").fetchone()[0] == 2
+
+
 def test_raiz_serve_html_com_design_do_sistema(banco, monkeypatch, tmp_path):
     import gabi.api as api
     monkeypatch.setattr(api, "PAINEL", tmp_path / "sem-build")  # sem build do painel: página de verificação da Fase 0

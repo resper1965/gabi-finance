@@ -86,7 +86,7 @@ def marcar_paga_manual(con, compromisso_id: str, por: str, hoje: dt.date) -> Non
         raise ValueError(f"a linha {linha} não existe mais nos Cadastros")
     if con.execute("select 1 from valor_do_mes where tipo='pago' and compromisso=? and mes=?", (linha, mes)).fetchone():
         return  # idempotente
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         con.execute("insert into valor_do_mes(mes, compromisso, tipo, data_pagamento, origem) values (?,?, 'pago', ?, 'manual (painel)')",
                     (mes, linha, hoje.isoformat()))

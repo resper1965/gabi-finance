@@ -381,3 +381,15 @@ def test_saldo_ilegivel_nao_grava(con, tmp_path):
     _rodar(con, FakeFin([ruim, CARTAO], {}), tmp_path)
     n = lambda aid: con.execute("select count(*) from saldo s join conta c on c.id=s.conta_id where c.externo_id=?", (aid,)).fetchone()[0]
     assert n("acc-bank-1111") == 0 and n("acc-card-9999") == 1
+
+
+def test_purgar_futuro_tudo_ou_nada(con):
+    con.execute("insert into conta(id, externo_id) values (1, 'c1')")
+    for i, x in enumerate(("f1", "f2"), start=1):
+        con.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos) values (1, ?, '2026-12-01', 1)", (x,))
+        con.execute("insert into conciliacao(tx_id, compromisso_id) values (?, ?)", (x, i))
+    con.execute("create trigger falha_f2 before delete on lancamento when old.externo_id='f2' begin select raise(abort, 'falha simulada'); end")
+    with pytest.raises(Exception):
+        captura._purgar_futuro(con, HOJE)
+    assert {r[0] for r in con.execute("select externo_id from lancamento")} == {"f1", "f2"}
+    assert con.execute("select count(*) from conciliacao").fetchone()[0] == 2

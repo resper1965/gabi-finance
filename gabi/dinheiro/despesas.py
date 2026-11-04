@@ -89,7 +89,7 @@ def _campos_validos(campos: dict) -> dict:
 
 def _gravar_nova(con, agora, quem, origem, dado: dict, tipo: str, hoje: dt.date) -> dict:
     linha = validar_linha(con, dado, None)
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         gravar_linha(con, linha, True, None, True, tipo)
         _auditar(con, agora, quem, origem, f"despesa {_serie(linha['id'])} criada ({tipo})")
@@ -233,7 +233,7 @@ def _recalcular(con, agora: dt.datetime) -> dict:
 
 def _escrever(con, agora: dt.datetime, quem: str, origem: str, o_que: str, faz: Callable[[], None]) -> dict:
     """`faz` + decisão numa transação só; depois recalcula A Pagar. Devolve `{"aviso": ...}` se só o recálculo falhou, senão `{}`."""
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         faz()
         _auditar(con, agora, quem, origem, o_que)

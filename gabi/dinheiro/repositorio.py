@@ -26,7 +26,7 @@ def _cent(reais):
 # ---------------- Cadastros (linhas, parâmetros, valores do mês) ----------------
 def gravar_leitura(con, leitura: dict) -> None:
     """Substitui os Cadastros pelo conteúdo validado (formato de planilha.validar). Atômico: tudo ou nada."""
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         con.execute("delete from valor_do_mes")
         con.execute("delete from compromisso_linha")
@@ -162,7 +162,7 @@ def gravar_resultado(con, comps, resultado, novos_vinculos, agora: dt.datetime, 
     `doc:*` nunca. Idempotente e atômico."""
     ts = agora.isoformat(timespec="seconds")
     manuais = {v[0] for v in novos_vinculos if v[2] == "manual"}
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         if meses:
             gerados = {c["id"] for c in comps}

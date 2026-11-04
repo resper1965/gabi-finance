@@ -266,7 +266,7 @@ async def lancamento_patch(lid: int, request: Request):
         if con.execute("select 1 from lancamento where id=?", (lid,)).fetchone() is None:
             raise erro(404, "nao_encontrado", f"lançamento {lid} não existe")
         cols = _validar_mudancas(con, corpo)
-        con.execute("begin")
+        con.execute("begin immediate")
         try:
             _aplicar_mudancas(con, [lid], cols)
             con.execute("commit")
@@ -291,7 +291,7 @@ async def lancamentos_lote(request: Request, ident: Identidade = Depends(exigir(
         faltam = [i for i in ids if con.execute("select 1 from lancamento where id=?", (i,)).fetchone() is None]
         if faltam:
             raise erro(404, "nao_encontrado", f"lançamentos inexistentes: {faltam}")
-        con.execute("begin")
+        con.execute("begin immediate")
         try:
             _aplicar_mudancas(con, ids, cols, regra_gastador=corpo.get("criar_regra") is True)
             con.execute("commit")

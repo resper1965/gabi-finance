@@ -123,3 +123,32 @@ def test_conectar_simultaneo_em_banco_novo_nao_falha_ao_ativar_wal(tmp_path):
         [t.start() for t in ts]
         [t.join() for t in ts]
     assert erros == []
+
+
+def test_transacao_padrao_e_imediata(tmp_path):
+    from gabi.db import transacao
+    con = conectar(tmp_path / "g.db")
+    lista = []
+    con.set_trace_callback(lista.append)
+    with transacao(con):
+        pass
+    assert "begin immediate" in lista
+
+
+def test_transacao_commit_falho_faz_rollback():
+    from gabi.db import transacao
+
+    class ConFalsa:
+        def __init__(self):
+            self.comandos = []
+
+        def execute(self, sql):
+            self.comandos.append(sql)
+            if sql == "commit":
+                raise sqlite3.OperationalError("database is locked")
+
+    con = ConFalsa()
+    with pytest.raises(sqlite3.OperationalError):
+        with transacao(con):
+            pass
+    assert con.comandos[-1] == "rollback"

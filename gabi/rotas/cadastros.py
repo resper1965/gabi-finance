@@ -62,7 +62,7 @@ def _auditar(con, quem: str, tipo: str, id_, acao: str) -> None:
 
 
 def _tx(con, fn):
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         r = fn()
         con.execute("commit")

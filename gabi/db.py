@@ -66,8 +66,9 @@ def _instrucoes(sql: str) -> list[str]:
 
 
 @contextmanager
-def transacao(con, imediata: bool = False, aberta: bool = False):
-    """Tudo ou nada: begin/commit, rollback se algo falhar (a conexão é autocommit; sem isto cada execute grava na hora)."""
+def transacao(con, imediata: bool = True, aberta: bool = False):
+    """Tudo ou nada: begin immediate/commit, rollback se algo falhar ou se o commit falhar (a conexão é autocommit; sem isto cada execute grava na hora).
+    Imediata por padrão: quem lê e depois grava pega o lock de escrita já no begin, sem o SQLITE_BUSY de upgrade de leitura para escrita."""
     if not aberta:  # aberta=True: o chamador já executou o begin (para tratar a espera pelo lock à parte)
         con.execute("begin immediate" if imediata else "begin")
     try:
@@ -76,4 +77,8 @@ def transacao(con, imediata: bool = False, aberta: bool = False):
         con.execute("rollback")
         raise
     else:
-        con.execute("commit")
+        try:
+            con.execute("commit")
+        except BaseException:
+            con.execute("rollback")  # commit falho (ex.: banco ocupado) deixaria a transação aberta
+            raise

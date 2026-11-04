@@ -254,7 +254,7 @@ def calcular_assinaturas(con, hoje: dt.date) -> dict:
     recs = [r for r in recs if not assinaturas_mod.eh_habito(con, r["chave"], habito)]   # almoço, mercado... repetem todo mês mas não são assinatura
     extras = assinaturas_mod.candidatas_por_categoria(con, hoje, nomes, {r["chave"] for r in recs})
     todas = [{**r, "ativa": True} for r in recs] + extras
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         itens = [{**_assinatura(con, r["chave"], r["descricao"], r, hoje), "ativa": r["ativa"]} for r in todas]
         con.execute("commit")

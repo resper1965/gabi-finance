@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from gabi.db import conectar, migrar
+from gabi.db import conectar, migrar, transacao
 from gabi.identidade import Identidade, exigir, normalizar_login
 
 AQUI = Path(__file__).resolve().parent
@@ -143,9 +143,10 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
                                              "mensagem": 'Envie {"confirmo": true} para revogar tudo.'})
         con = _con(request)
         try:
-            n = con.execute("update token_agente set revogado_em=? where revogado_em is null", (_agora(),)).rowcount
-            con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,?)",
-                        (_agora(), i.login, f"revogar tudo: {n} token(s) de agente", "api"))
+            with transacao(con):  # revogar e auditar juntos: nunca token revogado sem decisão registrada
+                n = con.execute("update token_agente set revogado_em=? where revogado_em is null", (_agora(),)).rowcount
+                con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?,?)",
+                            (_agora(), i.login, f"revogar tudo: {n} token(s) de agente", "api"))
         finally:
             con.close()
         return {"revogados": n}

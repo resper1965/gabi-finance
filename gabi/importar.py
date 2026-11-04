@@ -66,7 +66,7 @@ def _semear_cadastros(con, snapshot, hoje: dt.date, relatorio: dict | None) -> N
 def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | None = None) -> dict[str, int]:
     staging = Path(staging)
     familia, fin, memoria = _ler(staging)  # falta de arquivo levanta ANTES de qualquer escrita
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         for p in familia["pessoas"]:
             _upsert(con, "pessoa", ["id"], dict(id=p["id"], nome=p["nome"], papel=p.get("papel"),

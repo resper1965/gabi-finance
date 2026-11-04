@@ -110,7 +110,7 @@ def criar_sugestao(con, tipo: str, lancamento_id: int | None, payload: dict, mot
 
 
 def _em_transacao(con, fn):
-    con.execute("begin")
+    con.execute("begin immediate")
     try:
         r = fn()
         con.execute("commit")

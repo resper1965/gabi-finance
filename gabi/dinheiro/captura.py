@@ -196,10 +196,11 @@ def _gravar_contas(con, contas, ts, bancos_pj) -> dict[str, int]:
 
 def _purgar_futuro(con, hoje):
     """Parcela futura não é lançamento: apaga o que um estado antigo tenha deixado com data depois de hoje."""
-    futuros = [r[0] for r in con.execute("select externo_id from lancamento where data>?", (hoje.isoformat(),))]
-    for x in futuros:
-        con.execute("delete from conciliacao where tx_id=?", (x,))
-        con.execute("delete from lancamento where externo_id=?", (x,))
+    with transacao(con):  # tudo ou nada: sem isto cada delete grava na hora e uma falha no meio deixa conciliação órfã
+        futuros = [r[0] for r in con.execute("select externo_id from lancamento where data>?", (hoje.isoformat(),))]
+        for x in futuros:
+            con.execute("delete from conciliacao where tx_id=?", (x,))
+            con.execute("delete from lancamento where externo_id=?", (x,))
 
 
 def _buscar_conta(con, a, conta_id, cliente, hoje):
@@ -330,7 +331,7 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
                 bruto = gravar_bruto(bruto_base, "open-finance", agora.date(),
                                      [{"conta": aid, "tipo": "transacao", "dado": t} for t in itens]
                                      + [{"conta": aid, "tipo": "fatura", "dado": f} for f in faturas], rotulo=rotulo)
-                con.execute("begin")
+                con.execute("begin immediate")
                 try:
                     n_lidos, n_novos, n_ileg = _processar_conta(con, a, ids[aid], itens, faturas, hoje, donos, bruto.name)
                     con.execute("insert or replace into captura_conta(rodada_id, account_id, dia, lidos, novos, concluida_em) values (?,?,?,?,?,?)",

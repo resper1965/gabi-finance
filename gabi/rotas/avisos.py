@@ -175,7 +175,7 @@ async def lido(aviso_id: int, request: Request, ident: Identidade = Depends(exig
             raise erro(404, "nao_encontrado", f"aviso {aviso_id} não existe")
         if a["entregue_em"] is None:
             agora = dt.datetime.now(dt.timezone.utc).isoformat()
-            con.execute("begin")
+            con.execute("begin immediate")
             con.execute("update aviso set entregue_em=? where id=?", (agora, aviso_id))
             con.execute("insert into decisao(quando, quem, o_que, origem) values (?,?,?, 'api')", (agora, ident.login, f"aviso {aviso_id} lido"))
             con.execute("commit")
