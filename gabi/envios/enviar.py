@@ -82,12 +82,18 @@ def _chamar(l: dict, conteudo: dict, google, graph) -> dict | None:
 
 
 def enviar(con, proposta_id: int, hash: str, quem: str, agora: dt.datetime, google, graph) -> dict:
-    """Envia uma proposta pendente uma única vez. Propaga o ErroEnvio de `reservar`; trava ocupada = ErroEnvio("conflito") sem reservar.
+    """Envia uma proposta pendente uma única vez. Propaga o ErroEnvio de `reservar` (menos convite_obsoleto, que vira falhou sem chamar o provedor);
+    trava ocupada = ErroEnvio("conflito") sem reservar.
     Devolve {"id", "estado"} e, se não enviada, "motivo"."""
     with trava(_banco(con)) as tenho:
         if not tenho:
             raise ErroEnvio("conflito")
-        l = reservar(con, proposta_id, hash, quem, agora)
+        try:
+            l = reservar(con, proposta_id, hash, quem, agora)
+        except ErroEnvio as e:
+            if e.codigo != "convite_obsoleto":
+                raise
+            return {"id": proposta_id, "estado": "falhou", "motivo": "convite_obsoleto"}  # `reservar` já gravou falhou; o Graph não foi chamado
         conteudo = json.loads(l["conteudo"])
         try:
             r = _chamar(l, conteudo, google, graph)

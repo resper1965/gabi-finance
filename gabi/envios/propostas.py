@@ -287,8 +287,25 @@ def recusar(con, id: int, quem: str, agora: dt.datetime) -> None:
         raise ErroEnvio(erro)
 
 
+def _convite_obsoleto(con, l) -> bool:
+    """O convite da proposta ainda é o que o dono viu? Linha sumida, fonte desligada, já respondido (no Outlook ou antes) ou horário diferente = obsoleto.
+    Qualquer coisa ilegível também é obsoleto (falha fechada)."""
+    try:
+        c = json.loads(l["conteudo"])
+        ev = con.execute("select e.resposta, e.inicio_utc, e.fim_utc from agenda_evento e join agenda_fonte f on f.id=e.fonte_id "
+                         "where e.id=? and lower(f.conta)=? and f.estado='sim'", (c["evento_id"], l["conta"])).fetchone()
+        if ev is None or ev["resposta"] != "needsAction":
+            return True
+        mesmo = [dt.datetime.fromisoformat(a.replace("Z", "+00:00")) == dt.datetime.fromisoformat(b.replace("Z", "+00:00"))
+                 for a, b in ((ev["inicio_utc"], c["inicio_utc"]), (ev["fim_utc"], c["fim_utc"]))]
+        return not all(mesmo)
+    except Exception:  # noqa: BLE001 - falha fechada: na dúvida, não responde
+        return True
+
+
 def reservar(con, id: int, hash: str, quem: str, agora: dt.datetime) -> dict:
-    """Transição atômica pendente → enviando, com as checagens na ordem do spec. Vencida e conta_nao_permitida gravam o estado e só depois levantam."""
+    """Transição atômica pendente → enviando, com as checagens na ordem do spec. Vencida, conta_nao_permitida e convite_obsoleto (convite_resposta cujo
+    convite mudou na agenda local) gravam o estado e só depois levantam."""
     with transacao(con, imediata=True):
         l = con.execute("select * from envio_proposta where id=?", (id,)).fetchone()
         erro = None
@@ -311,6 +328,12 @@ def reservar(con, id: int, hash: str, quem: str, agora: dt.datetime) -> dict:
                             (_utc(agora), quem, id))
                 auditar(con, quem, agora, _texto_auditoria(l, "falhou"))
                 erro = "conta_nao_permitida"
+            elif l["tipo"] == "convite_resposta" and _convite_obsoleto(con, l):
+                # o Graph não acusa remarcação (mesmo id) nem resposta repetida: confere a agenda local ANTES de qualquer chamada; nada sai
+                con.execute("update envio_proposta set estado='falhou', motivo='convite_obsoleto', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
+                            (_utc(agora), quem, id))
+                auditar(con, quem, agora, _texto_auditoria(l, "falhou"))
+                erro = "convite_obsoleto"
             elif con.execute("update envio_proposta set estado='enviando', decidida_em=?, decidida_por=? where id=? and estado='pendente'",
                              (_utc(agora), quem, id)).rowcount == 0:
                 erro = "conflito"

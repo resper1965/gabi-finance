@@ -16,14 +16,14 @@ Data: 04/11/2026 · Estado: aceito (implementado na branch `feat/convites-agenda
 **Divergências da spec, como ficaram.**
 1. **Token:** a spec dizia "conta delegada"; a agenda da ness já é escrita com o token de aplicativo (`Calendars.ReadWrite`, como `evento_criar`). As três chamadas (`accept`, `tentativelyAccept`, `decline`) usam o mesmo token. Nenhum login novo.
 2. **Idempotência:** essas chamadas não aceitam `transactionId`. Vale a regra de sempre: uma tentativa só; erro 5xx vira `incerto` e nunca repete. Responder duas vezes é inofensivo.
-3. **"Obsoleta":** `envio_proposta.estado` não tem esse valor. 404 ou 409 do Graph viram `falhou` com `motivo='convite_obsoleto'`, sem repetir. Série não encontrada cai no mesmo código.
+3. **"Obsoleta":** `envio_proposta.estado` não tem esse valor. 404 ou 409 do Graph viram `falhou` com `motivo='convite_obsoleto'`, sem repetir; a conferência local no clique (abaixo) usa o mesmo código. Série não encontrada cai no mesmo código.
 4. **Resposta 202 sem corpo:** o cliente do Graph tratava corpo vazio como "resposta inválida"; agora é sucesso para essas chamadas.
 5. **`declined` nunca fica gravado:** a sincronização já apaga o evento recusado; o valor existe só no mapeamento.
 
 **Pontos decididos.**
 - **Provedor gravado** = o da `agenda_fonte` da conta. Uma conta Google em `envios.contas_agenda` falharia fechada no envio (`fonte_indisponivel`). Hoje `contas_agenda` tem só a conta Graph da ness.
 - **Convite já respondido:** o Graph pode devolver 400 em vez de 404/409. Nesse caso aparece `falhou` com `provedor_400`: sem erro 500 e sem repetir. A confirmar no seu teste real.
-- **Sem conferência local no clique:** não se olha de novo o banco local; o 404/409 do Graph cobre o convite que mudou entre o aviso e o clique.
+- **Conferência local no clique, antes do Graph:** se o organizador remarca, o Graph mantém o mesmo id e não devolve 404/409; responder de novo um convite já respondido também passa. Por isso, no **Enviar**, o brain relê o evento na agenda local: se sumiu, já não está sem resposta (você respondeu no Outlook) ou o início/fim mudou, a proposta vira `falhou` com `convite_obsoleto` sem nenhuma chamada ao Graph (falha fechada). Basta propor de novo com o horário atual.
 
 **Consequências.** O Hermes precisa da ferramenta nova no include e do SOUL com a linha do convite (passos do runbook `#envios`). Enquanto `envios.escrita` não estiver ligado, **Enviar** responde 409 e nada sai.
 

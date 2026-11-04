@@ -326,3 +326,33 @@ def test_convite_resposta_depois_de_falhou_pode_propor_e_enviar_de_novo(con):
     enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, Falso(erro=RuntimeError("convite_responder -> 409")))
     r2 = p.criar_convite_resposta(con, AGORA, conta=NESS, evento_id=ev, resposta="talvez")
     assert enviar(con, r2["id"], _hash(con, r2["id"]), "ricardo", AGORA, None, Falso())["estado"] == "enviada"
+
+
+# ---- recheck local antes do Graph (convite remarcado, respondido no Outlook ou apagado) ----
+
+@pytest.mark.parametrize("mudanca", [
+    "update agenda_evento set inicio_utc='2026-10-22T20:00:00+00:00', fim_utc='2026-10-22T21:00:00+00:00'",  # remarcado
+    "update agenda_evento set fim_utc='2026-10-22T19:30:00+00:00'",  # só o fim mudou
+    "update agenda_evento set resposta='accepted'",  # respondido no Outlook
+    "delete from agenda_evento",  # apagado
+])
+def test_convite_obsoleto_no_clique_falhou_sem_chamar_o_graph(con, mudanca):
+    r = _proposta_convite(con, "recusar")
+    con.execute(mudanca)
+    graph = Falso()
+    out = enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)
+    assert out == {"id": r["id"], "estado": "falhou", "motivo": "convite_obsoleto"}
+    assert graph.chamadas == []
+    l = _estado(con, r["id"])
+    assert l["estado"] == "falhou" and l["motivo"] == "convite_obsoleto" and l["decidida_em"] and l["enviada_em"] is None
+    audit = [x[0] for x in con.execute("select o_que from decisao where origem='envios' order by id")]
+    assert audit[-1] == f"Envio {r['id']} (convite_resposta, {NESS}): falhou"
+    assert _codigo(enviar, con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph).codigo == "conflito"  # fechado: não reabre
+    assert graph.chamadas == []
+
+
+def test_convite_inalterado_no_clique_segue_enviando(con):
+    r = _proposta_convite(con)
+    graph = Falso()
+    assert enviar(con, r["id"], _hash(con, r["id"]), "ricardo", AGORA, None, graph)["estado"] == "enviada"
+    assert len(graph.chamadas) == 1
