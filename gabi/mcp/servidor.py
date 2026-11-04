@@ -47,7 +47,7 @@ FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
     "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",), "email_ler": ("correio",), "email_lixeira": ("correio",), "email_regra_lixo": ("correio",), "email_remover_regra_lixo": ("correio",),
     **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                        "familia_registrar_pessoa", "familia_registrar_pet", "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
-                       "bens_listar", "contatos_buscar", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams")},
+                       "bens_listar", "contatos_buscar", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar", "decisoes_abertas", "decisao_responder", "regras_sugerir", "classificar_lancamento", "propor_teams", "propor_resposta_convite")},
 }
 
 

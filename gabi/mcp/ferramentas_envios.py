@@ -11,7 +11,7 @@ from gabi.envios.propostas import ErroEnvio
 from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.mcp.ferramentas_prop import ErroFerramenta
 
-ESCOPOS = {"propor_evento": "envios", "propor_teams": "envios"}
+ESCOPOS = {"propor_evento": "envios", "propor_teams": "envios", "propor_resposta_convite": "envios"}
 _MENSAGENS = {
     "requisicao_invalida": "entrada inválida (confira limites e formato)",
     "conta_nao_permitida": "conta não liberada para envios",
@@ -19,6 +19,8 @@ _MENSAGENS = {
     "convidado_invalido": "convidado inválido (use e-mail ou nome de contato)",
     "convidado_ambiguo": "convidado não encontrado ou com mais de um e-mail; pergunte ao Ricardo qual é",
     "destino_ambiguo": "destino não encontrado ou com mais de uma opção; pergunte ao Ricardo qual é",
+    "convite_nao_pendente": "esse convite já foi respondido ou é seu",
+    "proposta_duplicada": "já existe uma proposta para esse convite no painel",
     "fonte_indisponivel": "o Teams da ness não está disponível agora",
 }
 
@@ -101,3 +103,15 @@ def registrar(srv, executar, graph) -> None:
                 raise _erro(e) from None
             return _com_link(con, r)
         return executar("propor_teams", f)
+
+    @srv.tool()
+    def propor_resposta_convite(conta: str, evento_id: int, resposta: str) -> dict:
+        """PROPÕE responder a um convite de agenda recebido (`evento_id` do agenda_listar/avisos; `resposta`: aceitar, talvez ou recusar). Só convite pendente, futuro e de conta liberada.
+        Cria só proposta pendente: o envio só sai quando o Ricardo clica Enviar no painel. Nunca responde por conta própria."""
+        def f(con, agora):
+            try:
+                r = propostas.criar_convite_resposta(con, agora, conta=conta, evento_id=evento_id, resposta=resposta)
+            except ErroEnvio as e:
+                raise _erro(e) from None
+            return _com_link(con, r)
+        return executar("propor_resposta_convite", f)
