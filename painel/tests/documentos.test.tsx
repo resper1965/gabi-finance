@@ -34,7 +34,7 @@ const BEM_NOVO = { ...PROPOSTA, id: 6, titular: null, doc: { ...DOC_PROPOSTO, ti
   bem_novo: { tipo: "imovel", nome: "Apartamento Rua das Flores", dados: {} }, motivos: ["titular não encontrado"], paperless_id: null };
 const HIST = { id: 9, pessoa_id: "lia", campo: "telefones", antes: [], depois: ["+5511999990000"], quem: "hermes", quando: "2026-10-20T10:00:00", desfeito_em: null };
 
-function fake(o: { hist?: unknown[]; propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[]; erroPost?: { status: number; erro: string; mensagem: string } } = {}) {
+function fake(o: { hist?: unknown[]; propostas?: unknown[]; titulares?: unknown; vencimentos?: unknown[]; paperless?: string; erroPost?: { status: number; erro: string; mensagem: string } } = {}) {
   const chamadas: Chamada[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metodo = init?.method ?? "GET";
@@ -42,7 +42,7 @@ function fake(o: { hist?: unknown[]; propostas?: unknown[]; titulares?: unknown;
     const ok = (j: unknown) => ({ ok: true, status: 200, json: async () => env(j) }) as Response;
     if (metodo !== "GET" && o.erroPost) { const e = o.erroPost; return { ok: false, status: e.status, json: async () => ({ erro: e.erro, mensagem: e.mensagem }) } as Response; }
     if (metodo !== "GET") return ok({});
-    if (/\/documentos\/propostas/.test(url)) return ok({ itens: o.propostas ?? [PROPOSTA], paperless_url: "https://paperless.exemplo" });
+    if (/\/documentos\/propostas/.test(url)) return ok({ itens: o.propostas ?? [PROPOSTA], paperless_url: o.paperless ?? "https://paperless.exemplo" });
     if (/\/documentos\/titulares/.test(url)) return ok(o.titulares ?? TITULARES);
     if (/\/documentos\/vencimentos/.test(url)) return ok({ itens: o.vencimentos ?? [] });
     if (/\/familia\/historico/.test(url)) return ok({ itens: o.hist ?? [HIST] });
@@ -67,6 +67,12 @@ test("cartão mostra titular, motivos de conferir e link do Paperless", async ()
   expect(card.textContent).toContain("validade antes da emissão");
   const a = screen.getByRole("link", { name: "Paperless #88" });
   expect(a.getAttribute("href")).toBe("https://paperless.exemplo/documents/88/details");
+});
+
+test("paperless_url que não é http(s) não vira link", async () => {
+  fake({ paperless: "javascript:alert(1)" }); montar();
+  await screen.findByText("Paperless #88");
+  expect(screen.queryByRole("link", { name: "Paperless #88" })).toBeNull();
 });
 
 test("cartão sem titular mostra o bem novo", async () => {

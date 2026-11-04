@@ -3,6 +3,7 @@ import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { useCelular } from "../../lib/celular";
 import { dataCurta } from "../../lib/formato";
+import { urlSegura } from "../../lib/url";
 import { useApi } from "../../lib/useApi";
 
 interface Prioridade { tipo: string; titulo: string; motivo?: string; ref: number; sugestao?: string }
@@ -29,7 +30,7 @@ export function Hoje() {
           Fazer: <Bloco titulo="Fazer">{d.prioridades.length === 0 ? <Vazio t="Nada na fila." /> : d.prioridades.map((p, i) => (
             <li key={i} data-prioridade><strong>{p.titulo}</strong>{p.motivo && <small> · {p.motivo}</small>}{p.sugestao && <small> · a Gabi sugere {hora(p.sugestao)}</small>}</li>))}</Bloco>,
           Agenda: <Bloco titulo="Agenda">{d.agenda.length === 0 ? <Vazio t="Sem compromissos hoje." /> : d.agenda.map((e) => (
-            <li key={e.id}><span style={{ fontVariantNumeric: "tabular-nums" }}>{quando(e)}</span> {e.titulo ?? "(sem título)"}{e.privado && <small> · privado</small>} <small style={{ color: "var(--ink2)" }}>· {e.fonte}</small>{e.link_reuniao && <> · <a href={e.link_reuniao} target="_blank" rel="noopener noreferrer">entrar</a></>}</li>))}</Bloco>,
+            <li key={e.id}><span style={{ fontVariantNumeric: "tabular-nums" }}>{quando(e)}</span> {e.titulo ?? "(sem título)"}{e.privado && <small> · privado</small>} <small style={{ color: "var(--ink2)" }}>· {e.fonte}</small>{urlSegura(e.link_reuniao) && <> · <a href={urlSegura(e.link_reuniao)!} target="_blank" rel="noopener noreferrer">entrar</a></>}</li>))}</Bloco>,
           Dinheiro: <Bloco titulo="Dinheiro">{<>
             <li>Caixa agora <Valor valor={d.dinheiro.saldo} /></li>
             <li>Em atraso: {d.dinheiro.atrasadas.n} · <Valor valor={d.dinheiro.atrasadas.valor} /></li>

@@ -9,6 +9,7 @@ import { Vazio } from "../componentes/Estados";
 import { api } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { Aviso, useAcao } from "../lib/useAcao";
+import { urlSegura } from "../lib/url";
 import { useApi } from "../lib/useApi";
 
 interface Numero { nome: string; valor: string }
@@ -73,8 +74,9 @@ const chaveTitular = (tipo: string, id: string | null) => (id == null ? "" : `${
 
 function Paperless({ id, base }: { id: number | null; base: string | null }) {
   if (id == null) return null;
-  return base
-    ? <a href={`${base.replace(/\/$/, "")}/documents/${id}/details`} target="_blank" rel="noreferrer">Paperless #{id}</a>
+  const raiz = urlSegura(base);
+  return raiz
+    ? <a href={`${raiz.replace(/\/$/, "")}/documents/${id}/details`} target="_blank" rel="noreferrer">Paperless #{id}</a>
     : <span style={suave}>Paperless #{id}</span>;
 }
 

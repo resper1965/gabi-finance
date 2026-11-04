@@ -4,7 +4,7 @@ import { ToastProvider } from "../src/lib/toast";
 import { FiltrosProvider } from "../src/lib/filtros";
 import { Hoje } from "../src/telas/Trabalho/Hoje";
 import { Agenda } from "../src/telas/Trabalho/Agenda";
-import { apiFalsa } from "./apiFalsa";
+import { apiFalsa, amostra } from "./apiFalsa";
 
 const montar = (ui: React.ReactElement) => render(<ToastProvider><FiltrosProvider>{ui}</FiltrosProvider></ToastProvider>);
 function celular(ativo: boolean) {
@@ -38,4 +38,13 @@ test("Agenda proposta so sai apos confirmar", async () => {
   expect(await screen.findByText(/a Gabi propõe/)).toBeInTheDocument();
   expect(screen.getByText(/só sai após você confirmar/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /enviar/i })).toBeNull();
+});
+
+test("Hoje não mostra link de reunião que não seja http(s)", async () => {
+  const base = amostra("hoje");
+  base.dados.agenda[0].link_reuniao = "javascript:x";
+  apiFalsa({ hoje: base });
+  montar(<Hoje />);
+  await screen.findByText("Revisão Atlas", { exact: false });
+  expect(screen.queryByRole("link", { name: "entrar" })).toBeNull();
 });
