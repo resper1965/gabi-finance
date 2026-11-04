@@ -106,7 +106,7 @@ def registrar(srv, executar, graph) -> None:
 
     @srv.tool()
     def propor_resposta_convite(conta: str, evento_id: int, resposta: str) -> dict:
-        """PROPÕE responder a um convite de agenda recebido (`evento_id` do agenda_listar/avisos; `resposta`: aceitar, talvez ou recusar). Só convite pendente, futuro e de conta liberada.
+        """PROPÕE responder a um convite de agenda recebido (`conta` e `evento_id` vêm do item `convite_agenda` de `avisos_abertos`; `resposta`: aceitar, talvez ou recusar). Só convite pendente, futuro e de conta liberada.
         Cria só proposta pendente: o envio só sai quando o Ricardo clica Enviar no painel. Nunca responde por conta própria."""
         def f(con, agora):
             try:

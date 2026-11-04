@@ -2921,7 +2921,7 @@
   },
   "/api/v1/envios/convites": {
    "get": {
-    "description": "Convites de agenda recebidos e ainda sem resposta, com conflitos e o id da proposta aberta (pendente ou enviando), se houver.",
+    "description": "Convites de agenda recebidos e ainda sem resposta (série: só a próxima ocorrência), com conflitos e o id da proposta aberta (pendente ou enviando), se houver.",
     "operationId": "listar_convites_api_v1_envios_convites_get",
     "responses": {
      "200": {
