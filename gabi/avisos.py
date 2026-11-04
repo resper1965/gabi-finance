@@ -13,6 +13,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from gabi import atividades, projetos
+from gabi.agenda import consulta as consulta_agenda
+from gabi.agenda import convites
 from gabi.db import conectar, migrar
 from gabi.dinheiro.conciliacao import CONFIRMADO
 from gabi.dinheiro.valor import formatar
@@ -28,7 +30,7 @@ def _inicio_do_dia_utc(agora: dt.datetime) -> str:
     return dt.datetime(d.year, d.month, d.day, tzinfo=BRT).astimezone(dt.timezone.utc).isoformat()
 
 
-UMA_VEZ = {"atividade_hora"}  # chave = atividade + vencimento: o aviso "agora" sai uma vez só (a janela de 2 dias do produtor não pode reenviá-lo)
+UMA_VEZ = {"atividade_hora", "convite_agenda"}  # chave = atividade + vencimento: o aviso "agora" sai uma vez só (a janela de 2 dias do produtor não pode reenviá-lo)
 SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou", "projeto_parado"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
 DIAS_SILENCIO = 7
 HORAS_EXPORTACAO = 9 * 24
@@ -127,6 +129,9 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
         return (VALE if vale else RESOLVIDO), atual
     if tipo == "projeto_parado":
         return (VALE if projetos.revalidar_aviso(con, payload) else RESOLVIDO), payload
+    if tipo == "convite_agenda":  # respondido no Outlook, apagado ou remarcado: o aviso aberto some
+        r = con.execute("select resposta, inicio_utc from agenda_evento where id=?", (payload.get("evento_id"),)).fetchone()
+        return (VALE if r and r["resposta"] == "needsAction" and r["inicio_utc"] == payload.get("inicio_utc") else RESOLVIDO), payload
     return VALE, payload
 
 
@@ -144,7 +149,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
 
 
 TIPOS_ATIVIDADE = ("atividade_hora", "atividade_hoje", "atividade_resumo")
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", "projeto_parado", *TIPOS_ATIVIDADE)
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", "projeto_parado", "convite_agenda", *TIPOS_ATIVIDADE)
 ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -428,6 +433,10 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo(tipo, chave, p)
     for p in projetos.parados(con, agora):
         novo("projeto_parado", p["id"], p)
+    fuso = consulta_agenda.fuso_da_agenda(con)
+    for i in convites.pendentes(con, agora):
+        novo("convite_agenda", f"{i['evento_id']}:{i['inicio_utc']}",
+             {"evento_id": i["evento_id"], "titulo": i["titulo"], "inicio_utc": i["inicio_utc"], "texto": convites.texto_aviso(i, fuso)})
     return criados
 
 
