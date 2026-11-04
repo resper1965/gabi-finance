@@ -27,8 +27,8 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 
 ## Restaurar {#restaurar}
 Backups: o diário (`/var/backups/gabi-brain/gabi-brain-AAAA-MM-DD.sqlite`), o do instalador (`/var/backups/gabi-brain/gabi.db.antes-instalar-AAAA-MM-DD-HHMM`, os 5 últimos) ou um pacote decifrado de "Backup fora da VPS".
-1. **Anotar os timers ligados** (para religar só esses): `systemctl list-timers 'gabi-brain-*' --all`.
-2. **Parar tudo:** `sudo systemctl stop gabi-brain-api gabi-brain-mcp gabi-brain-fontes && sudo systemctl stop 'gabi-brain-*.timer'`.
+1. **Anotar os timers ligados** (para religar só esses): `systemctl list-units 'gabi-brain-*.timer' --state=active`.
+2. **Parar tudo, timers primeiro:** `sudo systemctl stop 'gabi-brain-*.timer'`, depois `sudo systemctl stop 'gabi-brain-*.service'` (pega também oneshot em andamento). Conferir: `systemctl list-units 'gabi-brain-*' --state=active` deve vir vazio; só siga quando vier.
 3. **Trocar o banco:** `sudo cp <backup escolhido> /var/lib/gabi-brain/gabi.db && sudo rm -f /var/lib/gabi-brain/gabi.db-wal /var/lib/gabi-brain/gabi.db-shm && sudo chown gabibrain:gabibrain /var/lib/gabi-brain/gabi.db && sudo chmod 600 /var/lib/gabi-brain/gabi.db`.
 4. **Conferir:** `sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db "pragma integrity_check"` deve responder `ok`.
 5. **Religar:** `sudo systemctl start gabi-brain-fontes gabi-brain-api gabi-brain-mcp` e, para cada timer anotado no passo 1, `sudo systemctl start <timer>`; conferir `/api/saude`.

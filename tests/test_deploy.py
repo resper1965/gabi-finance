@@ -76,6 +76,11 @@ def test_instalar_faz_backup_do_banco_antes_de_copiar():
     assert "if [ -f /var/lib/gabi-brain/gabi.db ]" in INSTALAR  # primeira instalação: sem banco, pula
 
 
+def test_backup_do_instalar_roda_como_gabibrain_e_sem_mode_ro():
+    assert "runuser -u gabibrain -- python3" in INSTALAR and "mode=ro" not in INSTALAR
+    assert "pragma integrity_check" in INSTALAR and "journal_mode=delete" in INSTALAR
+
+
 def test_instalar_troca_por_mv_e_nao_apaga_antes_de_copiar():
     assert "rm -rf /opt/gabi-brain/gabi " not in INSTALAR
     assert ".novo" in INSTALAR and ".velho" in INSTALAR and 'mv "/opt/gabi-brain/.novo/$d"' in INSTALAR

@@ -19,13 +19,19 @@ install -d -o root -g root -m 755 /opt/gabi-brain
 # Na primeira instalação o banco não existe: pula sem erro.
 if [ -f /var/lib/gabi-brain/gabi.db ]; then
   BKP_ANTES="/var/backups/gabi-brain/gabi.db.antes-instalar-$(date +%F-%H%M)"
-  python3 - "$BKP_ANTES" <<'PY'
-import sqlite3, sys
-src = sqlite3.connect("file:/var/lib/gabi-brain/gabi.db?mode=ro", uri=True)
+  # Roda como o dono do banco, em leitura/escrita normal: uma conexão somente-leitura como root deixaria gabi.db-wal/-shm root:root e a API não gravaria mais.
+  runuser -u gabibrain -- python3 - "$BKP_ANTES" <<'PY'
+import os, sqlite3, sys
+os.umask(0o077)
+src = sqlite3.connect("/var/lib/gabi-brain/gabi.db")
 dst = sqlite3.connect(sys.argv[1])
 src.backup(dst)
+dst.execute("pragma journal_mode=delete")
+ok = dst.execute("pragma integrity_check").fetchone()[0]
 dst.close()
 src.close()
+if ok != "ok":
+    sys.exit("backup antes de instalar falhou na integridade: " + ok)
 PY
   chown gabibrain:gabibrain "$BKP_ANTES"
   chmod 600 "$BKP_ANTES"
