@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from gabi.db import conectar, migrar, transacao
-from gabi.dinheiro.moeda import valor_lancamento
+from gabi.dinheiro.moeda import ValorIlegivel, valor_lancamento
 
 
 def _estrangeiras(bruto_base: Path) -> tuple[set, dict]:
@@ -35,7 +35,7 @@ def _estrangeiras(bruto_base: Path) -> tuple[set, dict]:
 def corrigir(con, bruto_base: Path, dry_run: bool = False) -> dict:
     """Só toca lançamentos cuja transação bruta MAIS NOVA é em moeda estrangeira; BRL nunca é alterado."""
     vistos, fora = _estrangeiras(bruto_base)
-    mudancas, sem_bruto, diferenca = [], 0, 0
+    mudancas, sem_bruto, diferenca, ilegiveis = [], 0, 0, 0
     linhas = con.execute("select l.id, l.externo_id, l.valor_centavos, l.moeda, l.valor_original_centavos, l.convertido, c.tipo "
                          "from lancamento l join conta c on c.id=l.conta_id").fetchall()
     for l in linhas:
@@ -45,7 +45,11 @@ def corrigir(con, bruto_base: Path, dry_run: bool = False) -> dict:
         t = fora.get(l["externo_id"])
         if t is None:
             continue
-        v = valor_lancamento(t, l["tipo"])
+        try:
+            v = valor_lancamento(t, l["tipo"])
+        except ValorIlegivel:  # mesmo critério da captura: pula e conta, nunca grava valor inventado
+            ilegiveis += 1
+            continue
         novo = (v.centavos, v.moeda, v.original_centavos, 1 if v.convertido else 0)
         if novo != (l["valor_centavos"], l["moeda"], l["valor_original_centavos"], l["convertido"]):
             mudancas.append((l["id"], novo))
@@ -54,7 +58,7 @@ def corrigir(con, bruto_base: Path, dry_run: bool = False) -> dict:
         with transacao(con):
             for lid, n in mudancas:
                 con.execute("update lancamento set valor_centavos=?, moeda=?, valor_original_centavos=?, convertido=? where id=?", (*n, lid))
-    return {"lidos": len(linhas), "mudariam": len(mudancas), "diferenca_centavos": diferenca, "sem_bruto": sem_bruto, "aplicado": not dry_run}
+    return {"lidos": len(linhas), "mudariam": len(mudancas), "diferenca_centavos": diferenca, "sem_bruto": sem_bruto, "ilegiveis": ilegiveis, "aplicado": not dry_run}
 
 
 def main(argv=None) -> int:
@@ -75,7 +79,7 @@ def main(argv=None) -> int:
     else:
         migrar(con, Path(__file__).resolve().parent.parent / "migrations")
     r = corrigir(con, Path(a.bruto), dry_run=a.dry_run)
-    print(f"{'DRY-RUN: ' if a.dry_run else ''}lidos={r['lidos']} mudariam={r['mudariam']} diferenca_centavos={r['diferenca_centavos']} sem_bruto={r['sem_bruto']}")
+    print(f"{'DRY-RUN: ' if a.dry_run else ''}lidos={r['lidos']} mudariam={r['mudariam']} diferenca_centavos={r['diferenca_centavos']} sem_bruto={r['sem_bruto']} ilegiveis={r['ilegiveis']}")
     return 0
 
 

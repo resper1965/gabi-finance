@@ -9,6 +9,10 @@ from gabi.dinheiro import caixa
 from gabi.dinheiro.valor import para_centavos
 
 
+class ValorIlegivel(ValueError):
+    """`amount` ausente, vazio ou não numérico: o lançamento não tem valor confiável e não pode virar R$ 0,00."""
+
+
 class ValorLancamento(NamedTuple):
     centavos: int             # sempre em reais quando convertido
     moeda: str | None         # None = BRL
@@ -35,7 +39,10 @@ def _sinal(c: int, typ: str, tipo_conta: str) -> int:
 
 def valor_lancamento(t: dict, tipo_conta: str) -> ValorLancamento:
     typ = str(t.get("type", "")).upper()
-    original = _sinal(_centavos(t.get("amount")) or 0, typ, tipo_conta)
+    bruto = _centavos(t.get("amount"))
+    if bruto is None:
+        raise ValorIlegivel("amount ilegível")
+    original = _sinal(bruto, typ, tipo_conta)
     moeda = str(t.get("currencyCode") or "").strip().upper() or None
     if moeda in (None, "BRL"):
         return ValorLancamento(original, None, None, True, original / 100)

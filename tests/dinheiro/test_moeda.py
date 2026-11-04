@@ -249,3 +249,20 @@ def test_corrigir_dry_run_nao_migra_banco_sem_0022(tmp_path, capsys):
     assert "0022" in capsys.readouterr().out
     c = conectar(tmp_path / "v.db")
     assert "moeda" not in [r[1] for r in c.execute("pragma table_info(lancamento)")]
+
+
+def test_amount_ilegivel_levanta():
+    from gabi.dinheiro.moeda import ValorIlegivel, valor_lancamento
+    for t in ({"amount": "1,234.56", "type": "DEBIT"}, {"amount": ""}, {}):
+        with pytest.raises(ValorIlegivel):
+            valor_lancamento(t, "BANK")
+
+
+def test_corrigir_pula_ilegivel_e_conta_sem_gravar(con, tmp_path):
+    from tools.corrigir_moeda import corrigir
+    base, cid = tmp_path / "bruto", _conta(con)
+    _lanc(con, cid, "u1", -601)
+    _raw(base, dt.date(2026, 10, 8), "a", [_usd("u1") | {"amount": "lixo"}])
+    antes = _snap(con)
+    r = corrigir(con, base)
+    assert r["ilegiveis"] == 1 and r["mudariam"] == 0 and _snap(con) == antes

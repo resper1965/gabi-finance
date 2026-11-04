@@ -14,7 +14,7 @@ from pathlib import Path
 from gabi.bruto import gravar_bruto
 from gabi.db import transacao
 from gabi.dinheiro import caixa, gastador, nao_gasto
-from gabi.dinheiro.moeda import valor_lancamento
+from gabi.dinheiro.moeda import ValorIlegivel, valor_lancamento
 from gabi.dinheiro.valor import para_centavos
 from gabi.rodada import registrar_rodada
 
@@ -28,6 +28,7 @@ class ResumoCaptura:
     contas: int
     lidos: int
     novos: int
+    ilegiveis: int = 0  # lançamentos pulados porque o valor não pôde ser lido
     falhas: list[str] = field(default_factory=list)
     sync_problemas: dict = field(default_factory=dict)
     rodada_id: int = 0
@@ -187,8 +188,9 @@ def _gravar_contas(con, contas, ts, bancos_pj) -> dict[str, int]:
              para_centavos(caixa.num(cd.get("creditLimit"))), para_centavos(caixa.num(cd.get("availableCreditLimit"))),
              (cd.get("balanceDueDate") or "")[:10] or None))
         ids[a["account_id"]] = con.execute("select id from conta where externo_id=?", (a["account_id"],)).fetchone()[0]
-        con.execute("insert or replace into saldo(conta_id, em, saldo_centavos) values (?,?,?)",
-                    (ids[a["account_id"]], ts, para_centavos(caixa.num(a.get("balance"))) or 0))
+        saldo = para_centavos(caixa.num(a.get("balance")))
+        if saldo is not None:  # saldo ilegível não vira R$ 0,00: mantém a última leitura
+            con.execute("insert or replace into saldo(conta_id, em, saldo_centavos) values (?,?,?)", (ids[a["account_id"]], ts, saldo))
     return ids
 
 
@@ -218,13 +220,17 @@ def _buscar_conta(con, a, conta_id, cliente, hoje):
     return itens, faturas
 
 
-def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -> tuple[int, int]:
-    aid, tipo, lidos, novos = a["account_id"], a["type"], 0, 0
+def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -> tuple[int, int, int]:
+    aid, tipo, lidos, novos, ilegiveis = a["account_id"], a["type"], 0, 0, 0
     for t in itens:
         data = (t.get("date") or "")[:10]
         if not data or data > hoje.isoformat():  # sem data ou parcela futura: não é lançamento
             continue
-        val = valor_lancamento(t, tipo)
+        try:
+            val = valor_lancamento(t, tipo)
+        except ValorIlegivel:  # não grava valor inventado: o lançamento antigo, se houver, fica como está
+            ilegiveis += 1
+            continue
         cc = t.get("creditCardMetadata") or {}
         nat = caixa.natureza(tipo, t.get("description"), t.get("category"), val.reais, donos)
         existia = con.execute("select 1 from lancamento where externo_id=?", (t["id"],)).fetchone() is not None
@@ -256,7 +262,7 @@ def _processar_conta(con, a, conta_id, itens, faturas, hoje, donos, bruto_ref) -
             (fid, aid, (g(f, "dueDate", "due_date") or "")[:10], para_centavos(caixa.num(g(f, "totalAmount", "total_amount", "amount"))),
              para_centavos(caixa.num(g(f, "minimumPaymentAmount", "minimum_payment"))), g(f, "paymentStatus", "payment_status"), conta_id))
     unificar_pending(con, conta_id)
-    return lidos, novos
+    return lidos, novos, ilegiveis
 
 
 JANELA_RETOMADA = dt.timedelta(hours=3)
@@ -311,7 +317,7 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
         ids = _gravar_contas(con, contas, ts, bancos_pj)
         donos = caixa.dono_tokens([a["owner"] for a in contas if a.get("owner") and a["type"] != "CREDIT"])
         _purgar_futuro(con, hoje)
-        lidos = novos = 0
+        lidos = novos = ilegiveis = 0
         falhas: dict[str, str] = {}
         for a in contas:
             aid = a["account_id"]
@@ -326,14 +332,14 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
                                      + [{"conta": aid, "tipo": "fatura", "dado": f} for f in faturas], rotulo=rotulo)
                 con.execute("begin")
                 try:
-                    n_lidos, n_novos = _processar_conta(con, a, ids[aid], itens, faturas, hoje, donos, bruto.name)
+                    n_lidos, n_novos, n_ileg = _processar_conta(con, a, ids[aid], itens, faturas, hoje, donos, bruto.name)
                     con.execute("insert or replace into captura_conta(rodada_id, account_id, dia, lidos, novos, concluida_em) values (?,?,?,?,?,?)",
                                 (rodada.id, aid, hoje.isoformat(), n_lidos, n_novos, agora.isoformat(timespec="seconds")))
                     con.execute("commit")
                 except BaseException:
                     con.execute("rollback")
                     raise
-                lidos, novos = lidos + n_lidos, novos + n_novos
+                lidos, novos, ilegiveis = lidos + n_lidos, novos + n_novos, ilegiveis + n_ileg
             except Exception as e:  # a conta fica fora desta rodada (rollback do parcial); as outras seguem
                 falhas[aid] = type(e).__name__
         erro_pos = None
@@ -351,10 +357,12 @@ def capturar(con, cliente, hoje: dt.date, agora: dt.datetime, bruto_base: Path, 
         rodada.lidos, rodada.novos = lidos, novos
         if falhas:
             rodada.aviso = "falhas: " + ", ".join(sorted(falhas))
+        if ilegiveis:
+            rodada.aviso = "; ".join(filter(None, [rodada.aviso, f"{ilegiveis} lançamento(s) com valor ilegível pulado(s)"]))
         if erro_pos:
             rodada.aviso = "; ".join(filter(None, [rodada.aviso, f"não é gasto e quem gastou não foram reaplicados: {erro_pos}"]))
         rid = rodada.id
-    return ResumoCaptura(len(contas), lidos, novos, sorted(falhas), problemas, rid)
+    return ResumoCaptura(len(contas), lidos, novos, ilegiveis, sorted(falhas), problemas, rid)
 
 
 TENTATIVAS_SALDOS = 3   # o provedor às vezes devolve só parte das contas (4 a 17 de 17 em 15/10): repete e junta o que vier

@@ -365,3 +365,19 @@ def test_captura_preenche_gastador_e_mantem_indicacao(con, tmp_path):
     _rodar(con, fin, tmp_path)
     L = _lancs(con)
     assert (L["c1"]["gastador_id"], L["c1"]["gastador_origem"]) == ("louise", "voce")
+
+
+def test_lancamento_ilegivel_nao_sobrescreve_valor(con, tmp_path):
+    _rodar(con, FakeFin([BANCO], {"acc-bank-1111": [tx("t1", "2026-10-07", "LOJA", "-50.00")]}), tmp_path)
+    fin = FakeFin([BANCO], {"acc-bank-1111": [tx("t1", "2026-10-07", "LOJA", "lixo"), tx("t2", "2026-10-07", "OUTRA", "-10.00")]})
+    r = capturar(con, fin, HOJE, AGORA + dt.timedelta(minutes=5), tmp_path / "bruto")
+    L = _lancs(con)
+    assert L["t1"]["valor_centavos"] == -5000 and L["t2"]["valor_centavos"] == -1000
+    assert r.ilegiveis == 1
+
+
+def test_saldo_ilegivel_nao_grava(con, tmp_path):
+    ruim = {**BANCO, "balance": "abc"}
+    _rodar(con, FakeFin([ruim, CARTAO], {}), tmp_path)
+    n = lambda aid: con.execute("select count(*) from saldo s join conta c on c.id=s.conta_id where c.externo_id=?", (aid,)).fetchone()[0]
+    assert n("acc-bank-1111") == 0 and n("acc-card-9999") == 1

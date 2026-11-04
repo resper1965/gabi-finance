@@ -107,7 +107,7 @@ def main(argv: list[str]) -> int:
             return 0
         r = rodar_extratos(con, Cliente(), agora.date(), agora, raiz / "bruto", raiz / "locks", sincronizar_antes="--sincronizar" in argv)
         c = r.captura
-        print(f"extratos: contas={c.contas} lidos={c.lidos} novos={c.novos} falhas={c.falhas} conferida={r.conferida} "
+        print(f"extratos: contas={c.contas} lidos={c.lidos} novos={c.novos} ilegiveis={c.ilegiveis} falhas={c.falhas} conferida={r.conferida} "
               f"classificados={r.classificacao.resolvidos} sugestoes={r.classificacao.sugestoes} compromissos={r.compromissos.gerados}")
         if c.sync_problemas:
             print(f"ATENÇÃO sincronização: {c.sync_problemas}")
