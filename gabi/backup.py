@@ -11,7 +11,8 @@ from gabi.db import conectar, migrar
 from gabi.rodada import registrar_rodada
 from gabi.hoje import hoje_brt
 
-TABELAS_CONTAGEM = ["pessoa", "empresa", "compromisso", "fatura", "memoria", "acesso", "decisao"]
+TABELAS_CONTAGEM = ["pessoa", "empresa", "compromisso", "fatura", "memoria", "acesso", "decisao",
+                    "atividade", "projeto", "compromisso_linha", "valor_do_mes", "documento"]
 
 
 def backup_db(con: sqlite3.Connection, destino_dir: Path, hoje: date) -> Path:

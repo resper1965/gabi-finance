@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from gabi.backup import backup_db, main, testar_restauracao
+from gabi.backup import TABELAS_CONTAGEM, backup_db, main, testar_restauracao
 from gabi.db import conectar, migrar
 
 MIGRACOES = Path(__file__).parent.parent / "migrations"
@@ -56,6 +56,15 @@ def test_testar_restauracao_ok_contagens_iguais_as_da_origem(banco, tmp_path):
     destino = backup_db(conectar(banco), tmp_path / "bk", HOJE)
     r = testar_restauracao(destino, ["pessoa", "acesso"])
     assert r == {"ok": True, "contagens": {"pessoa": 5, "acesso": 0}}
+
+
+def test_contagem_inclui_tabelas_novas(banco, tmp_path):
+    novas = ["atividade", "projeto", "compromisso_linha", "valor_do_mes", "documento"]
+    for t in novas:
+        assert t in TABELAS_CONTAGEM
+    destino = backup_db(conectar(banco), tmp_path / "bk", HOJE)
+    r = testar_restauracao(destino, TABELAS_CONTAGEM)
+    assert r["ok"] is True and all(r["contagens"][t] == 0 for t in novas)
 
 
 def test_arquivo_corrompido_falha_na_restauracao(banco, tmp_path):

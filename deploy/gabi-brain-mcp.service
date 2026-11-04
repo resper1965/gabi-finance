@@ -3,6 +3,7 @@ Description=gabi.brain MCP (leitura; só 127.0.0.1:8081; exige token Bearer)
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
+OnFailure=gabi-brain-falha@%n.service
 
 [Service]
 Type=simple

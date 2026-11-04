@@ -1,8 +1,8 @@
 [Unit]
-Description=gabi.brain backup diário às 03:30
+Description=gabi.brain backup diário às 03:30 (Brasília)
 
 [Timer]
-OnCalendar=*-*-* 03:30:00
+OnCalendar=*-*-* 03:30:00 America/Sao_Paulo
 Persistent=true
 Unit=gabi-brain-backup.service
 

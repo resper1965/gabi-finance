@@ -47,8 +47,15 @@ def test_api_nao_le_arquivo_de_segredos_na_fase_0():
 
 
 def test_backup_diario_as_0330_com_teste_de_restauracao():
-    assert "OnCalendar=*-*-* 03:30:00" in TIMER and "Persistent=true" in TIMER
+    assert "OnCalendar=*-*-* 03:30:00 America/Sao_Paulo" in TIMER and "Persistent=true" in TIMER
     assert "-m gabi.backup" in BKP and "--testar" in BKP and "Type=oneshot" in BKP
+
+
+def test_servicos_longos_avisam_falha():
+    for nome in ("api", "mcp", "fontes"):
+        texto = (DEPLOY / f"gabi-brain-{nome}.service").read_text()
+        assert "OnFailure=gabi-brain-falha@%n.service" in texto, nome
+        assert "StartLimitBurst=" in texto, nome
 
 
 def test_unidades_apontam_para_modulos_que_existem():

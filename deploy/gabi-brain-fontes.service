@@ -3,6 +3,7 @@ Description=gabi.brain fontes (Paperless e Nibo): único serviço com rede e tok
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
+OnFailure=gabi-brain-falha@%n.service
 
 [Service]
 Type=simple
