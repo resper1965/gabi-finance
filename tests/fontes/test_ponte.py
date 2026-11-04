@@ -1,7 +1,9 @@
+import socket
 import threading
 
 import pytest
 
+from gabi.fontes import ponte as mod_ponte
 from gabi.fontes.ambiente import fontes_do_ambiente
 from gabi.fontes.nibo import ErroNibo
 from gabi.fontes.paperless import ErroPaperless
@@ -652,3 +654,17 @@ def test_ponte_agenda_evento_criar_cruza_e_valida_a_forma(sock_agenda):
         with pytest.raises(ErroGoogleOAuth) as e:
             p.evento_criar(conta, "0123456789abcdefghijklmnop", {})
         assert str(e.value) == "resposta inválida do serviço de fontes"
+
+
+# ---- Task 8: a ponte não espera para sempre por um cliente mudo ----
+def test_servidor_desiste_de_cliente_mudo(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod_ponte, "ESPERA_PEDIDO", 0.2)
+    srv, sock = _servir(tmp_path, {"paperless": PaperlessFalso()})
+    try:
+        with socket.socket(socket.AF_UNIX) as c:
+            c.settimeout(2)  # se o servidor não fechar, o teste falha em vez de travar
+            c.connect(str(sock))
+            assert c.recv(1) == b""  # nada enviado nem fechado pelo cliente: o servidor fecha sem resposta
+    finally:
+        srv.shutdown()
+        srv.server_close()

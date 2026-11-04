@@ -20,6 +20,7 @@ from gabi.fontes.openrouter import ErroOpenRouter
 from gabi.fontes.paperless import ErroPaperless
 
 MAX_BYTES = 64 * 1024 * 1024
+ESPERA_PEDIDO = 30  # segundos para o pedido chegar inteiro; cliente mudo é desconectado
 PERMITIDOS = {
     "paperless": frozenset({"docs", "baixar", "texto", "documento"}),  # ADR-023: só a busca, o download e o OCR do MCP; nada escreve no Paperless
     "openrouter": frozenset({"completar", "completar_pdf"}),
@@ -106,10 +107,16 @@ class Servidor(socketserver.ThreadingUnixStreamServer):
 
 class _Manipulador(socketserver.BaseRequestHandler):
     def handle(self):
+        self.request.settimeout(ESPERA_PEDIDO)
         try:
-            resp = _atender(self.server.fontes, _ler_tudo(self.request))
+            bruto = _ler_tudo(self.request)
+        except TimeoutError:  # cliente mudo: fecha sem responder
+            return
         except ValueError as e:
             resp = {"erro": {"tipo": "interno", "msg": str(e)}}
+        else:
+            self.request.settimeout(None)
+            resp = _atender(self.server.fontes, bruto)
         self.request.sendall(json.dumps(resp).encode())
 
 
