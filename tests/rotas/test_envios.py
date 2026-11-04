@@ -165,12 +165,13 @@ def test_enviar_roda_fora_do_laco_e_devolve_resultado_do_dominio(banco):
 
 # ---- convites ----
 
-def _convite(banco, ext="AAMk-1", ini="2026-10-22T18:00:00+00:00", fim="2026-10-22T19:00:00+00:00", titulo="Comitê", resposta="needsAction", org="Ana Souza"):
+def _convite(banco, ext="AAMk-1", ini="2026-10-22T18:00:00+00:00", fim="2026-10-22T19:00:00+00:00", titulo="Comitê", resposta="needsAction", org="Ana Souza",
+             serie=None):
     c = conectar(banco)
     fonte = c.execute("select id from agenda_fonte where conta=?", (NESS,)).fetchone()[0]
     i = c.execute(
-        "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, livre, resposta, organizador_nome)"
-        " values (?,?,?,?,?,?,0,?,0,?,?)", (fonte, ext, ini, fim, ini[:10], fim[:10], titulo, resposta, org)).lastrowid
+        "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, livre, resposta, organizador_nome, serie_id)"
+        " values (?,?,?,?,?,?,0,?,0,?,?,?)", (fonte, ext, ini, fim, ini[:10], fim[:10], titulo, resposta, org, serie)).lastrowid
     c.close()
     return i
 
@@ -186,6 +187,22 @@ def test_convites_lista_com_conflito_e_proposta_id(cli, banco):
     assert r.status_code == 200, r.text
     itens = cli.get("/api/v1/envios/convites", headers=BOSS).json()["dados"]["itens"]
     assert itens[0]["proposta_id"] == r.json()["dados"]["id"]
+
+
+def test_convites_serie_uma_linha_e_proposta_id_pela_serie(cli, banco):
+    a = _convite(banco, serie="S1")
+    b = _convite(banco, ext="AAMk-2", ini="2026-10-23T18:00:00+00:00", fim="2026-10-23T19:00:00+00:00", serie="S1")
+    _convite(banco, ext="AAMk-3", ini="2026-10-24T18:00:00+00:00", fim="2026-10-24T19:00:00+00:00", serie="S1")
+    itens = cli.get("/api/v1/envios/convites", headers=BOSS).json()["dados"]["itens"]
+    assert [i["evento_id"] for i in itens] == [a]
+    r = _post(cli, f"/api/v1/envios/convites/{a}/propor", {"conta": NESS, "resposta": "aceitar"})
+    assert r.status_code == 200, r.text
+    c = conectar(banco)
+    c.execute("delete from agenda_evento where id=?", (a,))  # a primeira passou/sumiu: a próxima da série aparece com a mesma proposta aberta
+    c.commit()
+    c.close()
+    itens = cli.get("/api/v1/envios/convites", headers=BOSS).json()["dados"]["itens"]
+    assert [(i["evento_id"], i["proposta_id"]) for i in itens] == [(b, r.json()["dados"]["id"])]
 
 
 def test_convites_propor_cria_proposta_e_duplicada_409(cli, banco):

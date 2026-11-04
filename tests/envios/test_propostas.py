@@ -268,6 +268,18 @@ def test_convite_resposta_duplicada_enquanto_pendente_ou_enviando(con):
     assert _responder(con, outro)["estado"] == "pendente"  # outro convite não é duplicata
 
 
+def test_convite_resposta_duplicada_casa_pela_serie(con):
+    _agenda(con)
+    a = _convite(con, serie="S1")
+    b = _convite(con, ext="AAMk-2", ini="2026-10-23T18:00:00+00:00", fim="2026-10-23T19:00:00+00:00", serie="S1")
+    _responder(con, a)
+    assert _codigo(_responder, con, b, "recusar").codigo == "proposta_duplicada"  # outra ocorrência da mesma série
+    c = _convite(con, ext="AAMk-3", ini="2026-10-24T18:00:00+00:00", fim="2026-10-24T19:00:00+00:00", serie="S2")
+    assert _responder(con, c)["estado"] == "pendente"  # outra série não é duplicata
+    d = _convite(con, ext="AAMk-4", ini="2026-10-25T18:00:00+00:00", fim="2026-10-25T19:00:00+00:00")
+    assert _responder(con, d)["estado"] == "pendente"  # avulso continua 1 a 1
+
+
 def test_convite_resposta_depois_de_falhou_recusada_ou_vencida_pode_propor_de_novo(con):
     _agenda(con)
     ev = _convite(con, ini="2026-10-26T13:30:00+00:00", fim="2026-10-26T14:00:00+00:00")

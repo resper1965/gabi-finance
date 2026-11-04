@@ -9,8 +9,8 @@ Data: 04/11/2026 · Estado: aceito (implementado na branch `feat/convites-agenda
 2. **Só a ness (Graph).** Google, comentário na resposta, sugerir outro horário e botão no Telegram ficam fora.
 3. **Convite pendente** = evento recebido (não organizado por você), futuro, que não é de dia inteiro e ainda sem resposta. Convite que você organiza nunca vira aviso nem proposta.
 4. **Conflito** é calculado na leitura (não é gravado): outro evento no mesmo intervalo. Evento "livre" ou de dia inteiro não conta; encostar (fim = início) também não.
-5. **Aviso** novo `convite_agenda` no Telegram, com os conflitos no texto. Mudou o horário do convite: avisa de novo; mesmo horário nunca repete.
-6. **Proposta** `convite_resposta` (migração 0088 recria `envio_proposta` com o tipo novo). Duas abertas para o mesmo convite (pendente ou enviando) não existem; depois de falhar ou vencer pode propor de novo.
+5. **Aviso** novo `convite_agenda` no Telegram, com os conflitos no texto. Convite avulso: mudou o horário, avisa de novo; mesmo horário nunca repete. **Série** (o Graph lista cada ocorrência): Envios e avisos mostram só a primeira ocorrência futura sem resposta; a série avisa uma vez só (chave `serie:<id>`), e o aviso aberto vale enquanto alguma ocorrência seguir sem resposta.
+6. **Proposta** `convite_resposta` (migração 0088 recria `envio_proposta` com o tipo novo). Duas abertas para o mesmo convite (pendente ou enviando) não existem (na série, para a série inteira); depois de falhar ou vencer pode propor de novo.
 7. **Ferramenta MCP** `propor_resposta_convite` (escopo `envios`; 71 ferramentas no include) e duas rotas em `/api/v1/envios/convites`; no painel, um bloco "Convites" em Envios.
 
 **Divergências da spec, como ficaram.**

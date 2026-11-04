@@ -52,17 +52,17 @@ def listar_envios(request: Request, estado: str = "pendente"):
 
 @router.get("/convites")
 def listar_convites(request: Request):
-    """Convites de agenda recebidos e ainda sem resposta, com conflitos e o id da proposta aberta (pendente ou enviando), se houver."""
+    """Convites de agenda recebidos e ainda sem resposta (série: só a próxima ocorrência), com conflitos e o id da proposta aberta (pendente ou enviando), se houver."""
     agora = _agora(request)
     con = _con(request)
     try:
         abertas = {}
         for estado in ("pendente", "enviando"):
             for p in pr.listar(con, agora, estado):
-                if p["tipo"] == "convite_resposta":
-                    abertas.setdefault(p["conteudo"].get("evento_id"), p["id"])
+                if p["tipo"] == "convite_resposta":  # série: casa pela série (a ocorrência exibida pode ser outra)
+                    abertas.setdefault(cv.chave(p["conteudo"]), p["id"])
         itens = [{**{k: c[k] for k in ("evento_id", "conta", "titulo", "inicio_utc", "fim_utc", "organizador_nome", "conflita_com")},
-                  "proposta_id": abertas.get(c["evento_id"])} for c in cv.pendentes(con, agora)]
+                  "proposta_id": abertas.get(cv.chave(c))} for c in cv.pendentes(con, agora)]
         return envelope(con, {"itens": itens}, agora=agora)
     finally:
         con.close()

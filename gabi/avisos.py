@@ -130,6 +130,9 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     if tipo == "projeto_parado":
         return (VALE if projetos.revalidar_aviso(con, payload) else RESOLVIDO), payload
     if tipo == "convite_agenda":  # respondido no Outlook, apagado ou remarcado: o aviso aberto some
+        if payload.get("serie_id"):  # série: vale enquanto alguma ocorrência seguir sem resposta (remarcar uma ocorrência não resolve)
+            r = con.execute("select 1 from agenda_evento where serie_id=? and resposta='needsAction' limit 1", (payload["serie_id"],)).fetchone()
+            return (VALE if r else RESOLVIDO), payload
         r = con.execute("select resposta, inicio_utc from agenda_evento where id=?", (payload.get("evento_id"),)).fetchone()
         return (VALE if r and r["resposta"] == "needsAction" and r["inicio_utc"] == payload.get("inicio_utc") else RESOLVIDO), payload
     return VALE, payload
@@ -434,9 +437,10 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
     for p in projetos.parados(con, agora):
         novo("projeto_parado", p["id"], p)
     fuso = consulta_agenda.fuso_da_agenda(con)
-    for i in convites.pendentes(con, agora):
-        novo("convite_agenda", f"{i['evento_id']}:{i['inicio_utc']}",
-             {"evento_id": i["evento_id"], "titulo": i["titulo"], "inicio_utc": i["inicio_utc"], "texto": convites.texto_aviso(i, fuso)})
+    for i in convites.pendentes(con, agora):  # série: uma chave por série (avisa uma vez); avulso: evento + início (remarcado avisa de novo)
+        novo("convite_agenda", f"serie:{i['serie_id']}" if i["serie_id"] else f"{i['evento_id']}:{i['inicio_utc']}",
+             {"evento_id": i["evento_id"], "conta": i["conta"], "serie_id": i["serie_id"], "titulo": i["titulo"], "inicio_utc": i["inicio_utc"],
+              "texto": convites.texto_aviso(i, fuso)})
     return criados
 
 

@@ -18,7 +18,13 @@ def _janela(r) -> Janela:
     return Janela(r["inicio_utc"], r["fim_utc"], r["dia_local"], r["dia_fim_local"], False)
 
 
+def chave(item: dict):
+    """Identidade do convite para aviso e proposta aberta: a série (quando houver) ou o evento avulso."""
+    return ("serie", item["serie_id"]) if item.get("serie_id") else ("evento", item["evento_id"])
+
+
 def pendentes(con, agora: dt.datetime) -> list[dict]:
+    """Convites sem resposta, futuros e com hora, das contas de agenda liberadas, por início. Série: uma linha só (a primeira ocorrência futura)."""
     contas = contas_agenda(con)
     if not contas:
         return []
@@ -30,8 +36,12 @@ def pendentes(con, agora: dt.datetime) -> list[dict]:
     if not convites:
         return []
     ocupam = [r for r in con.execute(base + "and e.livre=0 and (e.resposta is null or e.resposta in (?,?)) order by e.inicio_utc, e.id", _RESPOSTAS_QUE_OCUPAM)]
-    saida = []
+    saida, series = [], set()
     for c in convites:
+        if c["serie_id"]:  # o Graph lista cada ocorrência; responder uma responde a série: só a primeira futura de cada série aparece
+            if c["serie_id"] in series:
+                continue
+            series.add(c["serie_id"])
         jc = _janela(c)
         conflitos = [o["titulo"] or "(sem título)" for o in ocupam if o["id"] != c["id"] and tempo.se_sobrepoem(jc, _janela(o))]
         saida.append({"evento_id": c["id"], "conta": c["conta"], "titulo": c["titulo"] or "(sem título)", "inicio_utc": c["inicio_utc"],

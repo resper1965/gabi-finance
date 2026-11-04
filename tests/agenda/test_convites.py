@@ -78,3 +78,23 @@ def test_texto_aviso_com_e_sem_conflito_e_sem_organizador():
     assert texto_aviso({**base, "conflita_com": []}, "America/Sao_Paulo") == "Sync · qui 15h–16h · de Ana · sem conflito"
     assert texto_aviso({**base, "organizador_nome": None, "inicio_utc": "2026-11-05T18:30:00+00:00"},
                        "America/Sao_Paulo") == "Sync · qui 15h30–16h · conflita com Dentista"
+
+
+def test_serie_colapsa_na_primeira_ocorrencia_futura(con):
+    f = _fonte(con)
+    _ev(con, f, "s0", "2026-11-03T18:00:00+00:00", "2026-11-03T19:00:00+00:00", "Daily", serie="S1")  # passada
+    ids = [_ev(con, f, f"s{d}", f"2026-11-{d:02d}T18:00:00+00:00", f"2026-11-{d:02d}T19:00:00+00:00", "Daily", serie="S1") for d in range(5, 20)]
+    _ev(con, f, "t1", "2026-11-06T13:00:00+00:00", "2026-11-06T14:00:00+00:00", "Semanal", serie="S2")
+    _ev(con, f, "t2", "2026-11-13T13:00:00+00:00", "2026-11-13T14:00:00+00:00", "Semanal", serie="S2")
+    a = _ev(con, f, "u1", "2026-11-07T13:00:00+00:00", "2026-11-07T14:00:00+00:00", "Avulso A")
+    b = _ev(con, f, "u2", "2026-11-08T13:00:00+00:00", "2026-11-08T14:00:00+00:00", "Avulso B")
+    r = pendentes(con, AGORA)
+    assert [(i["titulo"], i["serie_id"]) for i in r] == [("Daily", "S1"), ("Semanal", "S2"), ("Avulso A", None), ("Avulso B", None)]
+    assert r[0]["evento_id"] == ids[0] and r[2]["evento_id"] == a and r[3]["evento_id"] == b
+
+
+def test_serie_respondida_na_primeira_mostra_a_proxima(con):
+    f = _fonte(con)
+    _ev(con, f, "s1", "2026-11-05T18:00:00+00:00", "2026-11-05T19:00:00+00:00", "Daily", serie="S1", resposta="accepted")
+    seg = _ev(con, f, "s2", "2026-11-06T18:00:00+00:00", "2026-11-06T19:00:00+00:00", "Daily", serie="S1")
+    assert [i["evento_id"] for i in pendentes(con, AGORA)] == [seg]

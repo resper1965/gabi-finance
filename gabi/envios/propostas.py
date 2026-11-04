@@ -203,18 +203,20 @@ def _hora(d: dt.datetime) -> str:
     return f"{d.hour}h" if d.minute == 0 else f"{d.hour}h{d.minute:02d}"
 
 
-def _sem_duplicata(evento_id: int, agora: dt.datetime):
+def _sem_duplicata(evento_id: int, serie_id: str | None, agora: dt.datetime):
+    """Uma proposta aberta por convite: casa pela série (responder uma ocorrência responde a série toda) ou, avulso, pelo evento."""
     def checar(con):
         _vencer(con, agora)  # pendente vencida não bloqueia nova proposta
+        campo, valor = ("$.serie_id", serie_id) if serie_id else ("$.evento_id", evento_id)
         if con.execute("select 1 from envio_proposta where tipo='convite_resposta' and estado in ('pendente','enviando') "
-                       "and json_extract(conteudo, '$.evento_id')=?", (evento_id,)).fetchone():
+                       "and json_extract(conteudo, ?)=?", (campo, valor)).fetchone():
             raise ErroEnvio("proposta_duplicada")
     return checar
 
 
 def criar_convite_resposta(con, agora: dt.datetime, *, conta, evento_id, resposta) -> dict:
     """Proposta de responder a um convite recebido (aceitar/talvez/recusar). Só convite pendente (needsAction), com hora, futuro e da conta;
-    no máximo uma proposta aberta (pendente/enviando) por convite. Do organizador guarda só o nome, nunca e-mail."""
+    no máximo uma proposta aberta (pendente/enviando) por convite (série inteira, quando for série). Do organizador guarda só o nome, nunca e-mail."""
     if resposta not in RESPOSTAS_CONVITE or isinstance(evento_id, bool) or not isinstance(evento_id, int):
         raise _invalida()
     c = (conta or "").strip().lower()
@@ -236,7 +238,7 @@ def criar_convite_resposta(con, agora: dt.datetime, *, conta, evento_id, respost
     titulo = ev["titulo"] or "(sem título)"
     obj = {"conta": c, "provedor": prov, "evento_id": ev["id"], "externo_id": ev["externo_id"], "serie_id": ev["serie_id"], "titulo": titulo,
            "inicio_utc": _utc(ini), "fim_utc": _utc(fim), "organizador_nome": ev["organizador_nome"], "resposta": resposta, "conflita_com": conflita}
-    r = _gravar(con, agora, "convite_resposta", c, obj, min(agora + dt.timedelta(hours=24), ini), antes=_sem_duplicata(ev["id"], agora))
+    r = _gravar(con, agora, "convite_resposta", c, obj, min(agora + dt.timedelta(hours=24), ini), antes=_sem_duplicata(ev["id"], ev["serie_id"], agora))
     li, lf = ini.astimezone(_SP), fim.astimezone(_SP)
     r["resumo"] = f"Responder '{titulo}' {_DIAS[li.weekday()]} {_hora(li)}–{_hora(lf)}: {resposta}"
     return r
