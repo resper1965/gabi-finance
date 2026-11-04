@@ -451,3 +451,8 @@ def test_evento_graph_organizador_so_o_nome():
 def test_evento_graph_serie():
     assert g._evento(_item(seriesMasterId="S1"))["serie_id"] == "S1"
     assert g._evento(_item())["serie_id"] is None
+
+
+def test_evento_graph_organizador_com_email_no_nome_vira_none():
+    ev = g._evento(_item(organizer={"emailAddress": {"name": "maria@x.com", "address": "maria@x.com"}}))
+    assert ev["organizador_nome"] is None and "maria@x.com" not in repr(ev)

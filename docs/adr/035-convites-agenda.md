@@ -25,6 +25,13 @@ Data: 04/11/2026 · Estado: aceito (implementado na branch `feat/convites-agenda
 - **Convite já respondido:** o Graph pode devolver 400 em vez de 404/409. Nesse caso aparece `falhou` com `provedor_400`: sem erro 500 e sem repetir. A confirmar no seu teste real.
 - **Conferência local no clique, antes do Graph:** se o organizador remarca, o Graph mantém o mesmo id e não devolve 404/409; responder de novo um convite já respondido também passa. Por isso, no **Enviar**, o brain relê o evento na agenda local: se sumiu, já não está sem resposta (você respondeu no Outlook) ou o início/fim mudou, a proposta vira `falhou` com `convite_obsoleto` sem nenhuma chamada ao Graph (falha fechada). Basta propor de novo com o horário atual.
 
+**Limites conhecidos.**
+- Depois do **Enviar**, o convite continua na lista com os botões até a próxima sincronização da agenda trazer a resposta (a proposta aberta já impede outra).
+- Responder uma ocorrência de uma série (mesmo remarcada) responde a série inteira: a chamada vai para a série.
+- O envelope de `propor_resposta_convite` não traz frescor da agenda; a conferência local no clique cobre o convite que mudou.
+- O organizador cujo nome é um e-mail fica sem nome (nunca se guarda e-mail).
+- Colisão com `feat/projetos-melhorias`: se ela entrar antes, este ADR vira ADR-036 e a contagem de ferramentas vai a 74.
+
 **Consequências.** O Hermes precisa da ferramenta nova no include e do SOUL com a linha do convite (passos do runbook `#envios`). Enquanto `envios.escrita` não estiver ligado, **Enviar** responde 409 e nada sai.
 
 **Fora.** Responder com comentário, propor outro horário, convites do Google, botões no Telegram, resposta automática.

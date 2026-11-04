@@ -613,11 +613,12 @@ def _resposta(item: dict) -> str | None:
 
 
 def _organizador_nome(item: dict) -> str | None:
-    """Só o nome do organizador; o endereço (e os dos demais participantes) nunca é guardado."""
+    """Só o nome do organizador; o endereço (e os dos demais participantes) nunca é guardado. Nome que é um e-mail (o Graph repete o endereço
+    quando não há nome) também não."""
     o = item.get("organizer")
     e = o.get("emailAddress") if isinstance(o, dict) else None
     nome = e.get("name") if isinstance(e, dict) else None
-    return nome if isinstance(nome, str) and nome else None
+    return nome if isinstance(nome, str) and nome and "@" not in nome else None
 
 
 def _evento(item: dict) -> dict:
