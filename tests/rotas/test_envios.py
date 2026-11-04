@@ -161,3 +161,59 @@ def test_enviar_roda_fora_do_laco_e_devolve_resultado_do_dominio(banco):
     c = conectar(banco)
     assert tuple(c.execute("select estado, externo_id from envio_proposta where id=?", (r["id"],)).fetchone()) == ("enviada", "ev1")
     c.close()
+
+
+# ---- convites ----
+
+def _convite(banco, ext="AAMk-1", ini="2026-10-22T18:00:00+00:00", fim="2026-10-22T19:00:00+00:00", titulo="Comitê", resposta="needsAction", org="Ana Souza"):
+    c = conectar(banco)
+    fonte = c.execute("select id from agenda_fonte where conta=?", (NESS,)).fetchone()[0]
+    i = c.execute(
+        "insert into agenda_evento(fonte_id, externo_id, inicio_utc, fim_utc, dia_local, dia_fim_local, dia_inteiro, titulo, livre, resposta, organizador_nome)"
+        " values (?,?,?,?,?,?,0,?,0,?,?)", (fonte, ext, ini, fim, ini[:10], fim[:10], titulo, resposta, org)).lastrowid
+    c.close()
+    return i
+
+
+def test_convites_lista_com_conflito_e_proposta_id(cli, banco):
+    ev = _convite(banco)
+    _convite(banco, ext="AAMk-2", titulo="Almoço", resposta="accepted", ini="2026-10-22T18:30:00+00:00", fim="2026-10-22T20:00:00+00:00")
+    itens = cli.get("/api/v1/envios/convites", headers=BOSS).json()["dados"]["itens"]
+    assert len(itens) == 1
+    assert itens[0] == {"evento_id": ev, "conta": NESS, "titulo": "Comitê", "inicio_utc": "2026-10-22T18:00:00+00:00", "fim_utc": "2026-10-22T19:00:00+00:00",
+                        "organizador_nome": "Ana Souza", "conflita_com": ["Almoço"], "proposta_id": None}
+    r = _post(cli, f"/api/v1/envios/convites/{ev}/propor", {"conta": NESS, "resposta": "aceitar"})
+    assert r.status_code == 200, r.text
+    itens = cli.get("/api/v1/envios/convites", headers=BOSS).json()["dados"]["itens"]
+    assert itens[0]["proposta_id"] == r.json()["dados"]["id"]
+
+
+def test_convites_propor_cria_proposta_e_duplicada_409(cli, banco):
+    ev = _convite(banco)
+    r = _post(cli, f"/api/v1/envios/convites/{ev}/propor", {"conta": NESS, "resposta": "talvez"})
+    assert r.status_code == 200, r.text
+    d = r.json()["dados"]
+    assert d["estado"] == "pendente" and d["vence_em"] and d["resumo"]
+    assert [i["id"] for i in cli.get("/api/v1/envios", headers=BOSS).json()["dados"]["itens"]] == [d["id"]]
+    r2 = _post(cli, f"/api/v1/envios/convites/{ev}/propor", {"conta": NESS, "resposta": "talvez"})
+    assert r2.status_code == 409 and r2.json()["erro"] == "proposta_duplicada"
+
+
+def test_convites_propor_nao_pendente_409(cli, banco):
+    ev = _convite(banco, resposta="accepted")
+    r = _post(cli, f"/api/v1/envios/convites/{ev}/propor", {"conta": NESS, "resposta": "aceitar"})
+    assert r.status_code == 409 and r.json()["erro"] == "convite_nao_pendente"
+
+
+def test_convites_propor_corpo_invalido_400(cli, banco):
+    ev = _convite(banco)
+    u = f"/api/v1/envios/convites/{ev}/propor"
+    assert _post(cli, u, {"conta": NESS}).status_code == 400
+    assert _post(cli, u, {"conta": NESS, "resposta": "x"}).status_code == 400
+    assert _post(cli, u, {"resposta": "aceitar"}).status_code == 400
+
+
+def test_convites_nao_boss_403(cli, banco):
+    ev = _convite(banco)
+    assert cli.get("/api/v1/envios/convites", headers=VIP).status_code == 403
+    assert _post(cli, f"/api/v1/envios/convites/{ev}/propor", {"conta": NESS, "resposta": "aceitar"}, VIP).status_code == 403

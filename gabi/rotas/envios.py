@@ -5,6 +5,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, Request
 
+from gabi.agenda import convites as cv
 from gabi.envelope import envelope
 from gabi.envios import enviar as ex
 from gabi.envios import propostas as pr
@@ -14,11 +15,12 @@ from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
 router = APIRouter(prefix="/api/v1/envios", dependencies=[Depends(exigir("boss"))])
 
-CONFLITOS = {"conflito", "vencida", "hash_diferente", "envios_desligados", "conta_nao_permitida"}
+CONFLITOS = {"conflito", "vencida", "hash_diferente", "envios_desligados", "conta_nao_permitida", "proposta_duplicada", "convite_nao_pendente"}
 MENSAGENS = {
     "nao_encontrado": "envio não encontrado", "conflito": "o envio já foi decidido ou está em andamento",
     "vencida": "a proposta venceu", "hash_diferente": "a proposta mudou; recarregue a lista",
     "envios_desligados": "os envios estão desligados", "conta_nao_permitida": "a conta não está liberada para envios",
+    "proposta_duplicada": "já existe uma proposta aberta para este convite", "convite_nao_pendente": "o convite não está mais pendente",
 }
 
 
@@ -44,6 +46,43 @@ def listar_envios(request: Request, estado: str = "pendente"):
     try:
         itens = pr.listar(con, _agora(request), estado)
         return envelope(con, {"itens": itens, "escrita": "ligado" if pr.escrita_ligada(con) else "desligado"}, agora=_agora(request))
+    finally:
+        con.close()
+
+
+@router.get("/convites")
+def listar_convites(request: Request):
+    """Convites de agenda recebidos e ainda sem resposta, com conflitos e o id da proposta aberta (pendente ou enviando), se houver."""
+    agora = _agora(request)
+    con = _con(request)
+    try:
+        abertas = {}
+        for estado in ("pendente", "enviando"):
+            for p in pr.listar(con, agora, estado):
+                if p["tipo"] == "convite_resposta":
+                    abertas.setdefault(p["conteudo"].get("evento_id"), p["id"])
+        itens = [{**{k: c[k] for k in ("evento_id", "conta", "titulo", "inicio_utc", "fim_utc", "organizador_nome", "conflita_com")},
+                  "proposta_id": abertas.get(c["evento_id"])} for c in cv.pendentes(con, agora)]
+        return envelope(con, {"itens": itens}, agora=agora)
+    finally:
+        con.close()
+
+
+@router.post("/convites/{evento_id}/propor")
+async def propor_resposta_convite(evento_id: int, request: Request):
+    """Cria a proposta de resposta (aceitar, talvez ou recusar) a um convite pendente; nada é enviado até o "Enviar"."""
+    corpo = _corpo(await _json(request))
+    conta, resposta = corpo.get("conta"), corpo.get("resposta")
+    if not isinstance(conta, str) or not conta or resposta not in pr.RESPOSTAS_CONVITE:
+        raise erro(400, "requisicao_invalida", "conta e resposta (aceitar, talvez ou recusar) são obrigatórias")
+    agora = _agora(request)
+    con = _con(request)
+    try:
+        try:
+            r = pr.criar_convite_resposta(con, agora, conta=conta, evento_id=evento_id, resposta=resposta)
+        except ErroEnvio as e:
+            raise _erro(e) from None
+        return envelope(con, {"id": r["id"], "estado": "pendente", "vence_em": r["vence_em"], "resumo": r["resumo"]}, agora=agora)
     finally:
         con.close()
 
