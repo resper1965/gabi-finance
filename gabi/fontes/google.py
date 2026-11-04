@@ -78,7 +78,6 @@ class Google:
         msg = EmailMessage()  # cabeçalhos com acento saem codificados (RFC 2047)
         msg["To"], msg["Subject"] = ", ".join(para), assunto
         msg.set_content(corpo)
-        bruto = msg.as_bytes().decode("ascii", "replace")
         r = self._req("POST", f"{GMAIL}/{quote(caixa)}/drafts", {"message": {"raw": base64.urlsafe_b64encode(msg.as_bytes()).decode()}})
         return r["id"]
 

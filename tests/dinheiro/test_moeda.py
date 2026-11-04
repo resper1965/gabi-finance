@@ -1,6 +1,5 @@
 """Moeda estrangeira: valor_centavos é sempre em reais (amountInAccountCurrency); o original fica em colunas próprias."""
 import datetime as dt
-import json
 import shutil
 from pathlib import Path
 

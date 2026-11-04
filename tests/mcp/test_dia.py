@@ -1,6 +1,6 @@
 import inspect
 
-from gabi.mcp import ferramentas_dia, servidor
+from gabi.mcp import ferramentas_dia
 from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS
 
 

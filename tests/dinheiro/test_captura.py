@@ -1,6 +1,5 @@
 import datetime as dt
 import gzip
-import json
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -8,7 +7,7 @@ import pytest
 
 from gabi.db import conectar, migrar
 from gabi.dinheiro import captura
-from gabi.dinheiro.captura import capturar, hora_de_sincronizar, janela_inicio, sincronizar, unificar_pending
+from gabi.dinheiro.captura import capturar, hora_de_sincronizar, janela_inicio, sincronizar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 HOJE = dt.date(2026, 10, 8)

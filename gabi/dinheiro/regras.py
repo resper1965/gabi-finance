@@ -5,7 +5,6 @@ decisão do Ricardo (origem `voce`) nem resultado de regra anterior. Consome: db
 """
 import datetime as dt
 import json
-import math
 import re
 
 from gabi.dinheiro.condicao import confere, validar as validar_condicao

@@ -123,7 +123,6 @@ def test_socket_so_para_dono_e_grupo(ponte):
 
 # ---------------- Task 7a: enviar (Paperless) e openrouter ----------------
 from gabi.fontes.openrouter import ErroOpenRouter, OpenRouter  # noqa: E402
-from gabi.fontes.paperless import Paperless  # noqa: E402
 from gabi.fontes.ponte import PonteModelo  # noqa: E402
 from gabi.fontes.servico import openrouter_do_ambiente  # noqa: E402
 

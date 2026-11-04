@@ -3,7 +3,6 @@ Quem responde é o Ricardo, pelo canal (ferramenta MCP `decisao_responder`); a A
 from fastapi import APIRouter, Depends, Request
 
 from gabi import decisoes
-from gabi.db import conectar
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro

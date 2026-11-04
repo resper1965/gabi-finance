@@ -5,7 +5,7 @@ import threading
 import pytest
 
 from gabi.fontes.openrouter import ErroOpenRouter, Limites, OpenRouter
-from gabi.fontes.ponte import PERMITIDOS, Ponte, PonteModelo, Servidor
+from gabi.fontes.ponte import PERMITIDOS, PonteModelo, Servidor
 
 CHAVE = "sk-or-SEGREDO123"
 PDF = b"%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n2 0 obj << /Type /Pages >> endobj\n"

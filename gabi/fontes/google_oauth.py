@@ -10,7 +10,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from gabi.fontes._http import abrir
-from typing import Callable
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 FOLGA_S = 60

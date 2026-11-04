@@ -9,7 +9,7 @@ import datetime as dt
 import json
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 from gabi.dinheiro import caixa

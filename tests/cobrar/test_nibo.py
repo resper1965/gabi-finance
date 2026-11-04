@@ -7,7 +7,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
 
-from gabi.fontes import nibo as modulo
 from gabi.fontes.nibo import ErroNibo, Nibo
 
 RAIZ = Path(__file__).parent.parent.parent / "gabi"

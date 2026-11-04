@@ -4,7 +4,6 @@ Somas em centavos inteiros; texto só na borda (R7). Consome: dinheiro.{analise,
 """
 import datetime as dt
 import json
-import re
 
 from fastapi import APIRouter, Depends, Request
 

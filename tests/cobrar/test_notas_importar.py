@@ -1,5 +1,4 @@
 import datetime as dt
-from pathlib import Path
 
 from gabi.cobrar.notas_importar import main
 from gabi.db import conectar

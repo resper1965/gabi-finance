@@ -1,8 +1,6 @@
 import datetime as dt
 import fcntl
-import json
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -73,7 +71,7 @@ def test_conta_que_falhou_impede_a_conferencia(con, tmp_path):
 
 
 def test_so_confere_contas_liberadas_ou_todas_as_bank(con, tmp_path):
-    r = _rodar_ext(con, FakeFin([BANCO, CARTAO], _boa_historia()), tmp_path)
+    _rodar_ext(con, FakeFin([BANCO, CARTAO], _boa_historia()), tmp_path)
     tipos = {x["conta"] for x in con.execute("select c.externo_id as conta from conferencia f join conta c on c.id=f.conta_id")}
     assert tipos == {"acc-bank-1111", "acc-card-9999"}  # cartão também é conferido (volume e buracos), saldo do cartão é dispensado
 

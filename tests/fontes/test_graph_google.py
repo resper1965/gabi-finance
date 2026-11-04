@@ -1,10 +1,8 @@
 import inspect
-import json
-from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from gabi.fontes import google as gmod, graph as grmod

@@ -1,6 +1,5 @@
 import datetime as dt
 import json
-import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -8,7 +7,6 @@ import pytest
 from starlette.testclient import TestClient
 
 from gabi.db import conectar, migrar
-from gabi.dinheiro.valor import formatar
 from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, criar_mcp
 from gabi.mcp.tokens import emitir, revogar
 

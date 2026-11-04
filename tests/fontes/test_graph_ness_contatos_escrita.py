@@ -10,7 +10,7 @@ from tests.fontes.test_graph_ness import TokenFalso, _graph
 
 CONTA = "resper@ness.com.br"
 GID = "AAMkAGI2TG93AAA="
-URL = f"https://graph.microsoft.com/v1.0/users/resper%40ness.com.br/contacts"
+URL = "https://graph.microsoft.com/v1.0/users/resper%40ness.com.br/contacts"
 ANTES = {"nome": "Ana Souza", "telefone": "(11) 98888-7777"}
 DEPOIS = {"nome": "Ana Souza Lima", "telefone": "+5511988887777"}
 

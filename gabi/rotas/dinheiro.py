@@ -5,7 +5,6 @@ Consome: dinheiro.{contas_pagar,regras,analise,repositorio,valor}, envelope, ide
 """
 import datetime as dt
 import json
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 

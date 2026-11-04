@@ -2,7 +2,6 @@
 `MAX_ABERTAS` abertas. R1: só pergunta; o Ricardo escolhe a pessoa (ou deixa para depois). Resposta preenche SÓ os lançamentos
 ainda sem dono, com origem 'voce'. As opções são as pessoas mais usadas nos lançamentos já classificados (nada chumbado).
 Consome: lancamento, conta, pessoa, decisoes."""
-import json
 
 from gabi import decisoes
 from gabi.dinheiro.agenda_financeira import _brl

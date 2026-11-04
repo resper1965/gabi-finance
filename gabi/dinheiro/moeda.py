@@ -5,7 +5,6 @@ Moeda estrangeira com esse valor numérico: usa-se ele (convertido=True). Sem el
 em valor_centavos com convertido=False, e o produtor de avisos conta esses casos. Nunca se estima câmbio. Consome: caixa, valor."""
 from typing import NamedTuple
 
-from gabi.dinheiro import caixa
 from gabi.dinheiro.valor import para_centavos
 
 

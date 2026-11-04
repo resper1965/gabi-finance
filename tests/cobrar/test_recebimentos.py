@@ -91,7 +91,7 @@ def test_confirmar_rejeita_as_outras_propostas_da_nota_e_do_credito(con):
 
 
 def test_credito_ja_confirmado_para_outra_nota_nao_e_proposto_de_novo(con):
-    n1 = nota(con); l1 = credito(con)
+    nota(con); credito(con)
     propor_recebimentos(con)
     confirmar_recebimento(con, propostas(con)[0]["id"], "ricardo")
     nota(con)                                                        # nova nota do mesmo valor
@@ -116,7 +116,7 @@ def test_confirmar_exige_proposta_pendente_e_audita(con):
 
 
 def test_nota_com_recebimento_confirmado_sai_da_previsao(con):
-    n = nota(con, venc="2026-10-25"); credito(con, data="2026-10-24")
+    nota(con, venc="2026-10-25"); credito(con, data="2026-10-24")
     assert previsao(con, HOJE, 1, projetar=False)["meses"][0]["a_vencer"]["qtd"] == 1
     propor_recebimentos(con)
     confirmar_recebimento(con, propostas(con)[0]["id"], "ricardo")

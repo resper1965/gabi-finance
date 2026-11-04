@@ -6,7 +6,6 @@ Nunca usa dado real da família. Uso: python tools/golden.py [--todos]
 import datetime as dt
 import importlib
 import json
-import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -144,7 +143,6 @@ def _w_conferir(linha, hoje):
 
 
 def _cnpj_valido(base12):
-    e = _mod("extrator")
     for n in (12, 13):
         pesos = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] if n == 12 else [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         r = sum(int(a) * b for a, b in zip(base12[:n], pesos)) % 11

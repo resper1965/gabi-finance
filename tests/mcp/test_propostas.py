@@ -1,5 +1,4 @@
 import json
-import re
 
 import pytest
 from starlette.testclient import TestClient

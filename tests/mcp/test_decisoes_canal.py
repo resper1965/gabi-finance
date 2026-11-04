@@ -1,5 +1,4 @@
 """Cenário ponta a ponta do canal de decisão, com banco fictício: a API cria a pergunta (boss), o Hermes lê e responde pelo MCP."""
-import json
 
 import pytest
 from fastapi.testclient import TestClient

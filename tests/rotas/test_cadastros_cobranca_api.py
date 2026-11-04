@@ -1,6 +1,4 @@
-import datetime as dt
 import json
-from zoneinfo import ZoneInfo
 
 from tests.rotas.test_cobrar_api import BOSS, JSON, VIP, banco, cli, get, nibo, post  # noqa: F401  (fixtures e helpers)
 
