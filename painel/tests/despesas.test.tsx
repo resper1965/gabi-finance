@@ -14,13 +14,19 @@ const desfazer = async () => { await waitFor(() => expect(document.querySelector
 const achar = (chamadas: Chamada[], metodo: string, url: string) => chamadas.find((c) => c.metodo === metodo && c.url.endsWith(url));
 
 test("dispensar chama POST /despesas/{linha}/mes/{mes}/dispensar e o Desfazer chama DELETE", async () => {
-  const chamadas = apiFalsa();
-  montar();
-  await acoes("Escola");
-  fireEvent.click(screen.getByRole("menuitem", { name: "Dispensar este mês" }));
-  await waitFor(() => expect(achar(chamadas, "POST", "/api/v1/despesas/escola/mes/2026-10/dispensar")).toBeTruthy());
-  fireEvent.click(await desfazer());
-  await waitFor(() => expect(achar(chamadas, "DELETE", "/api/v1/despesas/escola/mes/2026-10/dispensar")).toBeTruthy());
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-26T12:00:00-03:00"));
+  try {
+    const chamadas = apiFalsa();
+    montar();
+    await acoes("Escola");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Dispensar este mês" }));
+    await waitFor(() => expect(achar(chamadas, "POST", "/api/v1/despesas/escola/mes/2026-10/dispensar")).toBeTruthy());
+    fireEvent.click(await desfazer());
+    await waitFor(() => expect(achar(chamadas, "DELETE", "/api/v1/despesas/escola/mes/2026-10/dispensar")).toBeTruthy());
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("encerrar chama POST /despesas/{linha}/encerrar depois de confirmar; o toast só avisa, sem Desfazer", async () => {
