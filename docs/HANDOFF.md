@@ -24,5 +24,5 @@ instalar = `sudo ~/instalar-brain.sh` (copia main para /opt). Toda escrita manua
 - HE3: teste da lixeira pelo Hermes com e-mail real e desfazer no painel.
 - A2: semana de aceite da Agenda (só avisar se algo errado).
 - H7: Hermes 7 dias estável: a conferir (a data de 02/11 passou; ver BACKLOG).
-- RG1: ok para merge e instalação da branch `fix/revisao-geral` (revisão de 04/11).
+- RG1: ok para merge e instalação da branch `fix/revisao-geral` (revisão de 04/11). Depois do merge e ANTES do `sudo ~/instalar-brain.sh`: `cd ~/gabi-brain/painel && npm run build` e conferir que `gabi/painel/` foi atualizado (está no `.gitignore`; o instalador copia o bundle da árvore, então sem o build o painel novo não chega à produção).
 - Em espera (não alertar): Nibo (A7/C3), Graph da ionic, Tailscale família.

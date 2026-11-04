@@ -139,6 +139,8 @@ def test_transacao_commit_falho_faz_rollback():
     from gabi.db import transacao
 
     class ConFalsa:
+        in_transaction = True
+
         def __init__(self):
             self.comandos = []
 
@@ -152,3 +154,13 @@ def test_transacao_commit_falho_faz_rollback():
         with transacao(con):
             pass
     assert con.comandos[-1] == "rollback"
+
+
+def test_transacao_nao_esconde_erro_quando_sqlite_ja_desfez(tmp_path):
+    from gabi.db import transacao
+
+    con = sqlite3.connect(tmp_path / "x.db", isolation_level=None)
+    with pytest.raises(ValueError, match="x"):
+        with transacao(con):
+            con.execute("rollback")
+            raise ValueError("x")

@@ -74,11 +74,13 @@ def transacao(con, imediata: bool = True, aberta: bool = False):
     try:
         yield
     except BaseException:
-        con.execute("rollback")
+        if con.in_transaction:  # o SQLite pode já ter desfeito sozinho; não esconder o erro original
+            con.execute("rollback")
         raise
     else:
         try:
             con.execute("commit")
         except BaseException:
-            con.execute("rollback")  # commit falho (ex.: banco ocupado) deixaria a transação aberta
+            if con.in_transaction:
+                con.execute("rollback")  # commit falho (ex.: banco ocupado) deixaria a transação aberta
             raise

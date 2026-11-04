@@ -5,6 +5,7 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 - Status: `systemctl is-active gabi-brain-api` → `active`.
 - Reiniciar: `sudo systemctl restart gabi-brain-api`. Parar: `sudo systemctl stop gabi-brain-api`.
 - Logs: `journalctl -u gabi-brain-api -n 50 --no-pager`.
+- Instalar versão nova (depois do merge na main): se o painel mudou, `cd ~/gabi-brain/painel && npm run build` e conferir que `gabi/painel/` foi atualizado (está no `.gitignore` e o instalador copia o bundle da árvore); só então `sudo ~/instalar-brain.sh`.
 - Socket: `ls -ld /run/gabi-brain` → `drwx------ gabibrain`; `ss -ltn | grep 8080` → **vazio** (não há porta TCP). Se aparecer qualquer `:8080`, **pare o serviço** e investigue.
 - Chamar a API à mão (como root ou `gabibrain`): `curl --unix-socket /run/gabi-brain/api.sock http://localhost/api/eu -H 'Tailscale-User-Login: <login>'`.
 
@@ -29,10 +30,11 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 Backups: o diário (`/var/backups/gabi-brain/gabi-brain-AAAA-MM-DD.sqlite`), o do instalador (`/var/backups/gabi-brain/gabi.db.antes-instalar-AAAA-MM-DD-HHMM`, os 5 últimos) ou um pacote decifrado de "Backup fora da VPS".
 1. **Anotar os timers ligados** (para religar só esses): `systemctl list-units 'gabi-brain-*.timer' --state=active`.
 2. **Parar tudo, timers primeiro:** `sudo systemctl stop 'gabi-brain-*.timer'`, depois `sudo systemctl stop 'gabi-brain-*.service'` (pega também oneshot em andamento). Conferir: `systemctl list-units 'gabi-brain-*' --state=active` deve vir vazio; só siga quando vier.
-3. **Trocar o banco:** `sudo cp <backup escolhido> /var/lib/gabi-brain/gabi.db && sudo rm -f /var/lib/gabi-brain/gabi.db-wal /var/lib/gabi-brain/gabi.db-shm && sudo chown gabibrain:gabibrain /var/lib/gabi-brain/gabi.db && sudo chmod 600 /var/lib/gabi-brain/gabi.db`.
-4. **Conferir:** `sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db "pragma integrity_check"` deve responder `ok`.
-5. **Religar:** `sudo systemctl start gabi-brain-fontes gabi-brain-api gabi-brain-mcp` e, para cada timer anotado no passo 1, `sudo systemctl start <timer>`; conferir `/api/saude`.
-6. **Registrar:** `sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db "insert into decisao(quando, quem, o_que, origem) values (datetime('now'), 'ricardo', 'Banco restaurado de <backup usado>', 'runbook#restaurar')"`.
+3. **Guardar o banco atual:** `sudo cp -p /var/lib/gabi-brain/gabi.db /var/backups/gabi-brain/gabi.db.antes-restaurar-$(date +%F-%H%M)`.
+4. **Trocar o banco:** `sudo cp <backup escolhido> /var/lib/gabi-brain/gabi.db && sudo rm -f /var/lib/gabi-brain/gabi.db-wal /var/lib/gabi-brain/gabi.db-shm && sudo chown gabibrain:gabibrain /var/lib/gabi-brain/gabi.db && sudo chmod 600 /var/lib/gabi-brain/gabi.db`.
+5. **Conferir** (a VPS não tem o CLI `sqlite3`): `cd /tmp && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -c "import sqlite3; print(sqlite3.connect('/var/lib/gabi-brain/gabi.db').execute('pragma integrity_check').fetchone()[0])"` deve imprimir `ok`.
+6. **Religar:** `sudo systemctl start gabi-brain-fontes gabi-brain-api gabi-brain-mcp` e, para cada timer anotado no passo 1, `sudo systemctl start <timer>`; conferir `/api/saude`.
+7. **Registrar:** `cd /tmp && sudo -u gabibrain /opt/gabi-brain/venv/bin/python -c "import sqlite3; c=sqlite3.connect('/var/lib/gabi-brain/gabi.db'); c.execute(\"insert into decisao(quando, quem, o_que, origem) values (datetime('now'), 'ricardo', 'Banco restaurado de <backup usado>', 'runbook#restaurar')\"); c.commit()"`.
 
 ## Backup fora da VPS {#backup-fora}
 Pacote semanal criptografado, para o Ricardo puxar; a chave privada nunca fica na VPS.

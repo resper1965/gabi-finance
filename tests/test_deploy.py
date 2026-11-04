@@ -81,6 +81,11 @@ def test_backup_do_instalar_roda_como_gabibrain_e_sem_mode_ro():
     assert "pragma integrity_check" in INSTALAR and "journal_mode=delete" in INSTALAR
 
 
+def test_backup_ruim_do_instalar_e_apagado_antes_de_sair():
+    assert "os.unlink(sys.argv[1])" in INSTALAR
+    assert INSTALAR.index("os.unlink(sys.argv[1])") < INSTALAR.index("sys.exit(")
+
+
 def test_instalar_troca_por_mv_e_nao_apaga_antes_de_copiar():
     assert "rm -rf /opt/gabi-brain/gabi " not in INSTALAR
     assert ".novo" in INSTALAR and ".velho" in INSTALAR and 'mv "/opt/gabi-brain/.novo/$d"' in INSTALAR
