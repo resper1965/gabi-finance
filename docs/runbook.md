@@ -22,15 +22,24 @@ Convenção: `BANCO=/var/lib/gabi-brain/gabi.db`. Comandos como usuário `gabibr
 ## Backup e restauração
 - Diário 03:30 (`gabi-brain-backup.timer`), com teste de restauração. À mão: `$PY -m gabi.backup --banco $BANCO --destino /var/backups/gabi-brain --testar`.
 - Resultado: `gabi-brain-AAAA-MM-DD.sqlite` (600) e uma rodada `backup`. Falha de integridade → rodada `erro` e código de saída 1.
-- **Restaurar:** `sudo systemctl stop gabi-brain-api`; copiar o backup desejado para `$BANCO`; apagar `gabi.db-wal` e `gabi.db-shm`; `sudo systemctl start gabi-brain-api`; conferir `/api/saude`.
+- **Restaurar:** ver [Restaurar](#restaurar).
 - Cópia fora da VPS: ver "Backup fora da VPS" abaixo (a VPS não guarda a única cópia).
+
+## Restaurar {#restaurar}
+Backups: o diário (`/var/backups/gabi-brain/gabi-brain-AAAA-MM-DD.sqlite`), o do instalador (`/var/backups/gabi-brain/gabi.db.antes-instalar-AAAA-MM-DD-HHMM`, os 5 últimos) ou um pacote decifrado de "Backup fora da VPS".
+1. **Anotar os timers ligados** (para religar só esses): `systemctl list-timers 'gabi-brain-*' --all`.
+2. **Parar tudo:** `sudo systemctl stop gabi-brain-api gabi-brain-mcp gabi-brain-fontes && sudo systemctl stop 'gabi-brain-*.timer'`.
+3. **Trocar o banco:** `sudo cp <backup escolhido> /var/lib/gabi-brain/gabi.db && sudo rm -f /var/lib/gabi-brain/gabi.db-wal /var/lib/gabi-brain/gabi.db-shm && sudo chown gabibrain:gabibrain /var/lib/gabi-brain/gabi.db && sudo chmod 600 /var/lib/gabi-brain/gabi.db`.
+4. **Conferir:** `sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db "pragma integrity_check"` deve responder `ok`.
+5. **Religar:** `sudo systemctl start gabi-brain-fontes gabi-brain-api gabi-brain-mcp` e, para cada timer anotado no passo 1, `sudo systemctl start <timer>`; conferir `/api/saude`.
+6. **Registrar:** `sudo -u gabibrain sqlite3 /var/lib/gabi-brain/gabi.db "insert into decisao(quando, quem, o_que, origem) values (datetime('now'), 'ricardo', 'Banco restaurado de <backup usado>', 'runbook#restaurar')"`.
 
 ## Backup fora da VPS {#backup-fora}
 Pacote semanal criptografado, para o Ricardo puxar; a chave privada nunca fica na VPS.
 1. **Uma vez, na sua máquina:** `gpg --quick-generate-key ricardo-gabi-backup` e `gpg --armor --export ricardo-gabi-backup > backup.pub`. Copie só a **pública** para a VPS: `sudo install -m 644 backup.pub /etc/gabi/backup.pub`. Guarde a privada (e uma cópia dela) fora da VPS.
 2. Domingo 04:00 BRT (`gabi-brain-exportacao.timer`) gera `/var/backups/gabi-brain/exportacao/gabi-brain-AAAA-MM-DD.sqlite.gpg` (600; guarda os 8 últimos) e uma rodada `exportacao`. Sem `/etc/gabi/backup.pub` a unidade nem roda; se o teste de restauração falhar, nada é exportado e o sino avisa. À mão: `sudo systemctl start gabi-brain-exportacao`.
 3. **Puxar (G17):** `scp vps:/var/backups/gabi-brain/exportacao/*.gpg ./` e conferir com `gpg --decrypt gabi-brain-AAAA-MM-DD.sqlite.gpg > teste.sqlite && sqlite3 teste.sqlite 'pragma integrity_check'` (deve dar `ok`).
-4. **Restaurar a partir do pacote:** decifrar na sua máquina, copiar para a VPS e seguir "Restaurar" acima.
+4. **Restaurar a partir do pacote:** decifrar na sua máquina, copiar para a VPS e seguir [Restaurar](#restaurar) abaixo.
 
 ## Alertas
 | Sinal | Significa | Ação |
@@ -77,7 +86,7 @@ O painel é `painel/` (React + Vite); `npm run build` gera `gabi/painel/` e a AP
 - **Rodar a rodada à mão:** `sudo systemctl start gabi-brain-extratos` (captura, conferência, classificação, compromissos e recebimentos propostos); ler com `journalctl -u gabi-brain-extratos -n 20 --no-pager -o cat`. Saldos: `gabi-brain-saldos`.
 - **Importar notas (NFS-e da Bekaa):** `sudo ~/instalar-notas.sh` (instala e roda `gabi-brain-notas`); o timer `gabi-brain-notas.timer` repete sozinho. Os recebimentos casados aparecem em Cobrar → Notas a receber para confirmar ou rejeitar.
 - **Ler avisos:** sino do painel; por linha de comando `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.avisos`. Tipos: `rodada_parada`, `conta_atrasada`, `cobrada_apos_cancelar`, `vence_hoje`, `servico_falhou` (qualquer unit com `OnFailure`), `exportacao_parada` (sem pacote há mais de 9 dias), `google_parado` (todas as fontes Google de correio e agenda falhando e sem sincronizar há mais de 2 h; ajustes `avisos.google_horas` e `avisos.vigiar_google`; refazer o token: `docs/fontes/google.md`), `banco_desatualizado` (o provedor não atualiza um banco há mais de 24 h; vem de `dinheiro.sync_banco`, gravado a cada sincronização; um aviso por banco por dia).
-- **Restaurar backup:** ver "Backup e restauração" e "Backup fora da VPS".
+- **Restaurar backup:** ver [Restaurar](#restaurar) e "Backup fora da VPS".
 - **Comparar com o gabi-financeiro (G21):** `python -m tools.comparar_agenda --mes AAAA-MM`; saída vazia por 7 dias é o critério de corte.
 
 ## Avisos de vencimento antecipados {#avisos-vencimento}

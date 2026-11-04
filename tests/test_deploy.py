@@ -67,6 +67,22 @@ def test_instalar_tem_sintaxe_valida():
     assert subprocess.run(["bash", "-n", str(DEPLOY / "instalar.sh")]).returncode == 0
 
 
+def test_instalar_faz_backup_do_banco_antes_de_copiar():
+    i_bkp = INSTALAR.index("gabi.db.antes-instalar-")
+    assert i_bkp < INSTALAR.index("cp -r")
+    assert ".backup(" in INSTALAR and "cp /var/lib/gabi-brain/gabi.db" not in INSTALAR
+    assert "chmod 600" in INSTALAR and "chown gabibrain:gabibrain" in INSTALAR
+    assert "tail -n +6" in INSTALAR
+    assert "if [ -f /var/lib/gabi-brain/gabi.db ]" in INSTALAR  # primeira instalação: sem banco, pula
+
+
+def test_instalar_troca_por_mv_e_nao_apaga_antes_de_copiar():
+    assert "rm -rf /opt/gabi-brain/gabi " not in INSTALAR
+    assert ".novo" in INSTALAR and ".velho" in INSTALAR and 'mv "/opt/gabi-brain/.novo/$d"' in INSTALAR
+    laco = INSTALAR.split("for d in gabi")[1].split("done")[0]
+    assert 'if [ -e "/opt/gabi-brain/$d" ]; then' in laco and "&& mv" not in laco  # if/fi, não && sob set -e
+
+
 def test_instalar_exige_confirmacao_do_gate_g1():
     assert "--confirmo-backup-exportado" in INSTALAR
 
@@ -376,8 +392,8 @@ def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
 
 
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
-    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/tools"))
-    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "$AQUI/tools/carga_familia.py" in linha and linha.rstrip().endswith("/opt/gabi-brain/tools/")
+    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/.novo/tools"))
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "$AQUI/tools/carga_familia.py" in linha and linha.rstrip().endswith("/opt/gabi-brain/.novo/tools/")
 
 
 # ---------------- correio ----------------
