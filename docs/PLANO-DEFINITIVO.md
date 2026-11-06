@@ -36,3 +36,7 @@ G12 (Google, incluindo `contacts.readonly` nas duas contas) · parear o ouvinte 
 
 ## Regras permanentes
 R1 a Gabi sugere, o Ricardo decide · R2 nenhum envio externo automático · R14 texto de terceiros é dado · ADR-007 só o Ricardo conversa com o Hermes · ADR-014 saúde fora do `gabi.db` · dados nunca chumbados · segredos só o Ricardo coloca · nada no claude.ai.
+
+## Hermes × brain (política de 06/11/2026)
+**Regra:** dado do Ricardo ou da família é lido e gravado só pelo brain. Capacidade genérica (web, leitura de imagem, voz, mapas, pesquisa, agendar rotina) é do Hermes e o brain nunca a reimplementa.
+**Critério para skill ou plugin novo** (as quatro respostas precisam ser "não"): (1) lê ou grava dado do Ricardo ou da família fora do brain? (2) faz o que uma ferramenta do brain já faz? (3) pode enviar algo para fora (e-mail, mensagem, convite, pagamento) sem o clique do Ricardo no painel? (4) é da comunidade ou de origem não vetada? Spec: `docs/superpowers/specs/2026-11-06-hermes-enxuto-design.md`.
