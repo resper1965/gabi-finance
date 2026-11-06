@@ -226,7 +226,7 @@ Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do R
 Decisão: `docs/adr/028-hermes-completo.md`. Instalar só com autorização do Ricardo, depois do merge da branch da Onda 2.
 1. `sudo ~/instalar-brain.sh` (reinicia o MCP e o serviço de fontes; sem migração nova).
 2. **Token:** `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens listar` para achar o id do token do Hermes; depois `sudo -u gabibrain /opt/gabi-brain/venv/bin/python -m gabi.mcp.tokens escopos <id> fin,docs,trabalho,propostas,pedidos,decisoes,envios,familia,contatos` (o comando troca a lista inteira: confira no `listar` que os escopos atuais são os 8 de antes e só acrescente `contatos`; o segredo não muda).
-3. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-onda2`; em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (39 ferramentas).
+3. **Hermes:** backup `cp -p ~/.hermes/config.yaml ~/.hermes/config.yaml.bak-antes-onda2`; em `mcp_servers › gabi_brain › tools › include` colocar a lista de `docs/fontes/hermes.md` (39 ferramentas na Onda 2; hoje são 71, ver `docs/fontes/hermes.md`).
 4. **SOUL:** `bash ~/gabi-brain/deploy/instalar-hermes-soul.sh`.
 5. `sudo systemctl restart hermes-gateway`.
 6. `/new` no Telegram **e** no WhatsApp.

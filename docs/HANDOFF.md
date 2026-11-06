@@ -1,4 +1,4 @@
-# Handoff — estado em 04/11/2026 (para retomar em outra sessão ou outro modelo)
+# Handoff — estado em 06/11/2026 (para retomar em outra sessão ou outro modelo)
 
 Despesas (ADR-032), atividades (ADR-033) e projetos (ADR-034) estão na main e instaladas desde 27/10; o que mudou depois está no `docs/STATUS.md`.
 Leia antes: `docs/STATUS.md`, `docs/BACKLOG.md` (fonte única do que falta), `docs/runbook.md`, `docs/PLANO-DEFINITIVO.md`.
@@ -24,5 +24,6 @@ instalar = `sudo ~/instalar-brain.sh` (copia main para /opt). Toda escrita manua
 - HE3: teste da lixeira pelo Hermes com e-mail real e desfazer no painel.
 - A2: semana de aceite da Agenda (só avisar se algo errado).
 - H7: Hermes 7 dias estável: a conferir (a data de 02/11 passou; ver BACKLOG).
-- RG1: ok para merge e instalação da branch `fix/revisao-geral` (revisão de 04/11). Depois do merge e ANTES do `sudo ~/instalar-brain.sh`: `cd ~/gabi-brain/painel && npm run build` e conferir que `gabi/painel/` foi atualizado (está no `.gitignore`; o instalador copia o bundle da árvore, então sem o build o painel novo não chega à produção).
+- RG1 (revisão de 04/11) já está instalada. Regra que vale sempre: ANTES do `sudo ~/instalar-brain.sh`, `cd ~/gabi-brain/painel && npm run build` e conferir que `gabi/painel/` foi atualizado (está no `.gitignore`; sem o build o painel novo não chega à produção).
+- CV1 e PJ1 instalados e testados em 06/11; H7 e HE4: ver BACKLOG (SOUL novo falta instalar, só com ok dele).
 - Em espera (não alertar): Nibo (A7/C3), Graph da ionic, Tailscale família.
