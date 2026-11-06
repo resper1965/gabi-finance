@@ -80,7 +80,7 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
     <OcultarContext.Provider value={oculto === "1"}>
       <IrContext.Provider value={ir}>
         <FaixaSlot.Provider value={slot}>
-          <div data-theme={tema === "escuro" ? "dark" : "light"} data-celular={celular} style={{ ["--pad" as string]: `${pad}px`, display: "flex", flexDirection: "column", height: "100vh", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.45 }}>
+          <div data-theme={tema === "escuro" ? "dark" : "light"} data-celular={celular} style={{ ["--pad" as string]: `${pad}px`, display: "flex", flexDirection: "column", height: "100dvh", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.45 }}>
             <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
               {!celular && (
                 <nav aria-label="Painéis" style={{ flex: "none", width: mini ? 60 : 236, borderRight: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -141,7 +141,7 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
               </div>
             </div>
             {celular && (
-              <nav aria-label="Barra inferior" style={{ flex: "none", display: "flex", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
+              <nav aria-label="Barra inferior" style={{ flex: "none", display: "flex", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                 {BARRA_CELULAR.map((id) => {
                   const a = AREAS.find((x) => x.id === id)!;
                   return <ItemBarra key={id} icone={ICONE[id]} rotulo={a.rotulo} atual={id === area.id} onClick={() => ir(id)} />;
@@ -150,7 +150,7 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
               </nav>
             )}
             {celular && mais && (
-              <div role="dialog" aria-label="Mais áreas" style={{ position: "fixed", left: 0, right: 0, bottom: 56, padding: 14, background: "var(--color-bg)", borderTop: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}>
+              <div role="dialog" aria-label="Mais áreas" style={{ position: "fixed", left: 0, right: 0, bottom: "calc(56px + env(safe-area-inset-bottom))", maxHeight: "calc(100dvh - 120px)", overflowY: "auto", padding: 14, background: "var(--color-bg)", borderTop: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}>
                 {AREAS.filter((a) => !BARRA_CELULAR.includes(a.id)).map((a) => <ItemNav key={a.id} area={a} atual={a.id === area.id} mini={false} ir={ir} />)}
               </div>
             )}
