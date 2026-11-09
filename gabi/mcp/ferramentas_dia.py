@@ -1,8 +1,9 @@
 """Ferramentas MCP do dia (escopo `trabalho`): resumo da manhã, agenda e e-mail. SÓ LEITURA; nenhuma ferramenta envia, apaga ou confirma (R1/R2/R14).
 Consome: dia, agenda.consulta, correio.consulta; recebe `executar` do servidor."""
 import datetime as dt
+import logging
 
-from gabi import decisoes, dia
+from gabi import antecipar, decisoes, dia
 from gabi.agenda import consulta
 from gabi.correio import consulta as consulta_correio
 from gabi.dinheiro import agenda_financeira
@@ -10,6 +11,8 @@ from gabi.envelope import envelope
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 from gabi.fontes.graph_ness import ErroGraphNess
 from gabi.mcp.ferramentas_prop import ErroFerramenta
+
+log = logging.getLogger(__name__)
 
 ESCOPOS = {"agenda_listar": "trabalho", "email_listar": "trabalho", "email_ler": "trabalho", "resumo_manha": "trabalho"}
 
@@ -139,6 +142,13 @@ def resumo_da_manha(con, agora: dt.datetime) -> dict:
     linhas += _bloco_correio(consulta_correio.importantes(con, limite=50, agora=agora), 0)
     if d["prioridades"]:
         linhas += ["", f"⭐ *Prioridade:* {_corta(d['prioridades'][0]['titulo'], 90)}"]
+    try:
+        a_frente = antecipar.bloco_resumo(con, agora)
+    except Exception:  # o olhar à frente nunca derruba o resumo da manhã (ADR-037)
+        log.exception("resumo da manhã: olhar à frente falhou")
+        a_frente = []
+    if a_frente:
+        linhas += [""] + a_frente
     n = len(decisoes.abertas(con))
     if n:  # só a contagem: as perguntas saem quando ele pedir ("o que está pendente?")
         linhas += ["", f"🗳 {n} decisão(ões) esperando você. Quer ver?" if n > 1 else "🗳 1 decisão esperando você. Quer ver?"]
