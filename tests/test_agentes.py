@@ -85,6 +85,28 @@ def test_rotacionar_atomico_se_emitir_falha(con):
     assert not con.in_transaction
 
 
+def test_rotacionar_desfaz_a_nova_se_revogar_falha_depois_do_insert(con, monkeypatch):
+    r = agentes.criar(con, AGORA, "r", "A", ["fin"])
+    antes = _n(con, "decisao")
+
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(agentes.tokens, "revogar", falha)
+    with pytest.raises(RuntimeError):
+        agentes.rotacionar(con, AGORA, "r", r["id"])
+    assert _n(con) == 1 and tokens.validar(con, r["chave"]).id == r["id"]
+    assert _n(con, "decisao") == antes and not con.in_transaction
+
+
+def test_criar_desfaz_a_chave_se_falha_depois_do_insert(con, monkeypatch):
+    def falha(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(agentes, "_auditar", falha)
+    with pytest.raises(RuntimeError):
+        agentes.criar(con, AGORA, "r", "A", ["fin"])
+    assert _n(con) == 0 and _n(con, "decisao") == 0 and not con.in_transaction
+
+
 def test_ultimo_uso_e_contagem_7d(con):
     r = agentes.criar(con, AGORA, "r", "A", ["fin"])
     for dias, h in ((10, 0), (3, 0), (1, 0)):
