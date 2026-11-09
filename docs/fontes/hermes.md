@@ -72,10 +72,10 @@ mcp_servers:
       - preparar_reuniao
       - projeto_anexar
       - projeto_atualizar
-      - projeto_criar
       - projeto_fato
       - projeto_fatos
       - projeto_gasto
+      - projeto_ligar
       - projeto_listar
       - projeto_pessoa
       - projeto_ver

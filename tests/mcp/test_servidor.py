@@ -24,7 +24,7 @@ NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "
 NOVAS_VER = {"contatos_buscar", "financeiro_a_receber", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
 NOVAS_AGIR = {"email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
               "financeiro_marcar_gasto", "assinaturas_listar", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso"}  # Onda 3: escrita reversível a pedido do Ricardo no chat (lixeira recuperável, restaura no painel)
-NOVAS_PROJETOS = {"projeto_criar", "projeto_listar", "projeto_ver", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_fatos", "anexo_recentes", "projeto_anexar"}  # ADR-034: projetos, depois do sim no chat
+NOVAS_PROJETOS = {"projeto_criar", "projeto_ligar", "projeto_listar", "projeto_ver", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_fatos", "anexo_recentes", "projeto_anexar"}  # ADR-034: projetos, depois do sim no chat
 NOVAS_ASSISTENTE = {"promessas_candidatas", "olhar_a_frente", "preparar_reuniao", "revisao_semana"}  # ADR-037: só leitura
 NOVAS_ATIVIDADES = {"atividade_criar", "atividade_listar", "atividade_concluir", "atividade_adiar", "atividade_cancelar"}  # ADR-033: to-do do Ricardo, criado direto a pedido no chat
 NOVAS_DESPESAS = {"despesas_listar", "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"}  # ADR-032: grava depois do sim do Ricardo no chat
@@ -117,8 +117,8 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_75_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_dos_projetos_e_do_assistente():
-    assert len(ESCOPOS_FERRAMENTAS) == 75
+def test_sobram_exatamente_as_76_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_dos_projetos_do_assistente_e_do_linear():
+    assert len(ESCOPOS_FERRAMENTAS) == 76
     assert sorted(ESCOPOS_FERRAMENTAS) == sorted(NOVAS_ASSISTENTE | NOVAS_PROJETOS | set(["agenda_financeira", "agenda_listar", "assinatura_marcar", "assinaturas_listar", "atividade_adiar", "atividade_cancelar", "atividade_concluir", "atividade_criar", "atividade_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
                                            "despesa_criar", "despesa_encerrar", "despesa_excluir", "despesa_mes", "despesa_mudar", "despesas_listar", "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_ler", "email_listar", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "empresas_listar", "familia_atualizar_contato",
                                            "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
@@ -132,7 +132,7 @@ def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar"}
     for n in nomes:
         if n in ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso",
-                 "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir", "atividade_criar", "projeto_criar", "projeto_atualizar"):  # escrita reversível a pedido do Ricardo (contato com Desfazer no painel; Onda 3: lixeira recuperável, regra de lixo, a receber manual), nunca documento
+                 "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir", "atividade_criar", "projeto_criar", "projeto_ligar", "projeto_atualizar"):  # escrita reversível a pedido do Ricardo (contato com Desfazer no painel; Onda 3: lixeira recuperável, regra de lixo, a receber manual), nunca documento
             continue
         palavras = set(n.replace("contas_a_pagar", "contas").split("_"))  # "contas a pagar" é consulta, não ação
         assert not (palavras & proibidas), n

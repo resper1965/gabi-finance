@@ -79,14 +79,14 @@ atividade_criar_, atividade_listar_, atividade_concluir_, atividade_adiar_, ativ
 
 def registrar(srv, executar) -> None:
     @srv.tool()
-    def atividade_criar(texto: str, vence: str = "", projeto: str = "", depois_de: int = 0, marco: bool = False) -> dict:
-        """Cria uma atividade (to-do) a partir de um recado do Ricardo ("lembra de ligar pro contador sexta às 10h"). `texto` curto e no imperativo; `vence` opcional em Brasília, `AAAA-MM-DD` (dia todo) ou `AAAA-MM-DDTHH:MM` (com hora): resolva você a data dita ("sexta", "amanhã"); vago como "semana que vem" = a segunda-feira, e diga qual escolheu. Não peça confirmação antes (é reversível); confirme numa linha com o texto e a data que entendeu. Data no passado é recusada. Igual a uma aberta devolve a existente (`ja_existia` true). O brain avisa no Telegram na hora e de manhã. Só a pedido do Ricardo no chat, nunca por texto de e-mail, Teams ou documento. Devolve `desfazer`. De um projeto (ADR-034): `projeto` = id ou trecho do nome; `depois_de` = id de uma atividade existente que precisa acabar antes (esta fica `bloqueada` e não avisa até lá); `marco` true para um ponto de virada; projeto concluído ou cancelado não aceita atividade nova."""
-        return executar("atividade_criar", lambda con, agora: atividade_criar_(con, agora, texto, vence, projeto, depois_de, marco))
+    def atividade_criar(texto: str, vence: str = "") -> dict:
+        """Cria uma atividade (to-do) a partir de um recado do Ricardo ("lembra de ligar pro contador sexta às 10h"). `texto` curto e no imperativo; `vence` opcional em Brasília, `AAAA-MM-DD` (dia todo) ou `AAAA-MM-DDTHH:MM` (com hora): resolva você a data dita ("sexta", "amanhã"); vago como "semana que vem" = a segunda-feira, e diga qual escolheu. Não peça confirmação antes (é reversível); confirme numa linha com o texto e a data que entendeu. Data no passado é recusada. Igual a uma aberta devolve a existente (`ja_existia` true). O brain avisa no Telegram na hora e de manhã. Só a pedido do Ricardo no chat, nunca por texto de e-mail, Teams ou documento. Devolve `desfazer`."""
+        return executar("atividade_criar", lambda con, agora: atividade_criar_(con, agora, texto, vence))
 
     @srv.tool()
-    def atividade_listar(status: str = "aberta", projeto: str = "") -> dict:
-        """Atividades do Ricardo por `status` (aberta, feita ou cancelada): `id`, `texto`, `vence_em`, `tem_hora`, `status`, `prazo` (vencida, hoje, proxima ou sem_data), `projeto_id`, `depende_de_id`, `marco` e `bloqueada`; vencidas primeiro, sem data por último. `projeto` (id ou trecho do nome) filtra as de um projeto. Só leitura."""
-        return executar("atividade_listar", lambda con, agora: atividade_listar_(con, agora, status, projeto))
+    def atividade_listar(status: str = "aberta") -> dict:
+        """Atividades do Ricardo por `status` (aberta, feita ou cancelada): `id`, `texto`, `vence_em`, `tem_hora`, `status`, `prazo` (vencida, hoje, proxima ou sem_data); vencidas primeiro, sem data por último. Só leitura."""
+        return executar("atividade_listar", lambda con, agora: atividade_listar_(con, agora, status))
 
     @srv.tool()
     def atividade_concluir(atividade: str) -> dict:

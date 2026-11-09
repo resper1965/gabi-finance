@@ -124,4 +124,4 @@ def test_soul_projetos_nao_reabre_concluido_nem_cancelado():
     # ADR-034: não existe reabrir; para voltar, cria de novo
     t = SOUL.read_text()
     linha = next(l for l in t.splitlines() if "projeto_atualizar" in l and "→" in l)
-    assert "projeto_criar" in linha and "reabrir" in linha
+    assert "projeto_ligar" in linha and "Linear" in linha and "reabrir" in linha  # ADR-038: criar de novo = Linear + projeto_ligar

@@ -7,10 +7,10 @@ import { TELAS } from "../src/App";
 import { apiFalsa, type Chamada } from "./apiFalsa";
 
 const env = (dados: unknown) => ({ dados_ate: null, desatualizado: false, fontes: [], dados });
-const proj = (id: number, nome: string, status = "ativo", feitas = 2, total = 5, prazo: string | null = "2026-11-20") => ({ id, nome, status, prazo, objetivo: "trocar o motor", progresso: { feitas, total }, orcamento_centavos: null });
+const proj = (id: number, nome: string, status = "ativo", feitas = 2, total = 5, prazo: string | null = "2026-11-20") => ({ id, nome, status, prazo, objetivo: "trocar o motor", progresso: { feitas, total }, orcamento_centavos: null, linear_url: id === 1 ? "https://linear.app/r/project/carro" : null });
 const ativ = (id: number, texto: string, extra = {}) => ({ id, texto, vence_em: null, tem_hora: false, status: "aberta", prazo: "sem_data", projeto_id: 1, depende_de_id: null, marco: false, bloqueada: false, ...extra });
 const DADOS = {
-  id: 1, nome: "Carro na oficina", objetivo: "trocar o motor", status: "ativo", prazo: "2026-11-20", progresso: { feitas: 2, total: 5 },
+  id: 1, nome: "Carro na oficina", objetivo: "trocar o motor", status: "ativo", prazo: "2026-11-20", progresso: { feitas: 2, total: 5 }, linear_url: "https://linear.app/r/project/carro",
   proximas: [ativ(2, "pedir orçamento", { vence_em: "2026-10-30", prazo: "proxima" })], bloqueadas: [ativ(3, "aprovar o serviço", { depende_de_id: 2, bloqueada: true, espera: "pedir orçamento" })],
   atrasadas: [ativ(4, "ligar pro seguro", { vence_em: "2026-10-20", prazo: "vencida" })],
   pessoas: [{ id: 1, nome: "Seu Jorge", papel: "mecânico", pessoa_id: null, contato: "11 99999-0000" }],
@@ -32,11 +32,13 @@ const abrir = async () => { fireEvent.click(await screen.findByRole("button", { 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-27T15:00:00")); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-test("lista os projetos ativos com prazo e progresso em texto, e tem as abas", async () => {
+test("lista os projetos ativos com prazo e a marca do Linear, sem progresso, e tem as abas", async () => {
   apiFalsa(SOBRE());
   montar();
-  expect(await screen.findByText("2/5")).toBeInTheDocument();
-  expect(screen.getByText("0/3")).toBeInTheDocument();
+  expect(await screen.findByText("Reforma da cozinha")).toBeInTheDocument();
+  expect(screen.queryByText("2/5")).toBeNull();
+  expect(screen.queryByText("0/3")).toBeNull();
+  expect(screen.getAllByText("Linear")).toHaveLength(1);
   expect(screen.getByText(/20\/11/)).toBeInTheDocument();
   expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Ativos", "Pausados", "Encerrados"]);
 });
@@ -44,7 +46,7 @@ test("lista os projetos ativos com prazo e progresso em texto, e tem as abas", a
 test("aba Pausados lê status=pausado e Encerrados lê concluído e cancelado", async () => {
   const chamadas = apiFalsa(SOBRE());
   montar();
-  await screen.findByText("2/5");
+  await screen.findByText("Reforma da cozinha");
   fireEvent.click(screen.getByRole("tab", { name: "Pausados" }));
   await waitFor(() => expect(chamadas.some((c) => c.url.endsWith("/api/v1/projetos?status=pausado"))).toBe(true));
   fireEvent.click(screen.getByRole("tab", { name: "Encerrados" }));
@@ -58,7 +60,7 @@ test("sem projeto mostra a frase de vazio", async () => {
   expect(await screen.findByText(/Nenhum projeto ativo/)).toBeInTheDocument();
 });
 
-test("abrir o detalhe mostra os blocos: resumo, atividades, pessoas, fatos e anexos", async () => {
+test("abrir o detalhe mostra a pasta: resumo com link do Linear, pessoas, fatos e anexos, sem etapas", async () => {
   const chamadas = apiFalsa(SOBRE());
   montar();
   await abrir();
@@ -67,10 +69,9 @@ test("abrir o detalhe mostra os blocos: resumo, atividades, pessoas, fatos e ane
   expect(screen.getByText(/5\.000,00/)).toBeInTheDocument();
   expect(screen.getByText(/1\.200,50/)).toBeInTheDocument();
   expect(screen.getByText(/3\.799,50/)).toBeInTheDocument();
-  expect(screen.getByText("pedir orçamento")).toBeInTheDocument();
-  expect(screen.getByText("aprovar o serviço")).toBeInTheDocument();
-  expect(screen.getByText("espera: pedir orçamento")).toBeInTheDocument();
-  expect(screen.getByText("ligar pro seguro")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Abrir no Linear" })).toHaveAttribute("href", "https://linear.app/r/project/carro");
+  expect(screen.queryByText("pedir orçamento")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Atividades" })).toBeNull();
   expect(screen.getByText(/Seu Jorge — mecânico/)).toBeInTheDocument();
   expect(screen.getByText("O mecânico disse que o prazo é dia 20")).toBeInTheDocument();
   expect(screen.getByText("oi, o carro fica pronto dia 20")).toBeInTheDocument();
@@ -194,7 +195,7 @@ test("caixa de entrada lista anexos, mostra a transcrição e 'Ligar a…' chama
 test("sem anexo novo a caixa de entrada não aparece", async () => {
   apiFalsa(SOBRE());
   montar();
-  await screen.findByText("2/5");
+  await screen.findByText("Reforma da cozinha");
   expect(screen.queryByText("Caixa de entrada")).toBeNull();
 });
 
