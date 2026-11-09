@@ -1,24 +1,22 @@
-/** Projetos: gestão de projetos do Ricardo (ADR-034), conduzida pelo Hermes; aqui ele vê, corrige e anota. Sem gráficos: progresso em texto.
+/** Projetos: a pasta do projeto (ADR-038): orçamento contra gasto, fatos, anexos e pessoas; projeto e etapas moram no Linear (botão "Abrir no Linear"). Sem gráficos.
  * Consome: GET /api/v1/projetos?status=, POST /projetos, GET/PATCH /projetos/{id}, POST /projetos/{id}/pessoas|gastos|fatos|anexos, GET /api/v1/anexos/recentes e /anexos/{id}/arquivo. */
 import { useState } from "react";
 import { Bloco } from "../componentes/Bloco";
 import { Vazio } from "../componentes/Estados";
 import { Painel } from "../componentes/Painel";
 import { api } from "../lib/api";
-import { dataCurta, formatarBRL as brl, quandoVence } from "../lib/formato";
+import { dataCurta, formatarBRL as brl } from "../lib/formato";
 import { Aviso, useAcao } from "../lib/useAcao";
 import { useApi } from "../lib/useApi";
 
 type Agir = ReturnType<typeof useAcao>["agir"];
-interface Progresso { feitas: number; total: number }
-interface Projeto { id: number; nome: string; status: string; prazo: string | null; objetivo: string | null; progresso: Progresso }
-interface Atividade { id: number; texto: string; vence_em: string | null; tem_hora: boolean; espera?: string | null }
+interface Progresso { feitas: number; total: number }  // só as atividades antigas do brain; não é mostrado
+interface Projeto { id: number; nome: string; status: string; prazo: string | null; objetivo: string | null; linear_url: string | null }
 interface Pessoa { id: number; nome: string; papel: string | null; contato: string | null }
 interface Fato { id: number; texto: string; data: string | null; pessoa_nome: string | null; anexo_id: number | null }
 interface AnexoItem { id: number; tipo: "imagem" | "audio" | "documento"; recebido_em: string; transcricao: string | null; paperless_id: number | null }
 interface Detalhe {
-  id: number; nome: string; objetivo: string | null; status: string; prazo: string | null; progresso: Progresso;
-  proximas: Atividade[]; bloqueadas: Atividade[]; atrasadas: Atividade[]; pessoas: Pessoa[];
+  id: number; nome: string; objetivo: string | null; status: string; prazo: string | null; progresso: Progresso; linear_url: string | null; pessoas: Pessoa[];
   orcamento: string | null; gasto: string; saldo: string | null; fatos_recentes: Fato[]; anexos: number; anexos_itens: AnexoItem[];
 }
 const ROTA = "/api/v1/projetos";
@@ -26,7 +24,6 @@ const arquivo = (id: number) => `/api/v1/anexos/${id}/arquivo`;
 const suave = { color: "var(--ink2)" } as const;
 const chip = (ativo: boolean) => ({ height: 32, padding: "0 12px", border: "1px solid var(--line3)", background: ativo ? "var(--sel-bg, var(--raised))" : "transparent", color: "var(--color-text)", font: "600 12.5px var(--font-body)", cursor: "pointer" }) as const;
 const campo = { display: "flex", flexDirection: "column", gap: 3, fontSize: 13 } as const;
-const quando = (a: Atividade) => quandoVence(a.vence_em, a.tem_hora);
 const STATUS: Record<string, string> = { ativo: "Ativo", pausado: "Pausado", concluido: "Concluído", cancelado: "Cancelado" };
 
 /** Lista de um status; clicar abre o detalhe. */
@@ -42,7 +39,7 @@ function Lista({ status, vazio, onAbrir }: { status: string; vazio: string; onAb
                 <span>{p.nome}</span>
                 <span style={{ display: "flex", gap: 12, fontSize: 12.5, ...suave }}>
                   {p.prazo && <span>prazo {dataCurta(p.prazo)}</span>}
-                  <span>{p.progresso.feitas}/{p.progresso.total}</span>
+                  {p.linear_url && <span>Linear</span>}
                 </span>
               </button>
             </li>))}
@@ -109,18 +106,6 @@ function CaixaDeEntrada({ onLigado }: { onLigado: () => void }) {
   );
 }
 
-function Linhas({ itens, extra }: { itens: Atividade[]; extra?: (a: Atividade) => string | null }) {
-  return (
-    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-      {itens.map((a) => (
-        <li key={a.id} style={{ display: "flex", gap: 10, justifyContent: "space-between", flexWrap: "wrap", padding: "6px 0", borderTop: "1px solid var(--color-divider)" }}>
-          <span>{a.texto}</span>
-          <span style={{ fontSize: 12.5, ...suave }}>{extra?.(a) ?? quando(a)}</span>
-        </li>))}
-    </ul>
-  );
-}
-
 type Form = "fato" | "gasto" | "pessoa" | null;
 
 function Formularios({ id, agir, ocupado, erros, recarregar }: { id: number; agir: Agir; ocupado: boolean; erros: Record<string, string>; recarregar: () => Promise<void> }) {
@@ -173,12 +158,12 @@ function Detalhe_({ id, onVoltar }: { id: number; onVoltar: () => void }) {
     <Painel leitura={leitura} arquivo="projeto">
       {(d) => {
         const encerrado = d.status === "concluido" || d.status === "cancelado";
-        const atrasadas = new Set(d.atrasadas.map((a) => a.id));
         return (
           <>
             <button className="btn btn-secondary" style={{ minHeight: 32, alignSelf: "flex-start" }} onClick={onVoltar}>← Projetos</button>
-            <Bloco titulo={d.nome} nota={`${STATUS[d.status] ?? d.status} · ${d.progresso.feitas}/${d.progresso.total} atividades`}>
+            <Bloco titulo={d.nome} nota={STATUS[d.status] ?? d.status}>
               {d.objetivo && <p style={{ margin: 0 }}>{d.objetivo}</p>}
+              {d.linear_url && <a className="btn btn-secondary" style={{ minHeight: 32, alignSelf: "flex-start" }} href={d.linear_url} target="_blank" rel="noopener noreferrer">Abrir no Linear</a>}
               <span style={{ fontSize: 13.5, ...suave }}>
                 {d.orcamento === null ? `Sem orçamento · gasto ${brl(d.gasto)}` : `Orçamento ${brl(d.orcamento)} · gasto ${brl(d.gasto)} · saldo ${brl(d.saldo ?? "0")}`}
               </span>
@@ -197,7 +182,7 @@ function Detalhe_({ id, onVoltar }: { id: number; onVoltar: () => void }) {
                   </span>
                   {confirmar && (
                     <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <p style={{ margin: 0 }}>{confirmar === "concluido" ? "Concluir" : "Cancelar"} "{d.nome}"? Não há como reabrir; para voltar, crie um projeto novo.{" As atividades abertas dele também são canceladas."}</p>
+                      <p style={{ margin: 0 }}>{confirmar === "concluido" ? "Concluir" : "Cancelar"} "{d.nome}"? Não há como reabrir; para voltar, crie um projeto novo.{d.progresso.total > 0 ? " As atividades abertas dele também são canceladas." : ""}</p>
                       <span style={{ display: "flex", gap: 8 }}>
                         <button className="btn btn-primary" disabled={ocupado} aria-label={`Confirmar ${confirmar === "concluido" ? "concluir" : "cancelar"}`}
                           onClick={() => patch({ status: confirmar }, confirmar === "concluido" ? "Projeto concluído." : "Projeto cancelado.").then((ok) => ok && setConfirmar(null))}>Confirmar</button>
@@ -206,14 +191,6 @@ function Detalhe_({ id, onVoltar }: { id: number; onVoltar: () => void }) {
                     </div>)}
                 </>)}
               <Aviso erro={erros.status} />
-            </Bloco>
-            <Bloco titulo="Atividades" nota="Quem cria e conclui é o Hermes (ou você, em Dia › Atividades).">
-              {d.atrasadas.length + d.proximas.length + d.bloqueadas.length === 0 ? <Vazio frase="Nenhuma atividade aberta neste projeto." /> : (
-                <>
-                  {d.atrasadas.length > 0 && <section><h4 style={{ margin: "4px 0", fontSize: 14 }}>Atrasadas</h4><Linhas itens={d.atrasadas} /></section>}
-                  {d.proximas.filter((a) => !atrasadas.has(a.id)).length > 0 && <section><h4 style={{ margin: "4px 0", fontSize: 14 }}>Próximas</h4><Linhas itens={d.proximas.filter((a) => !atrasadas.has(a.id))} /></section>}
-                  {d.bloqueadas.length > 0 && <section><h4 style={{ margin: "4px 0", fontSize: 14 }}>Bloqueadas</h4><Linhas itens={d.bloqueadas} extra={(a) => (a.espera ? `espera: ${a.espera}` : "espera outra atividade")} /></section>}
-                </>)}
             </Bloco>
             <Bloco titulo="Pessoas">
               {d.pessoas.length === 0 ? <Vazio frase="Nenhuma pessoa ligada a este projeto." /> : (
@@ -270,7 +247,7 @@ export function Projetos() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <CaixaDeEntrada key={rev} onLigado={() => setRev((n) => n + 1)} />
-      <Bloco titulo="Projetos" nota="Conte um projeto ao Hermes (Telegram ou WhatsApp); ele monta a lista e anota os fatos. Aqui você vê e corrige.">
+      <Bloco titulo="Projetos" nota="Conte um projeto ao Hermes (Telegram ou WhatsApp); ele cria o projeto e as etapas no Linear e guarda aqui a pasta (orçamento, fatos, anexos). Aqui você vê e corrige.">
         <NovoProjeto agir={agir} ocupado={ocupado} erro={erros.novo} aoCriar={async () => setRev((n) => n + 1)} />
         <div role="tablist" aria-label="Projetos" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {ABAS.map((a) => <button key={a} role="tab" aria-selected={aba === a} onClick={() => setAba(a)} style={chip(aba === a)}>{a}</button>)}

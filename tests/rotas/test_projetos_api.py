@@ -126,3 +126,14 @@ def test_arquivo_sumido_ou_documento_ou_fora_da_pasta_e_404(cli, banco):
     doc = conectar(banco).execute("insert into anexo(tipo, paperless_id, recebido_em) values ('documento', 5, 'x')").lastrowid
     for i in (sumido, fora, doc):
         assert req(cli, "GET", f"/api/v1/anexos/{i}/arquivo").status_code == 404
+
+
+def test_ver_e_listar_trazem_o_link_do_linear(cli, banco):  # ADR-038
+    p = _criar(cli, "Fazenda")
+    assert p["linear_id"] is None and p["linear_url"] is None
+    con = conectar(banco)
+    con.execute("update projeto set linear_id='LIN-1', linear_url='https://linear.app/r/project/fazenda' where id=?", (p["id"],))
+    con.commit()
+    con.close()
+    assert req(cli, "GET", f"{U}/{p['id']}").json()["dados"]["linear_url"] == "https://linear.app/r/project/fazenda"
+    assert req(cli, "GET", U).json()["dados"]["itens"][0]["linear_url"] == "https://linear.app/r/project/fazenda"
