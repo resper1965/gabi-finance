@@ -68,6 +68,8 @@ mcp_servers:
       - financeiro_recorrentes
       - financeiro_registrar_a_receber
       - financeiro_saldo
+      - olhar_a_frente
+      - preparar_reuniao
       - projeto_anexar
       - projeto_atualizar
       - projeto_criar
@@ -77,12 +79,14 @@ mcp_servers:
       - projeto_listar
       - projeto_pessoa
       - projeto_ver
+      - promessas_candidatas
       - propor_evento
       - propor_resposta_convite
       - propor_teams
       - regras_listar
       - regras_sugerir
       - resumo_manha
+      - revisao_semana
       - teams_pendentes
 ```
 A lista é a **explícita** (sem `*`) e é testada: `tests/mcp/test_hermes.py` falha se ela divergir das ferramentas dos escopos acima. Regerar: `python -m tools.gerar_hermes`.
