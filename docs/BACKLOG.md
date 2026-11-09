@@ -13,6 +13,7 @@ Regras que valem em tudo: R1 a Gabi sugere, o Ricardo decide (exceção: "para q
 | # | Item | Dono | Status | Pronto quando |
 |---|---|---|---|---|
 | AT1 | Marcar agenda e responder no Teams com anuência do Ricardo (ADR-024) | R+C | 🔧 27/10: `envios.escrita` LIGADO, contas de agenda gmail/ness/bekaa, `painel.url`; token do Hermes já tinha `envios`; gmail já pode criar evento. Agenda da ness ok (Calendars.ReadWrite); "cliente público" ligado pelo Ricardo em 27/10. Login do Teams feito em 27/10 (`GRAPH_NESS_TEAMS_REFRESH` gravado, `gabi-brain-fontes` reiniciado). Faltam: o token da resper@bekaa.eu com `calendar.events` e o teste (Hermes propõe, você clica Enviar em Envios) | um evento e uma mensagem no Teams enviados pelo painel e conferidos |
+| LN1 | Projetos no Linear (ADR-038): código pronto na branch `feat/projetos-linear` (nada mergeado nem instalado) | R+C | 🔧 09/11 | ok dele para merge+instalar, chave do Linear em `~/.hermes/.env`, passos do runbook `#linear` e aceite real ("vamos vender a fazenda"); depois de um mês, decidir o espelho de um sentido |
 | A2 | Uma semana de aceite: conferir telas Agenda, Prioridades e "Na lixeira" contra o app do Google | R | 🔧 | semana sem erro anotada |
 | A7 | Nibo: renovar `NIBO_TOKEN` (401 desde 16/10) | R | ⏸ on hold (chave da Nibo) | `systemctl start gabi-brain-notas` sem erro |
 | C3 | Conferir `NIBO_TOKEN` e as rotas `/partners`, `/customers`, `/categories` com dado real | R+C | ⏸ on hold (chave da Nibo) | G8 fechado |

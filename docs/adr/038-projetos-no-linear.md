@@ -1,6 +1,6 @@
 # ADR-038 · Projetos no Linear; o brain guarda a pasta (dinheiro, fatos, anexos, documentos)
 
-Data: 09/11/2026 · Estado: proposto (spec escrita, aguarda revisão do Ricardo; nada implementado) · Spec: `docs/superpowers/specs/2026-11-09-projetos-no-linear-design.md`
+Data: 09/11/2026 · Estado: aprovado e implementado na branch `feat/projetos-linear` (plano `docs/superpowers/plans/2026-11-09-projetos-no-linear.md`); NÃO mergeado, NÃO instalado (aguarda ok do Ricardo, a chave do Linear e o runbook `#linear`) · Spec: `docs/superpowers/specs/2026-11-09-projetos-no-linear-design.md`
 
 **Contexto.** O ADR-034 pôs a gestão de projetos dentro do brain ("tudo no brain, nenhuma ferramenta externa de projetos"), por causa do dinheiro. O Ricardo achou o painel pobre de dados e sem mobilidade (pesado no celular) e quer conduzir projetos ("vamos vender a fazenda") falando com o Hermes, com o projeto num gerenciador como o Linear.
 

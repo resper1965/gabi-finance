@@ -21,6 +21,7 @@ instalar = `sudo ~/instalar-brain.sh` (copia main para /opt). Toda escrita manua
   conferir `GRAPH_NESS_TEAMS_REFRESH` no env e `sudo systemctl restart gabi-brain-fontes`.
 
 ## 2. Em aberto com o Ricardo
+- LN1: projetos no Linear (ADR-038) pronto na branch `feat/projetos-linear`; falta o ok dele para merge+instalar, a chave do Linear e o aceite (runbook `#linear`).
 - HE3: teste da lixeira pelo Hermes com e-mail real e desfazer no painel.
 - A2: semana de aceite da Agenda (só avisar se algo errado).
 - H7: Hermes 7 dias estável: a conferir (a data de 02/11 passou; ver BACKLOG).

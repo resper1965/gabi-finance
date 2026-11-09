@@ -2,6 +2,8 @@
 
 Data: 27/10/2026 · Estado: aceito (implementado na branch `feat/projetos`, aguarda autorização de merge e instalação) · Spec: `docs/superpowers/specs/2026-10-27-projetos-design.md` · Plano: `docs/superpowers/plans/2026-10-27-projetos.md`
 
+> **ADR-038 (09/11/2026) substitui em parte este ADR:** projeto e etapas passam a morar no Linear; o brain guarda a pasta (dinheiro, fatos, anexos, pessoas) ligada por `linear_id`. A decisão 1 ("tudo no brain") e a linha "Fora: ferramenta externa de projetos" deixam de valer; `projeto_criar` e dependência/marco em `atividade_*` saem do que o Hermes enxerga (código fica).
+
 **Contexto.** O Ricardo quer gerir projetos dos mais variados tipos ("de ajustes em um carro até gestão de crise familiar"): criar o projeto, gerir as atividades e os recursos (dinheiro, pessoas, documentos e fatos), com print, imagem e áudio como evidência. Quem conduz é o Hermes (ou outro agente de IA); o painel serve para ver e corrigir. Não quis recriar o que já existe.
 
 **Decisões (tomadas pelo assistente a pedido do Ricardo em 27/10; ele pode mudar).**
