@@ -30,6 +30,9 @@ MAX_IDS_POR_CHAMADA = 100
 TAM_TRECHO = 280
 TAM_ASSUNTO = 300
 MAX_CORPO = 8000  # `email_ler` (MCP): o corpo sai em texto e cortado aqui
+MAX_TRECHO_ENVIADO = 600  # `promessas_candidatas` (ADR-037): trecho do que o dono escreveu, sem a citação
+MAX_ENVIADOS_TEXTO = 30   # mensagens enviadas lidas por conta e por chamada
+MAX_PARA = 5
 _ID = re.compile(r"^[0-9a-f]{6,32}$")
 _ENDERECO = re.compile(r"^[a-z0-9._%+'-]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,}$")
 _CABECALHOS = ("From", "Subject", "List-Unsubscribe", "Precedence", "Auto-Submitted")
@@ -348,6 +351,67 @@ def mensagem(conta: str, externo_id: str, token: Callable[[str], str], http=_htt
     return cortar_corpo(texto)
 
 
+_CITACAO = re.compile(r"^(on .{5,200} wrote:|em .{5,200} escreveu:|-{2,}\s*(original message|mensagem original)|de:\s.*|from:\s.*)$", re.I)
+
+
+def trecho_enviado(texto: str, limite: int = MAX_TRECHO_ENVIADO) -> str:
+    """O que o dono ESCREVEU: para na primeira linha de citação ("Em ... escreveu:", "On ... wrote:", "De:", mensagem original) e descarta linhas com ">"."""
+    mantidas = []
+    for linha in limpar_texto(texto).split("\n"):
+        if _CITACAO.match(linha.strip()):
+            break
+        if not linha.lstrip().startswith(">"):
+            mantidas.append(linha)
+    return limpar_texto("\n".join(mantidas))[:limite]
+
+
+def _corpo_da_resposta(resp: dict) -> str:
+    planos: list[str] = []
+    _partes(resp.get("payload"), "text/plain", planos)
+    if planos:
+        return "\n".join(planos)
+    htmls: list[str] = []
+    _partes(resp.get("payload"), "text/html", htmls)
+    return html_para_texto("\n".join(htmls))
+
+
+def enviados_textos(conta: str, dias: int, limite: int, token: Callable[[str], str], http=_http_real) -> list[dict]:
+    """[{externo_id, quando, para, assunto, trecho}] dos e-mails que o dono enviou nos últimos `dias` (1 a 14), do mais novo ao mais antigo, no máximo
+    MAX_ENVIADOS_TEXTO. Só GET; nada é guardado nem logado (ADR-037). O trecho é o que ele escreveu, sem citação, cortado em MAX_TRECHO_ENVIADO."""
+    conta = conta_valida(conta)
+    if not isinstance(dias, int) or isinstance(dias, bool) or not 1 <= dias <= 14:
+        raise ErroGoogleOAuth("janela inválida")
+    if not isinstance(limite, int) or isinstance(limite, bool) or not 1 <= limite <= MAX_ENVIADOS_TEXTO:
+        raise ErroGoogleOAuth("limite inválido")
+    q = urllib.parse.quote(f"in:sent newer_than:{dias}d")
+    try:
+        ids, _ = _ids_paginados(conta, f"{BASE}/messages?q={q}&maxResults={min(limite, 100)}", "messages", token, http, maximo=limite)
+    except _HistoricoExpirado:
+        raise ErroGoogleOAuth("messages.list -> 404") from None
+    saida = []
+    for i in ids[:limite]:
+        status, resp = _pegar(http, token, conta, "GET", f"{BASE}/messages/{i}?format=full")
+        if status == 404 or status in _VENENO:
+            continue
+        if status >= 400:
+            raise ErroGoogleOAuth(f"messages.get -> {status}")
+        if not isinstance(resp, dict):
+            raise ErroGoogleOAuth("resposta inválida do Google")
+        cab = _cabecalhos(resp)
+        para = []
+        for parte in re.split(r"[,;]", cab.get("to", "")):
+            a = _endereco(parte)
+            if a and a not in para:
+                para.append(a)
+        try:
+            quando = dt.datetime.fromtimestamp(int(resp.get("internalDate")) / 1000, dt.timezone.utc).isoformat(timespec="seconds")
+        except (TypeError, ValueError, OverflowError, OSError):
+            quando = None
+        saida.append({"externo_id": i, "quando": quando, "para": para[:MAX_PARA], "assunto": cab.get("subject", "")[:TAM_ASSUNTO],
+                      "trecho": trecho_enviado(_corpo_da_resposta(resp))})
+    return saida
+
+
 class GoogleEmail:
     """Objeto da ponte (JSON puro). Sem o token provider nada sai."""
 
@@ -374,6 +438,9 @@ class GoogleEmail:
 
     def mensagem(self, conta: str, externo_id: str) -> dict:
         return mensagem(conta, externo_id, self._token, self._http)
+
+    def enviados_textos(self, conta: str, dias: int, limite: int) -> list[dict]:
+        return enviados_textos(conta, dias, limite, self._token, self._http)
 
 
 def google_email_do_ambiente(env) -> GoogleEmail | None:

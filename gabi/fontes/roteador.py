@@ -55,6 +55,9 @@ class RoteadorEmail:
     def respondeu_a(self, conta, enderecos):
         return self._de(conta).respondeu_a(conta, enderecos)
 
+    def enviados_textos(self, conta, dias, limite):
+        return self._de(conta).enviados_textos(conta, dias, limite)
+
 
 def email_pela_ponte(caminho, contas_graph) -> RoteadorEmail | None:
     """Roteador do correio sobre a ponte (Gmail e Graph da ness); None se nenhum dos dois está configurado no serviço de fontes."""

@@ -18,8 +18,8 @@ from typing import Callable
 from gabi.fontes._http import com_retry
 from gabi.fontes.google_agenda import ResultadoEventos
 from gabi.fontes.google_contatos import MAX_EMAILS, _EMAIL
-from gabi.fontes.google_email import (MAX_CARGA_MSGS, MAX_ENDERECOS, MAX_ENDERECOS_CONSULTA, MAX_ENVIADOS_MSGS, MAX_IDS_POR_CHAMADA, TAM_ASSUNTO,
-                                      TAM_TRECHO, ResultadoEmail, _endereco, _lista, cortar_corpo, html_para_texto, limpar_texto)
+from gabi.fontes.google_email import (MAX_CARGA_MSGS, MAX_ENDERECOS, MAX_ENDERECOS_CONSULTA, MAX_ENVIADOS_MSGS, MAX_ENVIADOS_TEXTO, MAX_IDS_POR_CHAMADA, TAM_ASSUNTO,
+                                      TAM_TRECHO, ResultadoEmail, _endereco, _lista, cortar_corpo, html_para_texto, limpar_texto, trecho_enviado)
 
 BASE = "https://graph.microsoft.com/v1.0"
 HOST = "https://graph.microsoft.com/"
@@ -451,6 +451,36 @@ class GraphNess:
             if lidas >= MAX_ENVIADOS_MSGS:
                 break
         return list(vistos)[:MAX_ENDERECOS]
+
+    def enviados_textos(self, conta: str, dias: int, limite: int) -> list[dict]:
+        """[{externo_id, quando, para, assunto, trecho}] dos Enviados nos últimos `dias` (1 a 14), do mais novo ao mais antigo, no máximo MAX_ENVIADOS_TEXTO.
+        Só GET; nada é guardado nem logado (ADR-037). O trecho é o que o dono escreveu, sem citação."""
+        base = self._caixa(conta)
+        if not isinstance(dias, int) or isinstance(dias, bool) or not 1 <= dias <= 14:
+            raise ErroGraphNess("janela inválida")
+        if not isinstance(limite, int) or isinstance(limite, bool) or not 1 <= limite <= MAX_ENVIADOS_TEXTO:
+            raise ErroGraphNess("limite inválido")
+        q = urllib.parse.quote(f"sentDateTime ge {self._desde(dias)}", safe="")
+        url = (f"{base}/mailFolders/sentitems/messages?$select=id,subject,toRecipients,sentDateTime,body&$top={min(limite, 50)}"
+               f"&$orderby=sentDateTime%20desc&$filter={q}")
+        saida = []
+        for pagina in self._paginas(url, {"Prefer": f'{_IMUTAVEL}, outlook.body-content-type="text"'}):
+            for m in pagina.get("value") or []:
+                if not isinstance(m, dict) or not isinstance(m.get("id"), str):
+                    continue
+                corpo = m.get("body") if isinstance(m.get("body"), dict) else {}
+                texto = corpo.get("content") if isinstance(corpo.get("content"), str) else ""
+                texto = html_para_texto(texto) if str(corpo.get("contentType")).lower() == "html" else texto
+                para = []
+                for r in m.get("toRecipients") or []:
+                    a = _endereco((r.get("emailAddress") or {}).get("address") if isinstance(r, dict) and isinstance(r.get("emailAddress"), dict) else None)
+                    if a and a not in para:
+                        para.append(a)
+                saida.append({"externo_id": m["id"], "quando": m.get("sentDateTime"), "para": para[:5], "assunto": str(m.get("subject") or "")[:200],
+                              "trecho": trecho_enviado(texto)})
+                if len(saida) >= limite:
+                    return saida
+        return saida
 
     def respondeu_a(self, conta: str, enderecos) -> dict:
         """O dono já escreveu (To ou Cc) para cada endereço? Consulta exata nos Enviados, sem o limite da lista dos enviados recentes. Erro do Graph é erro

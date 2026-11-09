@@ -204,7 +204,7 @@ def test_cliente_so_faz_get_e_post_de_trash_untrash():
     for proibido in (r"\.send\b", r"/send\b", r"drafts", r"batchDelete", r"batchModify", r"/delete", r"\.delete\b", r"\.modify\b", r"/modify\b", r"labels"):
         assert not re.search(proibido, codigo, re.I), proibido
     assert not [n for n in dir(ge.GoogleEmail) if n.lstrip("_").startswith(("enviar", "responder", "apagar", "rascunho", "rotular"))]
-    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "listar_novos", "lixeira", "mensagem", "respondeu_a", "restaurar"]
+    assert sorted(m for m in dir(ge.GoogleEmail) if not m.startswith("_")) == ["enviados_recentes", "enviados_textos", "listar_novos", "lixeira", "mensagem", "respondeu_a", "restaurar"]
 
 
 def test_objeto_da_ponte_devolve_json_puro_e_sem_credencial_e_none():
@@ -340,3 +340,39 @@ def test_get_repete_503_e_post_nao_repete():
     f = Falso({("POST", "/messages/{id}/trash"): [(503, {})]})
     assert ge.lixeira("a@x.com", [ID(1)], Token(), http=f) == {ID(1): "erro"}
     assert len(f.chamadas) == 1
+
+
+# ---------------- enviados_textos (ADR-037) ----------------
+def _b64(t):
+    import base64
+    return base64.urlsafe_b64encode(t.encode()).decode().rstrip("=")
+
+
+def _env(n, to, assunto, corpo, quando_ms=1760875200000):
+    return {"id": ID(n), "internalDate": str(quando_ms),
+            "payload": {"mimeType": "text/plain", "headers": [{"name": "To", "value": to}, {"name": "Subject", "value": assunto}], "body": {"data": _b64(corpo)}}}
+
+
+def test_trecho_enviado_corta_na_citacao_e_descarta_linhas_com_maior():
+    texto = "Oi Ana,\nTe mando a proposta até sexta.\n> citação velha\nAbs\n\nEm seg., 3 de nov. de 2026 às 10:00, Ana <a@x.com> escreveu:\n> promessa de outro: pago amanhã"
+    assert ge.trecho_enviado(texto) == "Oi Ana,\nTe mando a proposta até sexta.\nAbs"
+    assert len(ge.trecho_enviado("x" * 5000)) == ge.MAX_TRECHO_ENVIADO
+
+
+def test_enviados_textos_devolve_para_assunto_quando_e_trecho_sem_gravar_nada():
+    f = Falso({("GET", "/messages"): [(200, {"messages": [{"id": ID(1)}, {"id": ID(2)}]})],
+               ("GET", "/messages/{id}"): [(200, _env(1, "Ana <Ana@X.com>, bia@y.com", "Proposta", "Te mando até sexta.")),
+                                           (200, _env(2, "c@z.com", "Oi", "ok"))]})
+    r = ge.enviados_textos("a@x.com", 7, 10, Token(), http=f)
+    assert r[0] == {"externo_id": ID(1), "quando": "2025-10-19T12:00:00+00:00", "para": ["ana@x.com", "bia@y.com"], "assunto": "Proposta", "trecho": "Te mando até sexta."}
+    assert len(r) == 2 and f.chamadas[0][2]["q"] == ["in:sent newer_than:7d"] and f.chamadas[1][2]["format"] == ["full"]
+
+
+def test_enviados_textos_respeita_limite_e_entradas_invalidas():
+    nunca = lambda *a, **k: pytest.fail("não deveria chamar")  # noqa: E731
+    for dias, limite in ((0, 5), (15, 5), (7, 0), (7, 31), (True, 5), (7, True)):
+        with pytest.raises(ErroGoogleOAuth):
+            ge.enviados_textos("a@x.com", dias, limite, Token(), http=nunca)
+    ids = [{"id": ID(i)} for i in range(1, 9)]
+    f = Falso({("GET", "/messages"): [(200, {"messages": ids})], ("GET", "/messages/{id}"): [(200, _env(1, "a@b.com", "s", "t"))]})
+    assert len(ge.enviados_textos("a@x.com", 7, 3, Token(), http=f)) == 3

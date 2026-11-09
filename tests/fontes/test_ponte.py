@@ -334,7 +334,7 @@ def sock_email(tmp_path):
 
 
 def test_ponte_sem_escrita_nova(sock_email):
-    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem"})
+    assert PERMITIDOS["google_email"] == frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "enviados_textos", "respondeu_a", "mensagem"})
     assert ERROS["google_email"] is ErroGoogleOAuth
     with pytest.raises(ErroGoogleOAuth) as e:
         Ponte(sock_email, "google_email")._chamar("segredo")
@@ -516,7 +516,7 @@ def sock_graph(tmp_path):
 
 def test_graph_ness_metodos_permitidos(sock_graph):
     assert PERMITIDOS["graph_ness"] == frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos", "listar_novos", "lixeira", "restaurar",
-                                                  "enviados_recentes", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
+                                                  "enviados_recentes", "enviados_textos", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
                                                   "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
                                                   "evento_criar", "convite_responder", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"})
     assert ERROS["graph_ness"] is ErroGraphNess
