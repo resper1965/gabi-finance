@@ -1,5 +1,5 @@
 /** Gabi › Agentes: as chaves do MCP (ADR-036). Lista, emite, troca escopos, revoga, rotaciona e mostra as últimas chamadas.
- * A chave (segredo) aparece uma única vez, ao emitir ou rotacionar; fechar o aviso a descarta (`chaveRecente`, que a Task 4 usa nas receitas).
+ * A chave (segredo) aparece uma única vez, ao emitir ou rotacionar; fechar o aviso a descarta, e as receitas voltam a usar <SUA_CHAVE>.
  * Consome: GET/POST /api/v1/agentes, GET /agentes/conexao, PATCH /agentes/{id}/escopos, POST /agentes/{id}/revogar e /rotacionar, GET /agentes/{id}/chamadas. */
 import { useState } from "react";
 import { Bloco } from "../../componentes/Bloco";
@@ -9,12 +9,12 @@ import { api } from "../../lib/api";
 import { dataCurta, horaDe } from "../../lib/formato";
 import { Aviso, useAcao } from "../../lib/useAcao";
 import { useApi } from "../../lib/useApi";
+import { ReceitasAgentes } from "./ReceitasAgentes";
 
 interface Agente { id: number; nome: string; escopos: string[]; criado_em: string; revogado_em: string | null; ativo: boolean; ultimo_uso: string | null; chamadas_7d: number }
 interface Conexao { url: string; escopos_padrao: string[]; escopos_validos: string[] }
 interface Chamada { quando: string; ferramenta: string; status: string }
 interface Emitida { id: number; nome: string; escopos: string[]; chave: string }
-export interface ChaveRecente { id: number; valor: string }
 type Agir = ReturnType<typeof useAcao>["agir"];
 const ROTA = "/api/v1/agentes";
 const suave = { color: "var(--ink2)" } as const;
@@ -33,16 +33,18 @@ function Escopos({ validos, marcados, onChange }: { validos: string[]; marcados:
 
 function ChaveNova({ chave, fechar }: { chave: Emitida; fechar: () => void }) {
   const [copiada, setCopiada] = useState(false);
-  const copiar = async () => { try { await navigator.clipboard.writeText(chave.chave); setCopiada(true); } catch { /* o texto segue selecionável */ } };
+  const [falhou, setFalhou] = useState(false);
+  const copiar = async () => { try { await navigator.clipboard.writeText(chave.chave); setCopiada(true); setFalhou(false); } catch { setFalhou(true); } };
   return (
     <div role="status" style={{ display: "flex", flexDirection: "column", gap: 8, border: "1px solid var(--color-divider)", padding: 12 }}>
       <strong>Chave de "{chave.nome}"</strong>
       <p style={{ margin: 0, ...suave }}>Guarde agora: esta chave não aparece de novo.</p>
       <code style={{ userSelect: "all", wordBreak: "break-all" }}>{chave.chave}</code>
       <span style={{ display: "flex", gap: 8 }}>
-        <button className="btn btn-primary" onClick={() => void copiar()}>{copiada ? "Copiada" : "Copiar"}</button>
+        <button className="btn btn-primary" aria-label="Copiar chave" onClick={() => void copiar()}>{copiada ? "Copiada" : "Copiar"}</button>
         <button className="btn btn-secondary" onClick={fechar}>Fechar</button>
       </span>
+      {falhou && <span style={suave}>Não consegui copiar; selecione o texto.</span>}
     </div>
   );
 }
@@ -74,13 +76,16 @@ function Linha({ a, conexao, agir, ocupado, erro, recarregar, emitida }: { a: Ag
   const [aberto, setAberto] = useState<"escopos" | "revogar" | "rotacionar" | "chamadas" | null>(null);
   const [novos, setNovos] = useState<string[]>(a.escopos);
   const [chamadas, setChamadas] = useState<Chamada[] | null>(null);
+  const [erroChamadas, setErroChamadas] = useState<string | null>(null);
   const chave = String(a.id);
   const hermes = ehHermes(a);
   const alternar = (qual: NonNullable<typeof aberto>) => setAberto(aberto === qual ? null : qual);
   const ver = async () => {
     if (aberto === "chamadas") return setAberto(null);
     setAberto("chamadas");
-    await agir(chave, async () => { setChamadas((await api.get<{ itens: Chamada[] }>(`${ROTA}/${a.id}/chamadas`)).dados.itens); }, "Chamadas carregadas.");
+    setErroChamadas(null);
+    try { setChamadas((await api.get<{ itens: Chamada[] }>(`${ROTA}/${a.id}/chamadas`)).dados.itens); }
+    catch { setErroChamadas("Não consegui carregar as chamadas."); }
   };
   const rotacionar = async () => {
     let nova: Emitida | null = null;
@@ -100,7 +105,7 @@ function Linha({ a, conexao, agir, ocupado, erro, recarregar, emitida }: { a: Ag
             {a.ultimo_uso ? `Último uso ${quando(a.ultimo_uso)}` : "nunca usada"} · {a.chamadas_7d} chamadas em 7 dias</span>
         </span>
         <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Ver chamadas de ${a.nome}`} disabled={ocupado} onClick={() => void ver()}>Ver chamadas</button>
+          <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Ver chamadas de ${a.nome}`} onClick={() => void ver()}>Ver chamadas</button>
           {a.ativo && <>
             <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Editar escopos de ${a.nome}`} disabled={ocupado} onClick={() => alternar("escopos")}>Editar escopos</button>
             <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Rotacionar ${a.nome}`} disabled={ocupado} onClick={() => alternar("rotacionar")}>Rotacionar</button>
@@ -114,7 +119,7 @@ function Linha({ a, conexao, agir, ocupado, erro, recarregar, emitida }: { a: Ag
           <span style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-primary" disabled={ocupado} aria-label={`Salvar escopos de ${a.nome}`}
               onClick={() => agir(chave, () => api.patch(`${ROTA}/${a.id}/escopos`, { escopos: novos }), "Escopos salvos.", recarregar).then((ok) => ok && setAberto(null))}>Salvar escopos</button>
-            <button className="btn btn-secondary" onClick={() => setAberto(null)}>Cancelar</button>
+            <button className="btn btn-secondary" onClick={() => { setNovos(a.escopos); setAberto(null); }}>Cancelar</button>
           </span>
         </span>)}
       {aberto === "revogar" && (
@@ -134,6 +139,7 @@ function Linha({ a, conexao, agir, ocupado, erro, recarregar, emitida }: { a: Ag
             <button className="btn btn-secondary" onClick={() => setAberto(null)}>Cancelar</button>
           </span>
         </div>)}
+      {aberto === "chamadas" && erroChamadas && <span role="alert" style={suave}>{erroChamadas}</span>}
       {aberto === "chamadas" && chamadas && (chamadas.length === 0 ? <Vazio frase="Nenhuma chamada ainda." /> : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13 }}>
           {chamadas.map((c, i) => <li key={i}>{quando(c.quando)} · {c.ferramenta} · {c.status}</li>)}
@@ -143,28 +149,25 @@ function Linha({ a, conexao, agir, ocupado, erro, recarregar, emitida }: { a: Ag
   );
 }
 
-/** `aoMudarChave` recebe a chave recém-emitida (ou null ao fechar o aviso): é o ponto de entrada das receitas de conexão (Task 4). */
-export function Agentes({ aoMudarChave }: { aoMudarChave?: (c: ChaveRecente | null) => void } = {}) {
+export function Agentes() {
   const leitura = useApi<{ itens: Agente[] }>(ROTA);
   const conexao = useApi<Conexao>(`${ROTA}/conexao`);
   const { ocupado, erros, agir } = useAcao();
-  const [nova, setNova] = useState<Emitida | null>(null);
-  const [chaveRecente, setChaveRecente] = useState<ChaveRecente | null>(null);
-  const mudar = (c: ChaveRecente | null) => { setChaveRecente(c); aoMudarChave?.(c); };
-  const emitida = (e: Emitida) => { setNova(e); mudar({ id: e.id, valor: e.chave }); void leitura.recarregar(); };
-  const fechar = () => { setNova(null); mudar(null); };
-  void chaveRecente;
+  const [nova, setNova] = useState<Emitida | null>(null); // única fonte da chave recente: some ao fechar o aviso
+  const emitida = (e: Emitida) => { setNova(e); void leitura.recarregar(); };
+  const fechar = () => setNova(null);
   const cx = conexao.env?.dados;
   return (
     <Painel leitura={leitura} arquivo="agentes">
       {(dados) => (
         <Bloco titulo="Agentes" nota="Chaves com que os seus agentes (Hermes e outros) acessam a Gabi pelo MCP.">
-          {nova && <ChaveNova chave={nova} fechar={fechar} />}
+          {nova && <ChaveNova key={nova.id} chave={nova} fechar={fechar} />}
           {cx && <Nova conexao={cx} agir={agir} ocupado={ocupado} erro={erros.nova} emitida={emitida} />}
           {dados.itens.length === 0 ? <Vazio frase="Nenhuma chave emitida." /> : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {cx && dados.itens.map((a) => <Linha key={a.id} a={a} conexao={cx} agir={agir} ocupado={ocupado} erro={erros[String(a.id)]} recarregar={leitura.recarregar} emitida={emitida} />)}
             </ul>)}
+          {cx && <ReceitasAgentes url={cx.url} chave={nova?.chave ?? null} />}
         </Bloco>)}
     </Painel>
   );

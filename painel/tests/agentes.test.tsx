@@ -69,7 +69,7 @@ test("ao emitir mostra a chave uma vez com botão Copiar e some ao fechar", asyn
   fireEvent.click(screen.getByText("Emitir chave"));
   expect(await screen.findByText("gb_segredo123")).toBeTruthy();
   expect(achar(c, "POST", "/api/v1/agentes")!.corpo).toEqual({ nome: "Novo", escopos: ["agenda", "documentos", "financeiro"] });
-  fireEvent.click(screen.getByText("Copiar"));
+  fireEvent.click(screen.getByLabelText("Copiar chave"));
   await waitFor(() => expect(escrever).toHaveBeenCalledWith("gb_segredo123"));
   fireEvent.click(screen.getByText("Fechar"));
   expect(screen.queryByText(/gb_/)).toBeNull();
@@ -77,7 +77,7 @@ test("ao emitir mostra a chave uma vez com botão Copiar e some ao fechar", asyn
 
 test("revogar pede confirmação", async () => {
   const c = fetchFalso(); montar();
-  await screen.findByText("Claude Code");
+  await screen.findByText("Hermes");
   fireEvent.click(screen.getByLabelText("Revogar Claude Code"));
   expect(achar(c, "POST", "/2/revogar")).toBeUndefined();
   fireEvent.click(screen.getByLabelText("Confirmar revogar Claude Code"));
@@ -98,7 +98,7 @@ test("rotacionar e revogar a chave do Hermes pedem confirmação reforçada", as
 
 test("editar escopos chama PATCH sem mostrar chave", async () => {
   const c = fetchFalso(); montar();
-  await screen.findByText("Claude Code");
+  await screen.findByText("Hermes");
   fireEvent.click(screen.getByLabelText("Editar escopos de Claude Code"));
   const linha = screen.getByLabelText("Salvar escopos de Claude Code").closest("li")!;
   fireEvent.click(within(linha).getByLabelText("financeiro"));
@@ -114,4 +114,73 @@ test("ver chamadas lista ferramenta, status e quando", async () => {
   fireEvent.click(screen.getByLabelText("Ver chamadas de Hermes"));
   expect(await screen.findByText(/agenda_financeira · ok/)).toBeTruthy();
   expect(screen.getByText(/^09\/11 08:30 · agenda_financeira/)).toBeTruthy();
+});
+
+async function emitirNovo(chave: string, posts: Record<string, unknown> = {}) {
+  const c = fetchFalso({ "POST /api/v1/agentes": { id: 9, nome: "Novo", escopos: ["agenda"], chave }, ...posts });
+  montar();
+  await screen.findByText("Hermes");
+  fireEvent.change(screen.getByLabelText("Nome do agente"), { target: { value: "Novo" } });
+  fireEvent.click(screen.getByText("Emitir chave"));
+  await screen.findByText(chave);
+  return c;
+}
+
+test("receitas usam <SUA_CHAVE> até emitir; com a chave nova a mostram e voltam ao fechar", async () => {
+  await emitirNovo("gb_zzz");
+  expect(screen.getAllByText(/export GABI_BRAIN_TOKEN="gb_zzz"/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/https:\/\/gabi\.exemplo\/mcp/).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByText("Fechar"));
+  expect(screen.queryByText(/gb_zzz/)).toBeNull();
+  expect(screen.getAllByText(/<SUA_CHAVE>/).length).toBeGreaterThan(0);
+});
+
+test("Copiada não passa para a chave seguinte", async () => {
+  Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => {}) }, configurable: true });
+  await emitirNovo("gb_um", { "POST /api/v1/agentes/N/rotacionar": { id: 10, nome: "Claude Code", escopos: ["agenda"], chave: "gb_dois" } });
+  fireEvent.click(screen.getByLabelText("Copiar chave"));
+  await screen.findByText("Copiada");
+  fireEvent.click(screen.getByLabelText("Rotacionar Claude Code"));
+  fireEvent.click(screen.getByLabelText("Confirmar rotacionar Claude Code"));
+  await screen.findByText("gb_dois");
+  expect(screen.queryByText("Copiada")).toBeNull();
+});
+
+test("falha ao copiar mostra mensagem curta", async () => {
+  Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => { throw new Error("no"); }) }, configurable: true });
+  await emitirNovo("gb_x");
+  fireEvent.click(screen.getByLabelText("Copiar chave"));
+  expect(await screen.findByText("Não consegui copiar; selecione o texto.")).toBeTruthy();
+});
+
+test("Cancelar em editar escopos descarta a edição", async () => {
+  fetchFalso(); montar();
+  await screen.findByText("Hermes");
+  fireEvent.click(screen.getByLabelText("Editar escopos de Claude Code"));
+  const linha = screen.getByLabelText("Salvar escopos de Claude Code").closest("li")!;
+  fireEvent.click(within(linha).getByLabelText("financeiro"));
+  fireEvent.click(within(linha).getByText("Cancelar"));
+  fireEvent.click(screen.getByLabelText("Editar escopos de Claude Code"));
+  const l2 = screen.getByLabelText("Salvar escopos de Claude Code").closest("li")!;
+  expect((within(l2).getByLabelText("financeiro") as HTMLInputElement).checked).toBe(false);
+});
+
+test("confirmação de agente comum não cita Telegram; revogar o Hermes não envia POST antes de Confirmar", async () => {
+  const c = fetchFalso(); montar();
+  await screen.findByText("Hermes");
+  fireEvent.click(screen.getByLabelText("Revogar Claude Code"));
+  expect(screen.getByRole("alert").textContent).not.toMatch(/Telegram/);
+  fireEvent.click(screen.getByLabelText("Revogar Hermes"));
+  expect(c.some((x) => x.metodo === "POST")).toBe(false);
+});
+
+test("ver chamadas com erro mostra mensagem local sem travar os botões", async () => {
+  fetchFalso();
+  const base = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+  vi.stubGlobal("fetch", vi.fn(async (u: string, i?: RequestInit) => u.endsWith("/chamadas") ? ({ ok: false, status: 500, json: async () => ({}) }) as Response : base(u, i)));
+  montar();
+  await screen.findByText("Hermes");
+  fireEvent.click(screen.getByLabelText("Ver chamadas de Hermes"));
+  expect(await screen.findByText("Não consegui carregar as chamadas.")).toBeTruthy();
+  expect((screen.getByLabelText("Revogar Hermes") as HTMLButtonElement).disabled).toBe(false);
 });
