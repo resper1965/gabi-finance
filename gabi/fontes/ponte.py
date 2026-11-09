@@ -27,11 +27,11 @@ PERMITIDOS = {
     "google_contatos": frozenset({"listar"}),
     "google_agenda": frozenset({"listar_calendarios", "listar_eventos", "evento_criar"}),  # ADR-024: criar só com proposta aprovada
     "graph_ness": frozenset({"contas", "contatos", "listar_calendarios", "listar_eventos",
-                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
+                             "listar_novos", "lixeira", "restaurar", "enviados_recentes", "enviados_textos", "respondeu_a", "mensagem", "teams_chats", "teams_mensagens",
                              "contato_criar", "contato_corrigir", "contato_renomear", "contato_apagar_telefone", "contato_apagar", "contato_adicionar_email",
                              # ADR-024: criar evento, responder convite e escrever no Teams só com proposta aprovada (graph_ness_envios)
                              "evento_criar", "convite_responder", "teams_equipes", "teams_canais", "teams_chat_enviar", "teams_canal_enviar"}),
-    "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "respondeu_a", "mensagem"}),  # Onda 2: `mensagem` só lê o corpo
+    "google_email": frozenset({"listar_novos", "lixeira", "restaurar", "enviados_recentes", "enviados_textos", "respondeu_a", "mensagem"}),  # Onda 2: `mensagem` só lê o corpo
     "nibo": frozenset({"nfse", "agendamentos_a_receber", "obter_arquivo"}),  # ADR-023: só o que notas_importar lê; o lote (escrita) saiu
 }
 ERROS = {"paperless": ErroPaperless, "nibo": ErroNibo, "openrouter": ErroOpenRouter, "google_contatos": ErroGoogleContatos,

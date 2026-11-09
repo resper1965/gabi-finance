@@ -258,3 +258,26 @@ def test_mensagem_graph_id_invalido_404_e_forma():
     gr, _ = graph([("GET", r"/messages/AAMk", (200, {"body": "x"}))])
     with pytest.raises(ErroGraphNess):
         gr.mensagem(CONTA, mid(1))
+
+
+# ---------------- enviados_textos (ADR-037) ----------------
+def test_enviados_textos_devolve_trecho_sem_citacao_e_converte_html():
+    pagina = {"value": [
+        {"id": mid(1), "subject": "Proposta", "sentDateTime": "2025-10-18T10:00:00Z", "toRecipients": [{"emailAddress": {"address": "Ana@X.com"}}],
+         "body": {"contentType": "text", "content": "Te mando até sexta.\n\nDe: Ana\nEnviado: ontem\n> velho"}},
+        {"id": mid(2), "subject": "Oi", "sentDateTime": "2025-10-17T10:00:00Z", "toRecipients": [],
+         "body": {"contentType": "html", "content": "<p>Ligo amanhã</p>"}}]}
+    gr, http = graph([("GET", r"/mailFolders/sentitems/messages$", (200, pagina))])
+    r = gr.enviados_textos(CONTA, 7, 10)
+    assert r[0] == {"externo_id": mid(1), "quando": "2025-10-18T10:00:00Z", "para": ["ana@x.com"], "assunto": "Proposta", "trecho": "Te mando até sexta."}
+    assert r[1]["trecho"] == "Ligo amanhã"
+    assert http.chamadas[0][2]["$filter"] == ["sentDateTime ge 2025-10-12T12:00:00Z"]
+    assert 'outlook.body-content-type="text"' in http.chamadas[0][4]["Prefer"]
+
+
+def test_enviados_textos_limite_e_entradas_invalidas():
+    gr, _ = graph([("GET", r"/sentitems/messages$", (200, {"value": [{"id": mid(i), "body": {"content": "x"}} for i in range(1, 9)]}))])
+    assert len(gr.enviados_textos(CONTA, 7, 3)) == 3
+    for dias, limite in ((0, 5), (15, 5), (7, 0), (7, 31), (True, 5)):
+        with pytest.raises(ErroGraphNess):
+            gr.enviados_textos(CONTA, dias, limite)
