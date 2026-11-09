@@ -25,10 +25,11 @@ NOVAS_VER = {"contatos_buscar", "financeiro_a_receber", "avisos_abertos", "teams
 NOVAS_AGIR = {"email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
               "financeiro_marcar_gasto", "assinaturas_listar", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso"}  # Onda 3: escrita reversível a pedido do Ricardo no chat (lixeira recuperável, restaura no painel)
 NOVAS_PROJETOS = {"projeto_criar", "projeto_listar", "projeto_ver", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_fatos", "anexo_recentes", "projeto_anexar"}  # ADR-034: projetos, depois do sim no chat
+NOVAS_ASSISTENTE = {"promessas_candidatas", "olhar_a_frente", "preparar_reuniao", "revisao_semana"}  # ADR-037: só leitura
 NOVAS_ATIVIDADES = {"atividade_criar", "atividade_listar", "atividade_concluir", "atividade_adiar", "atividade_cancelar"}  # ADR-033: to-do do Ricardo, criado direto a pedido no chat
 NOVAS_DESPESAS = {"despesas_listar", "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"}  # ADR-032: grava depois do sim do Ricardo no chat
 # contato grava direto a pedido do Ricardo (histórico e Desfazer no painel); documento só é proposto
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA | NOVAS_VER | NOVAS_AGIR | NOVAS_DESPESAS | NOVAS_ATIVIDADES | NOVAS_PROJETOS  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA | NOVAS_VER | NOVAS_AGIR | NOVAS_DESPESAS | NOVAS_ATIVIDADES | NOVAS_PROJETOS | NOVAS_ASSISTENTE  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
 
 
 @pytest.fixture
@@ -116,9 +117,9 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_71_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_e_dos_projetos():
-    assert len(ESCOPOS_FERRAMENTAS) == 71
-    assert sorted(ESCOPOS_FERRAMENTAS) == sorted(NOVAS_PROJETOS | set(["agenda_financeira", "agenda_listar", "assinatura_marcar", "assinaturas_listar", "atividade_adiar", "atividade_cancelar", "atividade_concluir", "atividade_criar", "atividade_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
+def test_sobram_exatamente_as_75_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_dos_projetos_e_do_assistente():
+    assert len(ESCOPOS_FERRAMENTAS) == 75
+    assert sorted(ESCOPOS_FERRAMENTAS) == sorted(NOVAS_ASSISTENTE | NOVAS_PROJETOS | set(["agenda_financeira", "agenda_listar", "assinatura_marcar", "assinaturas_listar", "atividade_adiar", "atividade_cancelar", "atividade_concluir", "atividade_criar", "atividade_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
                                            "despesa_criar", "despesa_encerrar", "despesa_excluir", "despesa_mes", "despesa_mudar", "despesas_listar", "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_ler", "email_listar", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "empresas_listar", "familia_atualizar_contato",
                                            "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
                                            "financeiro_a_receber", "financeiro_cancelar_a_receber", "financeiro_contas_a_pagar", "financeiro_indicar_gastador", "financeiro_lancamentos", "financeiro_marcar_gasto", "financeiro_marcar_reembolso", "financeiro_para_onde_vai", "financeiro_previsao",

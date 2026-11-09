@@ -21,7 +21,7 @@ from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_emp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
-from gabi.mcp import ferramentas_agir, ferramentas_atividades, ferramentas_dec, ferramentas_despesas, ferramentas_documentos, ferramentas_envios, ferramentas_familia, ferramentas_projetos, ferramentas_prop, ferramentas_dia, ferramentas_ver
+from gabi.mcp import ferramentas_agir, ferramentas_assistente, ferramentas_atividades, ferramentas_dec, ferramentas_despesas, ferramentas_documentos, ferramentas_envios, ferramentas_familia, ferramentas_projetos, ferramentas_prop, ferramentas_dia, ferramentas_ver
 from gabi.mcp.tokens import Token, validar
 from gabi.rotas.dinheiro import _item_pagar
 
@@ -34,7 +34,7 @@ ESCOPOS_FERRAMENTAS = {"financeiro_saldo": "fin", "despesas_por_empresa": "fin",
                        "financeiro_recorrentes": "fin", "financeiro_previsao": "fin",
                        **ferramentas_prop.ESCOPOS, **ferramentas_dia.ESCOPOS, **ferramentas_dec.ESCOPOS, **ferramentas_envios.ESCOPOS,
                        **ferramentas_familia.ESCOPOS, **ferramentas_documentos.ESCOPOS, **ferramentas_ver.ESCOPOS, **ferramentas_agir.ESCOPOS,
-                       **ferramentas_despesas.ESCOPOS, **ferramentas_atividades.ESCOPOS, **ferramentas_projetos.ESCOPOS}
+                       **ferramentas_despesas.ESCOPOS, **ferramentas_atividades.ESCOPOS, **ferramentas_projetos.ESCOPOS, **ferramentas_assistente.ESCOPOS}
 
 # fontes de frescor por ferramenta (nomes de `envelope.FONTES`): None = todas; () = sem dado que envelhece (nunca "desatualizado")
 FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
@@ -44,6 +44,7 @@ FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
     **{n: () for n in ferramentas_despesas.NOMES},  # cadastro do Ricardo: não envelhece
     **{n: () for n in ferramentas_atividades.NOMES},  # to-do do Ricardo: não envelhece
     **{n: () for n in ferramentas_projetos.NOMES},  # projetos do Ricardo: não envelhecem
+    "promessas_candidatas": (), "olhar_a_frente": None, "revisao_semana": None, "preparar_reuniao": ("agenda", "correio"),  # ADR-037: lê ao vivo / dados locais
     "agenda_listar": ("agenda",), "propor_evento": ("agenda",), "email_listar": ("correio",), "email_ler": ("correio",), "email_lixeira": ("correio",), "email_regra_lixo": ("correio",), "email_remover_regra_lixo": ("correio",),
     **{n: () for n in ("familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
                        "familia_registrar_pessoa", "familia_registrar_pet", "documentos_consultar", "documentos_vencimentos", "documentos_baixar", "documentos_buscar", "documentos_texto",
@@ -251,6 +252,7 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None, paperless=None, graph
     ferramentas_despesas.registrar(srv, executar)  # ADR-032: despesas de A Pagar, depois do sim no chat
     ferramentas_atividades.registrar(srv, executar)  # ADR-033: atividades (to-do), criadas direto a pedido no chat
     ferramentas_projetos.registrar(srv, executar)  # ADR-034: projetos, depois do sim no chat
+    ferramentas_assistente.registrar(srv, executar, correio)  # ADR-037: promessas, olhar à frente, preparo e revisão (só leitura)
     app = srv.streamable_http_app(json_response=True, stateless_http=True, transport_security=TransportSecuritySettings(allowed_hosts=list(hosts)))
     resultado = _Auth(app, banco)
     resultado.servidor = srv  # exposto para a documentação gerada
