@@ -39,7 +39,7 @@ def _progresso(con, id_: int) -> dict:
 def _item(con, row) -> dict:
     return {"id": row["id"], "nome": row["nome"], "objetivo": row["objetivo"], "status": row["status"], "prazo": row["prazo"],
             "orcamento_centavos": row["orcamento_centavos"], "criado_em": row["criado_em"], "encerrado_em": row["encerrado_em"], "origem": row["origem"],
-            "progresso": _progresso(con, row["id"])}
+            "linear_id": row["linear_id"], "linear_url": row["linear_url"], "progresso": _progresso(con, row["id"])}
 
 
 def _nome(nome: str) -> str:
@@ -120,6 +120,33 @@ def _criar_atividade(con, agora, quem, origem, a: dict, projeto_id: int, depende
     if item.get("ja_existia"):
         raise ValueError(f"a atividade '{item['texto']}' aparece duas vezes na lista")
     return item
+
+
+def ligar(con, agora: dt.datetime, quem: str, origem: str, linear_id: str, linear_url: str, nome: str = "", projeto_id: int | None = None) -> dict:
+    """ADR-038: registra a pasta do projeto que mora no Linear. Idempotente por `linear_id` (devolve a pasta que já existe). Sem `projeto_id` cria a pasta (exige `nome`);
+    com `projeto_id` liga uma pasta existente sem link, ativa ou pausada. Quem chama só liga depois do sim do Ricardo."""
+    linear_id, linear_url = str(linear_id or "").strip(), str(linear_url or "").strip()
+    if not linear_id:
+        raise ValueError("informe o linear_id do projeto")
+    if not linear_url.startswith("https://"):
+        raise ValueError("linear_url deve começar com https://")
+    ja = con.execute("select id from projeto where linear_id=?", (linear_id,)).fetchone()
+    if ja:
+        return ver(con, agora, ja["id"])
+    if projeto_id is None:
+        nome = _nome(nome)
+        novo = con.execute("insert into projeto(nome, objetivo, criado_em, origem, linear_id, linear_url) values (?,?,?,?,?,?)",
+                           (nome, "", agora.astimezone(UTC).isoformat(), origem, linear_id, linear_url)).lastrowid
+    else:
+        r = _ler(con, projeto_id)
+        if r["status"] in FINAIS:
+            raise ValueError(f"o projeto {projeto_id} está {r['status']} e não reabre; crie de novo")
+        if r["linear_id"]:
+            raise ValueError(f"o projeto {projeto_id} já está ligado a outro projeto do Linear ({r['linear_id']})")
+        con.execute("update projeto set linear_id=?, linear_url=? where id=?", (linear_id, linear_url, projeto_id))
+        novo, nome = projeto_id, r["nome"]
+    _auditar(con, agora, quem, origem, f"projeto {novo} ligado ao Linear ({linear_id}): {nome[:80]}")
+    return ver(con, agora, novo)
 
 
 def listar(con, agora: dt.datetime, status: str = "ativo") -> list[dict]:
@@ -274,7 +301,8 @@ def ver(con, agora: dt.datetime, projeto_id: int) -> dict:
     abertas = ativs.listar(con, agora, projeto_id=projeto_id)
     gasto = sum(g["centavos"] for g in _gastos(con, projeto_id))
     orc = r["orcamento_centavos"]
-    return {"id": r["id"], "nome": r["nome"], "objetivo": r["objetivo"], "status": r["status"], "prazo": r["prazo"], "progresso": _progresso(con, projeto_id),
+    return {"id": r["id"], "nome": r["nome"], "objetivo": r["objetivo"], "status": r["status"], "prazo": r["prazo"], "linear_id": r["linear_id"], "linear_url": r["linear_url"],
+            "progresso": _progresso(con, projeto_id),
             "proximas": [a for a in abertas if not a["bloqueada"]][:PROXIMAS], "bloqueadas": [{**a, "espera": _texto_da(con, a["depende_de_id"])} for a in abertas if a["bloqueada"]],
             "atrasadas": [a for a in abertas if a["prazo"] == "vencida"],
             "pessoas": [dict(p) for p in con.execute("select id, nome, papel, pessoa_id, contato from projeto_pessoa where projeto_id=? order by id", (projeto_id,))],
@@ -319,10 +347,13 @@ def anexar(con, agora: dt.datetime, quem: str, origem: str, projeto_id: int, ane
 
 
 def _ultimo_movimento(con, projeto_id: int, criado_em: str) -> dt.datetime:
-    """A data mais recente entre a criação do projeto e o que mexeu nele: atividade criada ou concluída, fato registrado, anexo recebido."""
+    """A data mais recente entre a criação do projeto e o que mexeu nele: atividade criada ou concluída, fato registrado, anexo recebido.
+    Projeto ligado ao Linear (ADR-038) não conta atividade do brain: as etapas vivem lá."""
     datas = [criado_em]
-    for sql in ("select max(criada_em), max(concluida_em) from atividade where projeto_id=?", "select max(registrado_em) from projeto_fato where projeto_id=?",
-                "select max(recebido_em) from anexo where projeto_id=?"):
+    sqls = ["select max(registrado_em) from projeto_fato where projeto_id=?", "select max(recebido_em) from anexo where projeto_id=?"]
+    if con.execute("select linear_id from projeto where id=?", (projeto_id,)).fetchone()["linear_id"] is None:
+        sqls.insert(0, "select max(criada_em), max(concluida_em) from atividade where projeto_id=?")
+    for sql in sqls:
         datas += [d for d in con.execute(sql, (projeto_id,)).fetchone() if d]
     return max(dt.datetime.fromisoformat(d).astimezone(UTC) for d in datas)
 
