@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, ESCOPOS_HERMES, ferramentas_do_token
+from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, ESCOPOS_HERMES, ferramentas_do_hermes, ferramentas_do_token
 
 DOC = (Path(__file__).parent.parent.parent / "docs" / "fontes" / "hermes.md").read_text(encoding="utf-8")
 PROIBIDAS = re.compile(r"(^|_)(enviar|send|apagar|delete|aprovar|ligar|decidir)(_|$)|(^|(?<!_a)_)pagar(_|$)")  # "contas_a_pagar" é leitura
@@ -9,8 +9,9 @@ PROIBIDAS = re.compile(r"(^|_)(enviar|send|apagar|delete|aprovar|ligar|decidir)(
 
 def test_hermes_so_ve_as_ferramentas_da_lista():
     bloco = re.search(r"include:\n((?:      - .*\n?)+)", DOC).group(1)
-    assert [l.strip()[2:] for l in bloco.splitlines()] == ferramentas_do_token(ESCOPOS_HERMES)
+    assert [l.strip()[2:] for l in bloco.splitlines()] == ferramentas_do_hermes()
     assert "*" not in bloco
+    assert "projeto_ligar" in ferramentas_do_hermes() and "projeto_criar" not in ferramentas_do_hermes()  # ADR-038
 
 
 def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel():
@@ -18,8 +19,8 @@ def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel
 
 
 def test_hermes_nao_tem_ferramenta_de_enviar_pagar_apagar_aprovar_ou_ligar_regra():
-    assert not [n for n in ferramentas_do_token(ESCOPOS_HERMES) if PROIBIDAS.search(n)]
-    assert {"resumo_manha", "financeiro_saldo", "despesas_por_empresa"} <= set(ferramentas_do_token(ESCOPOS_HERMES))
+    assert not [n for n in ferramentas_do_hermes() if PROIBIDAS.search(n) and n != "projeto_ligar"]  # projeto_ligar (ADR-038) só registra a pasta; o "ligar" proibido é o de regra
+    assert {"resumo_manha", "financeiro_saldo", "despesas_por_empresa"} <= set(ferramentas_do_hermes())
 
 
 def test_toda_ferramenta_tem_escopo_conhecido():

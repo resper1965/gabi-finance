@@ -2,13 +2,13 @@
 import re
 from pathlib import Path
 
-from gabi.mcp.servidor import ESCOPOS_HERMES, ferramentas_do_token
+from gabi.mcp.servidor import ferramentas_do_hermes
 
 DOC = Path(__file__).resolve().parent.parent / "docs" / "fontes" / "hermes.md"
 
 
 def lista_atual() -> str:
-    return "\n".join(f"      - {n}" for n in ferramentas_do_token(ESCOPOS_HERMES))
+    return "\n".join(f"      - {n}" for n in ferramentas_do_hermes())
 
 
 if __name__ == "__main__":
