@@ -13,31 +13,31 @@ export function receitas(url: string, chave: string | null): Receita[] {
   const lista: Receita[] = [
     {
       id: "claude-code", titulo: "Claude Code",
-      texto: `${ENV(k)}\nclaude mcp add --transport http gabi ${url} --header "Authorization: Bearer $GABI_BRAIN_TOKEN"\n\n# ${TESTE}`,
+      texto: `${ENV(k)}\nclaude mcp add --transport http gabi-brain ${url} --header "Authorization: Bearer $GABI_BRAIN_TOKEN"\n\n# ${TESTE}`,
       nota: "O comando grava o valor do cabeçalho na configuração do Claude Code (o shell expande a variável). Para não gravar a chave, use um .mcp.json com \"headers\": {\"Authorization\": \"Bearer ${GABI_BRAIN_TOKEN}\"} e \"type\": \"http\".",
     },
     {
       id: "cursor", titulo: "Cursor",
-      texto: `${ENV(k)}\n\n# ~/.cursor/mcp.json (ou .cursor/mcp.json no projeto)\n{\n  "mcpServers": {\n    "gabi": {\n      "url": "${url}",\n      "headers": {\n        "Authorization": "Bearer \${env:GABI_BRAIN_TOKEN}"\n      }\n    }\n  }\n}\n\n# ${TESTE}`,
+      texto: `${ENV(k)}\n\n# ~/.cursor/mcp.json (ou .cursor/mcp.json no projeto)\n{\n  "mcpServers": {\n    "gabi-brain": {\n      "url": "${url}",\n      "headers": {\n        "Authorization": "Bearer \${env:GABI_BRAIN_TOKEN}"\n      }\n    }\n  }\n}\n\n# ${TESTE}`,
       nota: "Abra o Cursor a partir de um terminal com a variável definida.",
     },
     {
       id: "codex", titulo: "Codex CLI",
-      texto: `${ENV(k)}\n\n# ~/.codex/config.toml\n[mcp_servers.gabi]\nurl = "${url}"\nbearer_token_env_var = "GABI_BRAIN_TOKEN"\n\n# ${TESTE}`,
+      texto: `${ENV(k)}\n\n# ~/.codex/config.toml\n[mcp_servers.gabi-brain]\nurl = "${url}"\nbearer_token_env_var = "GABI_BRAIN_TOKEN"\n\n# ${TESTE}`,
     },
     {
       id: "claude-desktop", titulo: "Claude Desktop (via mcp-remote)",
-      texto: `# claude_desktop_config.json\n{\n  "mcpServers": {\n    "gabi": {\n      "command": "npx",\n      "args": [\n        "-y",\n        "mcp-remote",\n        "${url}",\n        "--header",\n        "Authorization:Bearer \${GABI_BRAIN_TOKEN}"${permitir}\n      ],\n      "env": { "GABI_BRAIN_TOKEN": "${k}" }\n    }\n  }\n}\n\n# ${TESTE}`,
+      texto: `# claude_desktop_config.json\n{\n  "mcpServers": {\n    "gabi-brain": {\n      "command": "npx",\n      "args": [\n        "-y",\n        "mcp-remote",\n        "${url}",\n        "--header",\n        "Authorization:Bearer \${GABI_BRAIN_TOKEN}"${permitir}\n      ],\n      "env": { "GABI_BRAIN_TOKEN": "${k}" }\n    }\n  }\n}\n\n# ${TESTE}`,
       nota: "O Claude Desktop não lê variáveis do terminal, então aqui a chave fica no arquivo de configuração. Sem espaço depois de \"Authorization:\" de propósito (evita erro de parsing). Reinicie o Claude Desktop depois de editar.",
     },
     {
       id: "vscode", titulo: "VS Code (Copilot)",
-      texto: `# .vscode/mcp.json\n{\n  "inputs": [\n    { "type": "promptString", "id": "gabi-token", "description": "Chave do agente na Gabi", "password": true }\n  ],\n  "servers": {\n    "gabi": {\n      "type": "http",\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer \${input:gabi-token}" }\n    }\n  }\n}\n\n# ${TESTE}`,
+      texto: `# .vscode/mcp.json\n{\n  "inputs": [\n    { "type": "promptString", "id": "gabi-token", "description": "Chave do agente na Gabi", "password": true }\n  ],\n  "servers": {\n    "gabi-brain": {\n      "type": "http",\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer \${input:gabi-token}" }\n    }\n  }\n}\n\n# ${TESTE}`,
       nota: `O VS Code pergunta a chave na primeira vez e a guarda em local seguro; nada de chave no arquivo. Cole ${chave ? "a chave acima" : MARCADOR_CHAVE} quando ele pedir.`,
     },
     {
       id: "gemini", titulo: "Gemini CLI",
-      texto: `${ENV(k)}\ngemini mcp add --transport http --header "Authorization: Bearer $GABI_BRAIN_TOKEN" gabi ${url}\n\n# ${TESTE}`,
+      texto: `${ENV(k)}\ngemini mcp add --transport http --header "Authorization: Bearer $GABI_BRAIN_TOKEN" gabi-brain ${url}\n\n# ${TESTE}`,
       nota: "Sintaxe do comando conferida na documentação; ela não confirma expansão de variáveis dentro de \"headers\" no settings.json, então o comando grava o valor expandido na configuração do Gemini.",
     },
     {
@@ -45,5 +45,7 @@ export function receitas(url: string, chave: string | null): Receita[] {
       texto: "OpenAI API e agentes em nuvem (rodam fora do seu computador) precisam de uma URL pública. A Tailscale não alcança esses serviços, e a Gabi não é exposta à internet. Sem receita por enquanto.",
     },
   ];
+  const aviso = "Se a URL for http e o cliente recusar, use o mcp-remote como no Claude Desktop.";
+  if (http) for (const r of lista) if (["claude-code", "cursor", "codex"].includes(r.id)) r.nota = r.nota ? `${r.nota} ${aviso}` : aviso;
   return lista;
 }

@@ -18,7 +18,7 @@ test("com chave recente preenche só a receita e a variável de ambiente", () =>
   expect(receitas(URL, null).map((x) => x.texto).join("")).not.toContain("gb_abc");
 });
 test("Claude Code usa claude mcp add --transport http com header Authorization Bearer", () => {
-  expect(por("claude-code").texto).toMatch(/claude mcp add --transport http gabi https:\/\/gabi\.exemplo\/mcp --header "Authorization: Bearer \$GABI_BRAIN_TOKEN"/);
+  expect(por("claude-code").texto).toMatch(/claude mcp add --transport http gabi-brain https:\/\/gabi\.exemplo\/mcp --header "Authorization: Bearer \$GABI_BRAIN_TOKEN"/);
 });
 test("Cursor traz url e headers", () => {
   const t = por("cursor").texto;
@@ -46,4 +46,16 @@ test("a URL vem do /conexao", () => {
 test("URL http ganha --allow-http no mcp-remote", () => {
   expect(receitas("http://100.1.2.3:8000/mcp", null).find((r) => r.id === "claude-desktop")!.texto).toContain("--allow-http");
   expect(por("claude-desktop").texto).not.toContain("--allow-http");
+});
+test("todas as receitas usam o nome gabi-brain", () => {
+  const tudo = receitas(URL, null).map((r) => r.texto).join("\n").split(URL).join("");
+  expect(tudo).not.toMatch(/\bgabi\b(?!-)/);
+  expect(por("codex").texto).toContain("[mcp_servers.gabi-brain]");
+  expect(por("cursor").texto).toContain('"gabi-brain"');
+  expect(por("gemini").texto).toContain(`gabi-brain ${URL}`);
+});
+test("URL http ganha nota de mcp-remote em Claude Code, Cursor e Codex; https não", () => {
+  const h = receitas("http://100.1.2.3:8000/mcp", null);
+  for (const id of ["claude-code", "cursor", "codex"]) expect(h.find((r) => r.id === id)!.nota).toMatch(/mcp-remote/);
+  for (const id of ["claude-code", "cursor", "codex"]) expect(por(id).nota ?? "").not.toMatch(/mcp-remote/);
 });
