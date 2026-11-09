@@ -17,6 +17,13 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/agenda/fontes/{fonte_id}/calendarios/descobrir` | Pergunta ao Google ou ao Graph (pela ponte) quais calendários a conta enxerga e cadastra cada um como `a_decidir`. 503 `fonte_indisponivel` se a ponte ou a conta estiver fora. |
 | GET | `/api/v1/agenda/parametros` | Parâmetros da agenda: privados (mostrar|so_painel|ocultar), fuso e janela de leitura em dias (padrões se não definidos). |
 | PUT | `/api/v1/agenda/parametros` | Grava só os parâmetros enviados; valida faixas e audita só os nomes das chaves. |
+| GET | `/api/v1/agentes` | Chaves (ativas e revogadas) com escopos, último uso e chamadas dos últimos 7 dias; nunca o segredo. |
+| POST | `/api/v1/agentes` | Emite uma chave: `nome` e, opcional, `escopos` (padrão do Hermes, sem sensível). A `chave` aparece só nesta resposta. |
+| GET | `/api/v1/agentes/conexao` | URL do MCP e escopos (padrão e válidos) para montar a conexão do agente. |
+| GET | `/api/v1/agentes/{id_}/chamadas` | Últimas chamadas da chave: quando, ferramenta e status (nunca os argumentos). |
+| PATCH | `/api/v1/agentes/{id_}/escopos` | Troca os escopos de uma chave ativa; o segredo não muda. |
+| POST | `/api/v1/agentes/{id_}/revogar` | Revoga a chave (repetir não muda nada). |
+| POST | `/api/v1/agentes/{id_}/rotacionar` | Emite chave nova (mesmo nome e escopos) e revoga a antiga. A `chave` nova aparece só nesta resposta. |
 | GET | `/api/v1/anexos/recentes` | A caixa de entrada: anexos dos últimos 14 dias ainda sem projeto (com a transcrição do áudio, quando houver). |
 | GET | `/api/v1/anexos/{id_}/arquivo` | O original do anexo (imagem ou áudio), sem mascarar; 404 se o anexo não existe, é documento do Paperless ou o arquivo sumiu. |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |

@@ -347,6 +347,207 @@
     "summary": "Gravar Parametros"
    }
   },
+  "/api/v1/agentes": {
+   "get": {
+    "description": "Chaves (ativas e revogadas) com escopos, último uso e chamadas dos últimos 7 dias; nunca o segredo.",
+    "operationId": "listar_api_v1_agentes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Listar"
+   },
+   "post": {
+    "description": "Emite uma chave: `nome` e, opcional, `escopos` (padrão do Hermes, sem sensível). A `chave` aparece só nesta resposta.",
+    "operationId": "criar_api_v1_agentes_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Criar"
+   }
+  },
+  "/api/v1/agentes/conexao": {
+   "get": {
+    "description": "URL do MCP e escopos (padrão e válidos) para montar a conexão do agente.",
+    "operationId": "conexao_api_v1_agentes_conexao_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Conexao"
+   }
+  },
+  "/api/v1/agentes/{id_}/chamadas": {
+   "get": {
+    "description": "Últimas chamadas da chave: quando, ferramenta e status (nunca os argumentos).",
+    "operationId": "chamadas_api_v1_agentes__id___chamadas_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Chamadas"
+   }
+  },
+  "/api/v1/agentes/{id_}/escopos": {
+   "patch": {
+    "description": "Troca os escopos de uma chave ativa; o segredo não muda.",
+    "operationId": "escopos_api_v1_agentes__id___escopos_patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Escopos"
+   }
+  },
+  "/api/v1/agentes/{id_}/revogar": {
+   "post": {
+    "description": "Revoga a chave (repetir não muda nada).",
+    "operationId": "revogar_api_v1_agentes__id___revogar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Revogar"
+   }
+  },
+  "/api/v1/agentes/{id_}/rotacionar": {
+   "post": {
+    "description": "Emite chave nova (mesmo nome e escopos) e revoga a antiga. A `chave` nova aparece só nesta resposta.",
+    "operationId": "rotacionar_api_v1_agentes__id___rotacionar_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "id_",
+      "required": true,
+      "schema": {
+       "title": "Id ",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Rotacionar"
+   }
+  },
   "/api/v1/anexos/recentes": {
    "get": {
     "description": "A caixa de entrada: anexos dos últimos 14 dias ainda sem projeto (com a transcrição do áudio, quando houver).",
