@@ -2,8 +2,6 @@
 Nenhuma grava; criar atividade a partir de uma promessa é passo separado (`atividade_criar`), só depois do sim do Ricardo no chat (R14).
 `promessas_candidatas` lê ao vivo, pela ponte, o que o Ricardo ENVIOU (Gmail e Graph da ness): nada do texto é guardado nem logado; o brain nunca lê Teams.
 Consome: antecipar, revisao, reuniao; recebe `executar` e o `correio` (ponte por provedor) do servidor."""
-import datetime as dt
-
 from gabi import antecipar, reuniao, revisao
 from gabi.fontes.google_oauth import ErroGoogleOAuth
 from gabi.fontes.graph_ness import ErroGraphNess
