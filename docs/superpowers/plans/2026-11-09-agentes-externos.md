@@ -82,7 +82,7 @@
 
 **Interfaces:**
 - Consumes: Task 2; `useApi`, `useAcao`, `api.get/post/patch`, `Painel`, `Bloco`, `Aviso` (padrão de `painel/src/telas/Atividades.tsx`); fixtures `apiFalsa`/`amostra` de `painel/tests/apiFalsa.ts` (acrescentar a amostra `agentes` se o gerador for necessário; senão objeto escrito no teste, como em `qualidade.test.tsx`).
-- Produces: `export function Agentes()`; estado local `chaveRecente: {id, valor} | null` (usado pela Task 4 para preencher receitas).
+- Produces: `export function Agentes()`; estado local `nova?: {id, nome, chave}` (a chave recém-emitida, mostrada uma vez; a Task 4 a recebe como prop `chave`).
 
 - [ ] **Step 1: Write the failing tests** em `painel/tests/agentes.test.tsx`: `lista chaves com último uso, chamadas em 7 dias e revogadas esmaecidas` (linha sem uso mostra "nunca usada"), `nova chave vem com os escopos do Hermes marcados e sem sensivel` (checkboxes: `sensivel` desmarcado), `nome vazio bloqueia o envio`, `ao emitir mostra a chave uma vez com botão Copiar e some ao fechar` (depois de fechar, `queryByText(/gb_/)` é nulo), `revogar pede confirmação`, `rotacionar e revogar a chave do Hermes pedem confirmação reforçada` (texto cita Telegram e WhatsApp), `editar escopos chama PATCH sem mostrar chave`, `ver chamadas lista ferramenta, status e quando`.
 - [ ] **Step 2: Run** `cd painel && npx vitest run tests/agentes.test.tsx` → FAIL.
@@ -98,7 +98,7 @@
 - Test: `painel/tests/receitas.test.tsx`
 
 **Interfaces:**
-- Consumes: `GET /api/v1/agentes/conexao` (`url`); `chaveRecente` da Task 3.
+- Consumes: `GET /api/v1/agentes/conexao` (`url`); a chave recém-emitida (`nova?.chave`) da Task 3, recebida como prop `chave`.
 - Produces: `receitas(url: string, chave: string | null): {id: string; titulo: string; texto: string; nota?: string}[]` — usa `chave ?? "<SUA_CHAVE>"`; clientes: Claude Code, Cursor, Codex CLI, Claude Desktop/VS Code/Gemini CLI (via `mcp-remote` quando não houver config nativa) e o bloco "Não suportado" (OpenAI API e agentes em nuvem: precisam de URL pública). Todas terminam com o teste de 1 linha: pedir ao agente para chamar `ferramentas_ver`.
 
 - [ ] **Step 1: Write the failing tests:** `sem chave recente usa <SUA_CHAVE> e nunca um segredo`, `com chave recente preenche só a receita e a variável de ambiente`, `Claude Code usa claude mcp add --transport http com header Authorization Bearer`, `Cursor traz url e headers`, `Codex usa bearer_token_env_var`, `toda receita inclui o teste ferramentas_ver`, `aviso de não suportado cita OpenAI API e nuvem`, `a URL vem do /conexao`.
