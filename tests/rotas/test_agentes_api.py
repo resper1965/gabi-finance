@@ -1,6 +1,5 @@
 import datetime as dt
 
-import pytest
 from starlette.testclient import TestClient
 
 from gabi.db import conectar

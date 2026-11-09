@@ -128,7 +128,7 @@ async function emitirNovo(chave: string, posts: Record<string, unknown> = {}) {
 
 test("receitas usam <SUA_CHAVE> até emitir; com a chave nova a mostram e voltam ao fechar", async () => {
   await emitirNovo("gb_zzz");
-  expect(screen.getAllByText(/export GABI_BRAIN_TOKEN="gb_zzz"/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/read -rs GABI_BRAIN_TOKEN; export GABI_BRAIN_TOKEN/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/https:\/\/gabi\.exemplo\/mcp/).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByText("Fechar"));
   expect(screen.queryByText(/gb_zzz/)).toBeNull();

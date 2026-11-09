@@ -19,7 +19,7 @@ def _transacao(con: sqlite3.Connection):
     if con.in_transaction:  # já dentro de uma transação de quem chamou: ela decide o commit
         yield
         return
-    con.execute("begin")
+    con.execute("begin immediate")  # escrita lê antes de gravar: evita SQLITE_BUSY_SNAPSHOT
     try:
         yield
     except BaseException:

@@ -12,9 +12,10 @@ test("sem chave recente usa <SUA_CHAVE> e nunca um segredo", () => {
 });
 test("com chave recente preenche só a receita e a variável de ambiente", () => {
   const r = por("claude-code", "gb_abc");
-  expect(r.texto).toContain('export GABI_BRAIN_TOKEN="gb_abc"');
+  expect(r.texto).toContain("read -rs GABI_BRAIN_TOKEN; export GABI_BRAIN_TOKEN");
   expect(r.texto).not.toContain("<SUA_CHAVE>");
-  expect(r.texto.match(/gb_abc/g)).toHaveLength(1);
+  expect(r.texto).not.toContain("gb_abc");
+  expect(por("claude-desktop", "gb_abc").texto).toContain('"GABI_BRAIN_TOKEN": "gb_abc"');
   expect(receitas(URL, null).map((x) => x.texto).join("")).not.toContain("gb_abc");
 });
 test("Claude Code usa claude mcp add --transport http com header Authorization Bearer", () => {
