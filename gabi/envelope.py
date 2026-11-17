@@ -1,7 +1,6 @@
 """Envelope de toda resposta de leitura: `dados_ate` vem da última rodada CONFERIDA, não da última tentativa (R4/Review 4)."""
 import datetime as dt
 import json
-import sqlite3
 
 LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 # FONTE ÚNICA de verdade do frescor: {fonte (nome em rodada.fonte): limite | None}. Toda fonte passada a registrar_rodada() DEVE estar aqui
@@ -14,17 +13,15 @@ LIMITE_DESATUALIZADO = dt.timedelta(days=3)
 FONTES = {
     "open-finance": LIMITE_DESATUALIZADO,
     "notas-nibo": dt.timedelta(hours=30),               # diária 06:40
-    "agenda": dt.timedelta(hours=12),                   # idem (gabi-brain-agenda.timer); só conta com agenda_fonte liberada
-    "correio": dt.timedelta(hours=12),                  # idem (gabi-brain-correio.timer); só conta com email_fonte liberada
     "open-finance-saldos": None, "backup": None, "exportacao": None, "importacao-staging": None,
-    "documentos": None,  # leitura diária do Paperless só gera propostas; não é dado servido (OnFailure do timer avisa)
-    "teams": None,  # timers instalados e desligados até o Ricardo ligar; fontes None são filtradas (ficam fora da lista) e nunca contam em dados_ate
 }
 COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
 ESPERADAS = ("notas-nibo",)
 # Fontes cortadas pela ADR-023: as rodadas antigas ficam no banco (histórico), mas nunca entram na lista nem no dados_ate.
-CORTADAS = frozenset({"trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta"})
+# Corte do gabi-finance: agenda, correio, documentos e teams também (os módulos saíram; num banco copiado do gabi-brain ainda há fonte `agenda`/`correio`
+# liberada e rodadas velhas, que sem isto marcariam toda resposta como desatualizada).
+CORTADAS = frozenset({"trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta", "agenda", "correio", "documentos", "teams"})
 BRT = dt.timezone(dt.timedelta(hours=-3))
 LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
 HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
@@ -50,16 +47,6 @@ def proxima_rodada(agora: dt.datetime) -> str:
     raise AssertionError("inalcançável")
 
 
-def _em_uso(con, tabela: str) -> bool:
-    """Há linha liberada (estado 'sim') em `tabela`; a tabela pode faltar em bancos antigos."""
-    try:
-        return bool(con.execute(f"select 1 from {tabela} where estado='sim' limit 1").fetchone())
-    except sqlite3.OperationalError as e:
-        if "no such table" not in str(e):
-            raise
-        return False
-
-
 def _em_espera(con) -> set[str]:
     """Fontes que o Ricardo pôs em espera (parâmetro `fontes.em_espera`, lista JSON; p.ex. Nibo aguardando chave): aparecem como
     `em_espera` e não contam em dados_ate/desatualizado. Valor ausente ou estranho = nenhuma."""
@@ -69,16 +56,6 @@ def _em_espera(con) -> set[str]:
     except (TypeError, ValueError):
         return set()
     return {x for x in v if isinstance(x, str)} if isinstance(v, list) else set()
-
-
-def _agenda_em_uso(con) -> bool:
-    """`agenda` só vale como fonte com alguma fonte de agenda liberada."""
-    return _em_uso(con, "agenda_fonte")
-
-
-def _correio_em_uso(con) -> bool:
-    """`correio` só vale como fonte com alguma conta de e-mail liberada (`email_fonte` em estado 'sim')."""
-    return _em_uso(con, "email_fonte")
 
 
 def bancos_antigos(con, agora: dt.datetime) -> list[dict]:
@@ -112,8 +89,6 @@ def envelope(con, dados, agora: dt.datetime | None = None, fontes: tuple[str, ..
     fontes, ultimas, falta, atrasada = [], [], False, False
     nomes = {r[0] for r in con.execute("select distinct fonte from rodada")}
     nomes |= set(ESPERADAS)
-    nomes.add("agenda") if _agenda_em_uso(con) else nomes.discard("agenda")
-    nomes.add("correio") if _correio_em_uso(con) else nomes.discard("correio")
     nomes = sorted(n for n in nomes if n not in CORTADAS and not (n in FONTES and FONTES[n] is None))
     if filtro is not None:
         nomes = [n for n in nomes if n in filtro]

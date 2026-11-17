@@ -1,7 +1,6 @@
 import datetime as dt
 import json
 import pathlib
-import sqlite3
 import re
 
 from gabi.envelope import HORAS_RODADAS, proxima_rodada
@@ -136,16 +135,6 @@ def test_toda_fonte_registrada_no_codigo_esta_declarada_em_FONTES():
     assert achadas and achadas <= set(FONTES), achadas - set(FONTES)
 
 
-def test_erro_de_banco_que_nao_e_tabela_ausente_nao_e_engolido(con):
-    from gabi.envelope import _agenda_em_uso
-
-    class Trava:
-        def execute(self, *a):
-            raise sqlite3.OperationalError("database is locked")
-    with pytest.raises(sqlite3.OperationalError):
-        _agenda_em_uso(Trava())
-
-
 def test_limite_diario_e_30h(con):
     _producao(con)
     con.execute("delete from rodada where fonte='notas-nibo'")
@@ -159,48 +148,6 @@ def test_open_finance_conferida_ha_4_dias_manda_no_dados_ate(con):
     _r(con, "open-finance", 96, conferida=1)
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is True and e["dados_ate"] == "2026-10-07T12:00:00Z"
-
-
-# ---------------- agenda: fonte própria de frescor ----------------
-def test_agenda_conta_so_com_fonte_liberada_e_pela_propria_rodada(con):
-    _producao(con)
-    _r(con, "agenda", 1, status="ok")
-    assert "agenda" not in _estados(envelope(con, None, AGORA))  # ninguém liberado: não conta
-    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["agenda"] == "ok" and "trabalho" not in _estados(e)  # liberar agenda NÃO liga o 'trabalho' (e-mail)
-    con.execute("delete from rodada where fonte='agenda'")
-    _r(con, "agenda", 13, status="ok")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["agenda"] == "parada" and e["desatualizado"] is True
-
-
-def test_agenda_liberada_sem_nenhuma_rodada_aparece_nao_conferida(con):
-    _producao(con)
-    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["agenda"] == "nao_conferida" and e["desatualizado"] is True
-
-
-# ---------------- correio: fonte própria de frescor ----------------
-def test_correio_so_conta_com_fonte_liberada_e_pela_propria_rodada(con):
-    _producao(con)
-    _r(con, "correio", 1, status="ok")
-    assert "correio" not in _estados(envelope(con, None, AGORA))  # nenhuma conta liberada: não conta
-    con.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["correio"] == "ok" and "trabalho" not in _estados(e) and "agenda" not in _estados(e)  # liberar e-mail não liga os outros
-    con.execute("delete from rodada where fonte='correio'")
-    _r(con, "correio", 13, status="ok")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["correio"] == "parada" and e["desatualizado"] is True
-
-
-def test_correio_liberado_sem_nenhuma_rodada_aparece_nao_conferida(con):
-    _producao(con)
-    con.execute("insert into email_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
-    e = envelope(con, None, AGORA)
-    assert _estados(e)["correio"] == "nao_conferida" and e["desatualizado"] is True
 
 
 def _sync(con, **bancos):
@@ -230,7 +177,6 @@ def test_fontes_cortadas_nao_sao_esperadas_nem_desatualizam(con):
     assert not cortadas & set(ESPERADAS) and not cortadas & set(FONTES)
     _r(con, "open-finance", 1, conferida=1)
     _r(con, "notas-nibo", 1)
-    con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")  # caixa legada liberada não liga fonte nenhuma
     e = envelope(con, None, AGORA)
     assert e["desatualizado"] is False and not cortadas & set(_estados(e))
 
@@ -243,6 +189,16 @@ def test_rodadas_antigas_de_fontes_cortadas_nao_aparecem_na_lista(con):
         _r(con, f, 200, status="erro")
     nomes = set(_estados(envelope(con, None, AGORA)))
     assert nomes == {"open-finance", "notas-nibo"}
+
+
+def test_agenda_e_correio_do_banco_copiado_nao_desatualizam_o_gabi_finance(con):
+    """Corte do gabi-finance: o banco copiado do gabi-brain traz fonte de agenda liberada e rodadas velhas de agenda/correio; sem sincronizador, isso não pode marcar o dinheiro como desatualizado."""
+    _producao(con)
+    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
+    for f in ("agenda", "correio", "documentos", "teams"):
+        _r(con, f, 200, status="ok")
+    e = envelope(con, None, AGORA)
+    assert e["desatualizado"] is False and set(_estados(e)) == {"open-finance", "notas-nibo"}
 
 
 def test_fonte_em_espera_aparece_mas_nao_deixa_desatualizado(con):
@@ -272,11 +228,10 @@ def test_envelope_fontes_vazias_nunca_desatualizado(con):
 
 def test_envelope_fontes_filtradas(con):
     _producao(con)
-    con.execute("insert into agenda_fonte(conta, provedor, estado) values ('a@x.com','google','sim')")
-    _r(con, "agenda", 1)
+    _r(con, "notas-nibo", 1)
     _sync(con, Itau=(AGORA - dt.timedelta(hours=50)).isoformat())
-    e = envelope(con, None, AGORA, fontes=("agenda",))
-    assert [f["nome"] for f in e["fontes"]] == ["agenda"]
+    e = envelope(con, None, AGORA, fontes=("notas-nibo",))
+    assert [f["nome"] for f in e["fontes"]] == ["notas-nibo"]
     assert e["dados_ate"] == (AGORA - dt.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     assert e["desatualizado"] is False and "bancos_antigos" not in e  # banco antigo é dado do open-finance: fora do recorte
 

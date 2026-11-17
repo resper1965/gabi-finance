@@ -27,7 +27,12 @@ def test_0075_tira_as_vazias_e_preserva_as_legadas(tmp_path):
     con.execute("insert into escuta_remetente(numero, estado, vista_em, qtd) values ('+5511900000000','pendente','2026-10-01',1)")
     con.execute("insert into caixa_email(endereco, provedor, estado) values ('a@b.c','graph','sim')")
     con.execute("insert into memoria(chave, tipo, texto) values ('k','nota','texto antigo')")
-    migrar(con, MIGR)
+    ate_0089 = tmp_path / "ate0089"  # a 0090 (corte do gabi-finance) derruba escuta_remetente e caixa_email: este teste é da 0075
+    ate_0089.mkdir()
+    for arq in sorted(MIGR.glob("[0-9][0-9][0-9][0-9]_*.sql")):
+        if arq.name < "0090":
+            shutil.copy(arq, ate_0089 / arq.name)
+    migrar(con, ate_0089)
     assert not set(SAEM) & _tabelas(con)
     assert con.execute("select count(*) from escuta_remetente").fetchone()[0] == 1
     assert con.execute("select count(*) from caixa_email").fetchone()[0] == 1
