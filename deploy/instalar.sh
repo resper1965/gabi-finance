@@ -49,8 +49,8 @@ fi
 rm -rf /opt/gabi-brain/.novo /opt/gabi-brain/.velho
 install -d /opt/gabi-brain/.novo /opt/gabi-brain/.velho
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-brain/.novo/
-# Utilitário de administração (seeds editáveis): carregadores de seeds, a correção de moeda e o comparador do G21, a carga da família, não o diretório tools inteiro.
-install -d /opt/gabi-brain/.novo/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" "$AQUI/tools/carga_familia.py" /opt/gabi-brain/.novo/tools/
+# Utilitário de administração (seeds editáveis): carregadores de seeds, a correção de moeda e o comparador do G21, não o diretório tools inteiro.
+install -d /opt/gabi-brain/.novo/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" /opt/gabi-brain/.novo/tools/
 for d in gabi migrations seeds tools; do
   if [ -e "/opt/gabi-brain/$d" ]; then
     mv "/opt/gabi-brain/$d" /opt/gabi-brain/.velho/
@@ -68,29 +68,20 @@ install -m 644 "$AQUI"/deploy/gabi-brain-api.service "$AQUI"/deploy/gabi-brain-m
   "$AQUI"/deploy/gabi-brain-backup.timer "$AQUI"/deploy/gabi-brain-saldos.service "$AQUI"/deploy/gabi-brain-saldos.timer \
   "$AQUI"/deploy/gabi-brain-extratos.service "$AQUI"/deploy/gabi-brain-extratos.timer "$AQUI"/deploy/gabi-brain-notas.service \
   "$AQUI"/deploy/gabi-brain-notas.timer "$AQUI"/deploy/gabi-brain-avisos.service "$AQUI"/deploy/gabi-brain-avisos.timer "$AQUI"/deploy/gabi-brain-falha@.service "$AQUI"/deploy/gabi-brain-exportacao.service "$AQUI"/deploy/gabi-brain-exportacao.timer \
-  "$AQUI"/deploy/gabi-brain-contatos.service "$AQUI"/deploy/gabi-brain-contatos.timer \
-  "$AQUI"/deploy/gabi-brain-agenda.service "$AQUI"/deploy/gabi-brain-agenda.timer \
-  "$AQUI"/deploy/gabi-brain-correio.service "$AQUI"/deploy/gabi-brain-correio.timer \
-  "$AQUI"/deploy/gabi-brain-documentos.service "$AQUI"/deploy/gabi-brain-documentos.timer \
-  "$AQUI"/deploy/gabi-brain-teams.service "$AQUI"/deploy/gabi-brain-teams.timer \
-  "$AQUI"/deploy/gabi-brain-anexos.service "$AQUI"/deploy/gabi-brain-anexos.timer \
   "$AQUI"/deploy/gabi-brain-telegram.service "$AQUI"/deploy/gabi-brain-telegram.timer /etc/systemd/system/
-# Units cortadas pela ADR-023 (22/10/2026): desliga e remove as que o instalador antigo deixou em /etc/systemd/system (idempotente; não apaga dado).
+# Units cortadas pela ADR-023 (22/10/2026) e pelo corte do gabi-finance (agenda, anexos, contatos, correio, documentos, teams): desliga e remove as que o instalador antigo deixou em /etc/systemd/system (idempotente; não apaga dado).
 for u in gabi-brain-escuta.service gabi-brain-escuta.timer gabi-brain-escuta.path escuta-ouvinte.service gabi-brain-trabalho.service gabi-brain-trabalho.timer \
          gabi-brain-comprovantes.service gabi-brain-comprovantes.timer gabi-brain-exames.service gabi-brain-exames.timer \
-         gabi-brain-reembolso-saude.service gabi-brain-reembolso-saude.timer; do
+         gabi-brain-reembolso-saude.service gabi-brain-reembolso-saude.timer \
+         gabi-brain-agenda.service gabi-brain-agenda.timer gabi-brain-anexos.service gabi-brain-anexos.timer gabi-brain-contatos.service gabi-brain-contatos.timer \
+         gabi-brain-correio.service gabi-brain-correio.timer gabi-brain-documentos.service gabi-brain-documentos.timer gabi-brain-teams.service gabi-brain-teams.timer; do
   systemctl disable --now "$u" 2>/dev/null || true
   rm -f "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
-systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-telegram.timer gabi-brain-documentos.timer
+systemctl enable --now gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service gabi-brain-backup.timer gabi-brain-avisos.timer gabi-brain-notas.timer gabi-brain-exportacao.timer gabi-brain-telegram.timer
 # enable --now não reinicia serviço já ativo: sem isto o código novo fica no disco e o processo segue com o antigo.
 systemctl restart gabi-brain-fontes.service gabi-brain-api.service gabi-brain-mcp.service
-# O timer dos contatos do Google (gabi-brain-contatos.timer) também fica instalado e DESLIGADO (precisa de /etc/gabi/google-contatos.env do Ricardo).
-# O timer dos anexos (gabi-brain-anexos.timer, ADR-034) também fica instalado e DESLIGADO: liga pelo runbook #projetos (systemctl enable --now).
-# O timer da agenda do Google (gabi-brain-agenda.timer) também fica instalado e DESLIGADO (liga quando houver fonte liberada na aba Agenda; precisa de calendar.readonly no /etc/gabi/google.env).
-# O timer do correio (gabi-brain-correio.timer) também fica instalado e DESLIGADO (liga quando houver conta liberada em Cadastros › E-mail; precisa de gmail.modify no /etc/gabi/google.env e da chave do modelo).
-# O timer do Teams (gabi-brain-teams.timer) também fica instalado e DESLIGADO (liga quando houver conta de Teams liberada; runbook#graph-ness passo 7).
 # Os timers de captura (gabi-brain-saldos.timer, gabi-brain-extratos.timer) ficam instalados mas DESLIGADOS até você pôr a chave (G4).
 
 echo "OK. Verifique:"

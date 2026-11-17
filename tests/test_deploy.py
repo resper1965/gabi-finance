@@ -346,27 +346,6 @@ def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
 
 
 # ---------------- contatos do Google ----------------
-def test_unidades_contatos_seguem_o_padrao_e_nao_sao_ligadas():
-    srv, t = _ler("gabi-brain-contatos.service"), _ler("gabi-brain-contatos.timer")
-    assert "-m gabi.contatos.contatos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Unit=gabi-brain-contatos.service" in t
-    assert hasattr(importlib.import_module("gabi.contatos.contatos"), "main")
-    # escrita aprovada no Graph da ness roda depois da sincronização, na mesma unit e no mesmo sandbox (só AF_UNIX)
-    assert "ExecStartPost=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos_gravar" in srv
-    assert srv.index("ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.contatos.contatos\n") < srv.index("ExecStartPost=")
-    assert hasattr(importlib.import_module("gabi.contatos.contatos_gravar"), "main")
-    for nome in ("gabi-brain-contatos.service", "gabi-brain-contatos.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("contatos" in l for l in ligadas)
-
-
 def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
     assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in _ler("gabi-brain-fontes.service")
 
@@ -383,65 +362,9 @@ def test_unit_fontes_le_google_env_e_o_antigo():
     assert not [l for l in unit.splitlines() if l.startswith("Environment=") and ("REFRESH" in l or "SECRET" in l)]  # nenhum segredo na unit
 
 
-# ---------------- agenda ----------------
-def test_unidades_da_agenda_seguem_o_padrao_e_nao_sao_habilitadas():
-    srv, t = _ler("gabi-brain-agenda.service"), _ler("gabi-brain-agenda.timer")
-    assert "-m gabi.agenda" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "OnCalendar=*-*-* 06..22:10,40:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-agenda.service" in t
-    assert hasattr(importlib.import_module("gabi.agenda.__main__"), "main")
-    for nome in ("gabi-brain-agenda.service", "gabi-brain-agenda.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("agenda" in l for l in ligadas)
-
-
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
     linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/.novo/tools"))
-    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "$AQUI/tools/carga_familia.py" in linha and linha.rstrip().endswith("/opt/gabi-brain/.novo/tools/")
-
-
-# ---------------- correio ----------------
-def test_unidades_do_correio_seguem_o_padrao_e_nao_sao_habilitadas():
-    srv, t = _ler("gabi-brain-correio.service"), _ler("gabi-brain-correio.timer")
-    assert "-m gabi.correio" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv  # segredo só no serviço de fontes
-    assert "TimeoutStartSec=600" in srv  # sincronizar (até 130 s) + conferência (até 130 s) + processar (210 s) + lixeira cabem
-    assert "OnCalendar=*-*-* 06..22:05,20,35,50:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-correio.service" in t
-    assert hasattr(importlib.import_module("gabi.correio.__main__"), "main")
-    for nome in ("gabi-brain-correio.service", "gabi-brain-correio.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("correio" in l for l in ligadas)
-
-
-# ---------------- teams (instalado, NÃO habilitado) ----------------
-def test_unidades_do_teams_seguem_o_padrao_e_nao_sao_habilitadas():
-    srv, t = _ler("gabi-brain-teams.service"), _ler("gabi-brain-teams.timer")
-    assert "-m gabi.teams" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "TimeoutStartSec=300" in srv
-    assert "OnCalendar=*-*-* 07..20:00/15:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-teams.service" in t
-    assert hasattr(importlib.import_module("gabi.teams.__main__"), "main")
-    for nome in ("gabi-brain-teams.service", "gabi-brain-teams.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert not any("teams" in l for l in ligadas)
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "carga_familia" not in linha and linha.rstrip().endswith("/opt/gabi-brain/.novo/tools/")
 
 
 def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
@@ -465,7 +388,11 @@ def test_todo_modulo_que_uma_unit_executa_existe():
 
 CORTADAS = ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path", "escuta-ouvinte.service", "gabi-brain-trabalho.service",
             "gabi-brain-trabalho.timer", "gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer", "gabi-brain-exames.service",
-            "gabi-brain-exames.timer", "gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer")
+            "gabi-brain-exames.timer", "gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer",
+            # corte do gabi-finance: agenda, anexos, contatos, correio, documentos e teams saíram
+            "gabi-brain-agenda.service", "gabi-brain-agenda.timer", "gabi-brain-anexos.service", "gabi-brain-anexos.timer", "gabi-brain-contatos.service",
+            "gabi-brain-contatos.timer", "gabi-brain-correio.service", "gabi-brain-correio.timer", "gabi-brain-documentos.service",
+            "gabi-brain-documentos.timer", "gabi-brain-teams.service", "gabi-brain-teams.timer")
 
 
 def test_units_cortadas_nao_voltam_ao_repositorio():
@@ -481,38 +408,3 @@ def test_instalador_desliga_e_remove_as_units_cortadas_antes_do_reload():
     for nome in CORTADAS:
         assert f"/etc/systemd/system/{nome}" in texto[:reload] or nome in texto[:reload], nome
     assert "disable --now" in texto[:reload] and "rm -f" in texto[:reload]
-
-
-# ---------------- documentos (instalado e LIGADO) ----------------
-def test_unidades_dos_documentos_seguem_o_padrao_e_sao_ligadas():
-    srv, t = _ler("gabi-brain-documentos.service"), _ler("gabi-brain-documentos.timer")
-    assert "-m gabi.documentos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv
-    assert "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in srv
-    assert "RestrictAddressFamilies=AF_UNIX" in srv and "IPAddressDeny=any" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "UMask=0077"):
-        assert dur in srv, dur
-    assert "EnvironmentFile" not in srv
-    assert "OnCalendar=*-*-* 05:00:00 America/Sao_Paulo" in t and "Persistent=true" in t and "Unit=gabi-brain-documentos.service" in t
-    assert hasattr(importlib.import_module("gabi.documentos.__main__"), "main")
-    for nome in ("gabi-brain-documentos.service", "gabi-brain-documentos.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-documentos.timer" in ligadas[0]
-
-
-# ---------------- anexos (ADR-034; instalado, NÃO habilitado) ----------------
-def test_unidades_dos_anexos_seguem_o_padrao_e_nao_sao_habilitadas():
-    srv, t = _ler("gabi-brain-anexos.service"), _ler("gabi-brain-anexos.timer")
-    assert "-m gabi.anexos" in srv and "Type=oneshot" in srv and "User=gabibrain" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "ExecStartPre=+" in srv and ".hermes/cache" in srv and "ANEXOS_DIR=/var/lib/gabi-brain/anexos" in srv and "ProtectSystem=strict" in srv
-    assert "OnUnitActiveSec=2min" in t and "Unit=gabi-brain-anexos.service" in t
-    for nome in ("gabi-brain-anexos.service", "gabi-brain-anexos.timer"):
-        assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert not any("anexos" in l for l in ligadas)
-
-
-def test_anexos_so_avancam_o_selo_se_todas_as_copias_deram_certo():
-    srv = _ler("gabi-brain-anexos.service")
-    assert "|| ok=0" in srv and "[ $ok = 1 ]" in srv and srv.index("[ $ok = 1 ]") < srv.index("mv $S.novo $S")

@@ -110,14 +110,14 @@ def test_varredura_de_exclusao_pega_delete_fora_de_apagar():
 
 
 def test_nenhuma_rota_de_exclusao_no_codigo():
-    """O único DELETE do código é o de apagar contato da ness, dentro de `apagar`, aprovado um a um (ADR-021). Qualquer outro, ou outro nesse arquivo, falha."""
+    """Nenhum DELETE no código (o de apagar contato da ness saiu com os contatos no corte do gabi-finance; ADR-021). Qualquer um novo falha."""
     achados = []
     for arq in RAIZ.rglob("*.py"):
         if "painel" in arq.parts:
             continue
         for funcao in _exclusoes(arq.read_text(encoding="utf-8")):
             achados.append((arq.name, funcao))
-    assert achados == [("graph_ness_contatos.py", "apagar")]
+    assert achados == []
 
 
 def test_nfse_ordena_por_createDate_e_filtra_com_offset():

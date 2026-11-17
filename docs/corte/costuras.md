@@ -76,3 +76,18 @@ estão em `saem.txt` (um por linha). As Tasks 2–5 executam as ações abaixo; 
 | `gabi/decisoes.py` | Sai o efeito `adicionar_canal_email` com `_endereco`, `_normalizar_telefone` (as cópias da Task 2) e os testes dele | Lia `contato_google_email` (contatos saem). `tests/decisoes/test_helpers_privados.py` apagado: testava só essas cópias. |
 | `gabi/api.py:67` | Comentário "fábricas de Nibo/Paperless" virou "fábrica do Nibo" | Ajuste do controlador. |
 | Testes apagados | `tests/test_avisos_teams.py`, `test_avisos_convites.py`, `test_atividades_avisos.py`, `test_projetos_avisos.py`; trechos hermes/google/documento de `test_avisos.py`; `test_email_emergencial_vai_antes...` de `test_telegram.py`; descrever de caixa/agenda/correio/convite em `test_avisos_api.py`; efeito `adicionar_canal_email` em `test_decisoes.py` | Só cobrem comportamento não financeiro que saiu. |
+
+## Decisões da Task 5 (remoção)
+
+| Item | Decisão | Motivo |
+|---|---|---|
+| Módulos de `saem.txt` + `gabi/fontes/roteador.py` | Removidos (`git rm`) com os pacotes `agenda`, `contatos`, `correio`, `documentos`, `envios`, `familia`, `teams` inteiros | `roteador` não estava em `saem.txt` mas a Task 2 decidiu que sai (ruling do controlador). `tokens.py` já estava na lista. |
+| `tools/comparar_agenda.py` e `tests/test_comparar_agenda.py` | FICAM | O brief mandava remover, mas "agenda" ali é a agenda de COMPROMISSOS financeiros (compara com o gabi-financeiro, critério G21); não importa nada que sai e o teste é financeiro (regra: nenhum teste financeiro apagado). A decisão de aposentá-lo, se for o caso, é da Task de deploy/virada. |
+| `tools/capturas.py` | FICA | Capturas do painel (Playwright), sem dependência do que sai; o painel reduz na Task 7. |
+| `tools/auditar_promessas.py`, `tests/tools/*` | FICAM | Task 8 (prefixo e lista `ESCRITAS` só financeira). |
+| `tools/{carga_familia,obter_token_google,obter_token_teams,sonda_teams_ness}.py` | Removidos | Só serviam aos módulos que saem. |
+| `gabi/static` (`index.html`, `industry.css`) | FICA | `api.py` ainda monta `/static` e usa `static/index.html` como página reserva quando o painel não está construído. |
+| `deploy/gabi-brain-{agenda,anexos,contatos,correio,documentos,teams}.{service,timer}` | Removidos já aqui; `instalar.sh` os desliga e apaga na VPS (lista das units cortadas) | Sem eles o teste "todo módulo que uma unit executa existe" falha (zero falhas é exigência da Task 5). O RENOMEAR `gabi-brain-*` -> `gabi-finance-*` continua na Task 8; o `gabi-brain-fontes.service` ainda lê `google.env`/`google-contatos.env` (Task 8). |
+| `tests/test_deploy.py` | Saem os testes das units removidas; as removidas entram em `CORTADAS` (teste de que não voltam) | Só cobriam o que saiu. |
+| `tests/cobrar/test_nibo.py::test_nenhuma_rota_de_exclusao_no_codigo` | `achados == []` (antes aceitava o `apagar` de `graph_ness_contatos.py`) | O único DELETE do código saiu com os contatos; a asserção ficou mais forte, não mais fraca. |
+| `tests/rotas/test_cadastros_api.py` | Tira o import de `tests.familia.apoio.doc_pessoa` e os 2 documentos da família do banco de teste | O fixture só alimentava o `GET /pessoas/{pid}/cpf`, removido na Task 3; a tabela `documento` cai na migração 0090. |

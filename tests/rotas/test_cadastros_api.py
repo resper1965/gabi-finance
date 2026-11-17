@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from gabi.acesso import adicionar
 from gabi.api import criar_app
 from gabi.db import conectar, migrar
-from tests.familia.apoio import doc_pessoa
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 BOSS = {"Tailscale-User-Login": "boss@x.com"}
@@ -28,8 +27,6 @@ def banco(tmp_path):
     c.execute("insert into conta(externo_id, instituicao, tipo, apelido, estado, limite_centavos) values ('b1','C6','BANK','C6 PJ','a_decidir',NULL)")
     c.execute("insert into pessoa(id, nome, papel, telefone, dados) values ('lia','Lia','filha','+5511900000003', ?)",
               (json.dumps({"documentos": [{"tipo": "CPF", "numero": "***.***.***-09"}]}),))
-    doc_pessoa(c, "lia", "cpf", "111.444.777-09", origem="carga", criado_em="2026-10-08", atualizado_em="2026-10-08")
-    doc_pessoa(c, "lia", "rg", "12345678", origem="carga", criado_em="2026-10-08", atualizado_em="2026-10-08", excluido_em="2026-10-09")
     c.execute("insert into empresa(id, nome, cnpj) values ('ness','Ness','12.345.678/0001-90')")
     c.execute("insert into categoria(nome) values ('Mercado')")
     c.close()
