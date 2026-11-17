@@ -125,3 +125,11 @@ def test_escritas_financeiras_contam():
     for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
               "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso"):
         assert "mcp__gabi_finance__" + n in ap.FERRAMENTAS_DE_ESCRITA
+
+
+def test_ate_a_etapa_3_escrita_pelo_gabi_brain_tambem_cumpre(tmp_path):
+    for n in ("familia_registrar_pessoa", "email_lixeira", "financeiro_marcar_gasto"):
+        assert "mcp__gabi_brain__" + n in ap.FERRAMENTAS_DE_ESCRITA
+    assert "mcp__gabi_brain__financeiro_saldo" not in ap.FERRAMENTAS_DE_ESCRITA  # leitura não cumpre
+    p = _banco(tmp_path, [USER, ("tool", '{"ok": true}', "mcp__gabi_brain__familia_registrar_pessoa"), PROMESSA])
+    assert ap.promessas_sem_escrita(p, DESDE) == []

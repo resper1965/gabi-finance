@@ -1,5 +1,5 @@
 """Confere o que o Hermes prometeu gravar: acha respostas com "anotado", "registrei", "salvei" etc. sem chamada
-bem-sucedida a ferramenta de escrita do gabi-finance no mesmo turno (ADR-028).
+bem-sucedida a ferramenta de escrita do gabi-finance (ou, até a etapa 3, do gabi_brain) no mesmo turno (ADR-028).
 Uso: python -m tools.auditar_promessas [--desde YYYY-MM-DD] [--state-db ~/.hermes/state.db]. Somente leitura (?mode=ro).
 Imprime uma linha por caso (data, sessão, 80 primeiros caracteres) e a contagem; sai 0. Sem timer: o assistente roda."""
 import argparse
@@ -11,7 +11,11 @@ from pathlib import Path
 
 ESCRITAS = ("decisao_responder", "classificar_lancamento", "regras_sugerir", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
             "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso")
-FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_finance__" + n for n in ESCRITAS}
+# Até a etapa 3 o Hermes também escreve pelo servidor `gabi_brain` (família, e-mail, propostas; e, no histórico de antes da virada, o
+# próprio dinheiro): escrita ok por lá também cumpre a promessa. Lista = a de escrita do brain (tools/auditar_promessas.py de lá).
+ESCRITAS_BRAIN = ESCRITAS + ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "familia_propor_documento",
+                             "propor_evento", "propor_teams", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo")
+FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_finance__" + n for n in ESCRITAS} | {"mcp__gabi_brain__" + n for n in ESCRITAS_BRAIN}
 PROMESSA = re.compile(r"\b(anotad|anotei|registr|salv|guard|atualiz)\w*", re.I)
 PADRAO_STATE_DB = Path.home() / ".hermes" / "state.db"
 _EMBRULHO = re.compile(r"^\s*<untrusted_tool_result[^>]*>(.*?)(?:</untrusted_tool_result>\s*)?$", re.S)

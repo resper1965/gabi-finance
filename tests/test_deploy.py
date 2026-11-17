@@ -355,12 +355,25 @@ def test_so_existem_units_gabi_finance_e_nenhuma_traz_o_nome_antigo():
         assert not {f"gabi-finance-{cortada}.service", f"gabi-finance-{cortada}.timer"} & nomes, cortada
 
 
+# Na virada o Hermes fala com os DOIS servidores MCP: estes arquivos editam o SOUL/config do Hermes e por isso citam o NOME do servidor
+# `gabi_brain` (e o prefixo `mcp__gabi_brain__`). Nunca usuário, caminho, unidade ou segredo do brain: o resto da lista vale para eles também.
+CITAM_O_SERVIDOR_BRAIN = {"deploy/hermes/editar_soul.py", "tools/gerar_hermes.py", "tools/auditar_promessas.py"}
+SO_O_NOME_DO_SERVIDOR = ("gabi_brain", "mcp__gabi_brain")
+
+
+def _proibidos(rel: str, lista: tuple) -> tuple:
+    return tuple(v for v in lista if not (rel in CITAM_O_SERVIDOR_BRAIN and v in SO_O_NOME_DO_SERVIDOR))
+
+
 def test_deploy_so_usa_usuario_caminhos_e_segredos_do_gabi_finance():
-    texto = "\n".join(p.read_text() for p in DEPLOY.rglob("*") if p.is_file() and p.suffix in (".service", ".timer", ".sh", ".py", ".md"))
+    arquivos = [p for p in DEPLOY.rglob("*") if p.is_file() and p.suffix in (".service", ".timer", ".sh", ".py", ".md")]
+    texto = "\n".join(p.read_text() for p in arquivos)
     assert "User=gabifinance" in texto and "/opt/gabi-finance" in texto and "/var/lib/gabi-finance" in texto
     assert "/run/gabi-finance/" in texto and "/etc/gabi-finance/" in texto
-    for velho in ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "GABI_BRAIN", "/etc/gabi/", "/opt/gabi/"):
-        assert velho not in texto, velho
+    for p in arquivos:
+        rel = p.relative_to(DEPLOY.parent).as_posix()
+        for velho in _proibidos(rel, ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "GABI_BRAIN", "/etc/gabi/", "/opt/gabi/")):
+            assert velho not in p.read_text(), (rel, velho)
 
 
 def test_defaults_de_gabi_e_tools_nao_apontam_para_o_gabi_brain():
@@ -369,8 +382,9 @@ def test_defaults_de_gabi_e_tools_nao_apontam_para_o_gabi_brain():
         for p in (raiz / pasta).rglob("*"):
             if p.is_file() and p.suffix in (".py", ".html", ".sh") and "painel" not in p.parts:
                 t = p.read_text(encoding="utf-8")
-                for velho in ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "/etc/gabi/", "mcp__gabi_brain"):
-                    assert velho not in t, (str(p.relative_to(raiz)), velho)
+                rel = p.relative_to(raiz).as_posix()
+                for velho in _proibidos(rel, ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "/etc/gabi/", "mcp__gabi_brain")):
+                    assert velho not in t, (rel, velho)
 
 
 def test_mcp_nao_disputa_a_porta_com_o_gabi_brain_durante_a_virada():

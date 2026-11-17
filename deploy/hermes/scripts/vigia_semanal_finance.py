@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Vigia semanal SEM modelo: serviços do gabi-finance e do Hermes no ar, fontes de dados em dia e promessas do Hermes sem escrita.
-Sai pelo stdout (o cron `--no-agent` entrega ao Ricardo). Fonte: ~/gabi-finance/deploy/hermes/scripts/; cópia em ~/.hermes/scripts/.
+Sai pelo stdout (o cron `--no-agent` entrega ao Ricardo). Fonte: ~/gabi-finance/deploy/hermes/scripts/vigia_semanal_finance.py; cópia em ~/.hermes/scripts/ (nome próprio: o vigia_semanal.py lá é o do brain).
 Token em ~/.hermes/.env (GABI_FINANCE_TOKEN); nunca imprime segredo. Falha: uma linha curta e sai com 1."""
 import json
 import re

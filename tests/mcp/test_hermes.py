@@ -68,3 +68,11 @@ def test_soul_ensina_as_despesas_com_sim_antes_de_gravar():
     assert "depois do sim" in linha
     gravar = soul.split("Gravar de verdade:")[1]
     assert "despesa_" in gravar
+
+
+def test_doc_lista_as_28_que_saem_do_gabi_brain_e_os_cinco_ficam_nos_dois():
+    from tools.gerar_hermes import CABECALHO_TIRAR, NOS_DOIS, tirar_do_brain
+    bloco = DOC.split(CABECALHO_TIRAR)[1].split("```")[0]
+    assert [l[2:] for l in bloco.splitlines() if l.startswith("- ")] == tirar_do_brain()
+    assert len(tirar_do_brain()) == 28 and set(NOS_DOIS) <= set(ferramentas_do_hermes())
+    assert set(tirar_do_brain()) | set(NOS_DOIS) == set(ferramentas_do_hermes()) and not set(tirar_do_brain()) & set(NOS_DOIS)
