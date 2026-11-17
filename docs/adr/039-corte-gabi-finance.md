@@ -20,7 +20,7 @@ Criar o repositório `gabi-finance`, nascido **com o histórico inteiro** do `ga
 | F6 | **Pessoas ficam** (`pessoa`, portadores dos cartões, `gastador_regra`, "para quem"); ficha da família, documentos, pets e bens saem | `migrations/0090`, `0091` |
 | F7 | **Avisos só financeiros** e resumo da manhã financeiro | `gabi/avisos.py`, `gabi/telegram.py`, `resumo_manha` |
 | F8 | **MCP** com servidor `gabi_finance` e os **mesmos nomes de ferramenta** das financeiras; o prefixo muda de `mcp__gabi_brain__` para `mcp__gabi_finance__` | [`../mcp.md`](../mcp.md), `deploy/hermes/SOUL.md` |
-| F9 | **VPS:** usuário `gabifinance`, `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, unidades `gabi-finance-*`, host `gabi-finance.tail985643.ts.net` | `deploy/`, [`../virada.md`](../virada.md) |
+| F9 | **VPS:** usuário `gabifinance`, `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, unidades `gabi-finance-*`, host `gabi-brain.tail985643.ts.net` (a mesma máquina do brain) com o painel na porta **8444** e o MCP externo na **8445** (a 8443 é do brain) | `deploy/`, [`../virada.md`](../virada.md) |
 
 ### Decisões tomadas durante o corte (fora do spec)
 
@@ -45,9 +45,9 @@ Todo o comportamento financeiro: captura incremental, conferência, classificaç
 - (+) Um serviço pequeno, com superfície de ataque e de manutenção muito menor, que dá para entender e documentar inteiro.
 - (+) Os dados que saíram deixam de morar num banco com segredos e passam para o markdown, onde o Ricardo os controla.
 - (+) A volta é barata: o `gabi-brain` continua instalado e só perde o dinheiro depois da conferência.
-- (−) Até a etapa 3 o `gabi-brain` e o `gabi-finance` convivem: o Hermes passa a falar com dois servidores MCP, o SOUL do Hermes fica só financeiro e o aviso financeiro pode chegar duplicado no Telegram se o do `gabi-finance` for ligado.
+- (−) Até a etapa 3 o `gabi-brain` e o `gabi-finance` convivem: o Hermes passa a falar com dois servidores MCP, o SOUL do Hermes é editado (prefixo `mcp__gabi_finance__` nas ferramentas de dinheiro) e o brain, com `GABI_SEM_FINANCEIRO=1`, deixa de falar de dinheiro (sem aviso duplicado no Telegram).
 - (−) Agenda financeira degradada (item 7 acima).
-- (−) O endereço novo no Tailscale depende de configuração no console da Tailscale (a conferir no passo 7 da virada).
+- (−) O finance não tem nome próprio no Tailscale: usa portas da máquina do brain (8444 e 8445).
 
 ## Fora de escopo
 

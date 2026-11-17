@@ -9,7 +9,7 @@ from gabi.mcp.servidor import ESCOPOS_HERMES
 from gabi.mcp.tokens import ESCOPOS
 
 UTC = dt.timezone.utc
-URL_PADRAO = "https://gabi-finance.tail985643.ts.net:8443/mcp"
+URL_PADRAO = "https://gabi-brain.tail985643.ts.net:8445/mcp"  # mesma máquina do brain; 8443 é o MCP externo do brain, 8444 o painel do finance
 ORIGEM = "agentes"
 
 

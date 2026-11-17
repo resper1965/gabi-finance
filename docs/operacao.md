@@ -20,7 +20,7 @@ Tudo é `systemd`. Os serviços ficam de pé o tempo todo; o resto são tarefas 
 | `gabi-finance-exportacao.timer` | Pacote semanal criptografado para fora da VPS | domingo 04:00 | não | `backup.pub` (chave pública) |
 | `gabi-finance-falha@.service` | Gatilho `OnFailure=` de todas as unidades acima: grava o aviso `servico_falhou` | quando uma unidade falha | não | nenhum |
 
-Duas regras de segurança aparecem nessa tabela. **R5:** só a ponte tem o token do Nibo; a API, o MCP e a unidade de notas **não têm rede** (`IPAddressDeny=any`) e falam com ela pelo socket. A chave do **mcp.ai fica fora da ponte**: as unidades de extratos e saldos a leem do próprio `mcpai.env` e chamam o mcp.ai direto (decisão do corte; ver [`adr/039-corte-gabi-finance.md`](adr/039-corte-gabi-finance.md)). **R2:** o Telegram é a única exceção a "nada sai sozinho", e só funciona se `telegram.env` existir; sem o arquivo a unidade roda e não envia.
+Duas regras de segurança aparecem nessa tabela. **R5:** só a ponte tem o token do Nibo; a API e o MCP **não têm rede** (`IPAddressDeny=any`; o MCP só aceita `localhost`) e a unidade de notas só tem socket Unix (`RestrictAddressFamilies=AF_UNIX`); todas falam com a ponte pelo socket. A chave do **mcp.ai fica fora da ponte**: as unidades de extratos e saldos a leem do próprio `mcpai.env` e chamam o mcp.ai direto (decisão do corte; ver [`adr/039-corte-gabi-finance.md`](adr/039-corte-gabi-finance.md)). **R2:** o Telegram é a única exceção a "nada sai sozinho", e só funciona se `telegram.env` existir; sem o arquivo a unidade roda e não envia.
 
 Ver o que está agendado: `systemctl list-timers 'gabi-finance-*'`.
 

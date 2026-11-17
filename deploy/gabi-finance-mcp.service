@@ -11,8 +11,8 @@ User=gabifinance
 Group=gabifinance
 WorkingDirectory=/opt/gabi-finance
 Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
-# Hosts aceitos (anti DNS-rebinding). Para expor na tailnet: tailscale serve --https=8443 http://127.0.0.1:8082 e acrescente
-# o nome da máquina (ex.: gabi-finance.tail985643.ts.net:8443) aqui por drop-in.
+# Hosts aceitos (anti DNS-rebinding). Para agentes externos na tailnet: tailscale serve --bg --https=8445 http://127.0.0.1:8082
+# (8443 é o MCP externo do brain; 8444 o painel do finance) e acrescente gabi-brain.tail985643.ts.net:8445 aqui por drop-in.
 Environment=GABI_MCP_HOSTS=127.0.0.1:8082,localhost:8082
 # O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
 Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock

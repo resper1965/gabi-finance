@@ -359,6 +359,8 @@ def test_so_existem_units_gabi_finance_e_nenhuma_traz_o_nome_antigo():
 # `gabi_brain` (e o prefixo `mcp__gabi_brain__`). Nunca usuário, caminho, unidade ou segredo do brain: o resto da lista vale para eles também.
 CITAM_O_SERVIDOR_BRAIN = {"deploy/hermes/editar_soul.py", "tools/gerar_hermes.py", "tools/auditar_promessas.py"}
 SO_O_NOME_DO_SERVIDOR = ("gabi_brain", "mcp__gabi_brain")
+# O finance é servido pela MESMA máquina do tailnet (portas 8444 painel e 8445 MCP externo): o nome da máquina não é resto do brain.
+HOST_DA_MAQUINA = "gabi-brain.tail985643.ts.net"
 
 
 def _proibidos(rel: str, lista: tuple) -> tuple:
@@ -373,7 +375,7 @@ def test_deploy_so_usa_usuario_caminhos_e_segredos_do_gabi_finance():
     for p in arquivos:
         rel = p.relative_to(DEPLOY.parent).as_posix()
         for velho in _proibidos(rel, ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "GABI_BRAIN", "/etc/gabi/", "/opt/gabi/")):
-            assert velho not in p.read_text(), (rel, velho)
+            assert velho not in p.read_text().replace(HOST_DA_MAQUINA, ""), (rel, velho)
 
 
 def test_defaults_de_gabi_e_tools_nao_apontam_para_o_gabi_brain():
@@ -381,7 +383,7 @@ def test_defaults_de_gabi_e_tools_nao_apontam_para_o_gabi_brain():
     for pasta in ("gabi", "tools"):
         for p in (raiz / pasta).rglob("*"):
             if p.is_file() and p.suffix in (".py", ".html", ".sh") and "painel" not in p.parts:
-                t = p.read_text(encoding="utf-8")
+                t = p.read_text(encoding="utf-8").replace(HOST_DA_MAQUINA, "")
                 rel = p.relative_to(raiz).as_posix()
                 for velho in _proibidos(rel, ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "/etc/gabi/", "mcp__gabi_brain")):
                     assert velho not in t, (rel, velho)
@@ -391,3 +393,11 @@ def test_mcp_nao_disputa_a_porta_com_o_gabi_brain_durante_a_virada():
     """O serviço anterior segue em 127.0.0.1:8081 até a volta ser descartada; o gabi-finance usa 8082."""
     assert "--port 8082" in MCP and "8081" not in MCP
     assert "8081" not in INSTALAR
+
+
+def test_portas_da_tailnet_nao_disputam_com_o_brain():
+    """Mesma máquina do brain: 8443 é o MCP externo dele; o painel do finance fica na 8444 e o MCP externo na 8445."""
+    from gabi.agentes import URL_PADRAO
+    assert "Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8444\n" in API  # a origem leva a porta
+    assert URL_PADRAO == "https://gabi-brain.tail985643.ts.net:8445/mcp"
+    assert "8443" not in API and ":8443" not in URL_PADRAO

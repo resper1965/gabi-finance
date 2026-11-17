@@ -51,7 +51,7 @@ Nibo (NFS-e) ──────► ponte `fontes` (único processo com o token d
  (Tailscale)     (Hermes)            avisos, Telegram, backup)
 ```
 
-Um banco SQLite num arquivo só; uma API FastAPI em **socket Unix** (sem porta TCP) exposta apenas pelo `tailscale serve`, que injeta a identidade de quem entra; um servidor MCP em `127.0.0.1:8082` com token por agente; e tarefas curtas disparadas por timers do systemd. Só um processo tem rede e o token do Nibo. Detalhes, diagrama completo e fronteira de confiança: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
+Um banco SQLite num arquivo só; uma API FastAPI em **socket Unix** (sem porta TCP) exposta apenas pelo `tailscale serve`, que injeta a identidade de quem entra; um servidor MCP em `127.0.0.1:8082` com token por agente; e tarefas curtas disparadas por timers do systemd. Só a ponte (`gabi-finance-fontes`) tem o token do Nibo; têm rede, além dela, só as rodadas de extratos e saldos (mcp.ai) e a do Telegram; a API, o MCP, os avisos, as notas e o backup não. Detalhes, diagrama completo e fronteira de confiança: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
 
 **Tecnologia:** Python 3 (FastAPI, SQLite, uvicorn), painel React 19 + TypeScript + Vite, systemd, Tailscale. Código e comentários em português.
 
