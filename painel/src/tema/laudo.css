@@ -203,7 +203,7 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
   background: var(--folha); border: 1px solid var(--regra-forte); border-radius: var(--raio); box-shadow: var(--sombra-camada);
   animation: surge var(--dur) var(--curva);
 }
-.conteudo { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.conteudo { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; position: relative; }
 .pagina { padding: 24px 32px 56px; display: flex; flex-direction: column; gap: 28px; max-width: 1360px; }
 
 .app[data-celular="true"] .topo { padding: 12px 14px 0; gap: 10px; }
