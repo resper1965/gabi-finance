@@ -2,7 +2,7 @@
 
 Serviço **só financeiro** da Gabi, a assistente pessoal agêntica do Ricardo Esper. Lê extratos e saldos pelo Open Finance (mcp.ai) e as notas fiscais pelo Nibo, guarda tudo num banco SQLite e responde a perguntas como "tenho caixa?", "o que vence esta semana?", "para onde foi o dinheiro?" e "quem me deve?", por um **painel web** (atrás da Tailscale) e por um **servidor MCP** que o agente de conversa (Hermes, no Telegram e no WhatsApp) usa.
 
-> **Estado (17/11/2026): corte pronto, virada pendente.** O código, o banco, o painel, o MCP, o deploy e esta documentação estão prontos na branch `corte`; ainda não foi feito o merge na `main` nem a instalação na VPS. O roteiro para colocar no ar, com verificação em cada passo e a volta, é o [`docs/virada.md`](docs/virada.md). Situação e pendências: [`docs/STATUS.md`](docs/STATUS.md).
+> **Estado (17/11/2026): corte pronto, virada pendente.** O código, o banco, o painel, o MCP, o deploy e esta documentação estão prontos e na `main`; falta a instalação na VPS. O roteiro para colocar no ar, com verificação em cada passo e a volta, é o [`docs/virada.md`](docs/virada.md). Situação e pendências: [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Índice
 
