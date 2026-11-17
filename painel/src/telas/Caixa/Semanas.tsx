@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Bloco } from "../../componentes/Bloco";
-import { Estat, GradeKpi } from "../../componentes/Kpi";
+import { Achados } from "../../componentes/Achados";
+import { Etiqueta } from "../../componentes/Etiqueta";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { BarrasSemanas, type Semana } from "../../graficos/BarrasSemanas";
@@ -25,43 +26,40 @@ export function Semanas() {
         const entradas = reais.reduce((s, w) => s + Math.abs(soma(w.entradas)), 0), saidas = reais.reduce((s, w) => s + Math.abs(soma(w.saidas)), 0);
         const ultima = d.semanas[d.semanas.length - 1];
         return (
-          <>
-            <GradeKpi min={170}>
-              <Estat rotulo="Entradas realizadas"><Valor valor={entradas} /></Estat>
-              <Estat rotulo="Saídas realizadas"><Valor valor={saidas} /></Estat>
-              <Estat rotulo="Líquido no período"><Valor valor={entradas - saidas} /></Estat>
-              <Estat rotulo={`Saldo projetado em ${d.semanas.filter((s) => s.projecao).length} semanas`}>{ultima?.saldo ? <Valor valor={ultima.saldo} /> : "—"}</Estat>
-            </GradeKpi>
-            <Bloco titulo="Entradas e saídas por semana" nota="clique numa semana para ver os lançamentos">
+          <div className="pilha" style={{ gap: 32, maxWidth: 1000 }}>
+            <Achados itens={[
+              { codigo: "E-01", rotulo: "Entradas realizadas", fonte: "open-finance", base: `créditos do extrato em ${reais.length} semanas`, valor: <Valor valor={entradas} /> },
+              { codigo: "E-02", rotulo: "Saídas realizadas", fonte: "open-finance", base: `débitos do extrato em ${reais.length} semanas`, valor: <Valor valor={saidas} /> },
+              { codigo: "E-03", rotulo: "Líquido no período", fonte: "open-finance", base: "entradas − saídas realizadas", valor: <Valor valor={entradas - saidas} />,
+                carimbo: entradas - saidas < 0 ? { tipo: "erro", texto: "saiu mais" } : undefined },
+              { codigo: "E-04", rotulo: `Saldo projetado em ${d.semanas.filter((s) => s.projecao).length} semanas`, fonte: "open-finance", estado: "projecao", base: "saldo conferido + o que vence e o que deve entrar",
+                valor: ultima?.saldo ? <Valor valor={ultima.saldo} /> : <span className="suave">—</span>, carimbo: { tipo: "nota", texto: "projeção" } },
+            ]} />
+            <Bloco titulo="Entradas e saídas por semana" nota="clique numa semana (ou Enter sobre ela) para ver os lançamentos">
               <BarrasSemanas semanas={d.semanas} escolhida={inicio} aoEscolher={setInicio} oculto={oculto} />
             </Bloco>
             {sem && (
-              <Bloco>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 20 }}>Semana de {dataCurta(sem.inicio)} a {dataCurta(sem.fim)}</h3>
-                    <span style={{ fontSize: 12.5, color: "var(--ink2)" }}>entradas <Valor valor={Math.abs(soma(sem.entradas))} /> · saídas <Valor valor={Math.abs(soma(sem.saidas))} /> · líquido <Valor valor={soma(sem.entradas) + soma(sem.saidas)} /></span>
-                  </div>
-                  <button className="btn btn-secondary" onClick={() => setInicio(null)}>Fechar</button>
-                </div>
-                {sem.projecao && <span style={{ font: "500 12px var(--mono)", color: "var(--warn)" }}>▲ semana futura: valores projetados, ainda não aconteceram</span>}
-                <div style={{ display: "flex", flexDirection: "column" }}>
+              <Bloco titulo={`Semana de ${dataCurta(sem.inicio)} a ${dataCurta(sem.fim)}`} acao={<button className="btn btn-sm" onClick={() => setInicio(null)}>Fechar</button>}
+                nota={<>entradas <Valor valor={Math.abs(soma(sem.entradas))} /> · saídas <Valor valor={Math.abs(soma(sem.saidas))} /> · líquido <Valor valor={soma(sem.entradas) + soma(sem.saidas)} /></>}>
+                {sem.projecao && <span className="fila miudo"><Etiqueta tipo="nota" texto="projeção" />semana futura: valores projetados, ainda não aconteceram</span>}
+                <ul className="pauta">
                   {sem.projecao
                     ? [...sem.entradas, ...sem.saidas].map((i) => (
-                        <div key={i.categoria + i.valor} style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) auto", gap: "4px 12px", padding: "9px 0", borderTop: "1px solid var(--line2)", alignItems: "baseline" }}>
-                          <span /><span style={{ fontWeight: 600 }}>{i.categoria}</span><span style={{ fontWeight: 600 }}><Valor valor={i.valor} /></span>
-                        </div>))
+                        <li key={i.categoria + i.valor} className="linha-lanc">
+                          <span /><span className="linha-titulo">{i.categoria}</span><span className="linha-valor"><Valor valor={i.valor} /></span>
+                        </li>))
                     : (lanc.env?.dados.itens ?? []).map((l) => (
-                        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) auto", gap: "4px 12px", padding: "9px 0", borderTop: "1px solid var(--line2)", alignItems: "baseline" }}>
-                          <span style={{ font: "500 12px var(--mono)", color: "var(--ink2)" }}>{dataCurta(l.data)}</span>
-                          <span style={{ minWidth: 0 }}><span style={{ fontWeight: 600 }}>{l.estabelecimento}</span> <span style={{ fontSize: 12, color: "var(--ink2)" }}>· {l.categoria.nome ?? "sem categoria"} · {l.conta}</span></span>
-                          <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600, color: num(l.valor) > 0 ? "var(--ok)" : undefined, whiteSpace: "nowrap" }}><Valor valor={l.valor} /></span>
-                        </div>))}
-                  {!sem.projecao && lanc.env && lanc.env.dados.itens.length === 0 && <p style={{ color: "var(--ink2)", margin: 0 }}>Nenhum lançamento nesta semana.</p>}
-                </div>
+                        <li key={l.id} className="linha-lanc">
+                          <span className="mono suave">{dataCurta(l.data)}</span>
+                          <span style={{ minWidth: 0 }}><span className="linha-titulo">{l.estabelecimento}</span> <span className="miudo">· {l.categoria.nome ?? "sem categoria"} · {l.conta}</span></span>
+                          <span className="linha-valor" style={{ color: num(l.valor) > 0 ? "var(--carimbo-verde)" : undefined }}><Valor valor={l.valor} /></span>
+                        </li>))}
+                </ul>
+                {!sem.projecao && !lanc.env && <span className="esqueleto"><span className="esqueleto-linha" /><span className="esqueleto-linha" style={{ width: "70%" }} /></span>}
+                {!sem.projecao && lanc.env && lanc.env.dados.itens.length === 0 && <p className="suave">Nenhum lançamento nesta semana.</p>}
               </Bloco>
             )}
-          </>
+          </div>
         );
       }}
     </Painel>

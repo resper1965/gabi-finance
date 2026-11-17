@@ -13,8 +13,8 @@ React + Vite. O build sai em `../gabi/painel/` e a API serve em `/` (com `/asset
 | `npm run analisar` | falha se algum JS passar de 150 KB gzip |
 
 ## Regras
-- **R17, design Industry:** `src/tema/industry.css` é o CSS do protótipo, byte a byte, sem a linha `@import` (as fontes vêm de `@fontsource`, locais, em `src/main.tsx`). `src/tema/gabi.css` só acrescenta; nunca redefine token do Industry fora do tema escuro. Testes: `tests/fidelidade.test.ts`.
-- Classes do sistema (`.blueprint`, `.btn`, `.table`) são reutilizadas, nunca recriadas.
+- **Design (laudo):** toda cor, tipo, espaço e movimento vêm de `src/tema/tokens.css`; componentes e casca em `src/tema/laudo.css`. Fontes `@fontsource` locais em `src/main.tsx`. Testes: `tests/fidelidade.test.ts` (papéis de cor iguais nos dois temas, contraste ≥ 4,5:1, sem URL externa).
+- Valor-chave vai em `Evidencia`/`Achados` (código de item e proveniência); estado vai em `Etiqueta` (carimbo). Classes do sistema (`.btn`, `.tabela`, `.seg`, `.chip`, `.pauta`) são reutilizadas, nunca recriadas.
 - Sem CDN. Sem URL externa no build.
 - Um componente = um arquivo em `src/componentes/`; uma tela = um arquivo em `src/telas/`.
 - Dinheiro chega da API como string `"1234.56"`; o painel só formata (`Valor`), nunca calcula.

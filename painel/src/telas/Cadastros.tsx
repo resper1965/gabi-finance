@@ -30,24 +30,27 @@ export function Cadastros() {
   return (
     <Painel leitura={leitura} arquivo="contas conectadas">
       {(d) => (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <Bloco titulo="Contas">
-          <p style={{ color: "var(--ink2)", marginTop: 0 }}>Conta nova só entra no caixa único depois que você decidir.</p>
-          {d.itens.map((c) => (
-            <div key={c.id} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--line2)" }}>
-              <span style={{ flex: "1 1 160px" }}>{c.apelido}<small style={{ display: "block", color: "var(--ink2)" }}>{c.instituicao} · {c.tipo}</small></span>
-              <Etiqueta tipo={c.estado === "a_decidir" ? "conferir" : "ok"} texto={ESTADO[c.estado] ?? c.estado} />
-              <button className="btn btn-secondary" disabled={c.estado === "sim"} onClick={() => decidir(c, "sim")}>Entra no caixa único</button>
-              <button className="btn btn-secondary" disabled={c.estado === "nao"} onClick={() => decidir(c, "nao")}>Não entra</button>
-              <div role="group" aria-label={`Quem usa ${c.apelido.trim()}`} style={{ flexBasis: "100%", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--ink2)" }}>
-                <span>quem usa:</span>
-                {pessoas.filter((p) => p.dados?.beneficiario !== false).map((p) => (
-                  <button key={p.id} aria-pressed={(c.usuarios ?? []).includes(p.id)} onClick={() => alternarUsuario(c, p)} className="btn btn-secondary" style={{ minHeight: 28, padding: "0 8px" }}>{p.nome.split(" ")[0]}</button>
-                ))}
-                {(c.usuarios ?? []).length === 0 && <span>não definido (cada gasto vai para a fila)</span>}
-              </div>
-            </div>
-          ))}
+        <div className="pilha" style={{ gap: 40, maxWidth: 1100 }}>
+        <Bloco titulo="Contas" nota="conta nova só entra no caixa único depois que você decidir; marque quem usa cada cartão">
+          <ul className="pauta">
+            {d.itens.map((c) => (
+              <li key={c.id} className="conta">
+                <span className="pilha-curta" style={{ gap: 2 }}><span className="linha-titulo">{c.apelido}</span><span className="miudo">{c.instituicao} · {c.tipo}</span></span>
+                <span><Etiqueta tipo={c.estado === "a_decidir" ? "conferir" : c.estado === "sim" ? "ok" : "parado"} texto={ESTADO[c.estado] ?? c.estado} /></span>
+                <span role="group" aria-label={`Decisão sobre ${c.apelido.trim()}`} className="seg">
+                  <button className="seg-opt" aria-pressed={c.estado === "sim"} disabled={c.estado === "sim"} onClick={() => decidir(c, "sim")}>Entra no caixa único</button>
+                  <button className="seg-opt" aria-pressed={c.estado === "nao"} disabled={c.estado === "nao"} onClick={() => decidir(c, "nao")}>Não entra</button>
+                </span>
+                <div role="group" aria-label={`Quem usa ${c.apelido.trim()}`} className="fila conta-usuarios">
+                  <span className="lanc-rotulo">Quem usa</span>
+                  {pessoas.filter((p) => p.dados?.beneficiario !== false).map((p) => (
+                    <button key={p.id} className="chip" aria-pressed={(c.usuarios ?? []).includes(p.id)} onClick={() => alternarUsuario(c, p)}>{p.nome.split(" ")[0]}</button>
+                  ))}
+                  {(c.usuarios ?? []).length === 0 && <span className="miudo">não definido (cada gasto vai para a fila)</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
         </Bloco>
         <CadastrosEquivalencias />
         <CadastrosCobranca />

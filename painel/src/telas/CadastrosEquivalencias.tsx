@@ -7,7 +7,6 @@ import { useApi } from "../lib/useApi";
 interface Pendente { origem_pluggy: string; lancamentos: number }
 interface Categoria { id: number; nome: string; pai_id: number | null }
 
-const caixa = { height: 32, border: "1px solid var(--color-divider)", background: "var(--color-surface)", color: "inherit", font: "500 14px var(--font-body)", padding: "0 8px" } as const;
 
 /** Categorias que o banco usa e ainda não têm equivalência na nossa: as de mais lançamentos primeiro.
  *  Escolher aqui é aprovar (R1): a próxima rodada classifica os lançamentos com essa categoria, com origem "banco". */
@@ -32,17 +31,19 @@ export function CadastrosEquivalencias() {
   return (
     <Bloco titulo="Categorias do banco" nota="as que ainda não têm equivalência na nossa">
       <section role="region" aria-label="Categorias do banco sem equivalência">
-        {itens.length === 0 && <p style={{ color: "var(--ink2)", margin: 0 }}>Todas as categorias que o banco usa já têm equivalência.</p>}
+        {itens.length === 0 && <p className="suave">Todas as categorias que o banco usa já têm equivalência.</p>}
+        <ul className="pauta">
         {itens.map((p) => (
-          <div key={p.origem_pluggy} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--line2)" }}>
-            <span style={{ flex: "1 1 180px" }}>{p.origem_pluggy}<small style={{ display: "block", color: "var(--ink2)" }}>{p.lancamentos} lançamentos</small></span>
-            <select aria-label={`Categoria para ${p.origem_pluggy}`} value={escolha[p.origem_pluggy] ?? ""} onChange={(x) => setEscolha({ ...escolha, [p.origem_pluggy]: x.target.value })} style={caixa}>
+          <li key={p.origem_pluggy} className="cadastro-linha">
+            <span className="pilha-curta" style={{ gap: 2 }}><span className="forte">{p.origem_pluggy}</span><span className="miudo">{p.lancamentos} lançamentos</span></span>
+            <select aria-label={`Categoria para ${p.origem_pluggy}`} value={escolha[p.origem_pluggy] ?? ""} onChange={(x) => setEscolha({ ...escolha, [p.origem_pluggy]: x.target.value })}>
               <option value="">escolher…</option>
               {opcoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
-            <button className="btn btn-secondary" aria-label={`Salvar ${p.origem_pluggy}`} disabled={!escolha[p.origem_pluggy]} onClick={() => salvar(p)}>Salvar</button>
-          </div>
+            <button className="btn btn-sm" aria-label={`Salvar ${p.origem_pluggy}`} disabled={!escolha[p.origem_pluggy]} onClick={() => salvar(p)}>Salvar</button>
+          </li>
         ))}
+        </ul>
       </section>
     </Bloco>
   );

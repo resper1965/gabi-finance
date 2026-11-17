@@ -13,7 +13,6 @@ const paraCampo = (v?: string | null) => (v ? v.replace(".", ",") : "");
 /** Dia do vencimento: "dia:10" → "10"; "2026-10-10" → "10"; outra regra (ex.: último dia útil) → "". */
 const diaDe = (v?: string | null) => (!v ? "" : v.startsWith("dia:") ? v.slice(4) : /^\d{4}-\d{2}-\d{2}$/.test(v) ? String(Number(v.slice(8, 10))) : "");
 const diaValido = (s: string) => /^\d{1,2}$/.test(s) && Number(s) >= 1 && Number(s) <= 31;
-const campo = { display: "flex", flexDirection: "column" as const, gap: 3, fontSize: 13 };
 
 /** Formulário de despesa (A Pagar e Cadastros › Despesas). "nova": fixa (dia) ou avulsa (data); "daqui": muda valor/dia daqui em diante
  *  (a API decide o mês se "a partir de" ficar vazio); "mes": valor/data só do mês do item. Manda só o que mudou; valor sempre em reais string. */
@@ -67,7 +66,7 @@ export function DespesaForm({ modo, item, aoSalvar, aoCancelar }: { modo: ModoDe
 
   return (
     <form aria-label={modo === "nova" ? "Nova despesa" : modo === "daqui" ? `Mudar ${item?.nome} daqui em diante` : `Editar ${item?.nome} neste mês`}
-      style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end", padding: "10px 0" }} onSubmit={async (e) => {
+      className="form-linha" onSubmit={async (e) => {
         e.preventDefault();
         if (ocupado) return;
         const p = pedido();
@@ -76,24 +75,26 @@ export function DespesaForm({ modo, item, aoSalvar, aoCancelar }: { modo: ModoDe
         if (await agir("form", p.fazer, p.ok)) aoSalvar();
       }}>
       {modo === "nova" && (
-        <fieldset style={{ border: 0, padding: 0, margin: 0, display: "flex", gap: 12, fontSize: 13 }}>
-          <legend style={{ padding: 0, marginBottom: 3 }}>Tipo</legend>
-          <label><input type="radio" name="tipo-despesa" checked={tipo === "fixa"} onChange={() => setTipo("fixa")} /> Fixa</label>
-          <label><input type="radio" name="tipo-despesa" checked={tipo === "avulsa"} onChange={() => setTipo("avulsa")} /> Avulsa</label>
+        <fieldset>
+          <legend>Tipo</legend>
+          <span className="fila" style={{ gap: 14, minHeight: 34 }}>
+            <label className="opcao"><input type="radio" name="tipo-despesa" checked={tipo === "fixa"} onChange={() => setTipo("fixa")} /> Fixa</label>
+            <label className="opcao"><input type="radio" name="tipo-despesa" checked={tipo === "avulsa"} onChange={() => setTipo("avulsa")} /> Avulsa</label>
+          </span>
         </fieldset>)}
-      {modo === "nova" && <label style={campo}>Nome<input value={nome} onChange={(e) => setNome(e.target.value)} /></label>}
-      <label style={campo}>Valor<input inputMode="decimal" placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} /></label>
-      {(modo === "daqui" || (modo === "nova" && tipo === "fixa")) && <label style={campo}>Dia do vencimento<input inputMode="numeric" style={{ width: 70 }} value={dia} onChange={(e) => setDia(e.target.value)} /></label>}
-      {(modo === "mes" || (modo === "nova" && tipo === "avulsa")) && <label style={campo}>Data<input type="date" value={data} onChange={(e) => setData(e.target.value)} /></label>}
-      {modo === "daqui" && <label style={campo}>A partir de (opcional)<input type="month" value={aPartir} onChange={(e) => setAPartir(e.target.value)} /></label>}
+      {modo === "nova" && <label className="campo">Nome<input value={nome} onChange={(e) => setNome(e.target.value)} /></label>}
+      <label className="campo">Valor<input inputMode="decimal" placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} /></label>
+      {(modo === "daqui" || (modo === "nova" && tipo === "fixa")) && <label className="campo">Dia do vencimento<input inputMode="numeric" style={{ width: 80 }} value={dia} onChange={(e) => setDia(e.target.value)} /></label>}
+      {(modo === "mes" || (modo === "nova" && tipo === "avulsa")) && <label className="campo">Data<input type="date" value={data} onChange={(e) => setData(e.target.value)} /></label>}
+      {modo === "daqui" && <label className="campo">A partir de (opcional)<input type="month" value={aPartir} onChange={(e) => setAPartir(e.target.value)} /></label>}
       {modo === "nova" && (
-        <label style={campo}>Forma<select value={forma} onChange={(e) => setForma(e.target.value)}>{FORMAS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>)}
-      <span style={{ display: "flex", gap: 8 }}>
+        <label className="campo">Forma<select value={forma} onChange={(e) => setForma(e.target.value)}>{FORMAS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>)}
+      <span className="fila">
         <button className="btn btn-primary" type="submit" disabled={ocupado}>Salvar</button>
-        {aoCancelar && <button className="btn btn-secondary" type="button" disabled={ocupado} onClick={aoCancelar}>Cancelar</button>}
+        {aoCancelar && <button className="btn" type="button" disabled={ocupado} onClick={aoCancelar}>Cancelar</button>}
       </span>
-      {modo === "daqui" && <p style={{ margin: 0, flexBasis: "100%", fontSize: 12.5, color: "var(--ink2)" }}>Sem "a partir de": vale do mês em curso se ele não foi pago; se já foi, do próximo. Meses passados não mudam.</p>}
-      {msg && <p role="alert" style={{ margin: 0, flexBasis: "100%", color: "var(--danger)" }}>Erro: {msg}</p>}
+      {modo === "daqui" && <p className="miudo" style={{ flexBasis: "100%" }}>Sem "a partir de": vale do mês em curso se ele não foi pago; se já foi, do próximo. Meses passados não mudam.</p>}
+      {msg && <p role="alert" className="erro-linha">Erro: {msg}</p>}
       <Aviso erro={erros.form} />
     </form>
   );

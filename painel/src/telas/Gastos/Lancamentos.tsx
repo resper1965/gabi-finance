@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
+import { CheckCheck } from "lucide-react";
+import { Etiqueta } from "../../componentes/Etiqueta";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
+import { Vazio } from "../../componentes/Estados";
 import { api } from "../../lib/api";
 import { useFiltros } from "../../lib/filtros";
 import { dataCurta, num, originalEmReais } from "../../lib/formato";
@@ -17,7 +20,19 @@ interface ContaUso { apelido: string; usuarios?: string[] }
 const ORIGEM: Record<string, string> = { banco: "banco", regra: "regra", gabi: "Gabi sugere", voce: "você", fonte: "padrão do cadastro" };
 const POR_QUE: Record<string, string> = { fatura: "paga fatura de cartão", emissor: "boleto de fatura de cartão", propria: "transferência para empresa sua", investimento: "investimento", voce: "marcado por você" };
 
-/** "De quem é cada gasto?": toque no chip; vale só para aquele lançamento. "sempre assim" cria regra (R1: só com o seu toque). */
+/** Setas esquerda/direita (e Home/End) andam entre os botões do grupo; Enter ou espaço escolhem. */
+function setas(e: KeyboardEvent<HTMLElement>) {
+  const passo = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (passo === undefined && e.key !== "Home" && e.key !== "End") return;
+  const bs = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+  const i = bs.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const j = e.key === "Home" ? 0 : e.key === "End" ? bs.length - 1 : (i + passo! + bs.length) % bs.length;
+  bs[j]?.focus();
+}
+
+/** "De quem é cada gasto?": escolher a pessoa vale só para aquele lançamento; "sempre assim" cria regra (R1: só com o seu toque). */
 export function Lancamentos() {
   const { conta } = useFiltros();
   const avisar = useToast();
@@ -78,84 +93,103 @@ export function Lancamentos() {
   return (
     <Painel leitura={leitura} arquivo="lançamentos do extrato">
       {(d) => (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1000 }}>
-          <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink2)", textWrap: "pretty" }}>
-            Toque em quem é o gasto. A escolha vale <strong style={{ color: "var(--color-text)" }}>só para aquele lançamento</strong>; se quiser que todos os próximos do mesmo estabelecimento sigam igual, use "sempre assim", que vira regra. Cartões e contas aparecem juntos.
+        <div className="pilha" style={{ gap: 20, maxWidth: 1040 }}>
+          <p className="suave" style={{ maxWidth: "72ch" }}>
+            Escolha de quem é cada gasto. A escolha vale <strong style={{ color: "var(--tinta)" }}>só para aquele lançamento</strong>; "sempre assim" vira regra para os próximos do mesmo estabelecimento. Use as setas para andar entre as pessoas e Enter para escolher.
           </p>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <div role="group" aria-label="Filtro" className="seg">
-              {([["esperando", "Esperando você"], ["gastador", "Quem gastou: a indicar"], ["todos", "Todos"]] as const).map(([id, r]) => (
-                <button key={id} className="seg-opt" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
-                  style={{ whiteSpace: "nowrap", border: 0, borderLeft: "1px solid var(--color-divider)", marginLeft: -1, background: filtro === id ? "var(--color-accent)" : "transparent", color: filtro === id ? "var(--color-bg)" : "var(--color-text)" }}>{r}</button>
-              ))}
+          <div className="fila-entre">
+            <div className="fila" style={{ gap: 12 }}>
+              <div role="group" aria-label="Filtro" className="seg">
+                {([["esperando", "Esperando você"], ["gastador", "Quem gastou: a indicar"], ["todos", "Todos"]] as const).map(([id, r]) => (
+                  <button key={id} className="seg-opt" aria-pressed={filtro === id} onClick={() => setFiltro(id)}>{r}</button>
+                ))}
+              </div>
+              <span className="miudo num">{d.itens.length} {d.itens.length === 1 ? "lançamento" : "lançamentos"}{d.total > d.itens.length ? ` de ${d.total}` : ""}</span>
             </div>
-            {sugParaQuem.length > 0 && <button className="btn btn-secondary" onClick={confirmarTodas}>Confirmar as {sugParaQuem.length} sugestões da Gabi</button>}
+            {sugParaQuem.length > 0 && <button className="btn" onClick={confirmarTodas}><CheckCheck size={15} strokeWidth={1.8} aria-hidden="true" />Confirmar as {sugParaQuem.length} sugestões da Gabi</button>}
           </div>
-          {d.itens.length === 0 && <div style={{ border: "1px dashed var(--line3)", padding: 18, color: "var(--ok)", fontWeight: 600 }}>{filtro === "gastador" ? "✓ Nenhuma compra de cartão compartilhado esperando você indicar quem gastou." : "✓ Nada esperando você. Todos os lançamentos têm dono."}</div>}
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          {d.itens.length === 0 && <Vazio frase={filtro === "gastador" ? "Nenhuma compra de cartão compartilhado esperando você indicar quem gastou." : "Nada esperando você. Todos os lançamentos têm dono."} />}
+          <ul className="pauta lancamentos">
             {d.itens.map((l) => {
               const sug = sugParaQuem.find((s) => s.lancamento_id === l.id);
+              const despesa = num(l.valor) < 0;
+              const original = !oculto && originalEmReais(l);
               return (
-                <div key={l.id} data-lancamento={l.id} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 0", borderBottom: "1px solid var(--line2)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
-                    <span style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
-                      <span style={{ font: "500 12px var(--mono)", color: "var(--ink2)" }}>{dataCurta(l.data)}</span>
-                      <strong style={{ fontSize: 14.5 }}>{l.estabelecimento}</strong>
-                      <span style={{ fontSize: 12, color: "var(--ink2)" }}>{l.conta} · {l.categoria.nome ?? "sem categoria"}{l.empresa.nome ? ` · reembolso ${l.empresa.nome}` : ""}</span>
-                    </span>
-                    <span style={{ font: "600 16px var(--font-heading)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
-                      <Valor valor={l.valor} />
-                      {!oculto && originalEmReais(l) && <span style={{ display: "block", font: "500 11.5px var(--font-body)", color: "var(--ink2)" }}>{originalEmReais(l)}</span>}
-                    </span>
-                  </div>
-                  {(l.portadores?.length ?? 0) >= 2 && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: "var(--ink2)" }}>
-                      <span>Quem gastou:</span>
-                      <span role="group" aria-label={`Quem gastou: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {l.portadores!.map((pid) => {
-                          const marcado = l.gastador?.id === pid;
-                          return <button key={pid} aria-pressed={marcado} onClick={() => indicar(l, pid)}
-                            style={{ minHeight: 32, padding: "0 10px", border: `1px solid ${marcado ? "var(--color-accent)" : "var(--line3)"}`, background: marcado ? "var(--color-accent)" : "transparent", color: marcado ? "var(--color-bg)" : "var(--color-text)", cursor: "pointer", font: "600 12.5px var(--font-body)" }}>{pessoas.find((p) => String(p.id) === pid)?.nome ?? pid}</button>;
+                <li key={l.id} data-lancamento={l.id} className="lanc">
+                  <span className="lanc-data mono">{dataCurta(l.data)}</span>
+                  <div className="lanc-corpo">
+                    <div className="lanc-cab">
+                      <span className="pilha-curta" style={{ gap: 2 }}>
+                        <span className="lanc-nome">{l.estabelecimento}</span>
+                        <span className="linha-meta">
+                          <span>{l.conta}</span><span aria-hidden="true">·</span><span>{l.categoria.nome ?? "sem categoria"}</span>
+                          {l.empresa.nome && <><span aria-hidden="true">·</span><span>reembolso {l.empresa.nome}</span></>}
+                          {!sug && !l.para_quem.origem && <Etiqueta tipo="conferir" texto="sem dono" />}
+                        </span>
+                      </span>
+                      <span className="lanc-valor num" style={{ color: despesa ? undefined : "var(--carimbo-verde)" }}>
+                        <Valor valor={l.valor} />
+                        {original && <span className="celula-sub">{original}</span>}
+                      </span>
+                    </div>
+
+                    {(l.portadores?.length ?? 0) >= 2 && (
+                      <div className="lanc-escolha">
+                        <span className="lanc-rotulo">Quem gastou</span>
+                        <span role="group" aria-label={`Quem gastou: ${l.estabelecimento}`} className="fila" style={{ gap: 6 }} onKeyDown={setas}>
+                          {l.portadores!.map((pid) => (
+                            <button key={pid} className="chip" aria-pressed={l.gastador?.id === pid} onClick={() => indicar(l, pid)}>{pessoas.find((p) => String(p.id) === pid)?.nome ?? pid}</button>
+                          ))}
+                        </span>
+                        {l.gastador?.id && l.gastador.origem === "voce" && <button className="link miudo" onClick={() => indicar(l, String(l.gastador!.id), true)}>sempre {l.gastador.nome} em {l.estabelecimento} neste cartão</button>}
+                        {l.gastador?.origem === "regra" && <span className="miudo">(regra desta loja)</span>}
+                      </div>
+                    )}
+
+                    <div className="lanc-escolha">
+                      <span className="lanc-rotulo">Para quem</span>
+                      <span role="group" aria-label={`Para quem: ${l.estabelecimento}`} className="fila" style={{ gap: 6 }} onKeyDown={setas}>
+                        {opcoesPara(l).map((p) => {
+                          const marcado = l.para_quem.id === p.id, sugerido = sug?.payload.para_quem_id === p.id && !marcado;
+                          return (
+                            <button key={p.id} className="chip" aria-pressed={marcado} data-sugerido={sugerido || undefined} onClick={() => escolher(l, p)}
+                              style={sugerido ? { border: "1px dashed var(--ambar-borda)" } : undefined}>{p.nome}</button>
+                          );
                         })}
                       </span>
-                      {l.gastador?.id && l.gastador.origem === "voce" && <button onClick={() => indicar(l, String(l.gastador!.id), true)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>sempre {l.gastador.nome} em {l.estabelecimento} neste cartão</button>}
-                      {l.gastador?.origem === "regra" && <span>(regra desta loja)</span>}
+                      <span className="cresce" />
+                      {despesa && (l.gasto || empresas.length > 0) && (
+                        <span className="linha-meta lanc-secundario">
+                          {l.gasto && <>
+                            <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
+                            <button className="link" onClick={() => marcarGasto(l, !l.gasto!.valor)}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
+                            {l.gasto.origem === "voce" && <button className="link" onClick={() => marcarGasto(l, null)}>deixar a Gabi decidir</button>}
+                          </>}
+                          {empresas.length > 0 && (
+                            <label className="fila" style={{ gap: 6 }}>Reembolso
+                              <select className="campo-sm" aria-label={`Reembolso: ${l.estabelecimento}`} value={l.empresa.id == null ? "" : String(l.empresa.id)} onChange={(e) => marcarReembolso(l, e.target.value)}>
+                                <option value="">pessoal</option>
+                                {empresas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                              </select>
+                            </label>)}
+                        </span>)}
                     </div>
-                  )}
-                  <div role="group" aria-label={`Para quem: ${l.estabelecimento}`} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {opcoesPara(l).map((p) => {
-                      const marcado = l.para_quem.id === p.id, sugerido = sug?.payload.para_quem_id === p.id;
-                      return (
-                        <button key={p.id} aria-pressed={marcado} onClick={() => escolher(l, p)}
-                          style={{ minHeight: 32, padding: "0 10px", border: `1px ${sugerido && !marcado ? "dashed" : "solid"} ${marcado ? "var(--color-accent)" : sugerido ? "var(--warn)" : "var(--line3)"}`, background: marcado ? "var(--color-accent)" : sugerido ? "var(--warn-bg)" : "transparent", color: marcado ? "var(--color-bg)" : "var(--color-text)", cursor: "pointer", font: "600 12.5px var(--font-body)" }}>{p.nome}</button>
-                      );
-                    })}
+
+                    {(sug || l.para_quem.origem) && <div className="lanc-rodape">
+                      <span className="linha-meta">
+                        {sug ? <>
+                          <Etiqueta tipo="conferir" texto="sugestão" />
+                          <span>Gabi sugere: {pessoas.find((p) => p.id === sug.payload.para_quem_id)?.nome ?? "?"} · {sug.motivo}</span>
+                          <button className="link" onClick={() => confirmar(sug, l)}>confirmar</button>
+                        </> : <span>{l.para_quem.nome} · {ORIGEM[l.para_quem.origem!] ?? l.para_quem.origem}</span>}
+                        {l.para_quem.origem === "voce" && <button className="link" onClick={() => sempreAssim(l)}>sempre assim para {l.estabelecimento}</button>}
+                      </span>
+                    </div>}
                   </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: "var(--ink2)" }}>
-                    <span>{sug ? `Gabi sugere: ${pessoas.find((p) => p.id === sug.payload.para_quem_id)?.nome ?? "?"} · ${sug.motivo}` : l.para_quem.origem ? `${l.para_quem.nome} · ${ORIGEM[l.para_quem.origem] ?? l.para_quem.origem}` : "sem dono ainda"}</span>
-                    {sug && <button className="btn-link" onClick={() => confirmar(sug, l)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>confirmar</button>}
-                    {l.para_quem.origem === "voce" && <button onClick={() => sempreAssim(l)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>sempre assim para {l.estabelecimento}</button>}
-                    {l.gasto && num(l.valor) < 0 && <>
-                      <span aria-hidden="true">·</span>
-                      <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
-                      <button onClick={() => marcarGasto(l, !l.gasto!.valor)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
-                      {l.gasto.origem === "voce" && <button onClick={() => marcarGasto(l, null)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>deixar a Gabi decidir</button>}
-                    </>}
-                    {num(l.valor) < 0 && empresas.length > 0 && <>
-                      <span aria-hidden="true">·</span>
-                      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>Reembolso:
-                        <select aria-label={`Reembolso: ${l.estabelecimento}`} value={l.empresa.id == null ? "" : String(l.empresa.id)} onChange={(e) => marcarReembolso(l, e.target.value)}
-                          style={{ minHeight: 28, font: "500 12px var(--font-body)", color: "var(--color-text)", background: "transparent", border: "1px solid var(--line3)" }}>
-                          <option value="">pessoal</option>
-                          {empresas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                        </select>
-                      </label>
-                    </>}
-                  </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       )}
     </Painel>

@@ -1,8 +1,11 @@
-import { useState, type ReactNode } from "react";
-import { Etiqueta } from "../../componentes/Etiqueta";
+import { useState } from "react";
+import { ChevronDown, Plus } from "lucide-react";
+import { Etiqueta, type TipoEtiqueta } from "../../componentes/Etiqueta";
+import { Evidencia } from "../../componentes/Evidencia";
 import { formatarDadosAte } from "../../componentes/Faixa";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
+import { Vazio } from "../../componentes/Estados";
 import { api } from "../../lib/api";
 import { dataCurta, mesCurto, num } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
@@ -24,17 +27,18 @@ function Rodadas() {
   const itens = (useApi<{ itens: Rodada[] }>("/api/v1/rodadas?limite=20").env?.dados.itens ?? []).filter((r) => r.fonte === "open-finance").slice(0, 2);
   if (itens.length === 0) return null;
   return (
-    <section role="region" aria-label="Rodadas" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <h3 style={{ margin: 0, fontSize: 20 }}>Rodadas <span style={{ font: "500 12px var(--mono)", color: "var(--ink2)" }}>· extratos às 6h e 14h</span></h3>
-      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column" }}>
+    <section role="region" aria-label="Rodadas" className="secao">
+      <div className="secao-cab"><h2>Rodadas</h2><span className="secao-nota">extratos às 6h e 14h; a conferência fecha o saldo de cada conta com o banco</span></div>
+      <ul className="pauta">
         {itens.map((r) => (
-          <li key={r.id} style={{ padding: "8px 0", borderTop: "1px solid var(--line2)", display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
-              <span style={{ font: "500 12.5px var(--mono)" }}>{r.fim ? formatarDadosAte(r.fim) : "em andamento"}</span>
-              <span data-estado={r.conferida ? "conferida" : "nao-conferida"} style={{ fontWeight: 600, color: r.conferida ? "var(--ok)" : "var(--warn)" }}>{r.conferida ? "conferida" : "não conferida"}</span>
-              <span style={{ color: "var(--ink2)" }}>{r.lidos} lidos · {r.novos} novos</span>
+          <li key={r.id} className="pilha-curta" style={{ gap: 6 }}>
+            <span className="fila" style={{ gap: 12 }}>
+              <span className="mono" style={{ color: "var(--tinta)" }}>{r.fim ? formatarDadosAte(r.fim) : "em andamento"}</span>
+              <span className="carimbo" data-tipo={r.conferida ? "ok" : "erro"} data-estado={r.conferida ? "conferida" : "nao-conferida"}>{r.conferida ? "conferida" : "não conferida"}</span>
+              <span className="miudo">{r.lidos} lidos · {r.novos} novos · rodada <span className="mono">#{r.id}</span></span>
             </span>
-            {r.reprovadas.map((x, i) => <span key={i} style={{ fontSize: 12.5, color: "var(--ink2)" }}>▲ {x.conta}: {TIPO_CONFERENCIA[x.tipo] ?? x.tipo} — {x.detalhe}</span>)}
+            {r.reprovadas.map((x, i) => (
+              <span key={i} className="fila miudo"><Etiqueta tipo="erro" texto="divergente" /><span>{x.conta}: {TIPO_CONFERENCIA[x.tipo] ?? x.tipo} — {x.detalhe}</span></span>))}
           </li>
         ))}
       </ul>
@@ -42,21 +46,13 @@ function Rodadas() {
   );
 }
 
-const GRUPOS: [keyof Grupos, string, string, string][] = [
-  ["atrasadas", "Atrasadas", "var(--danger)", "já venceram"], ["hoje", "Vencem hoje", "var(--warn)", "pague hoje"],
-  ["proximas", "Próximos 7 dias", "var(--color-text)", "até a próxima semana"], ["adiante", "Mais adiante", "var(--ink2)", "depois disso"],
-  ["a_conferir", "A conferir", "var(--warn)", "valor ou documento incerto"], ["debito_automatico", "Débito automático", "var(--ink2)", "só aviso"],
+/** grupo → título, explicação, carimbo do grupo */
+const GRUPOS: [keyof Grupos, string, string, [TipoEtiqueta, string] | null][] = [
+  ["atrasadas", "Atrasadas", "já venceram", ["erro", "atrasado"]], ["hoje", "Vencem hoje", "pague hoje", ["erro", "vence hoje"]],
+  ["proximas", "Próximos 7 dias", "até a próxima semana", null], ["adiante", "Mais adiante", "depois disso", null],
+  ["a_conferir", "A conferir", "valor ou documento incerto", ["conferir", "a conferir"]], ["debito_automatico", "Débito automático", "só aviso: o banco debita sozinho", null],
 ];
 const FORMA: Record<string, string> = { pix: "Pix", boleto: "boleto", debito_automatico: "débito automático", fatura: "fatura do cartão", "": "" };
-
-function Cabecalho({ cor, titulo, sub, direita }: { cor: string; titulo: string; sub: string; direita?: ReactNode }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", paddingBottom: 6, borderBottom: `1px solid ${cor}` }}>
-      <h3 style={{ margin: 0, fontSize: 20, color: cor }}>{titulo} <span style={{ font: "500 12px var(--mono)", color: "var(--ink2)" }}>· {sub}</span></h3>
-      {direita}
-    </div>
-  );
-}
 
 const alvo = (b: Item): DespesaAlvo => ({ linha_id: b.linha_id!, nome: b.nome, valor: b.valor, mes: b.mes, vencimento: b.vencimento });
 const MENU: [ModoDespesa | "dispensar" | "encerrar", string][] = [["mes", "Editar este mês"], ["dispensar", "Dispensar este mês"], ["daqui", "Mudar daqui em diante"], ["encerrar", "Encerrar"]];
@@ -90,45 +86,47 @@ function Linha({ g, b, paga, recarregar }: { g: keyof Grupos; b: Item; paga: (i:
   });
   const escolher = (k: (typeof MENU)[number][0]) => { setMenu(false); if (k === "dispensar") void dispensar(); else setAberto(k); };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "6px 14px", padding: "11px 0", borderBottom: "1px solid var(--line2)", alignItems: "center" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-        <span style={{ fontWeight: 600 }}>{b.nome}</span>
-        <span style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 12.5, color: "var(--ink2)" }}>
-          <span style={{ fontFamily: "var(--mono)", color: g === "atrasadas" ? "var(--danger)" : undefined }}>vence {dataCurta(b.vencimento_util)}</span>
-          {FORMA[b.forma] && <span>· {FORMA[b.forma]}</span>}
+    <li className="linha-item">
+      <div className="pilha-curta" style={{ gap: 4 }}>
+        <span className="linha-titulo">{b.nome}</span>
+        <span className="linha-meta">
+          <span className="mono" style={{ color: g === "atrasadas" ? "var(--carimbo-vermelho)" : undefined }}>vence {dataCurta(b.vencimento_util)}</span>
+          {FORMA[b.forma] && <span>{FORMA[b.forma]}</span>}
           {g === "atrasadas" && <Etiqueta tipo="erro" texto={`${b.dias_atraso} ${b.dias_atraso === 1 ? "dia" : "dias"} de atraso`} />}
-          {g === "debito_automatico" && <span style={{ display: "inline-flex", gap: 3, padding: "0 6px", border: "1px solid var(--line3)", font: "600 11px/1.6 var(--font-body)" }}>↻ débito automático · só aviso</span>}
+          {g === "debito_automatico" && <Etiqueta tipo="parado" texto="débito automático · só aviso" />}
           {g === "a_conferir" && b.motivo && <span>{b.motivo}</span>}
         </span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, whiteSpace: "nowrap" }}>{b.valor === null ? "valor a conferir" : <Valor valor={b.valor} />}</span>
-        {g !== "debito_automatico" && g !== "a_conferir" && <button className="btn btn-secondary" style={{ minHeight: 32 }} onClick={() => paga(b)}>Já paguei</button>}
+      <div className="linha-acoes">
+        <span className="linha-valor">{b.valor === null ? <Etiqueta tipo="conferir" texto="valor a conferir" /> : <Valor valor={b.valor} />}</span>
+        {g !== "debito_automatico" && g !== "a_conferir" && <button className="btn btn-sm" onClick={() => paga(b)}>Já paguei</button>}
         {b.linha_id && (
           <span style={{ position: "relative" }}>
-            <button className="btn btn-secondary" style={{ minHeight: 32 }} aria-label={`Ações de ${b.nome}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>Ações ▾</button>
+            <button className="btn btn-sm btn-ghost" aria-label={`Ações de ${b.nome}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}
+              onKeyDown={(e) => { if (e.key === "Escape") setMenu(false); }}>Ações<ChevronDown size={14} strokeWidth={1.8} aria-hidden="true" /></button>
             {menu && (
-              <div role="menu" aria-label={`Ações de ${b.nome}`} style={{ position: "absolute", right: 0, top: "100%", zIndex: 5, display: "flex", flexDirection: "column", minWidth: 200, background: "var(--color-surface)", border: "1px solid var(--line3)", boxShadow: "var(--shadow-md)" }}>
-                {MENU.filter(([k]) => !(SO_DO_MES.has(k) && b.mes && b.mes < mesAtual())).map(([k, r]) => <button key={k} role="menuitem" className="btn btn-secondary" style={{ border: 0, justifyContent: "flex-start", textAlign: "left" }} onClick={() => escolher(k)}>{r}</button>)}
+              <div role="menu" aria-label={`Ações de ${b.nome}`} className="menu" onKeyDown={(e) => { if (e.key === "Escape") setMenu(false); }}>
+                {MENU.filter(([k]) => !(SO_DO_MES.has(k) && b.mes && b.mes < mesAtual())).map(([k, r]) => <button key={k} role="menuitem" className="menu-item" onClick={() => escolher(k)}>{r}</button>)}
               </div>)}
           </span>)}
       </div>
       {aberto === "encerrar" && (
-        <div role="alert" style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
-          <p style={{ margin: 0 }}>Encerrar {b.nome}? O que não foi pago sai de A Pagar; o que já foi pago fica no histórico.</p>
-          <span style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary" aria-label={`Confirmar encerrar ${b.nome}`} onClick={encerrar}>Confirmar</button>
-            <button className="btn btn-secondary" onClick={() => setAberto(null)}>Cancelar</button>
+        <div role="alert" className="linha-painel">
+          <p>Encerrar {b.nome}? O que não foi pago sai de A Pagar; o que já foi pago fica no histórico.</p>
+          <span className="fila">
+            <button className="btn btn-primary btn-sm" aria-label={`Confirmar encerrar ${b.nome}`} onClick={encerrar}>Confirmar</button>
+            <button className="btn btn-sm" onClick={() => setAberto(null)}>Cancelar</button>
           </span>
         </div>)}
       {(aberto === "mes" || aberto === "daqui") && (
-        <div style={{ gridColumn: "1 / -1" }}>
+        <div className="linha-painel">
           <DespesaForm modo={aberto} item={alvo(b)} aoCancelar={() => setAberto(null)} aoSalvar={() => { setAberto(null); void recarregar(); }} />
         </div>)}
-    </div>
+    </li>
   );
 }
 
+/** Caixa › A pagar: o que vence e quando, em grupos por urgência; cada total é um item do laudo com a sua proveniência. */
 export function APagar() {
   const leitura = useApi<Grupos>("/api/v1/contas-pagar");
   const avisar = useToast();
@@ -144,39 +142,52 @@ export function APagar() {
     <Painel leitura={leitura} arquivo="planilha de compromissos">
       {(d) => {
         const vazio = (Object.keys(d) as (keyof Grupos)[]).every((g) => d[g].length === 0);
+        const visiveis = GRUPOS.filter(([g]) => d[g].length > 0);
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-              {!nova && <button className="btn btn-secondary" style={{ minHeight: 32 }} onClick={() => setNova(true)}>+ despesa</button>}
-              {nova && <div style={{ alignSelf: "stretch" }}><DespesaForm modo="nova" aoCancelar={() => setNova(false)} aoSalvar={() => { setNova(false); leitura.recarregar(); }} /></div>}
+          <div className="pilha" style={{ gap: 32, maxWidth: 1080 }}>
+            <div className="fila-entre">
+              <p className="suave" style={{ maxWidth: "70ch" }}>Cada grupo soma o que vence nele. "Já paguei" anota o pagamento; a próxima rodada confere com o extrato.</p>
+              {!nova && <button className="btn" onClick={() => setNova(true)}><Plus size={15} strokeWidth={1.8} aria-hidden="true" />Nova despesa</button>}
             </div>
-            {vazio && <p style={{ margin: 0, color: "var(--ink2)" }}>Gabi: nenhum compromisso no mês. Cadastre as linhas em Cadastros.</p>}
-            {GRUPOS.filter(([g]) => d[g].length > 0).map(([g, titulo, cor, sub]) => (
-              <section key={g} data-grupo={g} style={{ display: "flex", flexDirection: "column" }}>
-                <Cabecalho cor={cor} titulo={titulo} sub={`${sub} · ${d[g].length}`}
-                  direita={<span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}><Valor valor={d[g].reduce((s, i) => s + num(i.valor), 0)} /></span>} />
-                {d[g].map((b) => <Linha key={b.id} g={g} b={b} paga={paga} recarregar={leitura.recarregar} />)}
-              </section>
-            ))}
+            {nova && <div className="folha"><DespesaForm modo="nova" aoCancelar={() => setNova(false)} aoSalvar={() => { setNova(false); leitura.recarregar(); }} /></div>}
+            {vazio && <Vazio frase="Nenhum compromisso no mês. Cadastre as despesas em Cadastros › Despesas." />}
+            {visiveis.map(([g, titulo, sub, carimbo], k) => {
+              const total = d[g].reduce((s, i) => s + num(i.valor), 0);
+              return (
+                <section key={g} data-grupo={g} className="secao" aria-label={titulo}>
+                  <div className="secao-cab">
+                    <span className="fila" style={{ gap: 10 }}><h2>{titulo}</h2>{carimbo && <Etiqueta tipo={carimbo[0]} texto={carimbo[1]} />}<span className="secao-nota">{sub} · {d[g].length}</span></span>
+                    <span className="linha-valor">
+                      <Evidencia codigo={`E-${String(k + 1).padStart(2, "0")}`} rotulo={`Total: ${titulo.toLowerCase()}`} fonte="open-finance" base={`soma de ${d[g].length} ${d[g].length === 1 ? "compromisso" : "compromissos"} da planilha`}
+                        estado={g === "a_conferir" ? "a_conferir" : undefined}><Valor valor={total} /></Evidencia>
+                    </span>
+                  </div>
+                  <ul className="pauta">{d[g].map((b) => <Linha key={b.id} g={g} b={b} paga={paga} recarregar={leitura.recarregar} />)}</ul>
+                </section>
+              );
+            })}
             {d.pagas.length > 0 && (
-              <section data-grupo="pagas" style={{ display: "flex", flexDirection: "column" }}>
-                <Cabecalho cor="var(--ok)" titulo="Pagas" sub="conciliadas com o extrato" />
-                {d.pagas.map((p) => {
-                  const diff = p.diferenca && num(p.diferenca) !== 0;
-                  return (
-                    <div key={p.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "6px 14px", padding: "11px 0", borderBottom: "1px solid var(--line2)", alignItems: "center" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        <span style={{ fontWeight: 600 }}>{p.nome}</span>
-                        <span style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 12.5, color: "var(--ink2)" }}>
-                          <Etiqueta tipo="ok" texto="pago" />
-                          <span>venc. {dataCurta(p.vencimento_util)}{p.pago_em ? ` ↔ extrato em ${dataCurta(p.pago_em)}` : ""}</span>
-                        </span>
-                        {diff && <span style={{ fontSize: 12.5, color: "var(--warn)" }}>≈ diferença de <Valor valor={p.diferenca!} /></span>}
-                      </div>
-                      <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, whiteSpace: "nowrap" }}>{p.valor === null ? "" : <Valor valor={p.valor} />}</span>
-                    </div>
-                  );
-                })}
+              <section data-grupo="pagas" className="secao" aria-label="Pagas">
+                <div className="secao-cab"><span className="fila" style={{ gap: 10 }}><h2>Pagas</h2><span className="secao-nota">conciliadas com o extrato · {d.pagas.length}</span></span></div>
+                <ul className="pauta">
+                  {d.pagas.map((p) => {
+                    const diff = p.diferenca && num(p.diferenca) !== 0;
+                    return (
+                      <li key={p.id} className="linha-item">
+                        <div className="pilha-curta" style={{ gap: 4 }}>
+                          <span className="linha-titulo">{p.nome}</span>
+                          <span className="linha-meta">
+                            <Etiqueta tipo="ok" texto="pago" />
+                            <span className="mono">venc. {dataCurta(p.vencimento_util)}</span>
+                            {p.pago_em && <span>no extrato em <span className="mono">{dataCurta(p.pago_em)}</span></span>}
+                            {diff && <><Etiqueta tipo="erro" texto="divergente" /><span>diferença de <Valor valor={p.diferenca!} /></span></>}
+                          </span>
+                        </div>
+                        <span className="linha-valor" style={{ color: "var(--tinta-2)" }}>{p.valor === null ? "" : <Valor valor={p.valor} />}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </section>
             )}
             <Rodadas />
