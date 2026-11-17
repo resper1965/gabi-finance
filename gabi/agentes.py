@@ -9,13 +9,13 @@ from gabi.mcp.servidor import ESCOPOS_HERMES
 from gabi.mcp.tokens import ESCOPOS
 
 UTC = dt.timezone.utc
-URL_PADRAO = "https://gabi-brain.tail985643.ts.net:8443/mcp"
+URL_PADRAO = "https://gabi-finance.tail985643.ts.net:8443/mcp"
 ORIGEM = "agentes"
 
 
 @contextlib.contextmanager
 def _transacao(con: sqlite3.Connection):
-    """Tudo ou nada. A conexão do brain é autocommit (isolation_level=None), então `with con:` não basta."""
+    """Tudo ou nada. A conexão é autocommit (isolation_level=None), então `with con:` não basta."""
     if con.in_transaction:  # já dentro de uma transação de quem chamou: ela decide o commit
         yield
         return

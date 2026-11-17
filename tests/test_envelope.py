@@ -18,7 +18,7 @@ def test_proxima_rodada_antes_das_6_e_das_14_e_na_virada_do_dia():
 
 
 def test_horas_batem_com_o_timer_instalado():
-    timer = (pathlib.Path(__file__).parent.parent / "deploy" / "gabi-brain-extratos.timer").read_text()
+    timer = (pathlib.Path(__file__).parent.parent / "deploy" / "gabi-finance-extratos.timer").read_text()
     horas = re.search(r"OnCalendar=\S+ (\d\d(?:,\d\d)*):00:00 America/Sao_Paulo", timer).group(1)
     assert tuple(int(h) for h in horas.split(",")) == HORAS_RODADAS
 

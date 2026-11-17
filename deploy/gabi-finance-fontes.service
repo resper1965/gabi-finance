@@ -1,28 +1,21 @@
 [Unit]
-Description=gabi.brain fontes (Paperless e Nibo): único serviço com rede e tokens; a API e o MCP falam com ele por socket Unix
+Description=gabi-finance fontes (Nibo): único serviço com rede e token da ponte; a API e o MCP falam com ele por socket Unix
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
-OnFailure=gabi-brain-falha@%n.service
+OnFailure=gabi-finance-falha@%n.service
 
 [Service]
 Type=simple
-User=gabibrain-fontes
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-# PAPERLESS_URL, PAPERLESS_TOKEN e NIBO_TOKEN ficam aqui, colocados por você (R5); '-' = sobe sem o arquivo e a fonte responde "não configurada".
-EnvironmentFile=-/etc/gabi/cobrar.env
-# OPENROUTER_API_KEY (e, se quiser, OPENROUTER_MODEL_FAST/OPENROUTER_MODEL_STRONG): opcional; sem o arquivo, o modelo responde "chave ausente".
-EnvironmentFile=-/etc/gabi/openrouter.env
-# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_REFRESH_<CONTA> (ex.: GOOGLE_REFRESH_RESPER_GMAIL_COM): opcional; colocados por você; sem o arquivo, os contatos respondem "não configurada".
-# O ÚLTIMO EnvironmentFile vence: o antigo (só contatos) vem primeiro e o canônico google.env (contatos + agenda) por último.
-EnvironmentFile=-/etc/gabi/google-contatos.env
-EnvironmentFile=-/etc/gabi/google.env
-# M365_TENANT_ID, M365_CLIENT_ID, M365_CLIENT_SECRET (e, se quiser, M365_CONTAS) do Graph da ness: opcional; formato KEY=valor, sem espaço ao redor do '='.
-EnvironmentFile=-/etc/gabi/graph-ness.env
-ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock
-# Pasta e socket para o dono e o grupo gabibrain (a API e o MCP); mais ninguém na VPS alcança a ponte.
-RuntimeDirectory=gabi-brain-fontes
+User=gabifinance-fontes
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+# NIBO_TOKEN fica aqui, colocado por você (R5). O mcp.ai NÃO passa pela ponte: as units de extratos e saldos leem MCPAI_KEY do próprio arquivo (mcpai.env).
+# '-' = sobe sem o arquivo e a fonte responde "não configurada".
+EnvironmentFile=-/etc/gabi-finance/nibo.env
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-finance-fontes/fontes.sock
+# Pasta e socket para o dono e o grupo gabifinance (a API e o MCP); mais ninguém na VPS alcança a ponte.
+RuntimeDirectory=gabi-finance-fontes
 RuntimeDirectoryMode=0750
 UMask=0007
 Restart=on-failure

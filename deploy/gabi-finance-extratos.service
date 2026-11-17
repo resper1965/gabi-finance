@@ -1,18 +1,18 @@
 [Unit]
-Description=gabi.brain extratos: captura, conferência, classificação e compromissos
+Description=gabi-finance extratos: captura, conferência, classificação e compromissos
 After=network-online.target
-OnFailure=gabi-brain-falha@%n.service
+OnFailure=gabi-finance-falha@%n.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=gabibrain
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
 # MCPAI_KEY (chave do Open Finance) fica aqui, colocada por você; '-' = o serviço sobe mesmo sem o arquivo (e falha com "sem_chave").
-EnvironmentFile=-/etc/gabi/brain.env
-ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.dinheiro.rodar extratos --sincronizar
+EnvironmentFile=-/etc/gabi-finance/mcpai.env
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.dinheiro.rodar extratos --sincronizar
 TimeoutStartSec=1800
 UMask=0077
 NoNewPrivileges=yes
@@ -25,4 +25,4 @@ ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/gabi-brain
+ReadWritePaths=/var/lib/gabi-finance

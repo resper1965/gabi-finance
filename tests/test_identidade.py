@@ -112,7 +112,7 @@ def _req(banco, scope_extra, permite_tcp=False, login=LOGIN):
 
 
 def test_socket_unix_e_confiavel_mesmo_sem_tcp_local(banco):
-    r = _req(banco, {"client": None, "server": ("/run/gabi-brain/api.sock", None)})
+    r = _req(banco, {"client": None, "server": ("/run/gabi-finance/api.sock", None)})
     assert exigir("boss")(r).login == "resper@ionic.health"
 
 

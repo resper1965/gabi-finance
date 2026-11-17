@@ -1,16 +1,15 @@
-# Hermes (Canal) · como o gabi.brain o enxerga
-O Hermes é **só interface**: lê e propõe pelo MCP, não guarda dado (trocar de agente não perde nada). Instalação, OpenRouter e WhatsApp seguem o plano mestre (TC.1, TC.5);
-**instalar o Hermes e desligar o OpenClaw só depois do término do gabi.brain** (decisão do Ricardo, 08/10). Esta página é o lado do gabi.brain.
+# Hermes (Canal) · como o gabi-finance o enxerga
+O Hermes é **só interface**: lê e propõe pelo MCP, não guarda dado (trocar de agente não perde nada). A instalação do Hermes é do plano mestre; esta página é o lado do gabi-finance.
 
 ## Conexão ao MCP (TC.2)
-Token emitido pelo painel/CLI com os escopos `fin, docs, trabalho, propostas, pedidos, decisoes, envios, familia` (nunca `sensivel`), colado pelo Ricardo no `.env` do Hermes (R5). Config do Hermes:
+Token emitido pelo painel/CLI com os escopos `fin, trabalho, propostas, pedidos, decisoes` (nunca `sensivel`), colado pelo Ricardo no `.env` do Hermes (R5). Config do Hermes:
 
 ```yaml
 mcp_servers:
-  gabi_brain:
-    url: http://127.0.0.1:8080/mcp
+  gabi_finance:
+    url: http://127.0.0.1:8082/mcp
     headers:
-      Authorization: Bearer ${GABI_BRAIN_TOKEN}
+      Authorization: Bearer ${GABI_FINANCE_TOKEN}
     tools:
       include:
       - agenda_financeira
@@ -51,7 +50,7 @@ A lista é a **explícita** (sem `*`) e é testada: `tests/mcp/test_hermes.py` f
 Se o Streamable HTTP falhar no Hermes, usar `transport: sse` e registrar aqui.
 
 ## Rodadas (TC.3)
-- Avisos: o Hermes chama `avisos_pendentes`, entrega no Telegram e só então `avisos_confirmar_entrega(aviso_id)` (ler não tira da fila). Aviso já enviado pelo `gabi-brain-telegram` (G15) não volta.
+- Avisos: o Hermes chama `avisos_pendentes`, entrega no Telegram e só então `avisos_confirmar_entrega(aviso_id)` (ler não tira da fila). Aviso já enviado pelo `gabi-finance-telegram` (G15) não volta.
 - 07:05: `resumo_manha` (até 5 linhas; a primeira é "⚠ Dados desatualizados…" quando for o caso) e, se quiser mais, `financeiro_contas_a_pagar`.
 
 ## Identidade (TC.4): ver `docs/adr/007-identidade-por-remetente.md`

@@ -1,10 +1,10 @@
 [Unit]
-Description=gabi.brain avisos a cada 15 minutos
+Description=gabi-finance avisos a cada 15 minutos
 
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=15min
-Unit=gabi-brain-avisos.service
+Unit=gabi-finance-avisos.service
 
 [Install]
 WantedBy=timers.target

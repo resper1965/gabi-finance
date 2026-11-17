@@ -74,7 +74,7 @@ def descrever(tipo: str, p: dict) -> tuple[str, str]:
 
 @router.get("")
 def listar(request: Request):
-    """Avisos abertos (não lidos) do gabi.brain, os mais novos primeiro, com título e texto em pt-BR."""
+    """Avisos abertos (não lidos) do gabi-finance, os mais novos primeiro, com título e texto em pt-BR."""
     con = _con(request)
     try:
         itens = []

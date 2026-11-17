@@ -19,7 +19,7 @@ def exportar(con, destino_dir: Path, chave_publica: Path, hoje: date, manter: in
     chave_publica, destino_dir = Path(chave_publica), Path(destino_dir)
     if not chave_publica.is_file():
         raise FileNotFoundError(f"chave pública ausente: {chave_publica}")
-    final = destino_dir / f"gabi-brain-{hoje.isoformat()}.sqlite.gpg"
+    final = destino_dir / f"gabi-finance-{hoje.isoformat()}.sqlite.gpg"
     if final.exists():
         return final  # reexecução no mesmo dia: o pacote de hoje já existe
     with registrar_rodada(con, "exportacao") as r:
@@ -45,7 +45,7 @@ def exportar(con, destino_dir: Path, chave_publica: Path, hoje: date, manter: in
             finally:
                 parcial.unlink(missing_ok=True)
         r.lidos = 1
-    for velho in sorted(destino_dir.glob("gabi-brain-*.sqlite.gpg"))[:-manter]:
+    for velho in sorted(destino_dir.glob("gabi-finance-*.sqlite.gpg"))[:-manter]:
         velho.unlink()
     return final
 
@@ -64,8 +64,8 @@ def main(banco: Path, destino_dir: Path, chave_publica: Path, hoje: date | None 
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
-    ap.add_argument("--destino", default="/var/backups/gabi-brain/exportacao")
-    ap.add_argument("--chave", default="/etc/gabi/backup.pub")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
+    ap.add_argument("--destino", default="/var/backups/gabi-finance/exportacao")
+    ap.add_argument("--chave", default="/etc/gabi-finance/backup.pub")
     a = ap.parse_args()
     sys.exit(main(Path(a.banco), Path(a.destino), Path(a.chave)))

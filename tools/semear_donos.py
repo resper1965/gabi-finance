@@ -118,7 +118,7 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--arquivo", default=str(Path(__file__).resolve().parent.parent / "seeds" / "donos-padrao.json"))
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     a = ap.parse_args()
     res = aplicar(conectar(a.banco), Path(a.arquivo), "claude (a pedido do Ricardo: donos padrão)")
     print(f"aplicados={res.aplicados} conflitos={res.conflitos} nao_encontrados={res.nao_encontrados}")

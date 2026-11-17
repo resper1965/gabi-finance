@@ -54,7 +54,7 @@ def test_lista_so_avisos_abertos_do_boss_com_titulo_e_texto_em_pt_br(cli, banco)
 
 
 def test_marcar_lido_registra_entregue_em_e_e_idempotente(cli, banco):
-    aid = _aviso(banco, "servico_falhou", {"chave": "u", "unidade": "gabi-brain-saldos.service"})
+    aid = _aviso(banco, "servico_falhou", {"chave": "u", "unidade": "gabi-finance-saldos.service"})
     r1 = cli.post(f"/api/v1/avisos/{aid}/lido", headers={**BOSS, "Content-Type": "application/json"}, content="{}")
     assert r1.status_code == 200
     c = conectar(banco)

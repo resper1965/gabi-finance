@@ -103,7 +103,7 @@ def reaplicar(con, ids=None) -> dict:
     return contagem
 
 
-if __name__ == "__main__":  # reaplica no histórico todo: python -m gabi.dinheiro.nao_gasto --banco /var/lib/gabi-brain/gabi.db
+if __name__ == "__main__":  # reaplica no histórico todo: python -m gabi.dinheiro.nao_gasto --banco /var/lib/gabi-finance/gabi.db
     import argparse
     from pathlib import Path
 

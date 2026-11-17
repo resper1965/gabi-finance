@@ -28,5 +28,5 @@ def marcar_origem_padrao(con) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     print(f"marcados como padrão do cadastro: {marcar_origem_padrao(conectar(ap.parse_args().banco))}")

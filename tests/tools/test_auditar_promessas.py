@@ -7,7 +7,7 @@ import time
 from tools import auditar_promessas as ap
 
 T0 = dt.datetime(2026, 10, 24, 12, 0).timestamp()
-ESCRITA = "mcp__gabi_brain__familia_registrar_pessoa"
+ESCRITA = "mcp__gabi_finance__financeiro_marcar_gasto"
 
 
 def _banco(tmp_path, msgs, source="telegram"):
@@ -48,7 +48,7 @@ def test_escrita_com_erro_e_caso(tmp_path):
 
 
 def test_leitura_nao_conta(tmp_path):
-    p = _banco(tmp_path, [USER, ("tool", '{"ok": true}', "mcp__gabi_brain__familia_consultar"), PROMESSA])
+    p = _banco(tmp_path, [USER, ("tool", '{"ok": true}', "mcp__gabi_finance__financeiro_saldo"), PROMESSA])
     assert len(ap.promessas_sem_escrita(p, DESDE)) == 1
 
 
@@ -121,7 +121,7 @@ def test_falhou(tmp_path):
     assert not ap.falhou('texto "estado": "erro" qualquer') and not ap.falhou(None)
 
 
-def test_escritas_da_onda3_contam():
-    for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo",
+def test_escritas_financeiras_contam():
+    for n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
               "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso"):
-        assert "mcp__gabi_brain__" + n in ap.FERRAMENTAS_DE_ESCRITA
+        assert "mcp__gabi_finance__" + n in ap.FERRAMENTAS_DE_ESCRITA

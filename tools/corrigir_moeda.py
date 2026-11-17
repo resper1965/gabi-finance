@@ -63,7 +63,7 @@ def corrigir(con, bruto_base: Path, dry_run: bool = False) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    raiz = Path(os.environ.get("GABI_DADOS", "/var/lib/gabi-brain"))
+    raiz = Path(os.environ.get("GABI_DADOS", "/var/lib/gabi-finance"))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--banco", default=os.environ.get("GABI_BANCO", str(raiz / "gabi.db")))
     ap.add_argument("--bruto", default=str(raiz / "bruto"))

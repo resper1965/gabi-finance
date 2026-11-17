@@ -66,7 +66,7 @@ if __name__ == "__main__":
     import argparse
     from gabi.db import conectar, migrar
     ap = argparse.ArgumentParser(prog="gabi.mcp.tokens")
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("emitir"); e.add_argument("nome"); e.add_argument("escopos", help="separados por vírgula: " + ",".join(sorted(ESCOPOS)))
     d = sub.add_parser("escopos"); d.add_argument("id", type=int); d.add_argument("escopos", help="separados por vírgula: " + ",".join(sorted(ESCOPOS)))

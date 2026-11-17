@@ -5,21 +5,21 @@ import subprocess
 from pathlib import Path
 
 DEPLOY = Path(__file__).parent.parent / "deploy"
-API = (DEPLOY / "gabi-brain-api.service").read_text()
-BKP = (DEPLOY / "gabi-brain-backup.service").read_text()
-TIMER = (DEPLOY / "gabi-brain-backup.timer").read_text()
+API = (DEPLOY / "gabi-finance-api.service").read_text()
+BKP = (DEPLOY / "gabi-finance-backup.service").read_text()
+TIMER = (DEPLOY / "gabi-finance-backup.timer").read_text()
 INSTALAR = (DEPLOY / "instalar.sh").read_text()
 
 
 def test_api_escuta_so_em_socket_unix_sem_proxy_headers():
     exec_start = re.search(r"^ExecStart=(.*)$", API, re.M).group(1)
-    assert "--uds /run/gabi-brain/api.sock" in exec_start and "--factory gabi.api:fabrica" in exec_start
+    assert "--uds /run/gabi-finance/api.sock" in exec_start and "--factory gabi.api:fabrica" in exec_start
     assert "--no-proxy-headers" in exec_start      # C1: nunca confiar em X-Forwarded-For
     assert "--port" not in exec_start and "--host" not in exec_start
 
 
 def test_socket_fica_em_pasta_so_do_servico():
-    assert "RuntimeDirectory=gabi-brain" in API and "RuntimeDirectoryMode=0700" in API and "UMask=0077" in API
+    assert "RuntimeDirectory=gabi-finance" in API and "RuntimeDirectoryMode=0700" in API and "UMask=0077" in API
 
 
 def test_servicos_sem_rede_alem_de_socket_unix():
@@ -35,11 +35,11 @@ def test_nenhum_arquivo_de_deploy_escuta_em_todas_as_interfaces():
 
 def test_servicos_rodam_como_usuario_sem_privilegios_e_endurecidos():
     for unidade in (API, BKP):
-        assert "User=gabibrain" in unidade
+        assert "User=gabifinance" in unidade
         assert "NoNewPrivileges=yes" in unidade and "ProtectSystem=strict" in unidade
         assert "ProtectHome=yes" in unidade and "PrivateTmp=yes" in unidade
-    assert "ReadWritePaths=/var/lib/gabi-brain" in API
-    assert "/var/backups/gabi-brain" in BKP
+    assert "ReadWritePaths=/var/lib/gabi-finance" in API
+    assert "/var/backups/gabi-finance" in BKP
 
 
 def test_api_nao_le_arquivo_de_segredos_na_fase_0():
@@ -53,8 +53,8 @@ def test_backup_diario_as_0330_com_teste_de_restauracao():
 
 def test_servicos_longos_avisam_falha():
     for nome in ("api", "mcp", "fontes"):
-        texto = (DEPLOY / f"gabi-brain-{nome}.service").read_text()
-        assert "OnFailure=gabi-brain-falha@%n.service" in texto, nome
+        texto = (DEPLOY / f"gabi-finance-{nome}.service").read_text()
+        assert "OnFailure=gabi-finance-falha@%n.service" in texto, nome
         assert "StartLimitBurst=" in texto, nome
 
 
@@ -70,14 +70,14 @@ def test_instalar_tem_sintaxe_valida():
 def test_instalar_faz_backup_do_banco_antes_de_copiar():
     i_bkp = INSTALAR.index("gabi.db.antes-instalar-")
     assert i_bkp < INSTALAR.index("cp -r")
-    assert ".backup(" in INSTALAR and "cp /var/lib/gabi-brain/gabi.db" not in INSTALAR
-    assert "chmod 600" in INSTALAR and "chown gabibrain:gabibrain" in INSTALAR
+    assert ".backup(" in INSTALAR and "cp /var/lib/gabi-finance/gabi.db" not in INSTALAR
+    assert "chmod 600" in INSTALAR and "chown gabifinance:gabifinance" in INSTALAR
     assert "tail -n +6" in INSTALAR
-    assert "if [ -f /var/lib/gabi-brain/gabi.db ]" in INSTALAR  # primeira instalação: sem banco, pula
+    assert "if [ -f /var/lib/gabi-finance/gabi.db ]" in INSTALAR  # primeira instalação: sem banco, pula
 
 
-def test_backup_do_instalar_roda_como_gabibrain_e_sem_mode_ro():
-    assert "runuser -u gabibrain -- python3" in INSTALAR and "mode=ro" not in INSTALAR
+def test_backup_do_instalar_roda_como_gabifinance_e_sem_mode_ro():
+    assert "runuser -u gabifinance -- python3" in INSTALAR and "mode=ro" not in INSTALAR
     assert "pragma integrity_check" in INSTALAR and "journal_mode=delete" in INSTALAR
 
 
@@ -87,10 +87,10 @@ def test_backup_ruim_do_instalar_e_apagado_antes_de_sair():
 
 
 def test_instalar_troca_por_mv_e_nao_apaga_antes_de_copiar():
-    assert "rm -rf /opt/gabi-brain/gabi " not in INSTALAR
-    assert ".novo" in INSTALAR and ".velho" in INSTALAR and 'mv "/opt/gabi-brain/.novo/$d"' in INSTALAR
+    assert "rm -rf /opt/gabi-finance/gabi " not in INSTALAR
+    assert ".novo" in INSTALAR and ".velho" in INSTALAR and 'mv "/opt/gabi-finance/.novo/$d"' in INSTALAR
     laco = INSTALAR.split("for d in gabi")[1].split("done")[0]
-    assert 'if [ -e "/opt/gabi-brain/$d" ]; then' in laco and "&& mv" not in laco  # if/fi, não && sob set -e
+    assert 'if [ -e "/opt/gabi-finance/$d" ]; then' in laco and "&& mv" not in laco  # if/fi, não && sob set -e
 
 
 def test_instalar_exige_confirmacao_do_gate_g1():
@@ -98,7 +98,7 @@ def test_instalar_exige_confirmacao_do_gate_g1():
 
 
 def test_instalar_usa_dependencias_fixas_e_nao_instala_o_projeto():
-    assert "requirements.lock" in INSTALAR and "pip install /opt/gabi-brain" not in INSTALAR
+    assert "requirements.lock" in INSTALAR and "pip install /opt/gabi-finance" not in INSTALAR
     lock = (DEPLOY.parent / "requirements.lock").read_text()
     for pacote in ("fastapi", "uvicorn", "starlette", "pydantic", "mcp"):
         assert re.search(rf"^{pacote}==\d", lock, re.M | re.I), pacote
@@ -122,8 +122,9 @@ def test_arvore_copiada_pelo_instalar_roda_sozinha(tmp_path):
 
 def test_instalar_nao_toca_nas_outras_pilhas_nem_em_segredos():
     executadas = "\n".join(l for l in INSTALAR.splitlines() if l.strip() and not l.lstrip().startswith(("#", "echo"))).lower()
-    for proibido in ("openclaw", "paperless", "buzz", "/etc/gabi", "docker", "ufw", "iptables"):
+    for proibido in ("openclaw", "paperless", "buzz", "gabi-brain", "gabibrain", "docker", "ufw", "iptables"):
         assert proibido not in executadas, proibido  # mencionar em comentário/mensagem é ok; executar, não
+    assert not re.search(r"/etc/gabi(?!-finance)", executadas)  # só a pasta /etc/gabi-finance (vazia); nenhum segredo é lido nem escrito
 
 
 def test_instalar_nao_abre_porta_nem_roda_tailscale_serve():
@@ -181,14 +182,14 @@ def _ler(nome):
     return (DEPLOY / nome).read_text()
 
 
-MCP = _ler("gabi-brain-mcp.service")
-SALDOS, EXTRATOS = _ler("gabi-brain-saldos.service"), _ler("gabi-brain-extratos.service")
-T_SALDOS, T_EXTRATOS = _ler("gabi-brain-saldos.timer"), _ler("gabi-brain-extratos.timer")
+MCP = _ler("gabi-finance-mcp.service")
+SALDOS, EXTRATOS = _ler("gabi-finance-saldos.service"), _ler("gabi-finance-extratos.service")
+T_SALDOS, T_EXTRATOS = _ler("gabi-finance-saldos.timer"), _ler("gabi-finance-extratos.timer")
 
 
-def test_mcp_escuta_so_em_localhost_8081_sem_proxy_headers():
+def test_mcp_escuta_so_em_localhost_8082_sem_proxy_headers():
     ex = re.search(r"^ExecStart=(.*)$", MCP, re.M).group(1)
-    assert "--factory gabi.mcp.servidor:fabrica" in ex and "--host 127.0.0.1" in ex and "--port 8081" in ex and "--no-proxy-headers" in ex
+    assert "--factory gabi.mcp.servidor:fabrica" in ex and "--host 127.0.0.1" in ex and "--port 8082" in ex and "--no-proxy-headers" in ex
     assert "0.0.0.0" not in MCP
 
 
@@ -200,11 +201,11 @@ def test_mcp_so_aceita_trafego_local_e_nao_le_segredo_de_agentes():
 
 def test_servicos_de_captura_podem_sair_para_a_internet_mas_com_o_resto_endurecido():
     for u in (SALDOS, EXTRATOS):
-        assert "EnvironmentFile=-/etc/gabi/brain.env" in u            # a chave da mcp.ai (G4); '-' = opcional
+        assert "EnvironmentFile=-/etc/gabi-finance/mcpai.env" in u            # a chave da mcp.ai (G4); '-' = opcional
         assert "IPAddressDeny" not in u and "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" in u
-        for dur in ("User=gabibrain", "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "UMask=0077"):
+        for dur in ("User=gabifinance", "NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "UMask=0077"):
             assert dur in u, dur
-        assert "ReadWritePaths=/var/lib/gabi-brain" in u and "Type=oneshot" in u
+        assert "ReadWritePaths=/var/lib/gabi-finance" in u and "Type=oneshot" in u
 
 
 def test_captura_chama_os_modulos_certos():
@@ -226,15 +227,19 @@ def test_os_horarios_sao_aceitos_pelo_systemd():
         assert r.returncode == 0, (expr, r.stderr)
 
 
-def test_instalar_liga_api_mcp_e_backup_mas_nao_a_captura():
-    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert len(ligadas) == 1 and "gabi-brain-api.service" in ligadas[0] and "gabi-brain-mcp.service" in ligadas[0] and "gabi-brain-backup.timer" in ligadas[0]
-    assert "extratos" not in ligadas[0] and "saldos" not in ligadas[0]  # só depois do G4 (chave da mcp.ai)
-    assert "gabi-brain-extratos.timer" in INSTALAR and "gabi-brain-saldos.timer" in INSTALAR  # mas instala as unidades
+def test_instalar_instala_todas_as_units_mas_nao_liga_nenhuma():
+    """A virada (docs/virada.md) liga na ordem certa, depois da conferência com o serviço anterior."""
+    executadas = "\n".join(l for l in INSTALAR.splitlines() if l.strip() and not l.lstrip().startswith(("#", "echo")))
+    for proibido in ("enable", "start ", "restart", "reload-or-restart", "--now"):
+        assert proibido not in executadas, proibido
+    unidades = sorted(p.name for p in DEPLOY.glob("gabi-finance-*") if p.suffix in (".service", ".timer"))
+    assert unidades
+    for nome in unidades:
+        assert nome in INSTALAR, nome
 
 
 def test_instalar_cria_pastas_do_bruto_e_dos_locks_privadas():
-    assert "/var/lib/gabi-brain/bruto" in INSTALAR and "/var/lib/gabi-brain/locks" in INSTALAR
+    assert "/var/lib/gabi-finance/bruto" in INSTALAR and "/var/lib/gabi-finance/locks" in INSTALAR
 
 
 def test_nenhuma_unidade_traz_segredo():
@@ -242,134 +247,89 @@ def test_nenhuma_unidade_traz_segredo():
         assert not re.search(r"sk_live|sk-[a-z0-9]{10}|Bearer |gb_[A-Za-z0-9_-]{20}", p.read_text()), p.name
 
 
-# ---------------- Fase 2: serviço de fontes (ponte para Paperless e Nibo) ----------------
-FONTES = _ler("gabi-brain-fontes.service")
+# ---------------- Fase 2: serviço de fontes (ponte para o Nibo) ----------------
+FONTES = _ler("gabi-finance-fontes.service")
 
 
-def test_so_o_servico_de_fontes_tem_rede_e_le_o_arquivo_de_tokens():
-    assert "EnvironmentFile=-/etc/gabi/cobrar.env" in FONTES
+def test_so_o_servico_de_fontes_tem_rede_e_le_o_token_do_nibo():
+    assert "EnvironmentFile=-/etc/gabi-finance/nibo.env" in FONTES
+    assert "mcpai" not in "\n".join(l for l in FONTES.splitlines() if l.startswith("EnvironmentFile"))  # o mcp.ai fica fora da ponte (spec F5)
     assert "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" in FONTES and "IPAddressDeny" not in FONTES
     for u in (API, MCP):
-        assert "EnvironmentFile" not in u and "GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock" in u
+        assert "EnvironmentFile" not in u and "GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock" in u
         assert "IPAddressDeny=any" in u  # a API e o MCP continuam sem rede
 
 
 def test_ponte_so_para_o_servico_e_o_grupo():
-    assert "User=gabibrain-fontes" in FONTES and "Group=gabibrain" in FONTES
-    assert "RuntimeDirectory=gabi-brain-fontes" in FONTES and "RuntimeDirectoryMode=0750" in FONTES and "UMask=0007" in FONTES
+    assert "User=gabifinance-fontes" in FONTES and "Group=gabifinance" in FONTES
+    assert "RuntimeDirectory=gabi-finance-fontes" in FONTES and "RuntimeDirectoryMode=0750" in FONTES and "UMask=0007" in FONTES
     for dur in ("NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "PrivateDevices=yes", "CapabilityBoundingSet="):
         assert dur in FONTES, dur
-    assert "-m gabi.fontes.servico --socket /run/gabi-brain-fontes/fontes.sock" in FONTES
+    assert "-m gabi.fontes.servico --socket /run/gabi-finance-fontes/fontes.sock" in FONTES
     assert hasattr(importlib.import_module("gabi.fontes.servico"), "main")
 
 
-def test_instalar_cria_o_usuario_e_liga_o_servico_de_fontes():
-    assert "useradd" in INSTALAR and "gabibrain-fontes" in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert "gabi-brain-fontes.service" in ligadas[0] and "gabi-brain-fontes.service" in INSTALAR.split("restart")[1]
+def test_instalar_cria_os_usuarios_e_a_pasta_de_segredos():
+    assert "useradd" in INSTALAR and "gabifinance-fontes" in INSTALAR and "id gabifinance " in INSTALAR
+    assert "/etc/gabi-finance" in INSTALAR
 
 
 # ---------------- avisos (plano de finalização, tarefa 4): o brain passa a avisar quando algo para ----------------
-AVISOS, T_AVISOS, FALHA = _ler("gabi-brain-avisos.service"), _ler("gabi-brain-avisos.timer"), _ler("gabi-brain-falha@.service")
-NOTAS = _ler("gabi-brain-notas.service")
+AVISOS, T_AVISOS, FALHA = _ler("gabi-finance-avisos.service"), _ler("gabi-finance-avisos.timer"), _ler("gabi-finance-falha@.service")
+NOTAS = _ler("gabi-finance-notas.service")
 
 
 def test_timer_de_avisos_roda_a_cada_15_minutos_e_esta_instalado_e_habilitado():
-    assert "OnUnitActiveSec=15min" in T_AVISOS and "Unit=gabi-brain-avisos.service" in T_AVISOS
-    for nome in ("gabi-brain-avisos.service", "gabi-brain-avisos.timer", "gabi-brain-falha@.service"):
+    assert "OnUnitActiveSec=15min" in T_AVISOS and "Unit=gabi-finance-avisos.service" in T_AVISOS
+    for nome in ("gabi-finance-avisos.service", "gabi-finance-avisos.timer", "gabi-finance-falha@.service"):
         assert nome in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-avisos.timer" in ligadas[0]
 
 
 def test_servicos_de_rotina_avisam_quando_falham():
     # a chave do mcp.ai expirou em 09/10 e ninguém soube por horas: toda rotina com OnFailure= chama o serviço de falha
     for texto in (SALDOS, EXTRATOS, BKP, NOTAS, AVISOS):
-        assert "OnFailure=gabi-brain-falha@%n.service" in texto
+        assert "OnFailure=gabi-finance-falha@%n.service" in texto
 
 
 def test_servico_de_falha_grava_aviso_com_o_nome_da_unidade_e_sem_rede():
     ex = re.search(r"^ExecStart=(.*)$", FALHA, re.M).group(1)
-    assert "gabi.avisos" in ex and "--falha %i" in ex and "RestrictAddressFamilies=AF_UNIX" in FALHA and "User=gabibrain" in FALHA
+    assert "gabi.avisos" in ex and "--falha %i" in ex and "RestrictAddressFamilies=AF_UNIX" in FALHA and "User=gabifinance" in FALHA
 
 
 def test_servico_de_avisos_so_le_e_grava_o_banco_sem_rede():
-    assert "gabi.avisos" in AVISOS and "User=gabibrain" in AVISOS and "RestrictAddressFamilies=AF_UNIX" in AVISOS and "ReadWritePaths=/var/lib/gabi-brain" in AVISOS
+    assert "gabi.avisos" in AVISOS and "User=gabifinance" in AVISOS and "RestrictAddressFamilies=AF_UNIX" in AVISOS and "ReadWritePaths=/var/lib/gabi-finance" in AVISOS
     assert "NoNewPrivileges=yes" in AVISOS and "ProtectSystem=strict" in AVISOS
 
 
 def test_timer_de_notas_roda_todo_dia_cedo_em_horario_de_brasilia_e_esta_instalado():
-    t = _ler("gabi-brain-notas.timer")
-    assert "OnCalendar=*-*-* 06:40:00 America/Sao_Paulo" in t and "Unit=gabi-brain-notas.service" in t and "Persistent=true" in t
-    assert "gabi-brain-notas.timer" in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-notas.timer" in ligadas[0]
+    t = _ler("gabi-finance-notas.timer")
+    assert "OnCalendar=*-*-* 06:40:00 America/Sao_Paulo" in t and "Unit=gabi-finance-notas.service" in t and "Persistent=true" in t
+    assert "gabi-finance-notas.timer" in INSTALAR
 
 
 def test_timer_de_exportacao_semanal_instalado():
-    svc = (DEPLOY / "gabi-brain-exportacao.service").read_text()
-    tmr = (DEPLOY / "gabi-brain-exportacao.timer").read_text()
+    svc = (DEPLOY / "gabi-finance-exportacao.service").read_text()
+    tmr = (DEPLOY / "gabi-finance-exportacao.timer").read_text()
     expr = re.search(r"^OnCalendar=(.*)$", tmr, re.M).group(1)
     assert subprocess.run(["systemd-analyze", "calendar", expr], capture_output=True, text=True).returncode == 0
     assert expr.startswith("Sun ") and "America/Sao_Paulo" in expr
-    assert "-m gabi.exportacao" in svc and "ConditionPathExists=/etc/gabi/backup.pub" in svc  # sem chave, não roda (nem exporta em claro)
-    assert "OnFailure=gabi-brain-falha@%n.service" in svc and "IPAddressDeny=any" in svc
-    assert "gabi-brain-exportacao.timer" in INSTALAR and "gabi-brain-exportacao.service" in INSTALAR
-    ligadas = [l for l in INSTALAR.splitlines() if "enable --now" in l and not l.lstrip().startswith(("#", "echo"))]
-    assert "gabi-brain-exportacao.timer" in ligadas[0]
+    assert "-m gabi.exportacao" in svc and "ConditionPathExists=/etc/gabi-finance/backup.pub" in svc  # sem chave, não roda (nem exporta em claro)
+    assert "OnFailure=gabi-finance-falha@%n.service" in svc and "IPAddressDeny=any" in svc
+    assert "gabi-finance-exportacao.timer" in INSTALAR and "gabi-finance-exportacao.service" in INSTALAR
 
 
 def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_no_repositorio():
-    srv, t = _ler("gabi-brain-telegram.service"), _ler("gabi-brain-telegram.timer")
-    assert "-m gabi.telegram" in srv and "EnvironmentFile=-/etc/gabi/telegram.env" in srv and "OnFailure=gabi-brain-falha@%n.service" in srv
-    assert "User=gabibrain" in srv and "NoNewPrivileges=yes" in srv and "ReadWritePaths=/var/lib/gabi-brain" in srv
-    assert "OnUnitActiveSec=5min" in t and "Unit=gabi-brain-telegram.service" in t
-    ligadas = [l for l in INSTALAR.splitlines() if l.startswith("systemctl enable")]
-    assert ligadas and "gabi-brain-telegram.timer" in ligadas[0]
+    srv, t = _ler("gabi-finance-telegram.service"), _ler("gabi-finance-telegram.timer")
+    assert "-m gabi.telegram" in srv and "EnvironmentFile=-/etc/gabi-finance/telegram.env" in srv and "OnFailure=gabi-finance-falha@%n.service" in srv
+    assert "User=gabifinance" in srv and "NoNewPrivileges=yes" in srv and "ReadWritePaths=/var/lib/gabi-finance" in srv
+    assert "OnUnitActiveSec=5min" in t and "Unit=gabi-finance-telegram.service" in t
+    assert "gabi-finance-telegram.timer" in INSTALAR
     assert "TELEGRAM_BOT_TOKEN=" not in srv + t + INSTALAR
 
 
-def test_unit_fontes_tem_environmentfile_opcional_do_openrouter():
-    assert "EnvironmentFile=-/etc/gabi/openrouter.env" in FONTES
-    for u in (API, MCP):
-        assert "openrouter" not in u  # a chave só é lida pelo serviço de fontes
-
-
-def test_runbook_openrouter_env_root_0600_e_limite_de_credito():
-    from pathlib import Path
-    rb = (Path(__file__).resolve().parent.parent / "docs/runbook.md").read_text()
-    trecho = rb.split("{#openrouter}")[1].split("\n## ")[0]
-    assert "root:root" in trecho and "0600" in trecho and "limite de crédito" in trecho
-
-
-# ---------------- escuta (WhatsApp): serviço, timer e gatilho por arquivo ----------------
-
-
-# ---------------- contatos do Google ----------------
-def test_fontes_le_o_ambiente_dos_contatos_como_opcional():
-    assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in _ler("gabi-brain-fontes.service")
-
-
-# ---------------- ouvinte do WhatsApp (serviço separado, só leitura) ----------------
-
-
-def test_unit_fontes_le_google_env_e_o_antigo():
-    unit = _ler("gabi-brain-fontes.service")
-    assert "EnvironmentFile=-/etc/gabi/google.env" in unit
-    assert "EnvironmentFile=-/etc/gabi/google-contatos.env" in unit  # compatibilidade
-    # systemd: o ÚLTIMO arquivo vence — o canônico (dois escopos) tem de vir depois do legado (só contatos)
-    assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
-    assert not [l for l in unit.splitlines() if l.startswith("Environment=") and ("REFRESH" in l or "SECRET" in l)]  # nenhum segredo na unit
-
-
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
-    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-brain/.novo/tools"))
-    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "carga_familia" not in linha and linha.rstrip().endswith("/opt/gabi-brain/.novo/tools/")
-
-
-def test_unit_fontes_continua_com_google_env_por_ultimo_e_sem_segredo():
-    unit = _ler("gabi-brain-fontes.service")
-    assert unit.index("EnvironmentFile=-/etc/gabi/google-contatos.env") < unit.index("EnvironmentFile=-/etc/gabi/google.env")
+    linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-finance/.novo/tools"))
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "carga_familia" not in linha and linha.rstrip().endswith("/opt/gabi-finance/.novo/tools/")
 
 
 # ---------------- simplificação (ADR-023) ----------------
@@ -386,25 +346,33 @@ def test_todo_modulo_que_uma_unit_executa_existe():
         assert importlib.util.find_spec(nome) is not None, nome
 
 
-CORTADAS = ("gabi-brain-escuta.service", "gabi-brain-escuta.timer", "gabi-brain-escuta.path", "escuta-ouvinte.service", "gabi-brain-trabalho.service",
-            "gabi-brain-trabalho.timer", "gabi-brain-comprovantes.service", "gabi-brain-comprovantes.timer", "gabi-brain-exames.service",
-            "gabi-brain-exames.timer", "gabi-brain-reembolso-saude.service", "gabi-brain-reembolso-saude.timer",
-            # corte do gabi-finance: agenda, anexos, contatos, correio, documentos e teams saíram
-            "gabi-brain-agenda.service", "gabi-brain-agenda.timer", "gabi-brain-anexos.service", "gabi-brain-anexos.timer", "gabi-brain-contatos.service",
-            "gabi-brain-contatos.timer", "gabi-brain-correio.service", "gabi-brain-correio.timer", "gabi-brain-documentos.service",
-            "gabi-brain-documentos.timer", "gabi-brain-teams.service", "gabi-brain-teams.timer")
+def test_so_existem_units_gabi_finance_e_nenhuma_traz_o_nome_antigo():
+    for p in (f for f in DEPLOY.iterdir() if f.suffix in (".service", ".timer")):
+        assert p.name.startswith("gabi-finance-"), p.name
+    nomes = {p.name for p in DEPLOY.glob("gabi-finance-*")}
+    for cortada in ("agenda", "anexos", "contatos", "correio", "documentos", "teams", "escuta", "trabalho", "exames"):
+        assert not {f"gabi-finance-{cortada}.service", f"gabi-finance-{cortada}.timer"} & nomes, cortada
 
 
-def test_units_cortadas_nao_voltam_ao_repositorio():
-    for nome in CORTADAS:
-        assert not (DEPLOY / nome).exists(), nome
+def test_deploy_so_usa_usuario_caminhos_e_segredos_do_gabi_finance():
+    texto = "\n".join(p.read_text() for p in DEPLOY.rglob("*") if p.is_file() and p.suffix in (".service", ".timer", ".sh", ".py", ".md"))
+    assert "User=gabifinance" in texto and "/opt/gabi-finance" in texto and "/var/lib/gabi-finance" in texto
+    assert "/run/gabi-finance/" in texto and "/etc/gabi-finance/" in texto
+    for velho in ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "GABI_BRAIN", "/etc/gabi/", "/opt/gabi/"):
+        assert velho not in texto, velho
 
 
-def test_instalador_desliga_e_remove_as_units_cortadas_antes_do_reload():
-    """Na VPS elas seguem ligadas desde o instalador antigo: sem desligar, `python -m gabi.trabalho` falharia a cada 15 min (ADR-023)."""
-    linhas = [l for l in INSTALAR.splitlines() if not l.lstrip().startswith("#")]
-    texto = "\n".join(linhas)
-    reload = texto.index("systemctl daemon-reload")
-    for nome in CORTADAS:
-        assert f"/etc/systemd/system/{nome}" in texto[:reload] or nome in texto[:reload], nome
-    assert "disable --now" in texto[:reload] and "rm -f" in texto[:reload]
+def test_defaults_de_gabi_e_tools_nao_apontam_para_o_gabi_brain():
+    raiz = DEPLOY.parent
+    for pasta in ("gabi", "tools"):
+        for p in (raiz / pasta).rglob("*"):
+            if p.is_file() and p.suffix in (".py", ".html", ".sh") and "painel" not in p.parts:
+                t = p.read_text(encoding="utf-8")
+                for velho in ("gabi-brain", "gabi_brain", "gabibrain", "gabi.brain", "/etc/gabi/", "mcp__gabi_brain"):
+                    assert velho not in t, (str(p.relative_to(raiz)), velho)
+
+
+def test_mcp_nao_disputa_a_porta_com_o_gabi_brain_durante_a_virada():
+    """O serviço anterior segue em 127.0.0.1:8081 até a volta ser descartada; o gabi-finance usa 8082."""
+    assert "--port 8082" in MCP and "8081" not in MCP
+    assert "8081" not in INSTALAR

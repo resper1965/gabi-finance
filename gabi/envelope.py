@@ -19,12 +19,12 @@ COM_CONFERENCIA = ("open-finance",)
 # Esperadas: devem aparecer mesmo sem nenhuma rodada (cliente sem token, timer que nunca disparou); sem rodada = nao_conferida = desatualizado.
 ESPERADAS = ("notas-nibo",)
 # Fontes cortadas pela ADR-023: as rodadas antigas ficam no banco (histórico), mas nunca entram na lista nem no dados_ate.
-# Corte do gabi-finance: agenda, correio, documentos e teams também (os módulos saíram; num banco copiado do gabi-brain ainda há fonte `agenda`/`correio`
+# Corte do gabi-finance: agenda, correio, documentos e teams também (os módulos saíram; num banco copiado da produção anterior ainda há fonte `agenda`/`correio`
 # liberada e rodadas velhas, que sem isto marcariam toda resposta como desatualizada).
 CORTADAS = frozenset({"trabalho", "comprovantes-paperless", "exames", "reembolso-saude", "escuta", "agenda", "correio", "documentos", "teams"})
 BRT = dt.timezone(dt.timedelta(hours=-3))
 LIMITE_BANCO = dt.timedelta(hours=24)  # idade máxima da última atualização que o PROVEDOR declarou para cada banco (`dinheiro.sync_banco`)
-HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-brain-extratos.timer (tests/test_envelope.py confere)
+HORAS_RODADAS = (6, 14)  # espelha OnCalendar de deploy/gabi-finance-extratos.timer (tests/test_envelope.py confere)
 
 
 def _utc(s: str) -> dt.datetime:

@@ -17,9 +17,7 @@ SOUL = RAIZ / "deploy" / "hermes" / "SOUL.md"
 SCRIPT = RAIZ / "deploy" / "instalar-hermes-soul.sh"
 TEXTO_AVISO = "Nenhum resultado para esta consulta. Diga ao Ricardo que não encontrou; não suponha nem estime."
 REGRAS = [
-    "Fato sobre dinheiro, documento ou pessoa só com dado devolvido por ferramenta nesta conversa. Sem resultado, diga 'não encontrei' e o que procurou. Dois dados diferentes: mostre os dois, com a origem.",
-    "Para ler um documento do Paperless, use `documentos_texto`; cite o título e a data.",
-    "Número de documento só quando o Ricardo pedir aquela pessoa e aquele documento.",
+    "Fato sobre dinheiro só com dado devolvido por ferramenta nesta conversa. Sem resultado, diga 'não encontrei' e o que procurou. Dois dados diferentes: mostre os dois, com a origem.",
 ]
 
 
@@ -69,7 +67,6 @@ def test_soul_do_repositorio_tem_as_tres_regras_e_nao_promete_fluxo_de_exames_ne
     # "reembolso" só aparece como a Empresa marcada na compra (financeiro_marcar_reembolso), que alimenta despesas_por_empresa
     assert "exames" not in t.lower() and "fluxo (" not in t.lower()
     assert all("financeiro_marcar_reembolso" in linha or "despesas_por_empresa" in linha for linha in t.splitlines() if "reembolso" in linha.lower())
-    assert "vai para o Paperless" in t or "foi para o Paperless" in t
 
 
 def _rodar(home: Path):
@@ -104,17 +101,3 @@ def test_soul_despesas_nao_reabre_encerrada():
     t = SOUL.read_text()
     linha = next(l for l in t.splitlines() if "despesa_encerrar" in l and "→" in l)
     assert "despesa_criar" in linha and "reabrir" in linha
-
-
-def test_soul_atividades_nao_reabre_concluida():
-    # ADR-033: não existe reabrir; para voltar, cria de novo
-    t = SOUL.read_text()
-    linha = next(l for l in t.splitlines() if "atividade_concluir" in l and "→" in l)
-    assert "atividade_criar" in linha and "reabrir" in linha
-
-
-def test_soul_projetos_nao_reabre_concluido_nem_cancelado():
-    # ADR-034: não existe reabrir; para voltar, cria de novo
-    t = SOUL.read_text()
-    linha = next(l for l in t.splitlines() if "projeto_atualizar" in l and "→" in l)
-    assert "projeto_ligar" in linha and "Linear" in linha and "reabrir" in linha  # ADR-038: criar de novo = Linear + projeto_ligar

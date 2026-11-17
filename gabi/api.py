@@ -1,4 +1,4 @@
-"""API do gabi.brain (Fase 0): identidade, saúde, segurança e revogação. Toda chamada /api/* é registrada (R4)."""
+"""API do gabi-finance (Fase 0): identidade, saúde, segurança e revogação. Toda chamada /api/* é registrada (R4)."""
 import datetime as dt
 import logging
 import os
@@ -59,7 +59,7 @@ def _guarda_csrf(request: Request) -> JSONResponse | None:
 
 def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origens_confiaveis=(), fontes=None) -> FastAPI:
     """permite_tcp_local=False é o padrão de produção: só o socket Unix do serviço é origem confiável."""
-    app = FastAPI(title="gabi.brain", docs_url=None, redoc_url=None)
+    app = FastAPI(title="gabi-finance", docs_url=None, redoc_url=None)
     app.state.banco = Path(banco)
     app.state.permite_tcp_local = permite_tcp_local
     app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
@@ -182,7 +182,7 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
 
 def fabrica() -> FastAPI:
     """uvicorn --factory gabi.api:fabrica --uds ... ; banco em GABI_BANCO. TCP local só com GABI_PERMITE_TCP_LOCAL=1 (dev). Origens do painel (CSRF) em GABI_ORIGENS_CONFIAVEIS, separadas por vírgula."""
-    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
+    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-finance/gabi.db"))
     con = conectar(banco)
     try:
         migrar(con, MIGRACOES)

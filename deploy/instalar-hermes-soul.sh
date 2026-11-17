@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala deploy/hermes/SOUL.md (fonte única) em ~/.hermes/SOUL.md, como o usuário atual (ricardo), sem sudo.
+# Instala deploy/hermes/SOUL.md (fonte única; SOUL financeiro do gabi-finance) em ~/.hermes/SOUL.md, como o usuário do Hermes (ricardo), sem sudo.
 # Se já existe um SOUL diferente, guarda backup SOUL.md.bak-AAAA-MM-DD-HHMM antes de sobrescrever.
 # Não reinicia o gateway: só imprime o lembrete.
 set -euo pipefail

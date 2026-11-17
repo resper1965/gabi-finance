@@ -1,4 +1,4 @@
-"""Importa as NFS-e do Nibo para `nota_fiscal` e guarda PDF/XML em /var/lib/gabi-brain/notas.
+"""Importa as NFS-e do Nibo para `nota_fiscal` e guarda PDF/XML em /var/lib/gabi-finance/notas.
 Uso: python -m gabi.cobrar.notas_importar [--desde AAAA-MM-DD]. O Nibo é lido pela ponte (GABI_FONTES_SOCKET): este processo não tem o token (R5).
 Consome: cobrar.notas, rodada, fontes.ambiente."""
 import argparse
@@ -39,8 +39,8 @@ def main(banco: Path, pasta: Path, desde: dt.date, nibo=None) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default=os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
-    ap.add_argument("--pasta", default="/var/lib/gabi-brain/notas")
+    ap.add_argument("--banco", default=os.environ.get("GABI_BANCO", "/var/lib/gabi-finance/gabi.db"))
+    ap.add_argument("--pasta", default="/var/lib/gabi-finance/notas")
     ap.add_argument("--desde", default="2017-01-01")
     a = ap.parse_args()
     sys.exit(main(Path(a.banco), Path(a.pasta), dt.date.fromisoformat(a.desde)))

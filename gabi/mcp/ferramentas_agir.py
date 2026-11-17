@@ -68,7 +68,7 @@ def financeiro_marcar_gasto(con, agora: dt.datetime, lancamento_ids, gasto) -> d
 
 
 def assinaturas_listar(con, agora: dt.datetime) -> dict:
-    """Assinaturas que o brain já detectou, com o status que o Ricardo deu. `no_rol` false = fora do rol (não é assinatura ou encerrada)."""
+    """Assinaturas que a Gabi já detectou, com o status que o Ricardo deu. `no_rol` false = fora do rol (não é assinatura ou encerrada)."""
     return {"itens": [{"id": r["id"], "nome": r["estabelecimento"], "status": r["status"], "no_rol": r["status"] not in FORA_DO_ROL}
                       for r in con.execute("select id, estabelecimento, status from assinatura order by estabelecimento")]}
 
@@ -191,7 +191,7 @@ def registrar(srv, executar) -> None:
 
     @srv.tool()
     def assinatura_marcar(assinatura: str, status: str) -> dict:
-        """Muda o status de uma assinatura pelo id ou pelo nome (trecho do nome serve). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (o brain avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`."""
+        """Muda o status de uma assinatura pelo id ou pelo nome (trecho do nome serve). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (a Gabi avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`."""
         alvo = int(assinatura) if str(assinatura).strip().isdigit() else assinatura
         return executar("assinatura_marcar", lambda con, agora: assinatura_marcar_(con, agora, alvo, status))
 

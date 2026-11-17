@@ -67,7 +67,7 @@ def _item_estado(con, i: dict):
 
 
 def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
-    """Releitura (só leitura) da condição do aviso NO MOMENTO da entrega: o gabi.brain nunca anuncia o que deixou de ser verdade.
+    """Releitura (só leitura) da condição do aviso NO MOMENTO da entrega: o gabi-finance nunca anuncia o que deixou de ser verdade.
     -> (estado, payload_atual). Estados: "vale" (pode enviar), "resolvido" (condição acabou: fechar SEM enviar), "incerto" (não enviar e NÃO fechar: reavalia na próxima rodada).
     conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, aberto por vencimento movido) = resolvido.
     vence_hoje: o payload atual traz só os itens ainda 'aberto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
@@ -252,7 +252,7 @@ def gerar_avisos(con, agora: dt.datetime) -> list[int]:
 
     ref = con.execute("select coalesce((select max(fim) from rodada where fonte='exportacao' and status='ok'), min(inicio)) from rodada").fetchone()[0]
     if ref and agora - dt.datetime.fromisoformat(ref) > dt.timedelta(hours=HORAS_EXPORTACAO):
-        novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
+        novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi-finance/backup.pub ou a exportação falhou)"})
 
     _bancos_desatualizados(con, agora, novo)
 
@@ -283,7 +283,7 @@ def registrar_servico_falhou(con, unidade: str, agora: dt.datetime) -> int | Non
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default=os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
+    ap.add_argument("--banco", default=os.environ.get("GABI_BANCO", "/var/lib/gabi-finance/gabi.db"))
     ap.add_argument("--falha", default=None, help="nome da unidade systemd que falhou (usado por OnFailure=)")
     a = ap.parse_args(argv)
     con = conectar(Path(a.banco))

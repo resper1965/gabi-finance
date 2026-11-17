@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Vigia semanal SEM modelo: serviços do brain e do Hermes no ar, fontes de dados em dia e promessas do Hermes sem escrita.
-Sai pelo stdout (o cron `--no-agent` entrega ao Ricardo). Fonte: ~/gabi-brain/deploy/hermes/scripts/; cópia em ~/.hermes/scripts/.
-Token em ~/.hermes/.env (GABI_BRAIN_TOKEN); nunca imprime segredo. Falha: uma linha curta e sai com 1."""
+"""Vigia semanal SEM modelo: serviços do gabi-finance e do Hermes no ar, fontes de dados em dia e promessas do Hermes sem escrita.
+Sai pelo stdout (o cron `--no-agent` entrega ao Ricardo). Fonte: ~/gabi-finance/deploy/hermes/scripts/; cópia em ~/.hermes/scripts/.
+Token em ~/.hermes/.env (GABI_FINANCE_TOKEN); nunca imprime segredo. Falha: uma linha curta e sai com 1."""
 import json
 import re
 import subprocess
@@ -9,17 +9,17 @@ import sys
 import urllib.request
 from pathlib import Path
 
-URL = "http://127.0.0.1:8081/mcp"
+URL = "http://127.0.0.1:8082/mcp"
 ENV = Path.home() / ".hermes" / ".env"
-BRAIN = Path.home() / "gabi-brain"
-NOSSAS = ("gabi-brain", "hermes")
+RAIZ = Path.home() / "gabi-finance"
+NOSSAS = ("gabi-finance", "hermes")
 PROBLEMA = ("erro", "parada")  # `nao_conferida` só informa (ADR-023), `em_espera` é fonte em espera de chave
 
 
 def token() -> str:
-    m = re.search(r"^GABI_BRAIN_TOKEN=(.+)$", ENV.read_text(), re.M)
+    m = re.search(r"^GABI_FINANCE_TOKEN=(.+)$", ENV.read_text(), re.M)
     if not m:
-        raise RuntimeError("sem GABI_BRAIN_TOKEN")
+        raise RuntimeError("sem GABI_FINANCE_TOKEN")
     return m.group(1).strip().strip("'\"")
 
 
@@ -40,7 +40,7 @@ def chamar(tok: str, ferramenta: str, args: dict) -> dict:
 
 
 def units_falhando(saida: str) -> list[str]:
-    """Units do brain e do Hermes na saída de `systemctl --failed --plain --no-legend` (as do sistema ficam de fora)."""
+    """Units do gabi-finance e do Hermes na saída de `systemctl --failed --plain --no-legend` (as do sistema ficam de fora)."""
     nomes = (linha.split()[0] for linha in saida.splitlines() if linha.strip())
     return [n for n in nomes if n.startswith(NOSSAS)]
 
@@ -79,7 +79,7 @@ def main(argv: list[str]) -> int:
     try:
         paradas = fontes_paradas(chamar(token(), "financeiro_saldo", {}))
         failed = subprocess.run(["systemctl", "--failed", "--plain", "--no-legend"], capture_output=True, text=True, timeout=30).stdout
-        aud = subprocess.run([str(BRAIN / ".venv" / "bin" / "python"), "-m", "tools.auditar_promessas"], cwd=BRAIN,
+        aud = subprocess.run([str(RAIZ / ".venv" / "bin" / "python"), "-m", "tools.auditar_promessas"], cwd=RAIZ,
                              capture_output=True, text=True, timeout=120).stdout
     except Exception as e:  # noqa: BLE001 - qualquer falha vira aviso curto
         print(f"Falhou: vigia semanal ({type(e).__name__})")

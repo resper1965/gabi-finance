@@ -1,13 +1,13 @@
 [Unit]
-Description=gabi.brain: grava o aviso de que a unidade %i falhou
+Description=gabi-finance: grava o aviso de que a unidade %i falhou
 
 [Service]
 Type=oneshot
-User=gabibrain
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
-ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.avisos --falha %i
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.avisos --falha %i
 UMask=0077
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -16,4 +16,4 @@ PrivateTmp=yes
 PrivateDevices=yes
 RestrictAddressFamilies=AF_UNIX
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/gabi-brain
+ReadWritePaths=/var/lib/gabi-finance

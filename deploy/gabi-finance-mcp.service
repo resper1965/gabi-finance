@@ -1,22 +1,22 @@
 [Unit]
-Description=gabi.brain MCP (leitura; só 127.0.0.1:8081; exige token Bearer)
+Description=gabi-finance MCP (leitura; só 127.0.0.1:8082; exige token Bearer)
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
-OnFailure=gabi-brain-falha@%n.service
+OnFailure=gabi-finance-falha@%n.service
 
 [Service]
 Type=simple
-User=gabibrain
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
-# Hosts aceitos (anti DNS-rebinding). Para expor na tailnet: tailscale serve --https=8443 http://127.0.0.1:8081 e acrescente
-# o nome da máquina (ex.: gabi.<tailnet>.ts.net:8443) aqui por drop-in.
-Environment=GABI_MCP_HOSTS=127.0.0.1:8081,localhost:8081
-# Paperless e Nibo vivem no serviço gabi-brain-fontes (esta unidade não tem rede nem tokens).
-Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
-ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8081 --no-proxy-headers
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
+# Hosts aceitos (anti DNS-rebinding). Para expor na tailnet: tailscale serve --https=8443 http://127.0.0.1:8082 e acrescente
+# o nome da máquina (ex.: gabi-finance.tail985643.ts.net:8443) aqui por drop-in.
+Environment=GABI_MCP_HOSTS=127.0.0.1:8082,localhost:8082
+# O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
+Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
+ExecStart=/opt/gabi-finance/venv/bin/uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8082 --no-proxy-headers
 Restart=on-failure
 RestartSec=5s
 UMask=0077
@@ -32,7 +32,7 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 IPAddressDeny=any
 IPAddressAllow=localhost
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/gabi-brain
+ReadWritePaths=/var/lib/gabi-finance
 MemoryMax=1G
 
 [Install]

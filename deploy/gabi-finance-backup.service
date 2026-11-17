@@ -1,13 +1,13 @@
 [Unit]
-Description=gabi.brain backup diário do banco, com teste de restauração
-OnFailure=gabi-brain-falha@%n.service
+Description=gabi-finance backup diário do banco, com teste de restauração
+OnFailure=gabi-finance-falha@%n.service
 
 [Service]
 Type=oneshot
-User=gabibrain
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-ExecStart=/opt/gabi-brain/venv/bin/python -m gabi.backup --banco /var/lib/gabi-brain/gabi.db --destino /var/backups/gabi-brain --testar
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.backup --banco /var/lib/gabi-finance/gabi.db --destino /var/backups/gabi-finance --testar
 UMask=0077
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -20,4 +20,4 @@ ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/gabi-brain /var/backups/gabi-brain
+ReadWritePaths=/var/lib/gabi-finance /var/backups/gabi-finance

@@ -103,7 +103,7 @@ class _Auth:
         if token is None:
             _registrar(self.banco, None, None, None, "nao_autenticado")
             resposta = JSONResponse({"erro": "nao_autenticado", "mensagem": "Envie Authorization: Bearer <token>."}, status_code=401,
-                                    headers={"WWW-Authenticate": 'Bearer realm="gabi-brain"'})
+                                    headers={"WWW-Authenticate": 'Bearer realm="gabi-finance"'})
             return await resposta(scope, receive, send)
         marca = _token.set(token)
         try:
@@ -253,12 +253,12 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None):
 
 
 def fabrica():
-    """uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8081 ; GABI_BANCO, GABI_MCP_HOSTS (separados por vírgula)."""
-    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
+    """uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8082 ; GABI_BANCO, GABI_MCP_HOSTS (separados por vírgula)."""
+    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-finance/gabi.db"))
     con = conectar(banco)
     try:
         migrar(con, MIGRACOES)
     finally:
         con.close()
-    hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8081,localhost:8081").split(",") if h.strip()]
+    hosts = [h.strip() for h in os.environ.get("GABI_MCP_HOSTS", "127.0.0.1:8082,localhost:8082").split(",") if h.strip()]
     return criar_mcp(banco, hosts)

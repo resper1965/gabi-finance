@@ -1,24 +1,24 @@
 [Unit]
-Description=gabi.brain API (socket Unix; exposta só pelo tailscale serve)
+Description=gabi-finance API (socket Unix; exposta só pelo tailscale serve)
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
-OnFailure=gabi-brain-falha@%n.service
+OnFailure=gabi-finance-falha@%n.service
 
 [Service]
 Type=simple
-User=gabibrain
-Group=gabibrain
-WorkingDirectory=/opt/gabi-brain
-Environment=GABI_BANCO=/var/lib/gabi-brain/gabi.db
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
 # Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
-Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi.tail985643.ts.net,https://gabi-brain.tail985643.ts.net
-# Paperless e Nibo vivem no serviço gabi-brain-fontes (esta unidade não tem rede nem tokens).
-Environment=GABI_FONTES_SOCKET=/run/gabi-brain-fontes/fontes.sock
+Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-finance.tail985643.ts.net
+# O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
+Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
 # Socket em pasta 0700 do serviço: nenhum outro processo da VPS alcança a API (e não pode forjar a identidade).
 # --no-proxy-headers: nunca confiar em X-Forwarded-For (o tailscale serve o envia e o uvicorn trocaria a origem).
-ExecStart=/opt/gabi-brain/venv/bin/uvicorn --factory gabi.api:fabrica --uds /run/gabi-brain/api.sock --no-proxy-headers
-RuntimeDirectory=gabi-brain
+ExecStart=/opt/gabi-finance/venv/bin/uvicorn --factory gabi.api:fabrica --uds /run/gabi-finance/api.sock --no-proxy-headers
+RuntimeDirectory=gabi-finance
 RuntimeDirectoryMode=0700
 UMask=0077
 Restart=on-failure
@@ -34,7 +34,7 @@ ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any
 CapabilityBoundingSet=
-ReadWritePaths=/var/lib/gabi-brain
+ReadWritePaths=/var/lib/gabi-finance
 MemoryMax=1G
 
 [Install]

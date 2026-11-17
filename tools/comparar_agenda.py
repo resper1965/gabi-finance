@@ -1,4 +1,4 @@
-"""Compara a agenda de compromissos do gabi.brain com a do gabi-financeiro (critério de corte da virada, G21).
+"""Compara a agenda de compromissos do gabi-finance com a do gabi-financeiro (critério de corte da virada, G21).
 Somente leitura dos dois lados. Divergência vira ajuste de cadastro, não de código.
 Uso: python -m tools.comparar_agenda [--mes AAAA-MM] [--banco ...] [--financeiro /var/lib/gabi-fin/compromissos.json]"""
 import json
@@ -67,7 +67,7 @@ def main(banco: Path, arquivo: Path, mes: str) -> int:
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     ap.add_argument("--financeiro", default="/var/lib/gabi-fin/compromissos.json")
     ap.add_argument("--mes", default=date.today().strftime("%Y-%m"))
     a = ap.parse_args()

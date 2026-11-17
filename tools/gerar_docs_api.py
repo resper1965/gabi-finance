@@ -20,7 +20,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
     with tempfile.TemporaryDirectory() as tmp:
         banco = banco or Path(tmp) / "doc.db"
         app = criar_app(banco)
-        mcp = criar_mcp(banco, hosts=["127.0.0.1:8081"])
+        mcp = criar_mcp(banco, hosts=["127.0.0.1:8082"])
         openapi = app.openapi()  # o OpenAPI enumera também os routers incluídos (app.routes não)
         rotas = []
         for caminho, ops in openapi["paths"].items():
@@ -30,7 +30,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
                     rotas.append((caminho, metodo.upper(), texto[0].strip() if texto else ""))
         rotas.sort()
         ferramentas = asyncio.run(mcp.servidor.list_tools())
-        linhas = ["# API do gabi.brain (gerado do código; não editar à mão)", "", FORMATO, "",
+        linhas = ["# API do gabi-finance (gerado do código; não editar à mão)", "", FORMATO, "",
                   "## REST (`/api/...`, só por `tailscale serve`; nível `boss` salvo indicação)", "",
                   "| Método | Rota | O que faz |", "|---|---|---|"]
         linhas += [f"| {m} | `{p}` | {d} |" for p, m, d in rotas]

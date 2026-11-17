@@ -1,10 +1,10 @@
 [Unit]
-Description=gabi.brain notas fiscais (NFS-e) do Nibo, todo dia às 06:40 (Brasília), depois da rodada de extratos das 06h
+Description=gabi-finance notas fiscais (NFS-e) do Nibo, todo dia às 06:40 (Brasília), depois da rodada de extratos das 06h
 
 [Timer]
 OnCalendar=*-*-* 06:40:00 America/Sao_Paulo
 Persistent=true
-Unit=gabi-brain-notas.service
+Unit=gabi-finance-notas.service
 
 [Install]
 WantedBy=timers.target
