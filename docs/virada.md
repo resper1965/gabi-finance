@@ -88,9 +88,9 @@ bash deploy/instalar.sh --confirmo-backup-exportado
 ```bash
 id gabifinance gabifinance-fontes                       # os dois usuários existem
 ls -l /opt/gabi-finance /etc/gabi-finance               # código e pasta de segredos (vazia)
-ls /opt/gabi-finance/migrations | tail -1               # 0092_limpar_herdados.sql
+ls /opt/gabi-finance/migrations | grep -c '^0092_limpar_herdados.sql$'   # 1
 systemctl list-unit-files 'gabi-finance-*' --no-pager   # "disabled" para as que têm [Install]; "static" para as oneshot sem [Install] e o falha@
-systemctl list-unit-files 'gabi-finance-*' --no-pager | grep -c enabled   # 0
+systemctl list-unit-files 'gabi-finance-*' --no-pager | awk '$2=="enabled"' | wc -l   # 0 ("disabled" contém "enabled": não use grep)
 systemctl is-active gabi-finance-api                    # "inactive"
 ss -ltn | grep -E ':8082' || echo "8082 livre"          # o MCP do brain segue na 8081; a 8082 ainda livre
 ```
