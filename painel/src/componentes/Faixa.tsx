@@ -41,13 +41,13 @@ export function Faixa({ dadosAte, desatualizado, fonte, proximaRodada, fontes = 
           ? <span>{desatualizado ? "Dados desatualizados · até" : "dados até"} <b className="mono">{formatarDadosAte(dadosAte)}</b></span>
           : <span>sem dados conferidos ainda</span>}
       </span>
-      {dadosAte && (desatualizado ? <Etiqueta tipo="conferir" texto="a conferir" /> : <Etiqueta tipo="ok" texto="rodada conferida" />)}
+      {dadosAte && (desatualizado ? <Etiqueta tipo="conferir" texto="a conferir" /> : <Etiqueta tipo="ok" texto={`conferida ${formatarDadosAte(dadosAte)}`} />)}
       {desatualizado && fonte && <span className="faixa-item"><b>{fonte} parou</b></span>}
       {fontes.length > 0 && <>
         <span className="faixa-sep faixa-fontes" aria-hidden="true" />
         <span className="faixa-item faixa-fontes"><span>fontes: {fontes.map((f, i) => <span key={f.nome}>{i ? ", " : ""}<span className="mono">{f.nome}</span>{f.estado !== "ok" ? ` (${f.estado})` : ""}</span>)}</span></span>
       </>}
-      {proximaRodada && <span className="faixa-item"><Clock size={13} strokeWidth={1.8} aria-hidden="true" />próxima rodada às {formatarHora(proximaRodada)}</span>}
+      {proximaRodada && <span className="faixa-item faixa-proxima"><Clock size={13} strokeWidth={1.8} aria-hidden="true" />próxima rodada às {formatarHora(proximaRodada)}</span>}
     </div>
   );
   return slot ? createPortal(faixa, slot) : faixa;

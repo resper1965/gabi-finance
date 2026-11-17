@@ -333,8 +333,9 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
   .achados td:first-child { grid-row: 1; grid-column: 1; }
   .achados td.achado-texto { grid-row: 1; grid-column: 2; }
   .achados td.achado-valor { grid-row: 1; grid-column: 3; font-size: var(--t1); }
-  .achados td.achado-estado { grid-row: 2; grid-column: 2 / 4; }
-  .achados td.achado-acao { grid-row: 3; grid-column: 2 / 4; text-align: left; }
+  .achados td.achado-estado { grid-row: 2; grid-column: 2; align-self: center; }
+  .achados td.achado-acao { grid-row: 2; grid-column: 3; text-align: right; }
+  .achados td.achado-acao .btn { min-height: 24px; padding: 0 2px; }
   .achados td:empty { display: none; }
 }
 
@@ -435,7 +436,7 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
 .conclusao-resto { color: var(--tinta-2); }
 .pendencias > li { gap: 6px; }
 @media (max-width: 1180px) {
-  .resumo { grid-template-columns: minmax(0, 1fr); grid-template-areas: "conc" "lat" "ach" "banc"; }
+  .resumo { grid-template-columns: minmax(0, 1fr); grid-template-areas: "conc" "ach" "lat" "banc"; }
 }
 .app[data-celular="true"] .conclusao { font-size: var(--t3); }
 .form-linha { display: flex; gap: 12px 14px; flex-wrap: wrap; align-items: flex-end; }
@@ -516,7 +517,23 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
 .codigo { margin: 0; padding: 10px 12px; background: var(--folha); border: 1px solid var(--regra); white-space: pre-wrap; word-break: break-all; user-select: all; font: 400 var(--t-1)/1.55 var(--mono); color: var(--tinta); }
 .grafico { max-width: 920px; }
 .linha-meta .mono { white-space: nowrap; }
-.app[data-celular="true"] .faixa-fontes { display: none; }
+.app[data-celular="true"] .faixa-fontes, .app[data-celular="true"] .faixa-proxima { display: none; }
+.app[data-celular="true"] .faixa { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
 .app[data-celular="true"] .linha-item { grid-template-columns: minmax(0, 1fr); }
 .app[data-celular="true"] .linha-acoes { justify-content: space-between; }
 .app[data-celular="true"] .linha-acoes .linha-valor { margin-right: auto; }
+.ev-fontes { display: flex; flex-direction: column; gap: 6px; }
+.ev-fonte { display: flex; flex-direction: column; }
+.linha-saldo { max-width: 920px; }
+.linha-saldo .grafico { max-width: none; }
+.grafico text.eixo { font-family: var(--sans); font-size: 11px; font-variant-numeric: tabular-nums; fill: var(--tinta-2); }
+.grafico-rotulo { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 0; line-height: 20px; padding: 1px 5px; white-space: nowrap; background: var(--papel); border-radius: 1px; font: 600 12px/18px var(--sans); color: var(--tinta); font-variant-numeric: tabular-nums; }
+.grafico-rotulo .ev-cod { vertical-align: 0; }
+.atestado { margin-top: 10px; font-size: var(--t-1); color: var(--tinta-2); max-width: 75ch; }
+.seg-sm .seg-opt { min-height: 26px; padding: 0 9px; font-size: var(--t-1); }
+.grafico-rotulo-titulo { font-weight: 500; color: var(--tinta-2); }
+.grafico-marcas { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--t-1); color: var(--tinta-2); }
+.grafico-marcas li { display: flex; align-items: center; gap: 8px; }
+.grafico-marcas strong { color: var(--tinta); font-weight: 650; }
+.grafico-marca { width: 9px; height: 9px; flex: none; border: 2px solid var(--tinta); border-radius: 50%; }
+.grafico-marca[data-principal] { border-color: var(--acento); }

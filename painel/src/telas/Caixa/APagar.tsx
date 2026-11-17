@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, Plus } from "lucide-react";
-import { Etiqueta, type TipoEtiqueta } from "../../componentes/Etiqueta";
+import { Etiqueta } from "../../componentes/Etiqueta";
 import { Evidencia } from "../../componentes/Evidencia";
 import { formatarDadosAte } from "../../componentes/Faixa";
 import { Painel } from "../../componentes/Painel";
@@ -9,6 +9,7 @@ import { Vazio } from "../../componentes/Estados";
 import { api } from "../../lib/api";
 import { dataCurta, mesCurto, num } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 import { DespesaForm, type DespesaAlvo, type ModoDespesa } from "./DespesaForm";
 
@@ -47,10 +48,11 @@ function Rodadas() {
 }
 
 /** grupo → título, explicação, carimbo do grupo */
-const GRUPOS: [keyof Grupos, string, string, [TipoEtiqueta, string] | null][] = [
-  ["atrasadas", "Atrasadas", "já venceram", ["erro", "atrasado"]], ["hoje", "Vencem hoje", "pague hoje", ["erro", "vence hoje"]],
-  ["proximas", "Próximos 7 dias", "até a próxima semana", null], ["adiante", "Mais adiante", "depois disso", null],
-  ["a_conferir", "A conferir", "valor ou documento incerto", ["conferir", "a conferir"]], ["debito_automatico", "Débito automático", "só aviso: o banco debita sozinho", null],
+/** grupo → título, explicação e código estável do total (o Resumo cita AP-01 + AP-02 + AP-03) */
+const GRUPOS: [keyof Grupos, string, string, string][] = [
+  ["atrasadas", "Atrasadas", "já venceram", "AP-01"], ["hoje", "Vencem hoje", "pague hoje", "AP-02"],
+  ["proximas", "Próximos 7 dias", "até a próxima semana", "AP-03"], ["adiante", "Mais adiante", "depois disso", "AP-04"],
+  ["a_conferir", "A conferir", "valor ou documento incerto", "AP-05"], ["debito_automatico", "Débito automático", "só aviso: o banco debita sozinho", "AP-06"],
 ];
 const FORMA: Record<string, string> = { pix: "Pix", boleto: "boleto", debito_automatico: "débito automático", fatura: "fatura do cartão", "": "" };
 
@@ -92,7 +94,8 @@ function Linha({ g, b, paga, recarregar }: { g: keyof Grupos; b: Item; paga: (i:
         <span className="linha-meta">
           <span className="mono" style={{ color: g === "atrasadas" ? "var(--carimbo-vermelho)" : undefined }}>vence {dataCurta(b.vencimento_util)}</span>
           {FORMA[b.forma] && <span>{FORMA[b.forma]}</span>}
-          {g === "atrasadas" && <Etiqueta tipo="erro" texto={`${b.dias_atraso} ${b.dias_atraso === 1 ? "dia" : "dias"} de atraso`} />}
+          {g === "atrasadas" && <Etiqueta tipo="erro" texto={`atrasada · ${b.dias_atraso} ${b.dias_atraso === 1 ? "dia" : "dias"}`} />}
+          {g === "hoje" && <Etiqueta tipo="erro" texto="vence hoje" />}
           {g === "debito_automatico" && <Etiqueta tipo="parado" texto="débito automático · só aviso" />}
           {g === "a_conferir" && b.motivo && <span>{b.motivo}</span>}
         </span>
@@ -151,14 +154,14 @@ export function APagar() {
             </div>
             {nova && <div className="folha"><DespesaForm modo="nova" aoCancelar={() => setNova(false)} aoSalvar={() => { setNova(false); leitura.recarregar(); }} /></div>}
             {vazio && <Vazio frase="Nenhum compromisso no mês. Cadastre as despesas em Cadastros › Despesas." />}
-            {visiveis.map(([g, titulo, sub, carimbo], k) => {
+            {visiveis.map(([g, titulo, sub, codigo]) => {
               const total = d[g].reduce((s, i) => s + num(i.valor), 0);
               return (
                 <section key={g} data-grupo={g} className="secao" aria-label={titulo}>
                   <div className="secao-cab">
-                    <span className="fila" style={{ gap: 10 }}><h2>{titulo}</h2>{carimbo && <Etiqueta tipo={carimbo[0]} texto={carimbo[1]} />}<span className="secao-nota">{sub} · {d[g].length}</span></span>
+                    <span className="fila" style={{ gap: 10 }}><h2>{titulo}</h2><span className="secao-nota">{sub} · {d[g].length}</span></span>
                     <span className="linha-valor">
-                      <Evidencia codigo={`E-${String(k + 1).padStart(2, "0")}`} rotulo={`Total: ${titulo.toLowerCase()}`} fonte="open-finance" base={`soma de ${d[g].length} ${d[g].length === 1 ? "compromisso" : "compromissos"} da planilha`}
+                      <Evidencia codigo={codigo} rotulo={`Total: ${titulo.toLowerCase()}`} fontes={[FONTE.planilha(), FONTE.extrato("conferência dos pagamentos")]} base={`soma de ${d[g].length} ${d[g].length === 1 ? "compromisso" : "compromissos"} da planilha`}
                         estado={g === "a_conferir" ? "a_conferir" : undefined}><Valor valor={total} /></Evidencia>
                     </span>
                   </div>
