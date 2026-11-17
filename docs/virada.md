@@ -123,13 +123,14 @@ Pare **só os timers** de dinheiro do brain (uma rodada em andamento termina soz
 
 ```bash
 systemctl stop gabi-brain-extratos.timer gabi-brain-saldos.timer gabi-brain-notas.timer
-while systemctl is-active --quiet gabi-brain-extratos.service gabi-brain-saldos.service gabi-brain-notas.service; do
+ocupado() { for u in extratos saldos notas; do case "$(systemctl show -p ActiveState --value gabi-brain-$u.service)" in inactive|failed) ;; *) return 0;; esac; done; return 1; }
+while ocupado; do
   echo "$(date +%T) rodada do brain em andamento; esperando..."; sleep 30
 done
 systemctl is-active gabi-brain-extratos.timer gabi-brain-saldos.timer gabi-brain-notas.timer gabi-brain-extratos.service gabi-brain-saldos.service gabi-brain-notas.service
 ```
 
-**Verificação:** a última linha imprime seis `inactive`.
+**Verificação:** a última linha imprime seis `inactive` (um `.service` pode aparecer `failed`: me avise antes de seguir; `activating` = rodada ainda em andamento: rode o laço de novo).
 
 Confira que o banco do brain está na versão que o gabi-finance espera (as migrações 0090 a 0092 do finance partem dela):
 

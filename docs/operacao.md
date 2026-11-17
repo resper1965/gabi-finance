@@ -28,6 +28,8 @@ Ver o que está agendado: `systemctl list-timers 'gabi-finance-*'`.
 
 O Hermes não tem timer aqui. O resumo das 07:05 é um agendamento do próprio Hermes que chama a ferramenta `resumo_manha` do MCP (até 5 linhas; a primeira vem como "Dados desatualizados" quando for o caso). O vigia semanal (segunda, 09h) é outro agendamento do Hermes (ver [`runbook.md`](runbook.md#vigia)).
 
+Depois da primeira segunda-feira após a virada, confira se o vigia do brain não acusou 'fontes de dinheiro paradas' (se acusar, o gateway do Hermes não repassa o .env para os scripts: ponha GABI_SEM_FINANCEIRO=1 direto no ambiente da rotina).
+
 ## Logs
 
 | Quer ver | Comando |
