@@ -38,8 +38,10 @@ export function useEvidencia(info: InfoEvidencia) {
   const posicionar = () => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
-    const acima = r.bottom + 240 > window.innerHeight && r.top > 260;
-    setPos({ top: acima ? r.top - 8 : r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 308)), acima });
+    const altura = 150 + info.fontes.length * 64 + (info.cita ? 20 : 0); // estimativa: o quadro cresce uma linha por fonte
+    const acima = r.bottom + 8 + altura > window.innerHeight && r.top - 8 - altura > 0;
+    const top = acima ? r.top - 8 : Math.max(8, Math.min(r.bottom + 8, window.innerHeight - altura - 8));
+    setPos({ top, left: Math.max(8, Math.min(r.left, window.innerWidth - 348)), acima });
   };
   const abrir = (atraso = 0) => {
     clearTimeout(timer.current);

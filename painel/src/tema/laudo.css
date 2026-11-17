@@ -269,7 +269,7 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
 }
 .ev[data-estado="a_conferir"] .ev-cod { background: var(--ambar); border-color: var(--ambar-borda); color: var(--ambar-tinta); }
 .ev-pop {
-  position: fixed; z-index: 60; width: 300px; max-width: calc(100vw - 16px);
+  position: fixed; z-index: 60; width: 340px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto;
   padding: 12px 14px; background: var(--folha); color: var(--tinta);
   border: 1px solid var(--regra-forte); border-radius: var(--raio); box-shadow: var(--sombra-camada);
   font: 400 var(--t-1)/1.45 var(--sans); pointer-events: none;
