@@ -1,0 +1,151 @@
+/* gabi.finance: tokens do painel. Fonte única de cor, tipo, espaço e movimento.
+   Claro (padrão, luz de escritório) e escuro. Texto com contraste mínimo de 4,5:1 nos dois. */
+
+:root,
+[data-theme="light"] {
+  /* chão e folhas */
+  --papel: oklch(0.962 0.008 170);        /* fundo: papel frio cinza-esverdeado */
+  --folha: oklch(0.985 0.004 170);        /* superfície de tabela, campo e painel */
+  --papel-2: oklch(0.935 0.011 170);      /* linha em foco, cabeçalho de tabela, hover */
+  --papel-3: oklch(0.905 0.013 170);      /* trilho de barra, esqueleto */
+
+  /* tinta */
+  --tinta: oklch(0.27 0.032 255);         /* azul-grafite */
+  --tinta-2: oklch(0.44 0.026 250);       /* texto secundário */
+  --tinta-3: oklch(0.51 0.02 245);        /* rótulo de eixo, legenda */
+  --regra: oklch(0.87 0.012 190);         /* regra fina de 1px */
+  --regra-forte: oklch(0.7 0.016 220);    /* regra de cabeçalho, borda de campo */
+
+  /* ação e seleção */
+  --acento: oklch(0.45 0.115 255);
+  --acento-hover: oklch(0.39 0.11 255);
+  --sobre-acento: oklch(0.985 0.004 170);
+  --acento-fundo: oklch(0.92 0.03 250);
+  --foco: oklch(0.52 0.15 255);
+  --selecao: oklch(0.85 0.06 250);
+
+  /* trilho grafite-toner (igual nos dois temas, um pouco mais fundo no escuro) */
+  --trilho: oklch(0.235 0.014 240);
+  --trilho-2: oklch(0.29 0.016 240);
+  --trilho-regra: oklch(0.35 0.016 240);
+  --trilho-tinta: oklch(0.9 0.01 200);
+  --trilho-tinta-2: oklch(0.74 0.014 220);
+
+  /* carimbos de estado */
+  --carimbo-vermelho: oklch(0.5 0.17 25);
+  --carimbo-vermelho-fundo: oklch(0.95 0.025 25);
+  --carimbo-verde: oklch(0.46 0.1 155);
+  --carimbo-verde-fundo: oklch(0.95 0.03 155);
+  --carimbo-azul: oklch(0.46 0.13 255);
+  --carimbo-azul-fundo: oklch(0.94 0.03 250);
+  --carimbo-grafite: oklch(0.42 0.025 250);
+
+  /* etiqueta de evidência: só para o que está a conferir */
+  --ambar: oklch(0.88 0.12 90);
+  --ambar-borda: oklch(0.6 0.12 75);
+  --ambar-tinta: oklch(0.33 0.07 65);
+  --ambar-fundo: oklch(0.955 0.045 92);
+
+  /* séries de gráfico */
+  --serie-1: oklch(0.34 0.06 255);
+  --serie-2: oklch(0.47 0.08 252);
+  --serie-3: oklch(0.6 0.075 248);
+  --serie-4: oklch(0.73 0.055 245);
+  --serie-5: oklch(0.83 0.035 240);
+  --entrada-1: oklch(0.52 0.09 165);
+  --entrada-2: oklch(0.74 0.07 165);
+  --emp-ness: oklch(0.58 0.12 230);
+  --emp-ionic: oklch(0.53 0.13 305);
+  --emp-bekaa: oklch(0.66 0.13 65);
+  --emp-pessoal: oklch(0.55 0.015 240);
+
+  --sombra-camada: 0 6px 20px -6px oklch(0.25 0.03 250 / 0.28), 0 1px 3px oklch(0.25 0.03 250 / 0.12);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --papel: oklch(0.205 0.01 225);
+  --folha: oklch(0.235 0.011 225);
+  --papel-2: oklch(0.27 0.012 225);
+  --papel-3: oklch(0.31 0.013 225);
+
+  --tinta: oklch(0.925 0.01 200);
+  --tinta-2: oklch(0.77 0.015 210);
+  --tinta-3: oklch(0.7 0.016 215);
+  --regra: oklch(0.33 0.012 225);
+  --regra-forte: oklch(0.46 0.014 225);
+
+  --acento: oklch(0.77 0.1 248);
+  --acento-hover: oklch(0.84 0.08 248);
+  --sobre-acento: oklch(0.2 0.03 250);
+  --acento-fundo: oklch(0.31 0.045 250);
+  --foco: oklch(0.78 0.12 248);
+  --selecao: oklch(0.4 0.08 250);
+
+  --trilho: oklch(0.155 0.01 235);
+  --trilho-2: oklch(0.215 0.012 235);
+  --trilho-regra: oklch(0.28 0.012 235);
+  --trilho-tinta: oklch(0.9 0.01 200);
+  --trilho-tinta-2: oklch(0.72 0.014 220);
+
+  --carimbo-vermelho: oklch(0.74 0.14 25);
+  --carimbo-vermelho-fundo: oklch(0.29 0.06 25);
+  --carimbo-verde: oklch(0.78 0.12 155);
+  --carimbo-verde-fundo: oklch(0.28 0.045 155);
+  --carimbo-azul: oklch(0.77 0.1 250);
+  --carimbo-azul-fundo: oklch(0.29 0.05 250);
+  --carimbo-grafite: oklch(0.78 0.015 215);
+
+  --ambar: oklch(0.8 0.13 85);
+  --ambar-borda: oklch(0.72 0.12 80);
+  --ambar-tinta: oklch(0.24 0.05 70);
+  --ambar-fundo: oklch(0.3 0.05 80);
+
+  --serie-1: oklch(0.88 0.04 245);
+  --serie-2: oklch(0.76 0.08 248);
+  --serie-3: oklch(0.63 0.09 250);
+  --serie-4: oklch(0.5 0.08 252);
+  --serie-5: oklch(0.4 0.06 252);
+  --entrada-1: oklch(0.72 0.09 165);
+  --entrada-2: oklch(0.52 0.07 165);
+  --emp-ness: oklch(0.72 0.11 230);
+  --emp-ionic: oklch(0.72 0.12 305);
+  --emp-bekaa: oklch(0.79 0.12 70);
+  --emp-pessoal: oklch(0.66 0.015 240);
+
+  --sombra-camada: 0 8px 24px -6px oklch(0 0 0 / 0.55), 0 1px 3px oklch(0 0 0 / 0.4);
+
+  color-scheme: dark;
+}
+
+:root {
+  --sans: "Public Sans Variable", "Public Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* escala fixa, razão ~1,14 */
+  --t-2: 0.6875rem;  /* 11: código de item, carimbo */
+  --t-1: 0.75rem;    /* 12: legenda, metadado */
+  --t0: 0.875rem;    /* 14: corpo */
+  --t1: 1rem;        /* 16: valor de linha, título de item */
+  --t2: 1.125rem;    /* 18: título de seção */
+  --t3: 1.3125rem;   /* 21: valor de achado */
+  --t4: 1.5rem;      /* 24: pergunta da tela (H1) */
+  --t5: 1.75rem;     /* 28: conclusão */
+
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 24px;
+  --e6: 32px;
+  --e7: 48px;
+
+  --raio: 2px;
+  --trilho-largura: 232px;
+  --trilho-mini: 60px;
+
+  --dur: 180ms;
+  --dur-curta: 150ms;
+  --curva: cubic-bezier(0.16, 1, 0.3, 1);
+}
