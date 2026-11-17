@@ -55,10 +55,10 @@ test("mudar daqui em diante manda valor_padrao e a_partir", async () => {
   expect(achar(chamadas, "PATCH", "/api/v1/despesas/escola")!.corpo).toEqual({ valor_padrao: "2350.50", a_partir: "2026-11" });
 });
 
-test("+ despesa avulsa manda tipo e data", async () => {
+test("Nova despesa avulsa manda tipo e data", async () => {
   const chamadas = apiFalsa();
   montar();
-  fireEvent.click(await screen.findByRole("button", { name: "+ despesa" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Nova despesa" }));
   fireEvent.click(screen.getByRole("radio", { name: "Avulsa" }));
   fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Conserto do portão" } });
   fireEvent.change(screen.getByLabelText("Valor"), { target: { value: "800" } });

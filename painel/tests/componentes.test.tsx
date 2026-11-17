@@ -5,6 +5,8 @@ import { Etiqueta, type TipoEtiqueta } from "../src/componentes/Etiqueta";
 import { Shell } from "../src/componentes/Shell";
 import { OcultarContext } from "../src/lib/ocultar";
 import { GRUPOS } from "../src/navegacao";
+import { Evidencia } from "../src/componentes/Evidencia";
+import { ProvContext } from "../src/lib/proveniencia";
 
 function celular(ativo: boolean) {
   window.matchMedia = ((q: string) => ({
@@ -41,15 +43,42 @@ test("Faixa mostra a próxima rodada no horário de Brasília", () => {
   expect(screen.getByRole("status")).toHaveTextContent("próxima rodada às 15h");
 });
 
-test("Etiqueta sempre tem simbolo e texto", () => {
-  const tipos: TipoEtiqueta[] = ["erro", "conferir", "ok", "atencao", "parado", "regra", "banco", "paperless", "ajuste"];
+test("Etiqueta é um carimbo: sempre com texto e tipo, a cor nunca sozinha", () => {
+  const tipos: TipoEtiqueta[] = ["erro", "conferir", "ok", "nota", "atencao", "parado", "regra", "banco", "paperless", "ajuste"];
   for (const t of tipos) {
     const { container, unmount } = render(<Etiqueta tipo={t} texto="texto" />);
-    const glifo = container.querySelector("[aria-hidden]")!.textContent!;
-    expect(glifo.length).toBeGreaterThan(0);
-    expect(container).toHaveTextContent("texto");
+    const carimbo = container.querySelector(".carimbo")!;
+    expect(carimbo).toHaveAttribute("data-tipo", t);
+    expect(carimbo).toHaveTextContent("texto");
     unmount();
   }
+});
+
+const prov = { dadosAte: "2026-10-08T17:00:00Z", desatualizado: false, proximaRodada: "2026-10-09T09:00:00Z",
+  fontes: [{ nome: "open-finance", estado: "ok", ultima: "2026-10-08T17:00:00Z" }, { nome: "notas-nibo", estado: "parado", ultima: null }] };
+
+test("Evidencia mostra a cadeia de proveniência ao focar e fecha com Esc", () => {
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-01" rotulo="Saldo do caixa único" fonte="open-finance" base="2 contas"><Valor valor="10.00" /></Evidencia></ProvContext.Provider>);
+  const gatilho = screen.getByRole("button", { name: /R\$ 10,00.*E-01/ });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+  fireEvent.focus(gatilho);
+  const quadro = screen.getByRole("tooltip");
+  expect(gatilho).toHaveAttribute("aria-describedby", quadro.id);
+  expect(quadro).toHaveTextContent("Saldo do caixa único");
+  expect(quadro).toHaveTextContent("open-finance");
+  expect(quadro).toHaveTextContent("dados até 08/10 14:00");
+  expect(quadro).toHaveTextContent("conferido");
+  fireEvent.keyDown(gatilho, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
+test("Evidencia de fonte parada fica a conferir", () => {
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-03" rotulo="A receber" fonte="notas-nibo"><Valor valor="5.00" /></Evidencia></ProvContext.Provider>);
+  const gatilho = screen.getByRole("button", { name: /E-03/ });
+  expect(gatilho).toHaveAttribute("data-estado", "a_conferir");
+  fireEvent.click(gatilho);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("a conferir");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("notas-nibo parou");
 });
 
 test("Shell lembra a ultima aba", () => {
