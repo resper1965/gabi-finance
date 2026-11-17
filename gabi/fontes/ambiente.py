@@ -1,27 +1,17 @@
 """Fábricas das fontes externas a partir do ambiente (R5: só variáveis de ambiente; nenhuma credencial no código ou no banco).
-`None` = fonte não configurada (a API responde 503 `fonte_indisponivel`). Consome: fontes.nibo_escrita, fontes.paperless."""
+`None` = fonte não configurada (a API responde 503 `fonte_indisponivel`). Consome: fontes.nibo_escrita, fontes.ponte."""
 import os
 
 from gabi.fontes.nibo_escrita import NiboEscrita
-from gabi.fontes.paperless import Paperless
-from gabi.fontes.graph_ness import ErroGraphNess
-from gabi.fontes.ponte import Ponte, PonteAgenda, PonteEmail, PonteGraph, PonteModelo
+from gabi.fontes.ponte import Ponte
 
 
 def fontes_do_ambiente() -> dict:
-    """Com GABI_FONTES_SOCKET (API e MCP, sem rede) as fontes vivem no serviço gabi-brain-fontes; sem ela, direto do ambiente."""
+    """Com GABI_FONTES_SOCKET (API e MCP, sem rede) as fontes vivem no serviço de fontes; sem ela, direto do ambiente."""
     caminho = os.environ.get("GABI_FONTES_SOCKET")
     if caminho:
         ok = lambda p: p if p.configurada() else None  # noqa: E731
-        fontes = {n: (lambda n=n: ok(Ponte(caminho, n))) for n in ("nibo", "paperless", "google_contatos")}
-        fontes["google_agenda"] = lambda: ok(PonteAgenda(caminho))  # validação da forma da resposta; só leitura
-        fontes["modelo"] = lambda: PonteModelo(caminho) if Ponte(caminho, "openrouter").configurada() else None  # reprocessar exames pela API
-        fontes["graph_ness"] = lambda: ok(PonteGraph(caminho))  # Graph da ness: só leitura
-        fontes["google_email"] = lambda: ok(PonteEmail(caminho))  # leitura e lixeira; sem enviar nem apagar
-        fontes["graph_email"] = lambda: ok(PonteEmail(caminho, "graph_ness", ErroGraphNess))  # correio da ness: leitura e Itens Excluídos
-        return fontes
+        return {"nibo": lambda: ok(Ponte(caminho, "nibo"))}
     return {
         "nibo": lambda: NiboEscrita(os.environ["NIBO_TOKEN"]) if os.environ.get("NIBO_TOKEN") else None,
-        "paperless": lambda: Paperless(os.environ["PAPERLESS_URL"], os.environ["PAPERLESS_TOKEN"])
-        if os.environ.get("PAPERLESS_URL") and os.environ.get("PAPERLESS_TOKEN") else None,
     }

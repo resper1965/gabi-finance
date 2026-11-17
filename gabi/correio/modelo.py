@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 from gabi.db import conectar
 from gabi.dinheiro.modelo import Orcamento
-from gabi.fontes.ponte import Ponte, PonteModelo
 
 BRT = ZoneInfo("America/Sao_Paulo")
 
@@ -157,6 +156,8 @@ def cliente_da_ponte(socket_path: str | None):
     if not socket_path:
         return None
     try:
+        # módulo que sai no corte (Task 5): PonteModelo já não existe em fontes.ponte; import tardio só para não quebrar quem importa este módulo
+        from gabi.fontes.ponte import Ponte, PonteModelo
         return PonteModelo(socket_path) if Ponte(socket_path, "openrouter").configurada() else None
     except Exception:  # noqa: BLE001 - ponte fora do ar nunca aborta a rodada
         return None
