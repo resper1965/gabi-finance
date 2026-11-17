@@ -1,5 +1,5 @@
 """Confere o que o Hermes prometeu gravar: acha respostas com "anotado", "registrei", "salvei" etc. sem chamada
-bem-sucedida a ferramenta de escrita do brain no mesmo turno (ADR-028).
+bem-sucedida a ferramenta de escrita do gabi-finance (ou, até a etapa 3, do gabi_brain) no mesmo turno (ADR-028).
 Uso: python -m tools.auditar_promessas [--desde YYYY-MM-DD] [--state-db ~/.hermes/state.db]. Somente leitura (?mode=ro).
 Imprime uma linha por caso (data, sessão, 80 primeiros caracteres) e a contagem; sai 0. Sem timer: o assistente roda."""
 import argparse
@@ -9,11 +9,13 @@ import re
 import sqlite3
 from pathlib import Path
 
-ESCRITAS = ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "familia_propor_documento",
-            "decisao_responder", "classificar_lancamento", "regras_sugerir", "propor_evento", "propor_teams",
-            "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo",
+ESCRITAS = ("decisao_responder", "classificar_lancamento", "regras_sugerir", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
             "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso")
-FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_brain__" + n for n in ESCRITAS}
+# Até a etapa 3 o Hermes também escreve pelo servidor `gabi_brain` (família, e-mail, propostas; e, no histórico de antes da virada, o
+# próprio dinheiro): escrita ok por lá também cumpre a promessa. Lista = a de escrita do brain (tools/auditar_promessas.py de lá).
+ESCRITAS_BRAIN = ESCRITAS + ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "familia_propor_documento",
+                             "propor_evento", "propor_teams", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo")
+FERRAMENTAS_DE_ESCRITA = {"mcp__gabi_finance__" + n for n in ESCRITAS} | {"mcp__gabi_brain__" + n for n in ESCRITAS_BRAIN}
 PROMESSA = re.compile(r"\b(anotad|anotei|registr|salv|guard|atualiz)\w*", re.I)
 PADRAO_STATE_DB = Path.home() / ".hermes" / "state.db"
 _EMBRULHO = re.compile(r"^\s*<untrusted_tool_result[^>]*>(.*?)(?:</untrusted_tool_result>\s*)?$", re.S)
@@ -29,7 +31,7 @@ def _json(texto: str):
 
 def falhou(content: str | None) -> bool:
     """Resultado de ferramenta com chave `erro` no topo. O Hermes guarda o resultado embrulhado em
-    `<untrusted_tool_result …>` + aviso + `{"result": "<json do brain em texto>"}`: tira o embrulho, decodifica as duas
+    `<untrusted_tool_result …>` + aviso + `{"result": "<json do gabi-finance em texto>"}`: tira o embrulho, decodifica as duas
     camadas e olha a chave. Se não decodificar (truncado), cai na regex só da chave (`"erro":`, com ou sem barras)."""
     texto = content or ""
     m = _EMBRULHO.match(texto)
@@ -71,7 +73,7 @@ def promessas_sem_escrita(state_db: Path, desde: dt.datetime) -> list[dict]:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Respostas do Hermes que prometeram gravar sem escrita no brain.")
+    ap = argparse.ArgumentParser(description="Respostas do Hermes que prometeram gravar sem escrita no gabi-finance.")
     ap.add_argument("--desde", help="YYYY-MM-DD (padrão: 7 dias atrás)")
     ap.add_argument("--state-db", type=Path, default=PADRAO_STATE_DB)
     a = ap.parse_args(argv)

@@ -68,35 +68,6 @@ def _para_quem_aplicar(con, p: dict) -> None:
                 (p["pessoa_id"], p["estabelecimento"]))
 
 
-def _canal_email_validar(con, p: dict) -> None:
-    """Só o e-mail de um contato do Google cujo telefone é um canal whatsapp DESTA pessoa (nada de endereço livre), já normalizado."""
-    from gabi.cobrar.cadastro import dados
-    from gabi.correio.regras import endereco
-    from gabi.contatos.telefone import normalizar_telefone
-    if not isinstance(p, dict) or set(p) != {"pessoa_id", "email"} or not isinstance(p.get("pessoa_id"), str) or not isinstance(p.get("email"), str):
-        raise ErroDecisao("opcoes_invalidas", "adicionar_canal_email exige pessoa_id e email, só esses dois")
-    if endereco(p["email"]) != p["email"]:
-        raise ErroDecisao("opcoes_invalidas", "email deve ser um endereço válido em minúsculas")
-    pessoa = con.execute("select id, dados from pessoa where id=? and excluido_em is null", (p["pessoa_id"],)).fetchone()
-    if pessoa is None:
-        raise ErroDecisao("opcoes_invalidas", "pessoa_id não existe")
-    numeros = {normalizar_telefone(c[9:]) or c[9:] for c in dados(pessoa).get("canais") or [] if isinstance(c, str) and c.startswith("whatsapp:")}
-    if not any(con.execute("select 1 from contato_google_email where email=? and telefone=?", (p["email"], n)).fetchone() for n in numeros):
-        raise ErroDecisao("opcoes_invalidas", "esse e-mail não é de um contato com o telefone desta pessoa")
-
-
-def _canal_email_aplicar(con, p: dict) -> None:
-    """Acrescenta `email:<endereço>` a `canais` (sem repetir) e não toca em mais nada de `pessoa.dados`."""
-    from gabi.cobrar.cadastro import dados
-    _canal_email_validar(con, p)  # a resposta pode vir dias depois: o contato pode ter mudado
-    pessoa = con.execute("select dados from pessoa where id=?", (p["pessoa_id"],)).fetchone()
-    d = dados(pessoa)
-    canais = d.get("canais") if isinstance(d.get("canais"), list) else []
-    if not any(isinstance(c, str) and c.lower() == f"email:{p['email']}" for c in canais):
-        d["canais"] = canais + [f"email:{p['email']}"]
-        con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), p["pessoa_id"]))
-
-
 # efeito -> (validação na criação, aplicação na resposta). Acrescentar um efeito é mudança de código revisada, nunca dado.
 EFEITOS = {
     "registrar_nota": (lambda con, p: None, lambda con, p: None),
@@ -104,7 +75,6 @@ EFEITOS = {
     "marcar_conta_sim": (_conta_existe, _conta_estado("sim")),
     "criar_compromisso": (_criar_compromisso_validar, _criar_compromisso_aplicar),
     "atribuir_para_quem": (_para_quem_validar, _para_quem_aplicar),
-    "adicionar_canal_email": (_canal_email_validar, _canal_email_aplicar),
 }
 
 

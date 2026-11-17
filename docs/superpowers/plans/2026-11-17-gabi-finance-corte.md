@@ -19,7 +19,7 @@
 - Ponte só com `mcpai` e `nibo` (F5). Regra R5 mantida: só o serviço de fontes tem rede e token.
 - MCP: nome do servidor `gabi_finance`; nomes das ferramentas financeiras **iguais** aos de hoje (F8).
 - Avisos no Telegram só financeiros; resumo da manhã só com o bloco dinheiro (F7).
-- Nomes na VPS (F9): usuário `gabifinance`; `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, `/run/gabi-finance/`; units `gabi-finance-*`; host `gabi-finance.tail985643.ts.net`.
+- Nomes na VPS (F9): usuário `gabifinance`; `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, `/run/gabi-finance/`; units `gabi-finance-*`; host `gabi-brain.tail985643.ts.net` com painel na 8444 e MCP externo na 8445 (revisão final; antes era `gabi-finance.tail985643.ts.net`).
 - Testes: `/tmp/gabi-venv/bin/python -m pytest -q` (venv com `requirements.lock` + pytest + ruff; criar com `python3 -m venv /tmp/gabi-venv && /tmp/gabi-venv/bin/pip install -q -r requirements.lock pytest ruff` se faltar). Lint: `/tmp/gabi-venv/bin/ruff check gabi tools tests`. Painel: `cd painel && npm ci && npx vitest run && npm run build`.
 - Falha pré-existente conhecida: `tests/test_obter_token_teams.py::test_main_gravar_falhando_nao_mostra_o_token` (roda como root). Sai junto com o módulo Teams na Task 5.
 - Commits terminam com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -107,9 +107,13 @@
 - [ ] **Step 2:** Renomear e ajustar. `instalar.sh` cria o usuário `gabifinance`, pastas e venv, instala as units **desligadas** (a virada liga).
 - [ ] **Step 3:** Suíte + ruff. Commit `chore(deploy): nomes e caminhos do gabi-finance`.
 
-### Task 9: Documentação e roteiro da virada
+### Task 9: Documentação farta e roteiro da virada
 
-**Files:** `docs/ARQUITETURA.md`, `docs/STATUS.md` (zerado para o gabi-finance), `docs/runbook.md` (seções que ficam), Create `docs/virada.md`.
+> Pedido do Ricardo (17/11): **documentar fartamente o repositório do gabi-finance no GitHub.** Quem abrir o repositório sem contexto precisa entender o que é, como funciona, como instalar, operar, recuperar e evoluir.
+
+**Files:** `README.md` (novo, completo), `docs/ARQUITETURA.md` (reescrito para o gabi-finance, com diagrama), `docs/STATUS.md` (zerado), `docs/runbook.md` (só seções financeiras, revisadas), Create `docs/virada.md`, Create `docs/modulos.md` (um verbete por módulo de `gabi/`: o que faz, tabelas que lê/escreve, quem chama, testes), Create `docs/dados.md` (cada tabela que fica: colunas, significado, quem escreve), Create `docs/mcp.md` (cada ferramenta: escopo, parâmetros, resposta, exemplo), Create `docs/painel.md` (cada tela: o que mostra, ações, rota da API), Create `docs/operacao.md` (timers e horários, logs, backup e restauração, rotação de tokens mcp.ai/Nibo, falhas comuns e como resolver), Create `docs/adr/039-corte-gabi-finance.md` (por que nasceu, o que saiu, decisões F1–F9), `docs/corte/` mantido como registro.
+
+- [ ] **Step 0:** Escrever os documentos acima a partir do código final (não do plano). `README.md` abre com: o que é, de onde veio (gabi-brain → etapa 2 do esper-brain), arquitetura em 1 parágrafo + diagrama, instalação, operação, links para cada doc. Teste `tests/test_docs.py`: todo módulo de `gabi/`, toda ferramenta MCP e toda tabela do banco migrado aparece em `docs/modulos.md`, `docs/mcp.md` e `docs/dados.md` respectivamente (falha se faltar).
 
 - [ ] **Step 1:** `docs/virada.md` com os comandos exatos dos 7 passos do spec e da volta, para o Ricardo rodar como root, incluindo: `sqlite3 .backup` (ou `python3 -c` com a API de backup) do banco do `gabi-brain` com os timers parados; aplicar migrações com o `migrar` do `gabi-finance`; mover tokens para `/etc/gabi-finance/` com permissão 600; `tailscale serve` do novo host; a conferência (script `tools/conferir_virada.py` que imprime saldos por conta, total A pagar do mês e projeção 30 dias de **um** banco — rodar contra os dois e comparar com `diff`); `config.yaml` do Hermes com backup e troca do servidor MCP; `/new`.
 - [ ] **Step 2:** `tools/conferir_virada.py` + teste (banco de teste → saída determinística). Suíte + ruff.

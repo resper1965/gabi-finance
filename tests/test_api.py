@@ -48,7 +48,7 @@ def test_saude_exige_boss_e_traz_estado(cli, banco):
     d = cli.get("/api/saude", headers=BOSS).json()
     assert d["db"] == "ok" and d["schema"] == len(list(MIGRACOES.glob("*.sql")))
     assert d["ultima_rodada"]["fonte"] == "teste" and d["ultima_rodada"]["status"] == "ok"
-    assert d["tabelas"]["acesso"] == 2 and "memoria" in d["tabelas"]
+    assert d["tabelas"]["acesso"] == 2 and "rodada" in d["tabelas"] and "memoria" not in d["tabelas"]
 
 
 def test_seguranca_lista_acessos_e_contagens(cli, banco):

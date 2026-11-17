@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi-finance exportação semanal (domingo 04:00, horário de Brasília)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-finance-exportacao.service
+
+[Install]
+WantedBy=timers.target

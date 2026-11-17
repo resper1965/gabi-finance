@@ -1,0 +1,36 @@
+[Unit]
+Description=gabi-finance fontes (Nibo): único serviço com rede e token da ponte; a API e o MCP falam com ele por socket Unix
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+OnFailure=gabi-finance-falha@%n.service
+
+[Service]
+Type=simple
+User=gabifinance-fontes
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+# NIBO_TOKEN fica aqui, colocado por você (R5). O mcp.ai NÃO passa pela ponte: as units de extratos e saldos leem MCPAI_KEY do próprio arquivo (mcpai.env).
+# '-' = sobe sem o arquivo e a fonte responde "não configurada".
+EnvironmentFile=-/etc/gabi-finance/nibo.env
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.fontes.servico --socket /run/gabi-finance-fontes/fontes.sock
+# Pasta e socket para o dono e o grupo gabifinance (a API e o MCP); mais ninguém na VPS alcança a ponte.
+RuntimeDirectory=gabi-finance-fontes
+RuntimeDirectoryMode=0750
+UMask=0007
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

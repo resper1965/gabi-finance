@@ -23,10 +23,10 @@ test("boleto de fatura mostra por que nao e gasto e deixa marcar como gasto", as
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "PATCH" && JSON.stringify(c.corpo) === JSON.stringify({ gasto: true }))).toBe(true));
 });
 
-test("marcacao sua pode voltar para o brain decidir", async () => {
+test("marcacao sua pode voltar para a Gabi decidir", async () => {
   const chamadas = apiFalsa({ "lancamentos-pendentes": comLanc({ valor: true, origem: "voce" }) });
   montar(<Lancamentos />);
-  fireEvent.click(await screen.findByRole("button", { name: "deixar o brain decidir" }));
+  fireEvent.click(await screen.findByRole("button", { name: "deixar a Gabi decidir" }));
   await waitFor(() => expect(chamadas.some((c) => c.metodo === "PATCH" && JSON.stringify(c.corpo) === JSON.stringify({ gasto: null }))).toBe(true));
 });
 

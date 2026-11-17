@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Shell, type Contagens } from "./componentes/Shell";
 import { Seletores } from "./componentes/Seletores";
 import { Vazio } from "./componentes/Estados";
@@ -18,29 +18,18 @@ import { Assinaturas } from "./telas/Gastos/Assinaturas";
 import { Regras } from "./telas/Regras";
 import { Cadastros } from "./telas/Cadastros";
 import { CadastrosDespesas } from "./telas/CadastrosDespesas";
-import { Atividades } from "./telas/Atividades";
-import { Projetos } from "./telas/Projetos";
-import { CadastrosDocumentos } from "./telas/CadastrosDocumentos";
-import { CadastrosContatos } from "./telas/CadastrosContatos";
-import { CadastrosAgenda } from "./telas/CadastrosAgenda";
-import { CadastrosTeams } from "./telas/CadastrosTeams";
-import { CadastrosCorreio } from "./telas/CadastrosCorreio";
-import { Prioridades } from "./telas/Trabalho/Prioridades";
-import { Hoje } from "./telas/Trabalho/Hoje";
-import { Agenda } from "./telas/Trabalho/Agenda";
-import { Envios } from "./telas/Envios";
 import { Avisos } from "./componentes/Avisos";
 import { Projecao } from "./telas/Caixa/Projecao";
-import { Qualidade } from "./telas/Gabi/Qualidade";
 import { Agentes } from "./telas/Gabi/Agentes";
 import { NotasAReceber } from "./telas/Cobrar/NotasAReceber";
 import { AReceber } from "./telas/Cobrar/AReceber";
 
 export const TELAS: Record<string, () => ReactNode> = {
-  visao: Resumo, projecao: Projecao, areceber: AReceber, notas: NotasAReceber, fluxo: Semanas, contas: APagar,
+  contas: APagar, projecao: Projecao, fluxo: Semanas, visao: Resumo,
   lanc: Lancamentos, destino: ParaOndeVai, cartao: Cartoes, parcelas: Parcelas, assin: Assinaturas,
-  regras: Regras, cadastros: Cadastros, despesas: CadastrosDespesas, documentos: CadastrosDocumentos, listacontatos: CadastrosContatos, agendas: CadastrosAgenda, teams: CadastrosTeams, correio: CadastrosCorreio, prioridades: Prioridades,
-  qualidade: Qualidade, agentes: Agentes, hoje: Hoje, agenda: Agenda, envios: Envios, atividades: Atividades, projetos: Projetos,
+  areceber: AReceber, notas: NotasAReceber,
+  regras: Regras, cadastros: Cadastros, despesas: CadastrosDespesas,
+  agentes: Agentes,
 };
 
 function tela(area: Area, aba: string) {
@@ -48,16 +37,7 @@ function tela(area: Area, aba: string) {
   return T ? <Limite key={aba} arquivo={`${area.rotulo} / ${aba}`}><T /></Limite> : <Vazio frase={`${area.rotulo} ainda não foi construída nesta fase.`} />;
 }
 
-/** Links antigos (o brain mandava #cadastros/familia antes da aba Documentos) abrem a aba nova; roda antes do Shell ler a URL. */
-const LINKS_ANTIGOS: Record<string, string> = { "#cadastros/familia": "#cadastros/documentos" };
-function redirecionarLinkAntigo(): null {
-  const novo = LINKS_ANTIGOS[window.location.hash];
-  if (novo) window.history.replaceState(null, "", novo);
-  return null;
-}
-
 export function App() {
-  useState(redirecionarLinkAntigo);
   const leituraContagens = useApi<Contagens>("/api/v1/contagens");
   const contagens = leituraContagens.env?.dados;
   return (

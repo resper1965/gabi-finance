@@ -1,0 +1,42 @@
+[Unit]
+Description=gabi-finance API (socket Unix; exposta só pelo tailscale serve)
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+OnFailure=gabi-finance-falha@%n.service
+
+[Service]
+Type=simple
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
+# Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
+# A origem inclui a porta (a API compara exatamente): o painel do finance é servido na 8444 do host do brain.
+Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8444
+# O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
+Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
+# Socket em pasta 0700 do serviço: nenhum outro processo da VPS alcança a API (e não pode forjar a identidade).
+# --no-proxy-headers: nunca confiar em X-Forwarded-For (o tailscale serve o envia e o uvicorn trocaria a origem).
+ExecStart=/opt/gabi-finance/venv/bin/uvicorn --factory gabi.api:fabrica --uds /run/gabi-finance/api.sock --no-proxy-headers
+RuntimeDirectory=gabi-finance
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-finance
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

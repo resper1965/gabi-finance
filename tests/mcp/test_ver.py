@@ -1,4 +1,4 @@
-"""Ferramentas de leitura da Onda 2 (`contatos_buscar`). Consome: gabi.mcp.ferramentas_ver, fixtures de tests/mcp/test_servidor.py."""
+"""Ferramentas de leitura da Onda 2 (a receber, avisos, regras, decisões, empresas). Consome: gabi.mcp.ferramentas_ver, fixtures de tests/mcp/test_servidor.py."""
 import datetime as dt
 import json
 
@@ -7,14 +7,11 @@ from starlette.testclient import TestClient
 
 from gabi.db import conectar
 from gabi.mcp import ferramentas_ver
-from gabi.mcp.ferramentas_ver import a_receber, avisos, buscar_contatos, decisoes, empresas, regras, teams_sem_resposta
-from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, ESCOPOS_HERMES, FONTES_DA_FERRAMENTA, criar_mcp, ferramentas_do_token
+from gabi.mcp.ferramentas_ver import a_receber, avisos, decisoes, empresas, regras
+from gabi.mcp.servidor import ESCOPOS_FERRAMENTAS, FONTES_DA_FERRAMENTA, criar_mcp
 from gabi.rotas.avisos import descrever
 from gabi.mcp.tokens import emitir
 from tests.mcp.test_servidor import AGORA, HOST, banco, chamar  # noqa: F401  (fixtures e helpers)
-
-TEL = "+5511993290462"
-
 
 @pytest.fixture
 def con(banco):
@@ -23,116 +20,7 @@ def con(banco):
     c.close()
 
 
-def _google(con, conta, tel, nome):
-    con.execute("insert into contato_google(conta, telefone, nome) values (?,?,?)", (conta, tel, nome))
-
-
-def test_buscar_sem_acento(con):
-    _google(con, "a@x", TEL, "João Silva")
-    assert buscar_contatos(con, "joao")["itens"][0]["nome"] == "João Silva"
-
-
-def test_buscar_por_pedaco_do_telefone(con):
-    _google(con, "a@x", TEL, "João Silva")
-    itens = buscar_contatos(con, "99329")["itens"]
-    assert len(itens) == 1 and itens[0]["telefones"] == [TEL]
-
-
-def test_junta_google_e_graph(con):
-    _google(con, "a@x", TEL, "Ana")
-    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness','g1','Ana N','(11) 99329-0462',?,'mobile','2026-10-01')", (TEL,))
-    itens = buscar_contatos(con, "ana")["itens"]
-    assert len(itens) == 1 and itens[0]["nome"] == "Ana" and itens[0]["origens"] == ["google:a@x", "graph:r@ness"]
-
-
-def test_nome_do_graph_quando_google_sem_nome(con):
-    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness','g1','Beto','x',?,'mobile','2026-10-01')", (TEL,))
-    assert buscar_contatos(con, "beto")["itens"][0]["nome"] == "Beto"
-
-
-def test_conta_do_graph_nas_tabelas_google_sai_como_graph(con):
-    _google(con, "r@ness", TEL, "Ana Ness")  # a sincronização grava a ness também em contato_google
-    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness','g1','Ana N','x',?,'mobile','2026-10-01')", (TEL,))
-    assert buscar_contatos(con, "ana")["itens"][0]["origens"] == ["graph:r@ness"]
-
-
-def test_nome_da_conta_destino_vence(con):
-    con.execute("insert into parametro(chave, valor) values ('escuta.conta_destino_contatos', '\"z@gmail\"')")
-    _google(con, "a@outra", TEL, "Nome Outra")
-    _google(con, "z@gmail", TEL, "Nome Gmail")
-    assert buscar_contatos(con, "nome")["itens"][0]["nome"] == "Nome Gmail"
-
-
-def test_graph_sem_telefone_nao_junta(con):
-    for gid, nome in (("g1", "Ana Um"), ("g2", "Ana Dois")):
-        con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('r@ness',?,?,'x',null,'mobile','2026-10-01')", (gid, nome))
-    assert buscar_contatos(con, "ana")["itens"] == []
-
-
-def test_email_entra_no_item(con):
-    _google(con, "a@x", TEL, "Ana")
-    con.execute("insert into contato_google_email(conta, email, telefone, nome) values ('a@x','ana@y.com',?,'Ana')", (TEL,))
-    itens = buscar_contatos(con, "ana@y")["itens"]
-    assert len(itens) == 1 and itens[0]["emails"] == ["ana@y.com"] and itens[0]["telefones"] == [TEL]
-
-
-def test_email_sem_telefone_vira_item_proprio(con):
-    con.execute("insert into contato_google_email(conta, email, telefone, nome) values ('a@x','zé@y.com','','Zé')")
-    it = buscar_contatos(con, "zé@y")["itens"][0]
-    assert it["telefones"] == [] and it["emails"] == ["zé@y.com"] and it["origens"] == ["google:a@x"]
-
-
-def test_texto_curto(con):
-    with pytest.raises(ValueError):
-        buscar_contatos(con, " a ")
-
-
-def test_sem_texto_da_o_resumo_das_duas_fontes(con):
-    _google(con, "a@x", "+5511993290461", "Bia")
-    _google(con, "a@x", TEL, "Ana")
-    con.execute("insert into contato_graph(conta, graph_id, nome, telefone_original, telefone, campo, atualizado_em) values ('n@ness','g1','Ana N','(11) 99329-0462',?,'mobile','2026-10-01')", (TEL,))
-    r = buscar_contatos(con, "", limite=1)
-    assert r["total"] == 2 and r["por_origem"] == {"google:a@x": 2, "graph:n@ness": 1}
-    assert [i["nome"] for i in r["itens"]] == ["Ana"]
-    assert buscar_contatos(con, "  ")["total"] == 2
-
-
-def test_limite(con):
-    for i, t in enumerate(("+5511993290461", "+5511993290462", "+5511993290463")):
-        _google(con, "a@x", t, f"Maria {i}")
-    assert len(buscar_contatos(con, "maria", limite=2)["itens"]) == 2
-    with pytest.raises(ValueError):
-        buscar_contatos(con, "maria", limite=0)
-
-
-def test_digitos_curtos_nao_casam_telefone(con):
-    _google(con, "a@x", TEL, "João")
-    assert buscar_contatos(con, "932")["itens"] == []
-
-
-def test_contatos_buscar_sem_escopo(banco):
-    c = conectar(banco)
-    tok = emitir(c, "x", ["fin"])
-    c.close()
-    with TestClient(criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA), base_url=f"http://{HOST}") as cli:
-        assert chamar(cli, tok, "contatos_buscar", texto="ana")["erro"] == "sem_escopo"
-
-
-def test_contatos_buscar_pelo_servidor(banco):
-    c = conectar(banco)
-    _google(c, "a@x", TEL, "João Silva")
-    tok = emitir(c, "x", ["contatos"])
-    c.close()
-    with TestClient(criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA), base_url=f"http://{HOST}") as cli:
-        assert chamar(cli, tok, "contatos_buscar", texto="joao")["dados"]["itens"][0]["nome"] == "João Silva"
-
-
-def test_escopo_hermes():
-    assert "contatos" in ESCOPOS_HERMES and ESCOPOS_FERRAMENTAS["contatos_buscar"] == "contatos"
-    assert "contatos_buscar" in ferramentas_do_token(ESCOPOS_HERMES)
-
-
-# ---------------- as seis leituras restantes ----------------
+# ---------------- as leituras financeiras ----------------
 def _nota(con, venc="2026-10-20", valor=123456):
     con.execute("insert into nota_fiscal(id, numero, emissao, status, valor_bruto_centavos, tomador_nome, vencimento, valor_liquido_centavos, importado_em, atualizado_em) "
                 "values ('n1','1','2026-10-01','autorizada',?, 'FGV', ?, ?, '2026-10-01','2026-10-01')", (valor, venc, valor))
@@ -180,39 +68,11 @@ def test_avisos_abertos(con):
     assert r["itens"][1]["entregue"] is True and (r["itens"][1]["titulo"], r["itens"][1]["texto"]) == descrever("banco_desatualizado", p)
 
 
-def test_avisos_convite_agenda_traz_evento_id_e_conta_e_os_outros_nao(con):
-    p = {"chave": "serie:S1", "evento_id": 42, "conta": "resper@ness.com.br", "serie_id": "S1", "titulo": "Comitê", "inicio_utc": "2026-10-09T18:00:00+00:00",
-         "texto": "Comitê · sex 15h–16h · de Ana · sem conflito"}
-    con.execute("insert into aviso(tipo, payload, criado_em) values ('convite_agenda',?,'2026-10-08T12:00:00+00:00')", (json.dumps(p),))
-    con.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada',?,'2026-10-08T11:00:00+00:00')", (json.dumps({"motivo": "caiu", "evento_id": 7}),))
-    conv, outro = avisos(con, AGORA)["itens"]
-    assert conv["tipo"] == "convite_agenda" and conv["evento_id"] == 42 and conv["conta"] == "resper@ness.com.br"
-    assert set(conv) == {"id", "tipo", "titulo", "texto", "criado_em", "entregue", "entregue_em", "evento_id", "conta"}
-    assert set(outro) == {"id", "tipo", "titulo", "texto", "criado_em", "entregue", "entregue_em"}
-
-
 def test_aviso_ilegivel_vira_titulo_do_tipo(con):
     con.execute("insert into aviso(tipo, payload, criado_em) values ('rodada_parada','{nao é json','2026-10-08T12:00:00+00:00')")
     assert avisos(con, AGORA)["itens"][0]["titulo"] == "rodada_parada" and avisos(con, AGORA)["itens"][0]["texto"] == ""
     with pytest.raises(ValueError):
         avisos(con, AGORA, dias=91)
-
-
-def _teams(con, conta, chat, para_mim, resposta=None, aviso=None, nome="Ana"):
-    con.execute("insert into teams_conversa(conta, chat_id, tipo, de_nome, ultima_para_mim_em, minha_ultima_resposta_em, ultimo_aviso_em) values (?,?,?,?,?,?,?)",
-                (conta, chat, "um_a_um", nome, para_mim, resposta, aviso))
-
-
-def test_teams_pendentes(con):
-    con.execute("insert into teams_fonte(conta, estado) values ('r@ness','sim')")
-    con.execute("insert into teams_fonte(conta, estado) values ('o@x','nao')")
-    _teams(con, "r@ness", "a", "2026-10-08T10:00:00-03:00")
-    _teams(con, "r@ness", "b", "2026-10-08T10:00:00-03:00", resposta="2026-10-08T11:00:00-03:00")
-    _teams(con, "o@x", "c", "2026-10-08T10:00:00-03:00")
-    _teams(con, "r@ness", "d", "2026-10-08T12:00:00-03:00", aviso="2026-10-08T14:00:00-03:00", nome="Bia")
-    r = teams_sem_resposta(con, AGORA)["itens"]
-    assert [(i["de_nome"], i["avisado"], i["passou_do_prazo"], i["horas_uteis"]) for i in r] == [("Ana", False, True, 5.0), ("Bia", True, True, 3.0)]
-    assert not {"texto", "mensagem", "corpo"} & set(r[0])
 
 
 def test_regras_listar_filtra(con):
@@ -244,14 +104,11 @@ def test_empresas_listar(con):
 
 def test_ver_pelo_servidor_e_fontes(banco):
     c = conectar(banco)
-    c.execute("insert into teams_fonte(conta, estado) values ('r@ness','sim')")
-    _teams(c, "r@ness", "a", "2026-10-08T10:00:00-03:00")
     _nota(c)
     tok = emitir(c, "x", ["trabalho", "fin"])
     c.close()
     with TestClient(criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA), base_url=f"http://{HOST}") as cli:
-        r = chamar(cli, tok, "teams_pendentes")
-        assert r["dados"]["itens"][0]["de_nome"] == "Ana" and r["desatualizado"] is False
+        assert chamar(cli, tok, "avisos_abertos")["desatualizado"] is False
         assert chamar(cli, tok, "financeiro_a_receber", mes="2026-10")["dados"]["notas"][0]["esperado"] == "1234.56"
         assert chamar(cli, tok, "financeiro_a_receber", mes="2026-13")["erro"] == "requisicao_invalida"
     assert FONTES_DA_FERRAMENTA["financeiro_a_receber"] is None

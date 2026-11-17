@@ -97,7 +97,7 @@ def main(argv: list[str]) -> int:
         print("uso: python -m gabi.dinheiro.rodar extratos [--sincronizar] | saldos")
         return 2
     from gabi.fontes.mcpai import Cliente, ErroMcpAi
-    raiz = Path(os.environ.get("GABI_DADOS", "/var/lib/gabi-brain"))
+    raiz = Path(os.environ.get("GABI_DADOS", "/var/lib/gabi-finance"))
     con = conectar(Path(os.environ.get("GABI_BANCO", raiz / "gabi.db")))
     migrar(con, Path(__file__).resolve().parent.parent.parent / "migrations")
     agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo"))

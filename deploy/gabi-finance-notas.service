@@ -1,0 +1,28 @@
+[Unit]
+Description=gabi-finance notas fiscais (NFS-e) do Nibo: histórico, PDF/XML e vencimentos (só leitura)
+After=gabi-finance-fontes.service
+OnFailure=gabi-finance-falha@%n.service
+Wants=gabi-finance-fontes.service
+
+[Service]
+Type=oneshot
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
+# O Nibo é lido pela ponte do serviço de fontes (único com rede e token, R5): este processo não tem token nem rede.
+Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
+ExecStart=/opt/gabi-finance/venv/bin/python -m gabi.cobrar.notas_importar
+TimeoutStartSec=900
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-finance

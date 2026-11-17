@@ -14,7 +14,6 @@ from gabi.dinheiro import contas_pagar as cp, despesas, gastador
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
 from gabi.identidade import Identidade, exigir
-from gabi.mascara import mascarar_documento
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, erro
 
 router = APIRouter(prefix="/api/v1/cadastros", dependencies=[Depends(exigir("boss"))])
@@ -461,23 +460,6 @@ def equivalencia_excluir(origem: str, request: Request, ident: Identidade = Depe
             _auditar(con, ident.login, "categorias/equivalencias", origem, "excluída")
         _tx(con, fazer)
         return {"origem_pluggy": origem, "excluido": True}
-    finally:
-        con.close()
-
-
-# ---------------- CPF/documento (só mascarado; consulta auditada) ----------------
-@router.get("/pessoas/{pid}/cpf")
-def pessoa_cpf(pid: str, request: Request, ident: Identidade = Depends(exigir("boss"))):
-    """Documentos da pessoa (sempre mascarados); a consulta fica auditada."""
-    con = _con(request)
-    try:
-        p = con.execute("select dados from pessoa where id=? and excluido_em is null", (pid,)).fetchone()
-        if p is None:
-            raise erro(404, "nao_encontrado", f"pessoa {pid} não existe")
-        docs = [{"tipo": d["tipo"].upper(), "numero": mascarar_documento(d["numero"])} for d in con.execute(
-            "select tipo, numero from familia_documento where pessoa_id=? and excluido_em is null order by id", (pid,))]
-        _tx(con, lambda: _auditar(con, ident.login, "pessoas", pid, "documento consultado"))
-        return envelope(con, {"id": pid, "documentos": docs, "mascarado": True}, agora=_agora(request))
     finally:
         con.close()
 

@@ -15,21 +15,14 @@ AGORA = dt.datetime(2026, 10, 8, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
                  "financeiro_recorrentes", "financeiro_previsao", "despesas_por_empresa", "fechamento_dia"}
-NOVAS_FASE2 = {"documentos_buscar", "documentos_baixar", "documentos_texto", "classificar_lancamento", "regras_sugerir"}
-NOVAS_FASE3 = {"agenda_listar", "email_ler", "email_listar", "resumo_manha"}  # só leitura do dia
+NOVAS_FASE2 = {"classificar_lancamento", "regras_sugerir"}
+NOVAS_FASE3 = {"resumo_manha", "olhar_a_frente"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
-NOVAS_ENVIOS = {"propor_evento", "propor_teams", "propor_resposta_convite"}  # só propõem; o envio sai do botão Enviar do painel
-NOVAS_FAMILIA = {"familia_listar", "familia_consultar", "familia_vencimentos", "familia_atualizar_contato", "familia_propor_documento",
-                 "documentos_consultar", "documentos_vencimentos", "bens_listar", "familia_registrar_pessoa", "familia_registrar_pet"}
-NOVAS_VER = {"contatos_buscar", "financeiro_a_receber", "avisos_abertos", "teams_pendentes", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
-NOVAS_AGIR = {"email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber",
-              "financeiro_marcar_gasto", "assinaturas_listar", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso"}  # Onda 3: escrita reversível a pedido do Ricardo no chat (lixeira recuperável, restaura no painel)
-NOVAS_PROJETOS = {"projeto_criar", "projeto_ligar", "projeto_listar", "projeto_ver", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_fatos", "anexo_recentes", "projeto_anexar"}  # ADR-034: projetos, depois do sim no chat
-NOVAS_ASSISTENTE = {"promessas_candidatas", "olhar_a_frente", "preparar_reuniao", "revisao_semana"}  # ADR-037: só leitura
-NOVAS_ATIVIDADES = {"atividade_criar", "atividade_listar", "atividade_concluir", "atividade_adiar", "atividade_cancelar"}  # ADR-033: to-do do Ricardo, criado direto a pedido no chat
+NOVAS_VER = {"financeiro_a_receber", "avisos_abertos", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
+NOVAS_AGIR = {"financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "financeiro_marcar_gasto", "assinaturas_listar", "assinatura_marcar",
+              "financeiro_indicar_gastador", "financeiro_marcar_reembolso"}  # Onda 3: escrita reversível a pedido do Ricardo no chat
 NOVAS_DESPESAS = {"despesas_listar", "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"}  # ADR-032: grava depois do sim do Ricardo no chat
-# contato grava direto a pedido do Ricardo (histórico e Desfazer no painel); documento só é proposto
-PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_ENVIOS | NOVAS_FAMILIA | NOVAS_VER | NOVAS_AGIR | NOVAS_DESPESAS | NOVAS_ATIVIDADES | NOVAS_PROJETOS | NOVAS_ASSISTENTE  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão/rascunho
+PERMITIDAS = LEITURA_FASE1 | NOVAS_FASE2 | NOVAS_FASE3 | NOVAS_DECISOES | NOVAS_VER | NOVAS_AGIR | NOVAS_DESPESAS  # nenhuma aprova, envia, paga ou apaga; as de proposta só criam sugestão pendente
 
 
 @pytest.fixture
@@ -63,7 +56,7 @@ def banco(tmp_path):
 @pytest.fixture
 def tokens(banco):
     c = conectar(banco)
-    t = {"fin": emitir(c, "hermes", ["fin"]), "docs": emitir(c, "so-docs", ["docs"])}
+    t = {"fin": emitir(c, "hermes", ["fin"]), "sem_fin": emitir(c, "so-propostas", ["propostas"])}
     c.close()
     return t
 
@@ -117,13 +110,9 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_76_ferramentas_da_simplificacao_dos_envios_da_familia_dos_documentos_da_lixeira_do_nao_gasto_do_gastador_do_reembolso_das_despesas_das_atividades_dos_projetos_do_assistente_e_do_linear():
-    assert len(ESCOPOS_FERRAMENTAS) == 76
-    assert sorted(ESCOPOS_FERRAMENTAS) == sorted(NOVAS_ASSISTENTE | NOVAS_PROJETOS | set(["agenda_financeira", "agenda_listar", "assinatura_marcar", "assinaturas_listar", "atividade_adiar", "atividade_cancelar", "atividade_concluir", "atividade_criar", "atividade_listar", "avisos_abertos", "bens_listar", "classificar_lancamento", "contatos_buscar", "decisao_responder", "decisoes_abertas", "decisoes_recentes",
-                                           "despesa_criar", "despesa_encerrar", "despesa_excluir", "despesa_mes", "despesa_mudar", "despesas_listar", "despesas_por_empresa", "documentos_baixar", "documentos_buscar", "documentos_consultar", "documentos_texto", "documentos_vencimentos", "email_ler", "email_listar", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "empresas_listar", "familia_atualizar_contato",
-                                           "familia_consultar", "familia_listar", "familia_propor_documento", "familia_registrar_pessoa", "familia_registrar_pet", "familia_vencimentos", "fechamento_dia",
-                                           "financeiro_a_receber", "financeiro_cancelar_a_receber", "financeiro_contas_a_pagar", "financeiro_indicar_gastador", "financeiro_lancamentos", "financeiro_marcar_gasto", "financeiro_marcar_reembolso", "financeiro_para_onde_vai", "financeiro_previsao",
-                                           "financeiro_recorrentes", "financeiro_registrar_a_receber", "financeiro_saldo", "propor_evento", "propor_resposta_convite", "propor_teams", "regras_listar", "regras_sugerir", "resumo_manha", "teams_pendentes"]))
+def test_sobram_exatamente_as_33_ferramentas_financeiras_do_corte():
+    assert len(ESCOPOS_FERRAMENTAS) == 33
+    assert sorted(ESCOPOS_FERRAMENTAS) == sorted(PERMITIDAS)
 
 
 def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
@@ -131,8 +120,8 @@ def test_lista_so_ferramentas_de_leitura_e_nenhuma_destrutiva(cli, tokens):
     assert nomes == PERMITIDAS
     proibidas = {"enviar", "apagar", "aprovar", "ligar", "excluir", "deletar", "remover", "transferir", "pagar", "criar", "atualizar"}
     for n in nomes:
-        if n in ("familia_atualizar_contato", "familia_registrar_pessoa", "familia_registrar_pet", "email_lixeira", "email_regra_lixo", "email_remover_regra_lixo", "financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador", "financeiro_marcar_reembolso",
-                 "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir", "atividade_criar", "projeto_criar", "projeto_ligar", "projeto_atualizar"):  # escrita reversível a pedido do Ricardo (contato com Desfazer no painel; Onda 3: lixeira recuperável, regra de lixo, a receber manual), nunca documento
+        if n in ("financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "financeiro_marcar_gasto", "assinatura_marcar", "financeiro_indicar_gastador",
+                 "financeiro_marcar_reembolso", "despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"):  # escrita reversível a pedido do Ricardo no chat
             continue
         palavras = set(n.replace("contas_a_pagar", "contas").split("_"))  # "contas a pagar" é consulta, não ação
         assert not (palavras & proibidas), n
@@ -144,7 +133,7 @@ def test_toda_ferramenta_tem_descricao_e_esquema(cli, tokens):
 
 
 def test_ferramenta_fora_do_escopo_devolve_sem_escopo_e_registra(cli, banco, tokens):
-    r = chamar(cli, tokens["docs"], "financeiro_saldo")
+    r = chamar(cli, tokens["sem_fin"], "financeiro_saldo")
     assert r["erro"] == "sem_escopo"
     l = conectar(banco).execute("select * from chamada_mcp where status='sem_escopo'").fetchone()
     assert (l["ferramenta"], l["escopo"], l["token_id"]) == ("financeiro_saldo", "fin", 2)
@@ -166,7 +155,7 @@ def test_despesas_por_empresa_usa_o_mes_corrente_e_formata_em_reais(cli, banco, 
     d = chamar(cli, tokens["fin"], "despesas_por_empresa")["dados"]
     assert d["mes"] == "2026-10" and d["empresas"] == [{"empresa_id": "ness", "empresa": "NESS", "total": "123.45",
                                                         "itens": [{"lancamento_id": d["empresas"][0]["itens"][0]["lancamento_id"], "data": "2026-10-02", "descricao": "HOTEL", "valor": "123.45"}]}]
-    assert chamar(cli, tokens["docs"], "despesas_por_empresa")["erro"] == "sem_escopo"
+    assert chamar(cli, tokens["sem_fin"], "despesas_por_empresa")["erro"] == "sem_escopo"
 
 
 def test_saldo_filtra_por_conta(cli, tokens):
@@ -285,7 +274,7 @@ def test_smoke_cliente_oficial_streamable_http(banco, tokens):
         assert nomes == PERMITIDAS
         assert saldo["dados"]["caixa_unico"] == "12345.60" and saldo["dados_ate"] == "2026-10-08T17:00:30Z"
         # o mesmo cliente com um token SEM o escopo recebe sem_escopo, não os dados
-        _, negado = asyncio.run(sessao(tokens["docs"]))
+        _, negado = asyncio.run(sessao(tokens["sem_fin"]))
         assert negado["erro"] == "sem_escopo"
     finally:
         servidor.should_exit = True
@@ -306,7 +295,7 @@ def _academia(banco):
 
 def test_analises_so_com_escopo_fin(tokens):
     from gabi.mcp.servidor import ferramentas_do_token
-    assert set(ANALISE) <= set(ferramentas_do_token(["fin"])) and not set(ANALISE) & set(ferramentas_do_token(["docs"]))
+    assert set(ANALISE) <= set(ferramentas_do_token(["fin"])) and not set(ANALISE) & set(ferramentas_do_token(["propostas"]))
 
 
 def test_recorrentes_devolve_a_serie(cli, banco, tokens):
@@ -343,11 +332,11 @@ def test_toda_ferramenta_declara_fontes():
     assert set(FONTES_DA_FERRAMENTA) == set(ESCOPOS_FERRAMENTAS)
 
 
-def test_familia_listar_sem_fontes(cli, banco):
+def test_ferramenta_sem_fontes_nao_marca_banco_antigo(cli, banco):
     c = conectar(banco)
-    tk = emitir(c, "fam", ["familia"])
+    tk = emitir(c, "fin2", ["fin"])
     c.execute("insert into parametro(chave, valor) values ('dinheiro.sync_banco', ?)", (json.dumps({"Itau": "2026-09-01T00:00:00Z"}),))
     c.commit()
     c.close()
-    r = chamar(cli, tk, "familia_listar")
+    r = chamar(cli, tk, "empresas_listar")
     assert r["desatualizado"] is False and r["fontes"] == [] and "bancos_antigos" not in r

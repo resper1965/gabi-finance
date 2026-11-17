@@ -1,5 +1,5 @@
 """Ferramentas MCP do canal de decisão (escopo `decisoes`): listar perguntas abertas e registrar a resposta do Ricardo.
-R1: a única escrita é gravar a escolha que ele deu (um número) numa pergunta que o brain mesmo criou; o efeito vem da lista fechada de gabi.decisoes
+R1: a única escrita é gravar a escolha que ele deu (um número) numa pergunta que a própria Gabi criou; o efeito vem da lista fechada de gabi.decisoes
 e não existe ferramenta para criar pergunta nem para escolher efeito pelo canal. Texto de terceiros nunca vira opção. Consome: decisoes."""
 from gabi import decisoes
 from gabi.mcp.ferramentas_prop import ErroFerramenta

@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi-finance avisos a cada 15 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=gabi-finance-avisos.service
+
+[Install]
+WantedBy=timers.target

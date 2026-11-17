@@ -1,0 +1,39 @@
+[Unit]
+Description=gabi-finance MCP (leitura; só 127.0.0.1:8082; exige token Bearer)
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+OnFailure=gabi-finance-falha@%n.service
+
+[Service]
+Type=simple
+User=gabifinance
+Group=gabifinance
+WorkingDirectory=/opt/gabi-finance
+Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
+# Hosts aceitos (anti DNS-rebinding). Para agentes externos na tailnet: tailscale serve --bg --https=8445 http://127.0.0.1:8082
+# (8443 é o MCP externo do brain; 8444 o painel do finance) e acrescente gabi-brain.tail985643.ts.net:8445 aqui por drop-in.
+Environment=GABI_MCP_HOSTS=127.0.0.1:8082,localhost:8082
+# O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
+Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
+ExecStart=/opt/gabi-finance/venv/bin/uvicorn --factory gabi.mcp.servidor:fabrica --host 127.0.0.1 --port 8082 --no-proxy-headers
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/gabi-finance
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

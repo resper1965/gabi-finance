@@ -50,7 +50,7 @@ def escrever_relatorio(r: dict, caminho: Path, hoje: dt.date) -> None:
 if __name__ == "__main__":
     from gabi.db import conectar
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     ap.add_argument("--saida", default=None)
     a = ap.parse_args()
     hoje = dt.datetime.now(BRT).date()

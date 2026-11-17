@@ -1,23 +1,23 @@
-"""Vigia semanal (script `no_agent` do cron do Hermes, deploy/hermes/scripts/vigia_semanal.py)."""
+"""Vigia semanal (script `no_agent` do cron do Hermes, deploy/hermes/scripts/vigia_semanal_finance.py)."""
 import importlib.util
 import sys
 from pathlib import Path
 
-CAMINHO = Path(__file__).resolve().parents[2] / "deploy" / "hermes" / "scripts" / "vigia_semanal.py"
-_spec = importlib.util.spec_from_file_location("vigia_semanal", CAMINHO)
+CAMINHO = Path(__file__).resolve().parents[2] / "deploy" / "hermes" / "scripts" / "vigia_semanal_finance.py"
+_spec = importlib.util.spec_from_file_location("vigia_semanal_finance", CAMINHO)
 vs = importlib.util.module_from_spec(_spec)
 _antes, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # sem __pycache__ em deploy/ (tests/test_deploy.py lê tudo como texto)
 _spec.loader.exec_module(vs)
 sys.dont_write_bytecode = _antes
 
-FALHAS = """gabi-brain-correio.service loaded failed failed gabi.brain correio
+FALHAS = """gabi-finance-saldos.service loaded failed failed gabi-finance saldos
 systemd-networkd-wait-online.service loaded failed failed Wait for Network
 hermes-gateway.service loaded failed failed Hermes
 """
 
 
-def test_units_falhando_so_do_brain_e_hermes():
-    assert vs.units_falhando(FALHAS) == ["gabi-brain-correio.service", "hermes-gateway.service"]
+def test_units_falhando_so_do_gabi_finance_e_hermes():
+    assert vs.units_falhando(FALHAS) == ["gabi-finance-saldos.service", "hermes-gateway.service"]
     assert vs.units_falhando("") == []
 
 
@@ -41,8 +41,8 @@ def test_promessas_le_a_contagem():
 
 def test_texto_tudo_ok_e_com_problemas():
     assert vs.texto([], [], 0) == "Vigia semanal: tudo ok (serviços no ar, dados em dia, 0 promessas sem escrita)."
-    t = vs.texto(["gabi-brain-correio.service"], ["agenda"], 2)
-    assert t.startswith("Vigia semanal:") and "gabi-brain-correio.service" in t and "agenda" in t and "2 promessas" in t
+    t = vs.texto(["gabi-finance-saldos.service"], ["notas-nibo"], 2)
+    assert t.startswith("Vigia semanal:") and "gabi-finance-saldos.service" in t and "notas-nibo" in t and "2 promessas" in t
     assert "não consegui" in vs.texto([], [], None)
 
 

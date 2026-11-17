@@ -66,7 +66,7 @@ def aplicar(con, arquivo: Path, quem: str) -> Resumo:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--arquivo", default=str(Path(__file__).resolve().parent.parent / "seeds" / "categorias-pessoais.csv"))
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
     a = ap.parse_args()
     resumo = aplicar(conectar(a.banco), Path(a.arquivo), "claude (a pedido do Ricardo: categorias pessoais)")
     print(f"categorias criadas={resumo.categorias_criadas} equivalencias criadas={resumo.equivalencias_criadas} conflitos={resumo.conflitos} nibo_nao_encontrados={resumo.nibo_nao_encontrados}")

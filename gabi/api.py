@@ -1,4 +1,4 @@
-"""API do gabi.brain (Fase 0): identidade, saúde, segurança e revogação. Toda chamada /api/* é registrada (R4)."""
+"""API do gabi-finance (Fase 0): identidade, saúde, segurança e revogação. Toda chamada /api/* é registrada (R4)."""
 import datetime as dt
 import logging
 import os
@@ -59,12 +59,12 @@ def _guarda_csrf(request: Request) -> JSONResponse | None:
 
 def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origens_confiaveis=(), fontes=None) -> FastAPI:
     """permite_tcp_local=False é o padrão de produção: só o socket Unix do serviço é origem confiável."""
-    app = FastAPI(title="gabi.brain", docs_url=None, redoc_url=None)
+    app = FastAPI(title="gabi-finance", docs_url=None, redoc_url=None)
     app.state.banco = Path(banco)
     app.state.permite_tcp_local = permite_tcp_local
     app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
     from gabi.fontes.ambiente import fontes_do_ambiente
-    app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábricas de Nibo/Paperless (injetáveis nos testes)
+    app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábrica do Nibo (injetável nos testes)
     app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)
@@ -164,39 +164,16 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_cadastros)
     from gabi.rotas.despesas import router as rotas_despesas
     app.include_router(rotas_despesas)
-    from gabi.rotas.atividades import router as rotas_atividades
-    app.include_router(rotas_atividades)
     from gabi.rotas.agentes import router as rotas_agentes
     app.include_router(rotas_agentes)
-    from gabi.rotas.projetos import router as rotas_projetos, router_anexos as rotas_anexos
-    app.include_router(rotas_projetos)
-    app.include_router(rotas_anexos)
     from gabi.rotas.contagens import router as rotas_contagens
     app.include_router(rotas_contagens)
     from gabi.rotas.cobrar import router as rotas_cobrar
     app.include_router(rotas_cobrar)
     from gabi.rotas.avisos import router as rotas_avisos
     app.include_router(rotas_avisos)
-    from gabi.rotas.contatos import router as rotas_contatos
-    app.include_router(rotas_contatos)
-    from gabi.rotas.envios import router as rotas_envios
-    app.include_router(rotas_envios)
-    from gabi.rotas.familia import router as rotas_familia
-    app.include_router(rotas_familia)
-    from gabi.rotas.documentos import router as rotas_documentos
-    app.include_router(rotas_documentos)
     from gabi.rotas.decisoes import router as rotas_decisoes
     app.include_router(rotas_decisoes)
-    from gabi.rotas.qualidade import router as rotas_qualidade
-    app.include_router(rotas_qualidade)
-    from gabi.rotas.agenda import router as rotas_agenda
-    app.include_router(rotas_agenda)
-    from gabi.rotas.teams import router as rotas_teams
-    app.include_router(rotas_teams)
-    from gabi.rotas.correio import router as rotas_correio
-    app.include_router(rotas_correio)
-    from gabi.rotas.dia import router as rotas_dia
-    app.include_router(rotas_dia)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")
@@ -205,7 +182,7 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
 
 def fabrica() -> FastAPI:
     """uvicorn --factory gabi.api:fabrica --uds ... ; banco em GABI_BANCO. TCP local só com GABI_PERMITE_TCP_LOCAL=1 (dev). Origens do painel (CSRF) em GABI_ORIGENS_CONFIAVEIS, separadas por vírgula."""
-    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-brain/gabi.db"))
+    banco = Path(os.environ.get("GABI_BANCO", "/var/lib/gabi-finance/gabi.db"))
     con = conectar(banco)
     try:
         migrar(con, MIGRACOES)

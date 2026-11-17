@@ -20,7 +20,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
     with tempfile.TemporaryDirectory() as tmp:
         banco = banco or Path(tmp) / "doc.db"
         app = criar_app(banco)
-        mcp = criar_mcp(banco, hosts=["127.0.0.1:8081"])
+        mcp = criar_mcp(banco, hosts=["127.0.0.1:8082"])
         openapi = app.openapi()  # o OpenAPI enumera também os routers incluídos (app.routes não)
         rotas = []
         for caminho, ops in openapi["paths"].items():
@@ -30,7 +30,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
                     rotas.append((caminho, metodo.upper(), texto[0].strip() if texto else ""))
         rotas.sort()
         ferramentas = asyncio.run(mcp.servidor.list_tools())
-        linhas = ["# API do gabi.brain (gerado do código; não editar à mão)", "", FORMATO, "",
+        linhas = ["# API do gabi-finance (gerado do código; não editar à mão)", "", FORMATO, "",
                   "## REST (`/api/...`, só por `tailscale serve`; nível `boss` salvo indicação)", "",
                   "| Método | Rota | O que faz |", "|---|---|---|"]
         linhas += [f"| {m} | `{p}` | {d} |" for p, m, d in rotas]
@@ -40,16 +40,7 @@ def montar(banco: Path | None = None) -> tuple[str, dict]:
             props = (t.input_schema or {}).get("properties", {}) if hasattr(t, "input_schema") else (t.inputSchema or {}).get("properties", {})
             entrada = ", ".join(sorted(props)) or "—"
             linhas.append(f"| `{t.name}` | `{ESCOPOS_FERRAMENTAS[t.name]}` | {entrada} | {(t.description or '').strip().splitlines()[0]} |")
-        linhas += ["", "Não existem ferramentas de enviar, pagar, apagar de vez, aprovar nem ligar regra de outro tipo (R13).", "",
-                   "## Pedidos {#pedidos}", "",
-                   "Receita (agente de canal): 1) `pedidos_registrar` com o remetente (`canal:identificador`) e os dados do pedido; 2) responder ao solicitante exatamente com `texto_para_responder` (nunca diga que pagou); "
-                   "3) o Ricardo decide no painel (Caixa › Pedidos): aprovar, pedir mais informação ou recusar; 4) `avisos_pendentes` traz o resultado; entregue no canal e confirme com `avisos_confirmar_entrega`; "
-                   "5) `pedidos_estado` consulta o andamento. Remetente não cadastrado ou sem permissão de pedir recebe `sem_escopo`. "
-                   "Pedidos com `canal='escuta'` (lidos pela escuta do WhatsApp) NUNCA geram resposta ao solicitante: decidir grava `mensagem_ao_solicitante` nulo e não cria aviso `pedido_*`, "
-                   "e `avisos_pendentes` não devolve aviso de pedido desse canal (R2: a Gabi não escreve a terceiros).", "",
-                   "## Hoje {#hoje}", "",
-                   "`GET /api/v1/hoje?filtro=all|<empresa>|t-<frente>` devolve `prioridades[]`, `agenda[]`, `emails_importantes[]` e `dinheiro` (só em `all`). Lê apenas de tabelas prontas, sem rede. "
-                   "No MCP: `resumo_manha`, `agenda_listar`, `email_listar` (escopo `trabalho`, só leitura). Concluir tarefa age na origem; criar rascunho é o único efeito externo e nunca envia.", ""]
+        linhas += ["", "Não existem ferramentas de enviar, pagar, apagar de vez, aprovar nem ligar regra de outro tipo (R13).", ""]
         return "\n".join(linhas), openapi
 
 

@@ -54,7 +54,7 @@ def test_lista_so_avisos_abertos_do_boss_com_titulo_e_texto_em_pt_br(cli, banco)
 
 
 def test_marcar_lido_registra_entregue_em_e_e_idempotente(cli, banco):
-    aid = _aviso(banco, "servico_falhou", {"chave": "u", "unidade": "gabi-brain-saldos.service"})
+    aid = _aviso(banco, "servico_falhou", {"chave": "u", "unidade": "gabi-finance-saldos.service"})
     r1 = cli.post(f"/api/v1/avisos/{aid}/lido", headers={**BOSS, "Content-Type": "application/json"}, content="{}")
     assert r1.status_code == 200
     c = conectar(banco)
@@ -80,39 +80,7 @@ def test_contagens_inclui_os_avisos_abertos_no_sino(cli, banco):
     assert depois["menu"]["avisos"] == 2 and depois["sino"] == antes["sino"] + 2
 
 
-def test_descrever_aviso_de_caixa_para_reconectar():
-    from gabi.rotas.avisos import descrever
-    titulo, texto = descrever("caixa_reconectar", {"endereco": "a@ionic.health"})
-    assert "a@ionic.health" in titulo and "credencial" in texto
-
-
-def test_descrever_aviso_de_agenda_para_reconectar():
-    from gabi.rotas.avisos import descrever
-    titulo, texto = descrever("agenda_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
-    assert "a@x.com" in titulo and "agenda" in texto
-
-
-def test_descrever_avisos_do_correio():
-    from gabi.rotas.avisos import descrever
-    titulo, texto = descrever("email_emergencial", {"chave": "T1", "remetente": "banco@x.com", "assunto": "Boleto vence hoje", "motivo": "prazo hoje"})
-    assert "banco@x.com" in titulo and "Boleto vence hoje" in titulo and "prazo hoje" in texto
-    titulo, texto = descrever("email_lixeira_resumo", {"chave": "2026-10-12", "total": 12, "itens": [{"remetente": "promo@loja.com", "assunto": "Oferta"}]})
-    assert "12" in titulo and "promo@loja.com" in texto and "Oferta" in texto and "restaur" in texto.lower()
-    assert "modelo" in descrever("email_sem_modelo", {"chave": "modelo", "motivo": "teto de custo do modelo"})[0].lower()
-    assert "teto de custo do modelo" in descrever("email_sem_modelo", {"chave": "modelo", "motivo": "teto de custo do modelo"})[1]
-    titulo, texto = descrever("email_reconectar", {"chave": "a@x.com", "conta": "a@x.com"})
-    assert "a@x.com" in titulo and "credencial" in texto
-    titulo, texto = descrever("email_falhou", {"chave": "falhou", "total": 3})
-    assert "3" in titulo and "tentativas" in texto
-
-
 def test_descrever_banco_desatualizado():
     from gabi.rotas.avisos import descrever
     titulo, texto = descrever("banco_desatualizado", {"banco": "Itaú", "desde": "2026-10-19T18:10:00Z"})
     assert titulo == "Itaú sem atualizar há mais de 24 h" and "19/10 15:10" in texto
-
-
-def test_lista_mostra_convite_de_agenda_com_titulo_convite(cli, banco):
-    _aviso(banco, "convite_agenda", {"chave": "1:x", "evento_id": 1, "titulo": "Alinhamento", "inicio_utc": "2026-11-05T18:00:00+00:00", "texto": "Alinhamento · qui 15h–16h · sem conflito"})
-    it = cli.get("/api/v1/avisos", headers=BOSS).json()["dados"]["itens"][0]
-    assert it["titulo"] == "Convite: Alinhamento" and it["texto"].endswith(" · painel › Envios")

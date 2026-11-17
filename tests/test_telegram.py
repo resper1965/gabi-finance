@@ -256,12 +256,3 @@ def test_vence_hoje_sem_item_aberto_mas_com_a_conferir_e_incerto(con):
     assert ainda_vale(con, "vence_hoje", {"chave": "k", "itens": itens}) == "incerto"
     con.execute("update compromisso set estado='pago' where id='b:1'")
     assert ainda_vale(con, "vence_hoje", {"chave": "k", "itens": itens}) == "resolvido"
-
-
-def test_email_emergencial_vai_antes_dos_demais_avisos(con):
-    for i in range(12):
-        _aviso(con, payload={"chave": str(i), "nome": f"C{i}", "vencimento": "2026-10-01", "valor": "R$ 1,00"})
-    _aviso(con, tipo="email_emergencial", payload={"chave": "T1", "remetente": "banco@x.com", "assunto": "Boleto vence hoje", "motivo": "prazo hoje"})
-    h = Http()
-    assert enviar_avisos(con, ENV, AGORA, h) == 10
-    assert "banco@x.com" in h.chamadas[0][1]["text"] and "Boleto vence hoje" in h.chamadas[0][1]["text"]  # o alerta passa na frente da fila de contas

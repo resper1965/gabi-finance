@@ -50,16 +50,16 @@ def test_criar_rejeita_nome_vazio_e_escopo_invalido(con):
 
 def test_trocar_escopos_nao_muda_segredo(con):
     r = agentes.criar(con, AGORA, "r", "A", ["fin"])
-    it = agentes.trocar_escopos(con, AGORA, "r", r["id"], ["docs", "fin"])
-    assert it["escopos"] == ["docs", "fin"] and "chave" not in it
-    assert tokens.validar(con, r["chave"]).escopos == {"docs", "fin"}
+    it = agentes.trocar_escopos(con, AGORA, "r", r["id"], ["fin", "trabalho"])
+    assert it["escopos"] == ["fin", "trabalho"] and "chave" not in it
+    assert tokens.validar(con, r["chave"]).escopos == {"fin", "trabalho"}
 
 
 def test_trocar_escopos_de_revogada_levanta_lookuperror(con):
     r = agentes.criar(con, AGORA, "r", "A", ["fin"])
     agentes.revogar_agente(con, AGORA, "r", r["id"])
     with pytest.raises(LookupError):
-        agentes.trocar_escopos(con, AGORA, "r", r["id"], ["docs"])
+        agentes.trocar_escopos(con, AGORA, "r", r["id"], ["propostas"])
 
 
 def test_revogar_faz_validar_devolver_none(con):
@@ -69,9 +69,9 @@ def test_revogar_faz_validar_devolver_none(con):
 
 
 def test_rotacionar_revoga_antiga_e_emite_nova_com_mesmos_escopos(con):
-    r = agentes.criar(con, AGORA, "r", "A", ["docs", "fin"])
+    r = agentes.criar(con, AGORA, "r", "A", ["fin", "trabalho"])
     n = agentes.rotacionar(con, AGORA, "r", r["id"])
-    assert n["id"] != r["id"] and n["nome"] == "A" and n["escopos"] == ["docs", "fin"] and n["chave"] != r["chave"]
+    assert n["id"] != r["id"] and n["nome"] == "A" and n["escopos"] == ["fin", "trabalho"] and n["chave"] != r["chave"]
     assert tokens.validar(con, r["chave"]) is None
     assert tokens.validar(con, n["chave"]).id == n["id"]
 
@@ -124,13 +124,13 @@ def test_chave_nunca_usada_tem_ultimo_uso_none_e_zero(con):
 
 def test_cada_operacao_grava_decisao_sem_segredo(con):
     r = agentes.criar(con, AGORA, "ricardo", "A", ["fin"])
-    agentes.trocar_escopos(con, AGORA, "ricardo", r["id"], ["docs"])
+    agentes.trocar_escopos(con, AGORA, "ricardo", r["id"], ["propostas"])
     n = agentes.rotacionar(con, AGORA, "ricardo", r["id"])
     agentes.revogar_agente(con, AGORA, "ricardo", n["id"])
     linhas = con.execute("select quem, o_que, origem from decisao order by id").fetchall()
     assert len(linhas) == 4 and all(l["origem"] == "agentes" and l["quem"] == "ricardo" for l in linhas)
     assert not any("gb_" in l["o_que"] for l in linhas)
-    assert 'emitida' in linhas[0]["o_que"] and "escopos=docs" in linhas[1]["o_que"] and f"nova {n['id']}" in linhas[2]["o_que"] and "revogada" in linhas[3]["o_que"]
+    assert 'emitida' in linhas[0]["o_que"] and "escopos=propostas" in linhas[1]["o_que"] and f"nova {n['id']}" in linhas[2]["o_que"] and "revogada" in linhas[3]["o_que"]
 
 
 def test_chamadas_de_revogada_continuam_visiveis(con):

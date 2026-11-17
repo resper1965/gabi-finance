@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi-finance extratos às 06h e 14h (Brasília)
+
+[Timer]
+OnCalendar=*-*-* 06,14:00:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-finance-extratos.service
+
+[Install]
+WantedBy=timers.target

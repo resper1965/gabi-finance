@@ -34,7 +34,7 @@ def test_backup_com_banco_aberto_por_outro_processo_e_consistente(banco, tmp_pat
 
 def test_backup_nome_permissao_e_diretorio(banco, tmp_path):
     destino = backup_db(conectar(banco), tmp_path / "bk", HOJE)
-    assert destino.name == "gabi-brain-2026-10-08.sqlite"
+    assert destino.name == "gabi-finance-2026-10-08.sqlite"
     assert stat.S_IMODE(destino.stat().st_mode) == 0o600
     assert stat.S_IMODE(destino.parent.stat().st_mode) == 0o700
 
@@ -59,7 +59,7 @@ def test_testar_restauracao_ok_contagens_iguais_as_da_origem(banco, tmp_path):
 
 
 def test_contagem_inclui_tabelas_novas(banco, tmp_path):
-    novas = ["atividade", "projeto", "compromisso_linha", "valor_do_mes", "documento"]
+    novas = ["compromisso_linha", "valor_do_mes"]
     for t in novas:
         assert t in TABELAS_CONTAGEM
     destino = backup_db(conectar(banco), tmp_path / "bk", HOJE)

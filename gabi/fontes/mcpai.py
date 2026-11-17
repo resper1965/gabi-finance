@@ -78,13 +78,13 @@ def _codigo(status: int, corpo: dict) -> str:
 def chamar(rota: str, corpo: dict, *, post: Post | None = None, chave: str | None = None) -> dict:
     """Uma chamada REST. Devolve `result`. Levanta RotaProibida antes de qualquer rede, e ErroMcpAi nos erros."""
     if rota in PROIBIDAS:
-        raise RotaProibida(f"rota proibida no gabi.brain: {rota}")
+        raise RotaProibida(f"rota proibida no gabi-finance: {rota}")
     chave = chave or os.environ.get("MCPAI_KEY")
     if not chave:
         raise ErroMcpAi("sem_chave")
     status, resposta, cab = (post or _post_http)(
         f"{BASE}/{rota}", corpo, {"Authorization": f"Bearer {chave}", "Content-Type": "application/json",
-                                  "Accept": "application/json", "User-Agent": "gabi-brain/1.0"})
+                                  "Accept": "application/json", "User-Agent": "gabi-finance/1.0"})
     resposta = resposta if isinstance(resposta, dict) else {}
     erro = resposta.get("error") if isinstance(resposta.get("error"), dict) else None
     if status >= 400 or erro or resposta.get("ok") is False:
@@ -117,7 +117,7 @@ class Cliente:
         if rota is None:
             raise RotaDesconhecida(ferramenta)
         if rota in PROIBIDAS:
-            raise RotaProibida(f"ferramenta proibida no gabi.brain: {ferramenta}")
+            raise RotaProibida(f"ferramenta proibida no gabi-finance: {ferramenta}")
         for i in range(tent):
             self.dorme(self.intervalo)
             try:

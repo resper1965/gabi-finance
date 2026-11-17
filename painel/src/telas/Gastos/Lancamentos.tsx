@@ -51,9 +51,9 @@ export function Lancamentos() {
     avisar(`${sugParaQuem.length} sugestões confirmadas por você.`);
     recarregar();
   };
-  /** gasto: true/false é a sua marcação (vence as regras); null devolve a decisão ao brain. */
+  /** gasto: true/false é a sua marcação (vence as regras); null devolve a decisão à Gabi. */
   const marcarGasto = async (l: Lanc, gasto: boolean | null) => {
-    try { await api.patch(`/api/v1/lancamentos/${l.id}`, { gasto }); avisar(gasto === null ? `${l.estabelecimento}: o brain volta a decidir.` : `Anotado: ${l.estabelecimento} ${gasto ? "é" : "não é"} gasto.`); recarregar(); }
+    try { await api.patch(`/api/v1/lancamentos/${l.id}`, { gasto }); avisar(gasto === null ? `${l.estabelecimento}: a Gabi volta a decidir.` : `Anotado: ${l.estabelecimento} ${gasto ? "é" : "não é"} gasto.`); recarregar(); }
     catch (e) { avisar((e as Error).message); }
   };
   /** Reembolso: a empresa que te devolve esta compra (entra em "Despesas por empresa"); continua sendo gasto seu. "" = pessoal. */
@@ -139,7 +139,7 @@ export function Lancamentos() {
                       <span aria-hidden="true">·</span>
                       <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
                       <button onClick={() => marcarGasto(l, !l.gasto!.valor)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
-                      {l.gasto.origem === "voce" && <button onClick={() => marcarGasto(l, null)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>deixar o brain decidir</button>}
+                      {l.gasto.origem === "voce" && <button onClick={() => marcarGasto(l, null)} style={{ padding: 0, border: 0, background: "transparent", color: "var(--color-accent-700)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>deixar a Gabi decidir</button>}
                     </>}
                     {num(l.valor) < 0 && empresas.length > 0 && <>
                       <span aria-hidden="true">·</span>

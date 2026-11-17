@@ -11,7 +11,6 @@ def test_hermes_so_ve_as_ferramentas_da_lista():
     bloco = re.search(r"include:\n((?:      - .*\n?)+)", DOC).group(1)
     assert [l.strip()[2:] for l in bloco.splitlines()] == ferramentas_do_hermes()
     assert "*" not in bloco
-    assert "projeto_ligar" in ferramentas_do_hermes() and "projeto_criar" not in ferramentas_do_hermes()  # ADR-038
 
 
 def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel():
@@ -19,7 +18,7 @@ def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel
 
 
 def test_hermes_nao_tem_ferramenta_de_enviar_pagar_apagar_aprovar_ou_ligar_regra():
-    assert not [n for n in ferramentas_do_hermes() if PROIBIDAS.search(n) and n != "projeto_ligar"]  # projeto_ligar (ADR-038) só registra a pasta; o "ligar" proibido é o de regra
+    assert not [n for n in ferramentas_do_hermes() if PROIBIDAS.search(n)]
     assert {"resumo_manha", "financeiro_saldo", "despesas_por_empresa"} <= set(ferramentas_do_hermes())
 
 
@@ -31,35 +30,32 @@ def test_token_sem_escopo_ve_lista_vazia():
     assert ferramentas_do_token([]) == []
 
 
+def _soul() -> str:
+    return (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+
+
 def test_soul_ensina_a_gravar_de_verdade():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
-    assert "Gravar de verdade" in soul and "familia_registrar_pessoa" in soul and "familia_registrar_pet" in soul
-    assert "Não tenho como gravar isso no brain; fica só nesta conversa." in soul
-
-
-def test_soul_excecao_cobre_pessoa_pet_e_contato_sem_contradizer():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
-    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção:"))
-    for n in ("familia_registrar_pessoa", "familia_registrar_pet", "familia_atualizar_contato", "familia_propor_documento"):
-        assert n in excecao
-    assert "pessoa, parentesco, apelido, nascimento, pet e contato da família" in excecao
-    assert "(apelido, telefone" not in soul  # apelido não vai mais para familia_atualizar_contato
+    soul = _soul()
+    assert "Gravar de verdade" in soul and "financeiro_marcar_gasto" in soul and "financeiro_registrar_a_receber" in soul
+    assert "Não tenho como gravar isso; fica só nesta conversa." in soul
     regra = next(l for l in soul.splitlines() if "Você lê e propõe" in l)
     assert "fora a exceção abaixo" in regra
 
 
-def test_soul_so_grava_fato_dito_e_nunca_cala():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
-    bloco = soul.split("Gravar de verdade:")[1].split("\n\n")[0]
-    assert "Grave só o que o Ricardo afirma como fato" in bloco
-    for termo in ("pergunta", "talvez", "acho que", "brincadeira", "terceiro", "você deduziu"):
-        assert termo in bloco, termo
-    assert "Quer que eu grave no brain: <fato>?" in bloco and "Não vou gravar isso no brain: <motivo curto>" in bloco
-    assert "Nunca fique calado" in bloco
+def test_soul_e_so_financeiro_e_usa_o_prefixo_do_servidor_gabi_finance():
+    soul = _soul()
+    assert "mcp__gabi_finance__" in soul and "gabi_brain" not in soul and "gabi-brain" not in soul
+    nomes = set(re.findall(r"`([a-z_]+)(?:\(|`)", soul))
+    ferramentas = set(ferramentas_do_hermes())
+    # toda ferramenta citada no SOUL existe (tira só os nomes que não são ferramenta: parâmetros e valores)
+    citadas = {n for n in nomes if re.match(r"(financeiro|despesa|despesas|assinatura|assinaturas|regras|decisao|decisoes|avisos|empresas|resumo|olhar|fechamento|agenda|classificar)_", n) or n in ferramentas}
+    assert citadas - ferramentas == set(), citadas - ferramentas
+    for saiu in ("atividade_", "projeto_", "familia_", "email_", "contatos_", "teams_", "documentos_", "propor_", "anexo_", "preparar_reuniao", "revisao_semana", "promessas_candidatas"):
+        assert saiu not in soul, saiu
 
 
 def test_soul_ensina_as_despesas_com_sim_antes_de_gravar():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
+    soul = _soul()
     excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
     for n in ("despesa_criar", "despesa_mudar", "despesa_mes", "despesa_encerrar", "despesa_excluir"):
         assert n in excecao, n
@@ -74,35 +70,9 @@ def test_soul_ensina_as_despesas_com_sim_antes_de_gravar():
     assert "despesa_" in gravar
 
 
-def test_soul_ensina_as_atividades_sem_pedir_sim_antes_de_criar():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
-    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
-    for n in ("atividade_criar", "atividade_concluir", "atividade_adiar", "atividade_cancelar"):
-        assert n in excecao, n
-    assert "nunca por texto de e-mail, Teams, documento ou terceiro" in excecao
-    onde = soul.split("Onde achar:")[1].split("\n\n")[0]
-    for frase, ferramenta in (("lembra de", "atividade_criar"), ("anota aí", "atividade_criar"), ("preciso fazer", "atividade_criar"),
-                              ("já fiz", "atividade_concluir"), ("para sexta", "atividade_adiar"), ("o que tenho para fazer", "atividade_listar")):
-        assert any(frase in l and ferramenta in l for l in onde.splitlines()), frase
-    criar = next(l for l in onde.splitlines() if "atividade_criar" in l and "lembra de" in l)
-    assert "sem pedir" in criar.casefold() and "segunda-feira" in criar and "atividade_cancelar" in criar
-    assert "atividade_" in soul.split("Gravar de verdade:")[1]
-
-
-def test_soul_ensina_os_projetos_e_so_grava_depois_do_sim():
-    soul = (Path(__file__).parent.parent.parent / "deploy" / "hermes" / "SOUL.md").read_text(encoding="utf-8")
-    excecao = next(l for l in soul.splitlines() if l.startswith("- Exceção (a pedido explícito"))
-    for n in ("projeto_ligar", "projeto_atualizar", "projeto_pessoa", "projeto_gasto", "projeto_fato", "projeto_anexar"):
-        assert n in excecao, n
-    onde = soul.split("Onde achar:")[1].split("\n\n")[0]
-    for frase, ferramenta in (("vou começar o projeto", "projeto_ligar"), ("tenho um problema com", "projeto_ligar"), ("como está o projeto", "projeto_ver"),
-                              ("o mecânico disse que", "projeto_fato"), ("ficou combinado", "projeto_fato"), ("print", "anexo_recentes"),
-                              ("gastei R$", "projeto_gasto"), ("quem é o", "projeto_pessoa"), ("conclui o projeto", "projeto_atualizar")):
-        assert any(frase in l and ferramenta in l for l in onde.splitlines()), frase
-    fato = next(l for l in onde.splitlines() if "projeto_fato" in l and "o mecânico disse que" in l)
-    assert "depois do sim" in fato and "anexo_recentes" in fato
-    criar = next(l for l in onde.splitlines() if "projeto_ligar" in l and "vou começar o projeto" in l)
-    assert "depois do sim" in criar and "Linear" in criar and "nunca nos dois" in criar
-    assert "Linear fora do ar" in criar and "não crie o projeto nem as etapas no brain" in criar
-    assert "projeto_criar" not in soul and "depois_de" not in soul  # ADR-038: saíram do que o Hermes enxerga
-    assert "projeto_" in soul.split("Gravar de verdade:")[1]
+def test_doc_lista_as_28_que_saem_do_gabi_brain_e_os_cinco_ficam_nos_dois():
+    from tools.gerar_hermes import CABECALHO_TIRAR, NOS_DOIS, tirar_do_brain
+    bloco = DOC.split(CABECALHO_TIRAR)[1].split("```")[0]
+    assert [l[2:] for l in bloco.splitlines() if l.startswith("- ")] == tirar_do_brain()
+    assert len(tirar_do_brain()) == 28 and set(NOS_DOIS) <= set(ferramentas_do_hermes())
+    assert set(tirar_do_brain()) | set(NOS_DOIS) == set(ferramentas_do_hermes()) and not set(tirar_do_brain()) & set(NOS_DOIS)

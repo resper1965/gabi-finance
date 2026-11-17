@@ -12,14 +12,14 @@ from gabi.rodada import registrar_rodada
 from gabi.hoje import hoje_brt
 
 TABELAS_CONTAGEM = ["pessoa", "empresa", "compromisso", "fatura", "memoria", "acesso", "decisao",
-                    "atividade", "projeto", "compromisso_linha", "valor_do_mes", "documento"]
+                    "compromisso_linha", "valor_do_mes"]
 
 
 def backup_db(con: sqlite3.Connection, destino_dir: Path, hoje: date) -> Path:
     destino_dir = Path(destino_dir)
     destino_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(destino_dir, 0o700)
-    final = destino_dir / f"gabi-brain-{hoje.isoformat()}.sqlite"
+    final = destino_dir / f"gabi-finance-{hoje.isoformat()}.sqlite"
     parcial = final.with_name(final.name + ".parcial")
     if final.exists():
         raise FileExistsError(f"já existe backup de {hoje}: {final}")
@@ -67,7 +67,7 @@ def main(banco: Path, destino_dir: Path, hoje: date | None = None, testar: bool 
     con = conectar(banco)
     migrar(con, Path(__file__).resolve().parent.parent / "migrations")
     hoje = hoje or hoje_brt()
-    if (Path(destino_dir) / f"gabi-brain-{hoje.isoformat()}.sqlite").exists():
+    if (Path(destino_dir) / f"gabi-finance-{hoje.isoformat()}.sqlite").exists():
         print(f"backup de {hoje} já existe; nada a fazer")  # reexecução no mesmo dia (instalação) não é falha
         return 0
     try:
@@ -89,8 +89,8 @@ def main(banco: Path, destino_dir: Path, hoje: date | None = None, testar: bool 
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--banco", default="/var/lib/gabi-brain/gabi.db")
-    ap.add_argument("--destino", default="/var/backups/gabi-brain")
+    ap.add_argument("--banco", default="/var/lib/gabi-finance/gabi.db")
+    ap.add_argument("--destino", default="/var/backups/gabi-finance")
     ap.add_argument("--testar", action="store_true", help="roda o teste de restauração (mensal)")
     a = ap.parse_args()
     sys.exit(main(Path(a.banco), Path(a.destino), testar=a.testar))

@@ -4,7 +4,7 @@ import { useApi } from "../lib/useApi";
 
 interface Aviso { id: number; tipo: string; titulo: string; texto: string; criado_em: string }
 
-/** Painel do sino: o que o gabi.brain avisa (rodada parada, conta atrasada, cobrada depois de cancelar, vence hoje, serviço que falhou).
+/** Painel do sino: o que o gabi.finance avisa (rodada parada, conta atrasada, cobrada depois de cancelar, vence hoje, serviço que falhou).
  *  "Marcar como lido" só tira o aviso da lista; o problema em si se resolve na tela de origem. */
 export function Avisos({ aoMudar }: { aoMudar?: () => void }) {
   const leitura = useApi<{ itens: Aviso[] }>("/api/v1/avisos");

@@ -371,14 +371,14 @@ ESPERA_SALDOS = 20      # segundos entre as tentativas
 
 
 def _contas_esperadas(con) -> dict[str, str]:
-    """Contas que o brain já conhece e não foram desligadas (estado 'nao') nem excluídas: externo_id -> nome."""
+    """Contas que o gabi-finance já conhece e não foram desligadas (estado 'nao') nem excluídas: externo_id -> nome."""
     return {r[0]: (r[1] or r[0]) for r in con.execute("select externo_id, apelido from conta where estado<>'nao' and excluido_em is null")}
 
 
 def capturar_saldos(con, cliente, agora: dt.datetime, bancos_pj=frozenset(), tentativas: int = TENTATIVAS_SALDOS,
                     dorme=time.sleep, espera: float = ESPERA_SALDOS) -> int:
     """Só contas e saldos (de hora em hora); não lê extrato. Fonte própria ('open-finance-saldos'): não entra no dados_ate.
-    Se vierem menos contas do que o brain conhece, repete até `tentativas` vezes e junta o que chegou; o que ainda faltar mantém
+    Se vierem menos contas do que o gabi-finance conhece, repete até `tentativas` vezes e junta o que chegou; o que ainda faltar mantém
     a última leitura (o caixa soma o saldo mais recente de cada conta) e a rodada guarda um aviso 'incompleta' em rodada.erro."""
     with registrar_rodada(con, "open-finance-saldos") as rodada:
         esperadas = _contas_esperadas(con)

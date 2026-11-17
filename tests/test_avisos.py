@@ -167,10 +167,10 @@ def test_payload_nao_tem_dado_sensivel(con):
 
 def test_servico_falhou_registra_aviso_com_o_nome_da_unidade(con):
     from gabi.avisos import registrar_servico_falhou
-    registrar_servico_falhou(con, "gabi-brain-saldos.service", AGORA)
-    registrar_servico_falhou(con, "gabi-brain-saldos.service", AGORA)          # idempotente no dia
+    registrar_servico_falhou(con, "gabi-finance-saldos.service", AGORA)
+    registrar_servico_falhou(con, "gabi-finance-saldos.service", AGORA)          # idempotente no dia
     p = json.loads(con.execute("select payload from aviso where tipo='servico_falhou'").fetchone()[0])
-    assert p["unidade"] == "gabi-brain-saldos.service" and con.execute("select count(*) from aviso").fetchone()[0] == 1
+    assert p["unidade"] == "gabi-finance-saldos.service" and con.execute("select count(*) from aviso").fetchone()[0] == 1
 
 
 def test_conta_atrasada_lida_nao_volta_no_dia_seguinte_e_nao_acumula_enquanto_nao_lida(con):
@@ -192,17 +192,6 @@ def test_exportacao_recente_nao_avisa(con):
     _rodada(con, 24 * 12, 1, fonte="backup"); _rodada(con, 24 * 3, 0, fonte="exportacao")
     gerar_avisos(con, AGORA)
     assert "exportacao_parada" not in _tipos(con)
-
-
-# ---------------- escuta_parada ----------------
-def _param_escuta(con, chave, valor):
-    import json as _j
-    con.execute("insert or replace into parametro(chave, valor) values (?,?)", (chave, _j.dumps(valor)))
-
-
-def _msg_em(con, horas_atras):
-    quando = (AGORA - dt.timedelta(hours=horas_atras)).isoformat()
-    con.execute("insert into escuta_msg(id_externo, de, recebida_em) values (?,?,?)", (f"x{horas_atras}", "+5511900000000", quando))
 
 
 def _tipos_novos(con):
@@ -346,55 +335,14 @@ def test_sem_produtor_o_telegram_tambem_consolida_duplicados(con):
     assert con.execute("select count(*) from aviso where telegram_em is not null").fetchone()[0] == 9  # 3 enviados + 6 superados
 
 
-# ---------------- hermes_parado (H4) ----------------
-def test_hermes_parado_avisa_uma_vez_por_dia(con):
-    gerar_avisos(con, AGORA, estado_servico=lambda u: "failed")
-    gerar_avisos(con, AGORA + dt.timedelta(hours=1), estado_servico=lambda u: "failed")
-    r = con.execute("select payload from aviso where tipo='hermes_parado'").fetchall()
-    assert len(r) == 1 and json.loads(r[0][0]) == {"chave": "hermes-gateway", "unidade": "hermes-gateway", "estado": "failed"}
-
-
-def test_hermes_ativo_subindo_ou_desconhecido_nao_avisa(con):
-    for st in ("active", "activating", "reloading", None):
-        gerar_avisos(con, AGORA, estado_servico=lambda u, st=st: st)
-    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
-
-
-def test_sem_leitor_de_servico_ninguem_consulta_o_systemd(con):
-    gerar_avisos(con, AGORA)  # padrão dos testes e de quem não passa o leitor
-    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
-
-
-def test_hermes_parado_pode_ser_desligado_e_a_unidade_trocada(con):
-    _param_escuta(con, "avisos.vigiar_hermes", False)
-    gerar_avisos(con, AGORA, estado_servico=lambda u: "failed")
-    assert con.execute("select count(*) from aviso where tipo='hermes_parado'").fetchone()[0] == 0
-    _param_escuta(con, "avisos.vigiar_hermes", True)
-    _param_escuta(con, "avisos.hermes_unidade", "outro-gateway")
-    chamadas = []
-    gerar_avisos(con, AGORA, estado_servico=lambda u: chamadas.append(u) or "inactive")
-    assert chamadas == ["outro-gateway"]
-
-
-def test_descrever_hermes_parado():
-    from gabi.rotas.avisos import descrever
-    t, x = descrever("hermes_parado", {"unidade": "hermes-gateway", "estado": "failed"})
-    assert "Hermes" in t and "restart hermes-gateway" in x and "failed" in x
-
-
-def test_estado_do_servico_devolve_none_quando_nao_ha_systemd_ou_unidade():
-    from gabi.avisos import estado_do_servico
-    assert estado_do_servico("unidade-que-nao-existe-xyz") is None
-
-
 def test_servico_falhou_nao_empilha_enquanto_nao_lido_e_fica_mudo_depois_de_lido(con):
     from gabi.avisos import registrar_servico_falhou
-    registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA)
-    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=1)) is None   # a unidade segue falhando: um aviso só
-    assert registrar_servico_falhou(con, "gabi-brain-saldos.service", AGORA + dt.timedelta(days=1)) is not None   # outra unidade tem o seu
+    registrar_servico_falhou(con, "gabi-finance-notas.service", AGORA)
+    assert registrar_servico_falhou(con, "gabi-finance-notas.service", AGORA + dt.timedelta(days=1)) is None   # a unidade segue falhando: um aviso só
+    assert registrar_servico_falhou(con, "gabi-finance-saldos.service", AGORA + dt.timedelta(days=1)) is not None   # outra unidade tem o seu
     con.execute("update aviso set entregue_em='x'")
-    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=2)) is None   # lido: silêncio por 7 dias
-    assert registrar_servico_falhou(con, "gabi-brain-notas.service", AGORA + dt.timedelta(days=9)) is not None
+    assert registrar_servico_falhou(con, "gabi-finance-notas.service", AGORA + dt.timedelta(days=2)) is None   # lido: silêncio por 7 dias
+    assert registrar_servico_falhou(con, "gabi-finance-notas.service", AGORA + dt.timedelta(days=9)) is not None
 
 
 def _sync_banco(con, **bancos):
@@ -421,157 +369,3 @@ def test_banco_atualizado_ou_sem_registro_ou_corrompido_nao_avisa(con):
     assert _tipos(con) == []
 
 
-# ---------------- google_parado: todas as fontes do Google falhando ----------------
-def _fonte_google(con, tabela, conta, erro=None, sincronizada_horas_atras=None, estado="sim", provedor="google"):
-    sinc = (AGORA - dt.timedelta(hours=sincronizada_horas_atras)).isoformat() if sincronizada_horas_atras is not None else None
-    con.execute(f"insert into {tabela}(conta, provedor, estado, sincronizada_em, ultimo_erro) values (?,?,?,?,?)", (conta, provedor, estado, sinc, erro))
-
-
-def test_google_parado_quando_todas_as_fontes_falham(con):
-    _fonte_google(con, "email_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
-    _fonte_google(con, "agenda_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
-    gerar_avisos(con, AGORA)
-    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
-    r = con.execute("select payload from aviso where tipo='google_parado'").fetchall()
-    assert len(r) == 1 and json.loads(r[0][0]) == {"chave": "google", "fontes": 2, "contas": ["a@gmail.com"]}
-
-
-def test_google_parado_nao_avisa_se_ao_menos_uma_fonte_funciona(con):
-    _fonte_google(con, "email_fonte", "a@gmail.com", "token recusado: a@gmail.com", 30)
-    _fonte_google(con, "agenda_fonte", "b@esper.ws", None, 0.2)
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
-
-
-def test_google_parado_ignora_falha_recente_isolada_fonte_nao_google_e_liberada_nao(con):
-    _fonte_google(con, "email_fonte", "a@gmail.com", "troca de token -> 503", 0.25)    # falhou há 15 min, sincronizou há pouco: oscilação
-    _fonte_google(con, "email_fonte", "n@ness.com.br", "erro", 50, provedor="graph")   # não é Google
-    _fonte_google(con, "agenda_fonte", "c@gmail.com", "token recusado: c@gmail.com", 50, estado="nao")  # não liberada
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
-
-
-def test_google_parado_recarga_vazia_nao_e_falha_e_sem_fonte_nao_avisa(con):
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
-    _fonte_google(con, "agenda_fonte", "a@gmail.com", "recarga vazia: eventos mantidos", 30)
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 0
-
-
-def test_google_parado_fonte_nunca_sincronizada_com_erro_conta(con):
-    _fonte_google(con, "email_fonte", "a@gmail.com", "conta não autorizada: a@gmail.com", None)
-    gerar_avisos(con, AGORA)
-    assert con.execute("select count(*) from aviso where tipo='google_parado'").fetchone()[0] == 1
-
-
-def test_descrever_google_parado():
-    from gabi.rotas.avisos import descrever
-    t, x = descrever("google_parado", {"fontes": 3, "contas": ["a@gmail.com", "b@esper.ws"]})
-    assert "Google" in t and "a@gmail.com" in x and "obter_token_google" in x
-
-
-# ---------------- documento_vence: marcos 60/30/7 (documentos.avisar_dias), fechado por documento novo ou excluído ----------------
-from gabi.avisos import RESOLVIDO, VALE, revalidar  # noqa: E402
-
-NUM_DOC = "YB654321"
-
-
-def _doc_vence(con, data, tipo="passaporte", titular="louise", data_tipo="validade") -> int:
-    if not con.execute("select 1 from pessoa where id=?", (titular,)).fetchone():
-        con.execute("insert into pessoa(id, nome, dados) values (?, 'Louise Lavrik Esper', '{}')", (titular,))
-    i = con.execute("insert into documento(titular_tipo, titular_id, tipo, pais, origem, criado_em, atualizado_em)"
-                    " values ('pessoa',?,?,'BR','ricardo','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')", (titular, tipo)).lastrowid
-    con.execute("insert into documento_numero(documento_id, nome, valor) values (?, 'numero', ?)", (i, NUM_DOC))
-    con.execute("insert into documento_data(documento_id, tipo, data) values (?,?,?)", (i, data_tipo, data))
-    return i
-
-
-def _avisos_doc(con) -> list[dict]:
-    return [json.loads(r[0]) for r in con.execute("select payload from aviso where tipo='documento_vence' order by id")]
-
-
-def test_documento_vence_um_aviso_por_marco_sem_repetir(con):
-    i = _doc_vence(con, "2026-12-10")  # 55 dias
-    gerar_avisos(con, AGORA)
-    gerar_avisos(con, AGORA + dt.timedelta(hours=2))
-    gerar_avisos(con, AGORA + dt.timedelta(days=1))
-    assert _avisos_doc(con) == [{"chave": f"{i}|60", "titular_nome": "Louise Lavrik Esper", "tipo": "passaporte", "data_tipo": "validade",
-                                 "data": "2026-12-10", "dias": 55}]
-    gerar_avisos(con, AGORA + dt.timedelta(days=30))   # 25 dias
-    gerar_avisos(con, AGORA + dt.timedelta(days=50))   # 5 dias
-    gerar_avisos(con, AGORA + dt.timedelta(days=51))
-    assert [(a["chave"], a["dias"]) for a in _avisos_doc(con)] == [(f"{i}|60", 55), (f"{i}|30", 25), (f"{i}|7", 5)]
-    assert NUM_DOC not in json.dumps(_avisos_doc(con))
-
-
-def test_documento_que_ja_entra_perto_avisa_so_o_menor_marco(con):
-    i = _doc_vence(con, "2026-10-20", tipo="crlv", data_tipo="vencimento")  # 4 dias
-    j = _doc_vence(con, "2027-03-01")  # longe: nada
-    gerar_avisos(con, AGORA)
-    assert [a["chave"] for a in _avisos_doc(con)] == [f"{i}|7"] and j
-
-
-def test_documento_avisar_dias_do_parametro(con):
-    con.execute("insert into parametro(chave, valor) values ('documentos.avisar_dias', '[10]')")
-    _doc_vence(con, "2026-11-20")  # 35 dias: o padrão avisaria
-    gerar_avisos(con, AGORA)
-    assert _avisos_doc(con) == []
-    gerar_avisos(con, AGORA + dt.timedelta(days=26))
-    assert [a["dias"] for a in _avisos_doc(con)] == [9]
-
-
-def test_documento_vencido_ha_mais_de_30_dias_nao_avisa(con):
-    _doc_vence(con, "2019-05-01")
-    _doc_vence(con, "2026-09-10", tipo="cnh")  # 36 dias atrás
-    gerar_avisos(con, AGORA)
-    assert _avisos_doc(con) == []
-
-
-def test_documento_vencido_ha_poucos_dias_avisa_uma_vez(con):
-    i = _doc_vence(con, "2026-10-06", tipo="cnh")
-    gerar_avisos(con, AGORA)
-    gerar_avisos(con, AGORA + dt.timedelta(days=3))
-    assert [(a["chave"], a["dias"]) for a in _avisos_doc(con)] == [(f"{i}|7", -10)]
-
-
-def test_documento_novo_do_mesmo_titular_e_tipo_resolve_e_fecha(con):
-    i = _doc_vence(con, "2026-11-10")
-    gerar_avisos(con, AGORA)
-    [p] = _avisos_doc(con)
-    assert revalidar(con, "documento_vence", p)[0] == VALE
-    _doc_vence(con, "2036-11-01")  # renovação aprovada
-    assert revalidar(con, "documento_vence", p)[0] == RESOLVIDO
-    gerar_avisos(con, AGORA + dt.timedelta(hours=1))
-    assert con.execute("select entregue_em is not null from aviso where tipo='documento_vence'").fetchone()[0] == 1
-    assert i
-
-
-def test_documento_de_outro_tipo_nao_resolve(con):
-    _doc_vence(con, "2026-11-10")
-    gerar_avisos(con, AGORA)
-    _doc_vence(con, "2036-11-01", tipo="rg")
-    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == VALE
-
-
-def test_documento_excluido_resolve(con):
-    i = _doc_vence(con, "2026-11-10")
-    gerar_avisos(con, AGORA)
-    con.execute("update documento set excluido_em='2026-10-16T13:00:00Z' where id=?", (i,))
-    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == RESOLVIDO
-
-
-def test_documento_renovado_no_lugar_resolve_e_volta_a_avisar_na_data_nova(con):
-    i = _doc_vence(con, "2026-11-10")
-    gerar_avisos(con, AGORA)
-    con.execute("update documento_data set data='2027-11-10' where documento_id=?", (i,))
-    assert revalidar(con, "documento_vence", _avisos_doc(con)[0])[0] == RESOLVIDO
-    gerar_avisos(con, dt.datetime(2027, 10, 20, 12, 0, tzinfo=UTC))  # 21 dias da data nova
-    assert [(a["chave"], a["data"]) for a in _avisos_doc(con)] == [(f"{i}|30", "2026-11-10"), (f"{i}|30", "2027-11-10")]
-
-
-def test_descrever_documento_vence():
-    from gabi.rotas.avisos import descrever
-    t, x = descrever("documento_vence", {"chave": "3|30", "titular_nome": "Louise Lavrik Esper", "tipo": "passaporte", "data_tipo": "validade",
-                                         "data": "2026-11-10", "dias": 25})
-    assert f"{t} {x}" == "Documento vence: passaporte de Louise Lavrik Esper em 10/11 (25 dias)"

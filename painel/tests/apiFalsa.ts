@@ -7,14 +7,12 @@ const amostra = (n: string) => JSON.parse(readFileSync(join(__dirname, "amostras
 const ROTAS: [RegExp, string][] = [
   [/\/avisos/, "avisos"], [/\/caixa\/projecao/, "caixa-projecao"], [/\/cobrar\/a-receber$/, "cobrar-a-receber"], [/\/cobrar\/previsao/, "cobrar-previsao"], [/\/cobrar\/recebimentos/, "cobrar-recebimentos"], [/\/cobrar\/notas/, "cobrar-notas"],
   [/\/categorias\/equivalencias\/pendentes/, "equivalencias-pendentes"],
-  [/\/caixa\/resumo/, "caixa-resumo"], [/\/caixa\/semanas/, "caixa-semanas"], [/\/contas-pagar/, "contas-pagar"], [/\/despesas/, "despesas"], [/\/atividades/, "atividades"],
-  [/\/anexos\/recentes/, "anexos-recentes"], [/\/projetos\/\d+$/, "projeto-detalhe"], [/\/projetos/, "projetos"],
+  [/\/caixa\/resumo/, "caixa-resumo"], [/\/caixa\/semanas/, "caixa-semanas"], [/\/contas-pagar/, "contas-pagar"], [/\/despesas/, "despesas"],
   [/\/lancamentos.*pendente=para_quem/, "lancamentos-pendentes"], [/\/lancamentos/, "lancamentos"],
   [/\/destino\/agrupado.*por=pessoa/, "destino-pessoa"], [/\/destino\/agrupado/, "destino-fornecedor"], [/\/destino/, "destino"],
   [/\/cartoes/, "cartoes"], [/\/parcelas/, "parcelas"], [/\/assinaturas/, "assinaturas"], [/\/sugestoes/, "sugestoes"], [/\/regras/, "regras"],
-  [/\/gabi\/qualidade/, "qualidade"], [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/rodadas/, "rodadas"],
+  [/\/custo/, "custo"], [/\/contagens/, "contagens"], [/\/rodadas/, "rodadas"],
   [/\/cadastros\/nibo/, "cadastros-nibo"], [/\/cadastros\/liberacoes/, "cadastros-liberacoes"], [/\/cadastros\/contas/, "cadastros-contas"], [/\/cadastros\/pessoas/, "cadastros-pessoas"],
-  [/\/hoje/, "hoje"], [/\/agenda/, "agenda"],
   [/\/cadastros\/categorias/, "cadastros-categorias"], [/\/cadastros\/empresas/, "cadastros-empresas"],
 ];
 

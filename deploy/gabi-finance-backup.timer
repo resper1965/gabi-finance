@@ -1,0 +1,10 @@
+[Unit]
+Description=gabi-finance backup diário às 03:30 (Brasília)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Sao_Paulo
+Persistent=true
+Unit=gabi-finance-backup.service
+
+[Install]
+WantedBy=timers.target

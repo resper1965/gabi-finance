@@ -109,7 +109,7 @@ def indicar(con, ids: list[int], pessoa: str | None, regra: bool = False) -> Non
             preencher(con, [x[0] for x in con.execute(f"select id from lancamento where conta_id in ({','.join('?' * len(contas))})", list(contas))])
 
 
-if __name__ == "__main__":  # preenche o histórico todo: python -m gabi.dinheiro.gastador --banco /var/lib/gabi-brain/gabi.db
+if __name__ == "__main__":  # preenche o histórico todo: python -m gabi.dinheiro.gastador --banco /var/lib/gabi-finance/gabi.db
     import argparse
     from pathlib import Path
 

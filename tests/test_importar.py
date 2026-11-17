@@ -21,9 +21,16 @@ def con(tmp_path):
 def test_importa_contagens_da_fixture(con):
     n = importar_staging(con, STAGING)
     assert n == {
-        "pessoa": 2, "pet": 1, "empresa": 1, "compromisso_fixo": 1, "matriz_acesso": 2, "allowlist_vip": 1,
+        "pessoa": 2, "empresa": 1, "compromisso_fixo": 1, "matriz_acesso": 2,
         "compromisso": 3, "agenda_estado": 1, "agenda_eventos": 1, "conciliacao": 1, "fatura": 1,
-        "conta_estado": 1, "memoria": 2, "compromisso_linha": 0, "valor_do_mes": 0, "parametro": 0}
+        "conta_estado": 1, "compromisso_linha": 0, "valor_do_mes": 0, "parametro": 0}
+
+
+def test_pets_allowlist_e_memoria_do_staging_sao_ignorados(con):
+    """O staging da fixture ainda traz pets, allowlist_vip e memoria.jsonl; o carregador não os lê (as tabelas caíram na 0091)."""
+    importar_staging(con, STAGING)
+    nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+    assert not {"pet", "allowlist_vip", "memoria"} & nomes
 
 
 def test_importar_duas_vezes_nao_duplica(con):

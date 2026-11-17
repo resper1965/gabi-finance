@@ -40,7 +40,7 @@ def _decifrar(pacote: Path, home: Path, saida: Path) -> Path:
 def test_exportacao_gera_pacote_criptografado_e_registra_rodada(con, tmp_path, chaves):
     pub, home = chaves
     pacote = exportar(con, tmp_path / "exp", pub, HOJE)
-    assert pacote.name == "gabi-brain-2026-10-18.sqlite.gpg" and pacote.stat().st_mode & 0o777 == 0o600
+    assert pacote.name == "gabi-finance-2026-10-18.sqlite.gpg" and pacote.stat().st_mode & 0o777 == 0o600
     assert b"SQLite format 3" not in pacote.read_bytes()                     # criptografado de verdade
     banco = _decifrar(pacote, home, tmp_path / "volta.sqlite")                # e restaurável com a chave privada
     assert conectar(banco).execute("select nome from pessoa").fetchone()[0] == "Ana"
@@ -68,10 +68,10 @@ def test_mantem_so_os_ultimos_pacotes(con, tmp_path, chaves):
     pub, _ = chaves
     for k in range(5):
         exportar(con, tmp_path / "exp", pub, HOJE - dt.timedelta(days=7 * (4 - k)), manter=3)
-    assert sorted(p.name for p in (tmp_path / "exp").glob("*.gpg")) == [f"gabi-brain-2026-10-{d}.sqlite.gpg" for d in ("04", "11", "18")]
+    assert sorted(p.name for p in (tmp_path / "exp").glob("*.gpg")) == [f"gabi-finance-2026-10-{d}.sqlite.gpg" for d in ("04", "11", "18")]
 
 
 def test_mesmo_dia_duas_vezes_nao_duplica_nem_falha(con, tmp_path, chaves):
     pub, _ = chaves
     exportar(con, tmp_path / "exp", pub, HOJE)
-    assert exportar(con, tmp_path / "exp", pub, HOJE).name == "gabi-brain-2026-10-18.sqlite.gpg" and len(list((tmp_path / "exp").glob("*.gpg"))) == 1
+    assert exportar(con, tmp_path / "exp", pub, HOJE).name == "gabi-finance-2026-10-18.sqlite.gpg" and len(list((tmp_path / "exp").glob("*.gpg"))) == 1
