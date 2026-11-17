@@ -7,6 +7,7 @@ import { Valor } from "../../componentes/Valor";
 import { BarrasSemanas, type Semana } from "../../graficos/BarrasSemanas";
 import { dataCurta, num } from "../../lib/formato";
 import { useOcultar } from "../../lib/ocultar";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Lanc { id: number; data: string; estabelecimento: string; valor: string; conta: string; categoria: { nome: string | null } }
@@ -28,12 +29,12 @@ export function Semanas() {
         return (
           <div className="pilha" style={{ gap: 32, maxWidth: 1000 }}>
             <Achados itens={[
-              { codigo: "E-01", rotulo: "Entradas realizadas", fonte: "open-finance", base: `créditos do extrato em ${reais.length} semanas`, valor: <Valor valor={entradas} /> },
-              { codigo: "E-02", rotulo: "Saídas realizadas", fonte: "open-finance", base: `débitos do extrato em ${reais.length} semanas`, valor: <Valor valor={saidas} /> },
-              { codigo: "E-03", rotulo: "Líquido no período", fonte: "open-finance", base: "entradas − saídas realizadas", valor: <Valor valor={entradas - saidas} />,
+              { codigo: "SM-01", rotulo: "Entradas realizadas", fontes: [FONTE.extrato()], base: `créditos do extrato em ${reais.length} semanas`, valor: <Valor valor={entradas} /> },
+              { codigo: "SM-02", rotulo: "Saídas realizadas", fontes: [FONTE.extrato()], base: `débitos do extrato em ${reais.length} semanas`, valor: <Valor valor={saidas} /> },
+              { codigo: "SM-03", rotulo: "Líquido no período", fontes: [FONTE.extrato()], base: "entradas − saídas realizadas", valor: <Valor valor={entradas - saidas} />,
                 carimbo: entradas - saidas < 0 ? { tipo: "erro", texto: "saiu mais" } : undefined },
-              { codigo: "E-04", rotulo: `Saldo projetado em ${d.semanas.filter((s) => s.projecao).length} semanas`, fonte: "open-finance", estado: "projecao", base: "saldo conferido + o que vence e o que deve entrar",
-                valor: ultima?.saldo ? <Valor valor={ultima.saldo} /> : <span className="suave">—</span>, carimbo: { tipo: "nota", texto: "projeção" } },
+              { codigo: "SM-04", rotulo: `Saldo projetado em ${d.semanas.filter((s) => s.projecao).length} semanas`, estado: "projecao", base: "saldo conferido + o que vence e o que deve entrar", fontes: [FONTE.extrato("saldo conferido de hoje"), FONTE.despesas(), FONTE.planilha("contas a pagar"), FONTE.notas("entradas previstas (notas a vencer)")],
+                valor: ultima?.saldo ? <Valor valor={ultima.saldo} /> : <span className="suave">—</span> },
             ]} />
             <Bloco titulo="Entradas e saídas por semana" nota="clique numa semana (ou Enter sobre ela) para ver os lançamentos">
               <BarrasSemanas semanas={d.semanas} escolhida={inicio} aoEscolher={setInicio} oculto={oculto} />

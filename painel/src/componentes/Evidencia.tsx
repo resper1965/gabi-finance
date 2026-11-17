@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useProveniencia } from "../lib/proveniencia";
+import { useProveniencia, type FonteEvidencia } from "../lib/proveniencia";
 import { Etiqueta } from "./Etiqueta";
 import { formatarDadosAte, formatarHora } from "./Faixa";
 
@@ -8,11 +8,12 @@ import { formatarDadosAte, formatarHora } from "./Faixa";
 export type EstadoEvidencia = "conferido" | "a_conferir" | "projecao";
 
 export interface InfoEvidencia {
-  codigo: string;            // "E-01": número do item no laudo
+  codigo: string;            // "AP-01": código estável do item na tela (prefixo da tela + número fixo)
   rotulo: string;            // o que é o valor
-  fonte?: string;            // nome da fonte no envelope ("open-finance", "notas-nibo"); sem ela, todas as do envelope
-  base?: ReactNode;          // de onde sai o número (contas somadas, regra do cálculo)
-  estado?: EstadoEvidencia;  // sem ele, sai do envelope
+  fontes: FonteEvidencia[];  // cada entrada que alimenta o número; um item composto lista todas
+  cita?: string;             // itens de outras telas que o número soma ("AP-01 + AP-02")
+  base?: ReactNode;          // regra do cálculo
+  estado?: EstadoEvidencia;  // sem ele, sai do envelope (estado das fontes que o envelope descreve)
 }
 
 const ESTADO: Record<EstadoEvidencia, [Parameters<typeof Etiqueta>[0]["tipo"], string]> = {
@@ -29,9 +30,10 @@ export function useEvidencia(info: InfoEvidencia) {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abertaAntes = useRef(false); // estado no instante do toque: o foco que vem com o toque já abre, então o clique não pode fechar de novo
   const [pos, setPos] = useState<{ top: number; left: number; acima: boolean } | null>(null);
-  const fontes = (prov?.fontes ?? []).filter((f) => !info.fonte || f.nome === info.fonte);
-  const parada = fontes.find((f) => f.estado !== "ok");
-  const estado: EstadoEvidencia = info.estado ?? (prov && !prov.desatualizado && !parada && prov.dadosAte ? "conferido" : "a_conferir");
+  const doEnvelope = (nome: string) => prov?.fontes.find((f) => f.nome === nome);
+  const descritas = info.fontes.map((f) => doEnvelope(f.nome)).filter((f) => f !== undefined);
+  const parada = descritas.find((f) => f.estado !== "ok");
+  const estado: EstadoEvidencia = info.estado ?? (prov && !prov.desatualizado && !parada && prov.dadosAte && descritas.length ? "conferido" : "a_conferir");
 
   const posicionar = () => {
     const r = ref.current?.getBoundingClientRect();
@@ -59,8 +61,16 @@ export function useEvidencia(info: InfoEvidencia) {
     <div role="tooltip" id={id} className="ev-pop" style={{ top: pos.top, left: pos.left, transform: pos.acima ? "translateY(-100%)" : undefined }}>
       <div className="ev-pop-cab"><strong>{info.rotulo}</strong><span className="mono">{info.codigo}</span></div>
       <ol className="ev-cadeia">
-        <li><span className="ev-k">Fonte</span><span className="ev-passo">
-          {fontes.length ? fontes.map((f) => f.nome).join(", ") : "sem fonte registrada"}
+        <li><span className="ev-k">{info.fontes.length > 1 ? "Fontes" : "Fonte"}</span><span className="ev-passo ev-fontes">
+          {info.fontes.map((f) => {
+            const e = doEnvelope(f.nome);
+            return (
+              <span key={f.nome} className="ev-fonte">
+                <span><span className="mono">{f.nome}</span> · {f.papel}</span>
+                <span className="celula-sub">{e ? (e.estado === "ok" ? "no envelope: em dia" : `no envelope: ${e.estado}`) : "fora do envelope: sem estado informado"}</span>
+              </span>);
+          })}
+          {info.cita && <span className="celula-sub">soma {info.cita}</span>}
           {info.base && <span className="celula-sub">{info.base}</span>}</span></li>
         <li><span className="ev-k">Rodada</span><span className="ev-passo">
           {prov?.dadosAte ? <>dados até <span className="mono">{formatarDadosAte(prov.dadosAte)}</span></> : "nenhuma rodada conferida ainda"}

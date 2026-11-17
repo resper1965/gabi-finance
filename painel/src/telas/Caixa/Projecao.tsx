@@ -5,6 +5,7 @@ import { Etiqueta } from "../../componentes/Etiqueta";
 import { Painel } from "../../componentes/Painel";
 import { Valor } from "../../componentes/Valor";
 import { dataCurta, num } from "../../lib/formato";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Dia { dia: string; entradas: string; saidas: string; saldo: string }
@@ -25,11 +26,11 @@ export function Projecao() {
         return (
           <div className="pilha" style={{ gap: 32, maxWidth: 1120 }}>
             <Achados itens={[
-              { codigo: "E-01", rotulo: "Saldo hoje", fonte: "open-finance", base: "saldo conferido de todas as contas do caixa único", valor: <Valor valor={d.saldo_inicial} />, prova: "ponto de partida da previsão" },
-              { codigo: "E-02", rotulo: "Menor saldo", fonte: "open-finance", estado: "projecao", base: "o dia mais baixo da previsão", valor: <Valor valor={d.menor_saldo.saldo} />,
-                prova: <>em <span className="mono">{dataCurta(d.menor_saldo.dia)}</span></>, carimbo: negativo ? { tipo: "erro", texto: "fica negativo" } : { tipo: "nota", texto: "projeção" } },
-              { codigo: "E-03", rotulo: `Saldo em ${d.dias.length} dias`, fonte: "open-finance", estado: "projecao", base: "saldo de hoje + entradas previstas − saídas a pagar",
-                valor: <Valor valor={fim?.saldo ?? d.saldo_inicial} />, prova: fim ? <>em <span className="mono">{dataCurta(fim.dia)}</span></> : undefined, carimbo: { tipo: "nota", texto: "projeção" } },
+              { codigo: "PV-01", rotulo: "Saldo hoje", fontes: [FONTE.extrato()], base: "saldo conferido de todas as contas do caixa único", valor: <Valor valor={d.saldo_inicial} />, prova: "ponto de partida da previsão" },
+              { codigo: "PV-02", rotulo: "Menor saldo", fontes: [FONTE.extrato("saldo conferido de hoje"), FONTE.despesas(), FONTE.planilha("contas a pagar"), FONTE.notas("entradas previstas (notas a vencer)")], estado: "projecao", base: "o dia mais baixo da previsão", valor: <Valor valor={d.menor_saldo.saldo} />,
+                prova: <>em <span className="mono">{dataCurta(d.menor_saldo.dia)}</span></>, carimbo: negativo ? { tipo: "erro", texto: "fica negativo" } : undefined },
+              { codigo: "PV-03", rotulo: `Saldo em ${d.dias.length} dias`, fontes: [FONTE.extrato("saldo conferido de hoje"), FONTE.despesas(), FONTE.planilha("contas a pagar"), FONTE.notas("entradas previstas (notas a vencer)")], estado: "projecao", base: "saldo de hoje + entradas previstas − saídas a pagar",
+                valor: <Valor valor={fim?.saldo ?? d.saldo_inicial} />, prova: fim ? <>em <span className="mono">{dataCurta(fim.dia)}</span></> : undefined },
             ]} />
             <Bloco titulo="Saldo projetado por dia" nota="só os dias com entrada ou saída">
               <div className="tabela-rolagem">

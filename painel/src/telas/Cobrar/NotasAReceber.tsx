@@ -7,6 +7,7 @@ import { Valor } from "../../componentes/Valor";
 import { api } from "../../lib/api";
 import { dataCurta } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Nota { numero: string; tomador: string; emissao: string; vencimento: string | null; bruto: string; liquido: string; situacao: string; nibo_pago: boolean; pdf: boolean; xml: boolean }
@@ -64,7 +65,7 @@ export function NotasAReceber() {
             const itens = d.itens.filter((n) => n.situacao === sit);
             if (itens.length === 0) return null;
             return (
-              <Bloco key={sit} titulo={titulo} nota={<>{itens.length} {itens.length === 1 ? "nota" : "notas"} · líquido <Evidencia codigo={`E-${String(k + 1).padStart(2, "0")}`} rotulo={titulo} fonte="notas-nibo" base="soma do líquido das notas do grupo" estado={sit === "recebida" ? "conferido" : sit === "a_vencer" ? undefined : "a_conferir"}><Valor valor={d.totais[chave]} /></Evidencia></>}>
+              <Bloco key={sit} titulo={titulo} nota={<>{itens.length} {itens.length === 1 ? "nota" : "notas"} · líquido <Evidencia codigo={`NT-${String(k + 1).padStart(2, "0")}`} rotulo={titulo} fontes={[FONTE.notas()]} base="soma do líquido das notas do grupo" estado={sit === "recebida" ? "conferido" : sit === "a_vencer" ? undefined : "a_conferir"}><Valor valor={d.totais[chave]} /></Evidencia></>}>
                 <section role="region" aria-label={sit === "a_vencer" ? "A receber" : titulo} className="tabela-rolagem">
                   <table className="tabela">
                     <thead><tr><th>Nota</th><th>Tomador</th><th>Vence</th><th className="num">Bruto</th><th className="num">Líquido</th><th><span className="sr-only">Estado</span></th></tr></thead>

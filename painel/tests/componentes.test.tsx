@@ -58,7 +58,7 @@ const prov = { dadosAte: "2026-10-08T17:00:00Z", desatualizado: false, proximaRo
   fontes: [{ nome: "open-finance", estado: "ok", ultima: "2026-10-08T17:00:00Z" }, { nome: "notas-nibo", estado: "parado", ultima: null }] };
 
 test("Evidencia mostra a cadeia de proveniência ao focar e fecha com Esc", () => {
-  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-01" rotulo="Saldo do caixa único" fonte="open-finance" base="2 contas"><Valor valor="10.00" /></Evidencia></ProvContext.Provider>);
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-01" rotulo="Saldo do caixa único" fontes={[{ nome: "open-finance", papel: "saldos" }]} base="2 contas"><Valor valor="10.00" /></Evidencia></ProvContext.Provider>);
   const gatilho = screen.getByRole("button", { name: /R\$ 10,00.*E-01/ });
   expect(screen.queryByRole("tooltip")).toBeNull();
   fireEvent.focus(gatilho);
@@ -73,7 +73,7 @@ test("Evidencia mostra a cadeia de proveniência ao focar e fecha com Esc", () =
 });
 
 test("Evidencia abre no toque (foco + clique) e fecha no toque seguinte", () => {
-  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-06" rotulo="Menor saldo" fonte="open-finance" estado="projecao"><Valor valor="1.00" /></Evidencia></ProvContext.Provider>);
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-06" rotulo="Menor saldo" fontes={[{ nome: "open-finance", papel: "saldos" }]} estado="projecao"><Valor valor="1.00" /></Evidencia></ProvContext.Provider>);
   const gatilho = screen.getByRole("button", { name: /E-06/ });
   fireEvent.pointerDown(gatilho); fireEvent.focus(gatilho); fireEvent.click(gatilho);
   expect(screen.getByRole("tooltip")).toHaveTextContent("projeção");
@@ -82,7 +82,7 @@ test("Evidencia abre no toque (foco + clique) e fecha no toque seguinte", () => 
 });
 
 test("Evidencia de fonte parada fica a conferir", () => {
-  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-03" rotulo="A receber" fonte="notas-nibo"><Valor valor="5.00" /></Evidencia></ProvContext.Provider>);
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-03" rotulo="A receber" fontes={[{ nome: "notas-nibo", papel: "notas" }]}><Valor valor="5.00" /></Evidencia></ProvContext.Provider>);
   const gatilho = screen.getByRole("button", { name: /E-03/ });
   expect(gatilho).toHaveAttribute("data-estado", "a_conferir");
   fireEvent.click(gatilho);

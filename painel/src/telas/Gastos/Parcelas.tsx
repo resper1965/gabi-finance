@@ -6,6 +6,7 @@ import { Painel } from "../../componentes/Painel";
 import { useCelular } from "../../componentes/Shell";
 import { Valor } from "../../componentes/Valor";
 import { mesCurto, num } from "../../lib/formato";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 import { useOcultar } from "../../lib/ocultar";
 
@@ -29,11 +30,11 @@ export function Parcelas() {
         return (
           <div className="pilha" style={{ gap: 32, maxWidth: 1120 }}>
             <Achados itens={[
-              ...(d.por_mes[0] ? [{ codigo: "E-01", rotulo: `Comprometido em ${nomeMes(d.por_mes[0].mes)}`, fonte: "open-finance", base: "parcelas já contratadas que caem neste mês", valor: <Valor valor={d.por_mes[0].total} /> }] : []),
-              ...(d.por_mes[1] ? [{ codigo: "E-02", rotulo: `Em ${nomeMes(d.por_mes[1].mes)}`, fonte: "open-finance", base: "parcelas já contratadas para o mês seguinte", valor: <Valor valor={d.por_mes[1].total} />,
+              ...(d.por_mes[0] ? [{ codigo: "PC-01", rotulo: `Comprometido em ${nomeMes(d.por_mes[0].mes)}`, fontes: [FONTE.extrato()], base: "parcelas já contratadas que caem neste mês", valor: <Valor valor={d.por_mes[0].total} /> }] : []),
+              ...(d.por_mes[1] ? [{ codigo: "PC-02", rotulo: `Em ${nomeMes(d.por_mes[1].mes)}`, fontes: [FONTE.extrato()], base: "parcelas já contratadas para o mês seguinte", valor: <Valor valor={d.por_mes[1].total} />,
                 prova: liberado > 0 ? <>libera <Valor valor={liberado} /> por mês</> : undefined }] : []),
-              { codigo: "E-03", rotulo: "Falta pagar, no total", fonte: "open-finance", base: `${d.itens.length} compras: parcelas restantes × valor da parcela`, valor: <Valor valor={faltam} /> },
-              { codigo: "E-04", rotulo: "Última parcela", fonte: "open-finance", base: "a compra que termina por último", valor: <span className="mono" style={{ fontSize: "var(--t1)" }}>{ultima ? mesCurto(ultima) : "—"}</span> },
+              { codigo: "PC-03", rotulo: "Falta pagar, no total", fontes: [FONTE.extrato()], base: `${d.itens.length} compras: parcelas restantes × valor da parcela`, valor: <Valor valor={faltam} /> },
+              { codigo: "PC-04", rotulo: "Última parcela", fontes: [FONTE.extrato()], base: "a compra que termina por último", valor: <span className="mono" style={{ fontSize: "var(--t1)" }}>{ultima ? mesCurto(ultima) : "—"}</span> },
             ]} />
             {terminam.length > 0 && (
               <div className="quadro" data-tom="ok">

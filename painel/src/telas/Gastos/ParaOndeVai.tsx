@@ -8,6 +8,7 @@ import { Vazio } from "../../componentes/Estados";
 import { corDestino, type Fluxo, type No } from "../../graficos/fluxo";
 import { useFiltros } from "../../lib/filtros";
 import { dataCurta, num } from "../../lib/formato";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Destino {
@@ -66,8 +67,8 @@ export function ParaOndeVai() {
           <div className="pilha" style={{ gap: 32, maxWidth: 1120 }}>
             <div className="fila-entre" style={{ alignItems: "flex-end", gap: 20 }}>
               <p className="sentenca" style={{ maxWidth: "36em" }}>
-                {quando} saiu <Evidencia codigo="E-01" rotulo="Total que saiu" fonte="open-finance" base={`débitos de ${dataCurta(d.periodo.de)} a ${dataCurta(d.periodo.ate)}`}><Valor valor={d.total} /></Evidencia>.{" "}
-                {pct(pessoal, total)} é consumo seu (<Evidencia codigo="E-02" rotulo="Consumo pessoal" fonte="open-finance" base="gastos sem empresa de reembolso"><Valor valor={pessoal} /></Evidencia>); o resto, <Valor valor={total - pessoal} />, é das empresas e volta como reembolso.
+                {quando} saiu <Evidencia codigo="PO-01" rotulo="Total que saiu" fontes={[FONTE.extrato()]} base={`débitos de ${dataCurta(d.periodo.de)} a ${dataCurta(d.periodo.ate)}`}><Valor valor={d.total} /></Evidencia>.{" "}
+                {pct(pessoal, total)} é consumo seu (<Evidencia codigo="PO-02" rotulo="Consumo pessoal" fontes={[FONTE.extrato()]} base="gastos sem empresa de reembolso"><Valor valor={pessoal} /></Evidencia>); o resto, <Valor valor={total - pessoal} />, é das empresas e volta como reembolso.
               </p>
               <div role="group" aria-label="Visualização" className="seg">
                 {(Object.keys(ROTULO) as Vista[]).map((v) => (

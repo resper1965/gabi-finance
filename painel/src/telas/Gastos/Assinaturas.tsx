@@ -9,6 +9,7 @@ import { Valor } from "../../componentes/Valor";
 import { api } from "../../lib/api";
 import { dataCurta, mesCurto, num } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Ass {
@@ -68,12 +69,11 @@ export function Assinaturas() {
         return (
           <div className="pilha" style={{ gap: 32, maxWidth: 1120 }}>
             <Achados itens={[
-              { codigo: "E-01", rotulo: "Recorrente por mês", fonte: "open-finance", base: "valor atual de cada assinatura no rol", valor: <Valor valor={d.total_mensal} />,
+              { codigo: "AS-01", rotulo: "Recorrente por mês", fontes: [FONTE.extrato()], base: "valor atual de cada assinatura no rol", valor: <Valor valor={d.total_mensal} />,
                 prova: <span>{rol.filter((a) => a.ativa !== false).length} assinaturas ativas</span> },
-              { codigo: "E-02", rotulo: "Em 12 meses", fonte: "open-finance", base: "débitos das assinaturas do rol nos últimos 12 meses", valor: <Valor valor={total12} />, prova: "débitos dos últimos 12 meses" },
-              { codigo: "E-03", rotulo: "A conferir", fonte: "open-finance", estado: aConferir ? "a_conferir" : undefined, base: "recorrências detectadas que você ainda não marcou",
-                valor: <span className="num">{aConferir}</span>, prova: `${rol.filter((a) => a.sinais.nova).length} novas`,
-                carimbo: aConferir ? { tipo: "conferir", texto: "a conferir" } : undefined },
+              { codigo: "AS-02", rotulo: "Em 12 meses", fontes: [FONTE.extrato()], base: "débitos das assinaturas do rol nos últimos 12 meses", valor: <Valor valor={total12} />, prova: "débitos dos últimos 12 meses" },
+              { codigo: "AS-03", rotulo: "A conferir", fontes: [FONTE.extrato()], estado: aConferir ? "a_conferir" : undefined, base: "recorrências detectadas que você ainda não marcou",
+                valor: <span className="num">{aConferir}</span>, prova: `${rol.filter((a) => a.sinais.nova).length} novas` },
             ]} />
             {rol.filter((a) => a.sinais.cobrada_depois_de_cancelar).map((a) => (
               <div key={a.id} role="alert" className="quadro" data-tom="erro">

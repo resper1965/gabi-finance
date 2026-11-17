@@ -10,6 +10,7 @@ import { useCelular } from "../../componentes/Shell";
 import { api } from "../../lib/api";
 import { dataCurta, mesCurto, num } from "../../lib/formato";
 import { useToast } from "../../lib/toast";
+import { FONTE } from "../../lib/proveniencia";
 import { useApi } from "../../lib/useApi";
 
 interface Cartao {
@@ -107,7 +108,7 @@ export function Cartoes() {
                           <span className="miudo">{f.percentual_limite.toLocaleString("pt-BR")}% do limite{c.limite ? <> de <Valor valor={c.limite} /></> : null}</span>
                         </span>) : <span className="miudo">sem limite informado</span>}
                       <span className="linha-valor" style={{ fontSize: "var(--t2)" }}>
-                        <Evidencia codigo={`E-${String(k + 1).padStart(2, "0")}`} rotulo={`Fatura aberta · ${c.apelido}`} fonte="open-finance" base={`fatura ${f.status}, vence em ${dataCurta(f.vencimento)}`}><Valor valor={f.total} /></Evidencia>
+                        <Evidencia codigo={`CT-${String(d.itens.indexOf(c) + 1).padStart(2, "0")}`} rotulo={`Fatura aberta · ${c.apelido}`} fontes={[FONTE.extrato()]} base={`fatura ${f.status}, vence em ${dataCurta(f.vencimento)}`}><Valor valor={f.total} /></Evidencia>
                       </span>
                     </li>
                   );
