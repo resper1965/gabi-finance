@@ -1,4 +1,5 @@
-"""Carrega o staging (Plano 1) no banco, de forma idempotente e numa só transação. Consome: db, rodada."""
+"""Carrega o staging (Plano 1) no banco, de forma idempotente e numa só transação. Só a parte financeira e a base de pessoas/empresas:
+pets, lista de números autorizados e memória de conversas não são mais lidos nem gravados (migração 0091). Consome: db, rodada."""
 import datetime as dt
 import hashlib
 import json
@@ -13,8 +14,8 @@ from gabi.rodada import registrar_rodada
 from gabi.hoje import hoje_brt
 
 MIGRACOES = Path(__file__).resolve().parent.parent / "migrations"
-TABELAS = ("pessoa", "pet", "empresa", "compromisso_fixo", "matriz_acesso", "allowlist_vip", "compromisso",
-           "agenda_estado", "agenda_eventos", "conciliacao", "fatura", "conta_estado", "memoria",
+TABELAS = ("pessoa", "empresa", "compromisso_fixo", "matriz_acesso", "compromisso",
+           "agenda_estado", "agenda_eventos", "conciliacao", "fatura", "conta_estado",
            "compromisso_linha", "valor_do_mes", "parametro")
 
 
@@ -40,11 +41,10 @@ def _upsert(con, tabela: str, pk: list[str], linha: dict) -> None:
     con.execute(sql, [linha[c] for c in cols])
 
 
-def _ler(staging: Path) -> tuple[dict, dict, list[dict]]:
+def _ler(staging: Path) -> tuple[dict, dict]:
     familia = json.loads((staging / "familia.json").read_text(encoding="utf-8"))
     fin = json.loads((staging / "fin.json").read_text(encoding="utf-8"))
-    memoria = [json.loads(l) for l in (staging / "memoria.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
-    return familia, fin, memoria
+    return familia, fin
 
 
 def _semear_cadastros(con, snapshot, hoje: dt.date, relatorio: dict | None) -> None:
@@ -65,15 +65,12 @@ def _semear_cadastros(con, snapshot, hoje: dt.date, relatorio: dict | None) -> N
 
 def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | None = None) -> dict[str, int]:
     staging = Path(staging)
-    familia, fin, memoria = _ler(staging)  # falta de arquivo levanta ANTES de qualquer escrita
+    familia, fin = _ler(staging)  # falta de arquivo levanta ANTES de qualquer escrita
     con.execute("begin immediate")
     try:
         for p in familia["pessoas"]:
             _upsert(con, "pessoa", ["id"], dict(id=p["id"], nome=p["nome"], papel=p.get("papel"),
                     telefone=p.get("telefone"), dados=_json(p), origem=p.get("origem")))
-        for p in familia["pets"]:
-            _upsert(con, "pet", ["id"], dict(id=p["id"], nome=p["nome"], especie=p.get("especie"),
-                    dados=_json(p), origem=p.get("origem")))
         for e in familia["empresas"]:
             _upsert(con, "empresa", ["id"], dict(id=e["id"], nome=e["nome"], cnpj=e.get("cnpj"),
                     dados=_json(e), origem=e.get("origem")))
@@ -86,10 +83,6 @@ def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | N
             _upsert(con, "matriz_acesso", ["informacao"], dict(
                 informacao=l["informacao"], boss=l.get("boss"), familia_vip=l.get("familia_vip"),
                 terceiros=l.get("terceiros")))
-        for a in familia["allowlist_vip"]:
-            _upsert(con, "allowlist_vip", ["chave"], dict(
-                chave=_chave(a.get("pessoa"), a.get("rotulo"), a.get("telefone")),
-                pessoa=a.get("pessoa"), rotulo=a.get("rotulo"), telefone=a.get("telefone")))
         for c in fin["compromissos"]:
             _upsert(con, "compromisso", ["id"], dict(
                 id=c["id"], origem=c.get("origem"), linha_id=c.get("linha_id"), nome=c.get("nome"),
@@ -121,11 +114,6 @@ def importar_staging(con: sqlite3.Connection, staging: Path, relatorio: dict | N
                 pj=c.get("pj"), ult_tx_real=c.get("ult_tx_real"), ult_sync_ok=c.get("ult_sync_ok"),
                 status_conexao=c.get("status_conexao"), saldo_centavos=_centavos(c.get("saldo")),
                 atualizado_em=c.get("atualizado_em")))
-        for m in memoria:
-            _upsert(con, "memoria", ["chave"], dict(
-                chave=_chave(m["tipo"], m.get("path"), m.get("bloco"), m.get("sessao"), m.get("mensagem")),
-                tipo=m["tipo"], path=m.get("path"), sessao=m.get("sessao"), papel=m.get("papel"),
-                timestamp=m.get("timestamp"), texto=m["texto"], origem=m.get("origem")))
         con.execute("commit")
     except BaseException:
         con.execute("rollback")

@@ -13,13 +13,13 @@ MIGR = Path(__file__).parent.parent / "migrations"
 RAIZ = Path(__file__).parent.parent
 
 # fica: finanças, base/auth/MCP (acesso, matriz_acesso, token_agente, chamada, chamada_mcp, aviso, rodada, parametro, decisao, pergunta, schema_versao)
-# e as que código que fica ainda usa: agenda_evento/agenda_fonte (dinheiro.sugestoes_agenda), pet/allowlist_vip/memoria/agenda_estado/agenda_eventos/
+# e as que código que fica ainda usa: agenda_evento/agenda_fonte (dinheiro.sugestoes_agenda), agenda_estado/agenda_eventos/
 # compromisso_fixo/conta_estado (importar, o carregador do staging) e custo_modelo (dinheiro.modelo). `pessoa` fica com todas as linhas.
 KEEP = {
-    "acesso", "agenda_estado", "agenda_evento", "agenda_eventos", "agenda_fonte", "allowlist_vip", "assinatura", "aviso", "captura_conta", "categoria",
+    "acesso", "agenda_estado", "agenda_evento", "agenda_eventos", "agenda_fonte", "assinatura", "aviso", "captura_conta", "categoria",
     "chamada", "chamada_mcp", "compromisso", "compromisso_fixo", "compromisso_linha", "compromisso_padrao", "conciliacao", "conferencia", "conta",
-    "conta_estado", "custo_modelo", "decisao", "empresa", "equivalencia_categoria", "fatura", "gastador_regra", "lancamento", "matriz_acesso", "memoria",
-    "nota_fiscal", "parametro", "pergunta", "pessoa", "pet", "receber_manual", "receber_manual_proposta", "recebimento_nota", "regra", "rodada", "saldo",
+    "conta_estado", "custo_modelo", "decisao", "empresa", "equivalencia_categoria", "fatura", "gastador_regra", "lancamento", "matriz_acesso",
+    "nota_fiscal", "parametro", "pergunta", "pessoa", "receber_manual", "receber_manual_proposta", "recebimento_nota", "regra", "rodada", "saldo",
     "schema_versao", "sugestao", "token_agente", "valor_do_mes",
 }
 # sai: agenda/e-mail sincronizados (e-mail, caixa), Teams, contatos, envios, escuta, família/documentos/bens/pets-documento, projetos, atividades, anexos, legados
@@ -29,6 +29,8 @@ DROP = {
     "familia_documento", "familia_proposta", "pessoa_documento_legado", "pessoa_historico", "pessoa_proposta_legado", "projeto", "projeto_fato",
     "projeto_gasto", "projeto_pessoa", "teams_conversa", "teams_fonte",
 }
+# sai na 0091 (minimização de dados): só o carregador do staging as gravava e nada financeiro as lê
+DROP_0091 = {"pet", "allowlist_vip", "memoria"}
 OBRIGATORIAS = {"pessoa", "conta", "gastador_regra", "decisao", "acesso", "matriz_acesso", "token_agente", "chamada_mcp", "aviso", "rodada"}
 
 
@@ -48,7 +50,7 @@ def _nomes(con) -> set[str]:
 def test_keep_e_drop_cobrem_tudo_o_que_existe_na_0089(tmp_path):
     con = conectar(tmp_path / "a.db")
     migrar(con, _ate(tmp_path, "0090"))
-    assert not KEEP & DROP and _nomes(con) == KEEP | DROP
+    assert not KEEP & DROP and not (KEEP | DROP) & DROP_0091 and _nomes(con) == KEEP | DROP | DROP_0091
 
 
 def test_depois_da_0090_so_ficam_as_que_ficam(tmp_path):
@@ -61,7 +63,7 @@ def test_depois_da_0090_so_ficam_as_que_ficam(tmp_path):
 
 def test_nenhum_modulo_que_fica_le_tabela_derrubada():
     achados = []
-    padrao = re.compile(r"\b(?:from|join|into|update|table|exists)\s+(" + "|".join(sorted(DROP)) + r")\b", re.I)
+    padrao = re.compile(r"\b(?:from|join|into|update|table|exists)\s+(" + "|".join(sorted(DROP | DROP_0091)) + r")\b", re.I)
     for pasta in ("gabi", "tools"):
         for arq in (RAIZ / pasta).rglob("*.py"):
             for m in padrao.finditer(arq.read_text(encoding="utf-8")):
@@ -126,3 +128,22 @@ def test_obrigatorias_continuam_com_as_colunas_de_base(tmp_path, tabela):
     con = conectar(tmp_path / "g.db")
     migrar(con, MIGR)
     assert {r[1] for r in con.execute(f"pragma table_info({tabela})")}
+
+
+def test_a_0091_derruba_pet_allowlist_e_memoria_sem_tocar_em_pessoa_nem_no_dinheiro(tmp_path):
+    con = conectar(tmp_path / "g.db")
+    migrar(con, _ate(tmp_path, "0091"))
+    assert DROP_0091 <= _nomes(con)
+    con.execute("insert into pessoa(id, nome, papel) values ('p1','Ana','filha')")
+    con.execute("insert into pet(id, nome) values ('t1','Thor')")
+    con.execute("insert into allowlist_vip(chave, pessoa) values ('k','p1')")
+    con.execute("insert into memoria(chave, tipo, texto) values ('m1','nota','x')")
+    con.execute("insert into compromisso(id, origem, nome, vencimento, estado) values ('c1','linha','Luz','2026-10-10','aberto')")
+    antes = [tuple(r) for r in con.execute("select * from pessoa")], [tuple(r) for r in con.execute("select * from compromisso")]
+    migrar(con, MIGR)
+    assert not _nomes(con) & DROP_0091 and _nomes(con) == KEEP
+    assert ([tuple(r) for r in con.execute("select * from pessoa")], [tuple(r) for r in con.execute("select * from compromisso")]) == antes
+    assert con.execute("pragma foreign_key_check").fetchall() == []
+    sql = (MIGR / "0091_minimizar_dados.sql").read_text(encoding="utf-8")
+    for instrucao in [i for i in re.findall(r"^drop .*?;", sql, re.M | re.S)]:
+        con.execute(instrucao)  # idempotente: já caíram e `if exists` não falha

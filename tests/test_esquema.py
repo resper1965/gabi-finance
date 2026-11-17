@@ -7,9 +7,9 @@ from gabi.db import conectar, migrar
 
 MIGRACOES = Path(__file__).parent.parent / "migrations"
 ESPERADAS = {
-    "pessoa", "pet", "empresa", "compromisso_fixo", "matriz_acesso", "allowlist_vip", "acesso",
+    "pessoa", "empresa", "compromisso_fixo", "matriz_acesso", "acesso",
     "compromisso", "fatura", "conciliacao", "conta_estado", "agenda_estado", "agenda_eventos",
-    "memoria", "rodada", "chamada", "decisao", "token_agente", "schema_versao",
+    "rodada", "chamada", "decisao", "token_agente", "schema_versao",
 }
 
 
@@ -29,21 +29,6 @@ def test_acesso_rejeita_nivel_invalido(con):
     con.execute("insert into acesso(login, pessoa_id, nivel, criado_em) values ('a@x.com','p1','boss','2026-10-08')")
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("insert into acesso(login, pessoa_id, nivel, criado_em) values ('b@x.com','p1','x','2026-10-08')")
-
-
-def _mem(con, chave, texto):
-    con.execute("insert into memoria(chave, tipo, texto, origem) values (?, 'memoria', ?, 'teste')", (chave, texto))
-
-
-def _achar(con, termo):
-    return [r[0] for r in con.execute(
-        "select m.texto from memoria_fts f join memoria m on m.id=f.rowid where memoria_fts match ?", (termo,))]
-
-
-def test_memoria_chave_unica(con):
-    _mem(con, "1", "a")
-    with pytest.raises(sqlite3.IntegrityError):
-        _mem(con, "1", "b")
 
 
 def test_valores_em_centavos_inteiros(con):
