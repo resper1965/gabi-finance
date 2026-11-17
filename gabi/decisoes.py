@@ -2,8 +2,6 @@
 R1: a Gabi pergunta, o Ricardo decide. R2: nada é enviado daqui. `efeito` vem de uma lista FECHADA e validada; nunca código livre.
 Responder grava a decisão (origem 'canal') e aplica o efeito na mesma transação; só uma resposta por pergunta."""
 import json
-import re
-from email.utils import parseaddr
 
 from gabi.db import transacao
 
@@ -70,62 +68,6 @@ def _para_quem_aplicar(con, p: dict) -> None:
                 (p["pessoa_id"], p["estabelecimento"]))
 
 
-_ENDERECO = re.compile(r"^[a-z0-9._%+'-]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,}$")
-
-
-def _endereco(texto) -> str | None:
-    """Endereço puro e minúsculo do cabeçalho `From`; None se não houver um válido. (Cópia de correio.regras.endereco: o correio saiu do gabi-finance.)"""
-    if not isinstance(texto, str):
-        return None
-    a = parseaddr(texto)[1].strip().lower()
-    return a if _ENDERECO.match(a) else None
-
-
-def _normalizar_telefone(bruto: str) -> str | None:
-    """E.164 brasileiro (+55...). Sem DDI assume +55. None se inválido. JID só vale com sufixo de telefone (@s.whatsapp.net,
-    @c.us): `@lid`, `@g.us` e outros são ids opacos, nunca telefone. Celular antigo (+55 DD + 8 dígitos começando em 6–9) ganha
-    o 9 na frente; fixo (2–5) não muda. (Cópia de contatos.telefone.normalizar_telefone: os contatos saíram do gabi-finance.)"""
-    if not isinstance(bruto, str):
-        return None
-    if "@" in bruto and bruto.split("@", 1)[1].strip().lower() not in ("s.whatsapp.net", "c.us"):
-        return None
-    digitos = re.sub(r"\D", "", bruto.split("@")[0])
-    if len(digitos) in (10, 11):
-        digitos = "55" + digitos
-    if digitos.startswith("55") and len(digitos) == 12 and digitos[4] in "6789":
-        digitos = digitos[:4] + "9" + digitos[4:]
-    if digitos.startswith("55") and len(digitos) in (12, 13):
-        return "+" + digitos
-    return None
-
-
-def _canal_email_validar(con, p: dict) -> None:
-    """Só o e-mail de um contato do Google cujo telefone é um canal whatsapp DESTA pessoa (nada de endereço livre), já normalizado."""
-    from gabi.cobrar.cadastro import dados
-    if not isinstance(p, dict) or set(p) != {"pessoa_id", "email"} or not isinstance(p.get("pessoa_id"), str) or not isinstance(p.get("email"), str):
-        raise ErroDecisao("opcoes_invalidas", "adicionar_canal_email exige pessoa_id e email, só esses dois")
-    if _endereco(p["email"]) != p["email"]:
-        raise ErroDecisao("opcoes_invalidas", "email deve ser um endereço válido em minúsculas")
-    pessoa = con.execute("select id, dados from pessoa where id=? and excluido_em is null", (p["pessoa_id"],)).fetchone()
-    if pessoa is None:
-        raise ErroDecisao("opcoes_invalidas", "pessoa_id não existe")
-    numeros = {_normalizar_telefone(c[9:]) or c[9:] for c in dados(pessoa).get("canais") or [] if isinstance(c, str) and c.startswith("whatsapp:")}
-    if not any(con.execute("select 1 from contato_google_email where email=? and telefone=?", (p["email"], n)).fetchone() for n in numeros):
-        raise ErroDecisao("opcoes_invalidas", "esse e-mail não é de um contato com o telefone desta pessoa")
-
-
-def _canal_email_aplicar(con, p: dict) -> None:
-    """Acrescenta `email:<endereço>` a `canais` (sem repetir) e não toca em mais nada de `pessoa.dados`."""
-    from gabi.cobrar.cadastro import dados
-    _canal_email_validar(con, p)  # a resposta pode vir dias depois: o contato pode ter mudado
-    pessoa = con.execute("select dados from pessoa where id=?", (p["pessoa_id"],)).fetchone()
-    d = dados(pessoa)
-    canais = d.get("canais") if isinstance(d.get("canais"), list) else []
-    if not any(isinstance(c, str) and c.lower() == f"email:{p['email']}" for c in canais):
-        d["canais"] = canais + [f"email:{p['email']}"]
-        con.execute("update pessoa set dados=? where id=?", (json.dumps(d, ensure_ascii=False), p["pessoa_id"]))
-
-
 # efeito -> (validação na criação, aplicação na resposta). Acrescentar um efeito é mudança de código revisada, nunca dado.
 EFEITOS = {
     "registrar_nota": (lambda con, p: None, lambda con, p: None),
@@ -133,7 +75,6 @@ EFEITOS = {
     "marcar_conta_sim": (_conta_existe, _conta_estado("sim")),
     "criar_compromisso": (_criar_compromisso_validar, _criar_compromisso_aplicar),
     "atribuir_para_quem": (_para_quem_validar, _para_quem_aplicar),
-    "adicionar_canal_email": (_canal_email_validar, _canal_email_aplicar),
 }
 
 

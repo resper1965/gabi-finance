@@ -1,8 +1,8 @@
-"""Produtor de avisos: grava em `aviso` o que o Ricardo precisa saber (rodada parada, conta atrasada, assinatura cancelada e cobrada,
-o que vence hoje, serviço que falhou). Consome: db (rodada, compromisso, assinatura, lancamento, aviso). Só grava; entregar é outra etapa.
+"""Produtor de avisos financeiros: grava em `aviso` o que o Ricardo precisa saber (rodada parada, conta atrasada, assinatura cancelada e cobrada,
+o que vence hoje, serviço que falhou). No gabi-finance só há avisos do dinheiro (agenda, atividades, projetos, Teams, documentos e Hermes saíram). Consome: db (rodada, compromisso, assinatura, lancamento, aviso). Só grava; entregar é outra etapa.
 
 Um aviso por (tipo, chave) por dia de Brasília, aberto ou lido. O payload leva só nome, valor e datas: nunca CPF, documento, conta ou chave PIX.
-Uso: python -m gabi.avisos            (timer de 15 min)    |    python -m gabi.avisos --falha gabi-brain-saldos.service  (OnFailure=)"""
+Uso: python -m gabi.avisos            (timer de 15 min)    |    python -m gabi.avisos --falha gabi-finance-saldos.service  (OnFailure=)"""
 import argparse
 import datetime as dt
 import json
@@ -12,9 +12,6 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from gabi import atividades, projetos
-from gabi.agenda import consulta as consulta_agenda
-from gabi.agenda import convites
 from gabi.db import conectar, migrar
 from gabi.dinheiro.conciliacao import CONFIRMADO
 from gabi.dinheiro.valor import formatar
@@ -30,8 +27,7 @@ def _inicio_do_dia_utc(agora: dt.datetime) -> str:
     return dt.datetime(d.year, d.month, d.day, tzinfo=BRT).astimezone(dt.timezone.utc).isoformat()
 
 
-UMA_VEZ = {"atividade_hora", "convite_agenda"}  # chave = atividade + vencimento: o aviso "agora" sai uma vez só (a janela de 2 dias do produtor não pode reenviá-lo)
-SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou", "projeto_parado"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
+SEMANAL = {"conta_atrasada", "cobrada_apos_cancelar", "exportacao_parada", "servico_falhou"}  # persistem por dias: um aviso aberto por vez, lembrete a cada 7 dias depois de lido
 DIAS_SILENCIO = 7
 HORAS_EXPORTACAO = 9 * 24
 
@@ -49,8 +45,6 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
         if con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and (entregue_em is null or criado_em>=?)"
                        " and not (telegram_em is not null and telegram_em is entregue_em)" + velho, args).fetchone():
             return None
-    if tipo in UMA_VEZ and con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=?", (tipo, str(chave))).fetchone():
-        return None  # a chave já leva o vencimento: avisado uma vez, nunca de novo nos dias seguintes
     ja = con.execute("select 1 from aviso where tipo=? and json_extract(payload,'$.chave')=? and criado_em>=?", (tipo, str(chave), _inicio_do_dia_utc(agora))).fetchone()
     if ja:
         return None
@@ -58,10 +52,6 @@ def _novo(con, agora: dt.datetime, tipo: str, chave, payload: dict) -> int | Non
                           (tipo, json.dumps({"chave": str(chave), **payload}, ensure_ascii=False), agora.astimezone(dt.timezone.utc).isoformat())).lastrowid
     if tipo in TIPOS_REVALIDADOS:
         consolidar_duplicados(con, agora)  # o recém-criado é o mais recente: os velhos da mesma conta ficam superados
-    if tipo == "atividade_resumo":  # a chave é o dia: o resumo de ontem não enviado fica superado pelo de hoje
-        ts = agora.astimezone(dt.timezone.utc).isoformat()
-        for r in con.execute("select id, telegram_em from aviso where tipo='atividade_resumo' and entregue_em is null and id<?", (novo_id,)).fetchall():
-            _fechar(con, r["id"], r["telegram_em"] is not None, ts)
     return novo_id
 
 
@@ -82,8 +72,7 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     conta_atrasada: compromisso `atrasado` = vale; `a_conferir` ou linha inexistente = incerto; qualquer outro estado (pago, aberto por vencimento movido) = resolvido.
     vence_hoje: o payload atual traz só os itens ainda 'aberto' (por id; sem id, nome+vencimento); nenhum = resolvido. Entregue em outro dia, o item que virou
     `atrasado` sai (resolvido): quem assume é o conta_atrasada. cobrada_apos_cancelar: vale se a assinatura segue em `cancelar`.
-    documento_vence: resolvido se o documento ou o titular saiu, se a data dele mudou ou se há outro documento ativo do mesmo titular e tipo
-    com data posterior (renovação aprovada). Demais tipos: sempre valem."""
+    Demais tipos: sempre valem."""
     if tipo == "conta_atrasada":
         r = con.execute("select estado from compromisso where id=?", (str(payload.get("chave")),)).fetchone()
         if r is None or r[0] == "a_conferir":
@@ -111,30 +100,6 @@ def revalidar(con, tipo: str, payload: dict) -> tuple[str, dict]:
     if tipo == "cobrada_apos_cancelar":
         ok = con.execute("select 1 from assinatura where id=? and status='cancelar'", (str(payload.get("chave")),)).fetchone() is not None
         return (VALE if ok else RESOLVIDO), payload
-    if tipo == "teams_sem_resposta":
-        conta, _, chat_id = str(payload.get("chave") or "").partition("|")
-        r = con.execute("select c.ultima_para_mim_em, c.minha_ultima_resposta_em, f.estado from teams_conversa c join teams_fonte f on f.conta=c.conta "
-                        "where c.conta=? and c.chat_id=?", (conta, chat_id)).fetchone()
-        if r is None or r["estado"] != "sim":
-            return RESOLVIDO, payload
-        from gabi.teams.regra import _dt
-        para_mim, resp = _dt(r["ultima_para_mim_em"]), _dt(r["minha_ultima_resposta_em"])
-        if para_mim is None or (resp is not None and resp >= para_mim):
-            return RESOLVIDO, payload
-        return VALE, payload
-    if tipo == "documento_vence":
-        return _documento_vence_estado(con, payload), payload
-    if tipo in TIPOS_ATIVIDADE:
-        vale, atual = atividades.revalidar_aviso(con, tipo, payload)
-        return (VALE if vale else RESOLVIDO), atual
-    if tipo == "projeto_parado":
-        return (VALE if projetos.revalidar_aviso(con, payload) else RESOLVIDO), payload
-    if tipo == "convite_agenda":  # respondido no Outlook, apagado ou remarcado: o aviso aberto some
-        if payload.get("serie_id"):  # série: vale enquanto alguma ocorrência seguir sem resposta (remarcar uma ocorrência não resolve)
-            r = con.execute("select 1 from agenda_evento where serie_id=? and resposta='needsAction' limit 1", (payload["serie_id"],)).fetchone()
-            return (VALE if r else RESOLVIDO), payload
-        r = con.execute("select resposta, inicio_utc from agenda_evento where id=?", (payload.get("evento_id"),)).fetchone()
-        return (VALE if r and r["resposta"] == "needsAction" and r["inicio_utc"] == payload.get("inicio_utc") else RESOLVIDO), payload
     return VALE, payload
 
 
@@ -151,8 +116,7 @@ def triar(con, aviso_id: int, tipo: str, payload: dict, agora: dt.datetime) -> t
     return estado, atual
 
 
-TIPOS_ATIVIDADE = ("atividade_hora", "atividade_hoje", "atividade_resumo")
-TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve", "teams_sem_resposta", "documento_vence", "projeto_parado", "convite_agenda", *TIPOS_ATIVIDADE)
+TIPOS_REVALIDADOS = ("conta_atrasada", "vence_hoje", "cobrada_apos_cancelar", "vence_em_breve")
 ABERTOS_A_VENCER = ("aberto",)
 ANTECEDENCIA_PADRAO = 3
 TOLERANCIA_VALOR = 0.10   # aviso de "valor diferente" só acima de 10% do estimado
@@ -207,75 +171,6 @@ def _parametro(con, chave: str, padrao):
         return padrao
 
 
-UNIDADE_HERMES = "hermes-gateway"
-
-
-def estado_do_servico(unidade: str) -> str | None:
-    """'active', 'failed', 'inactive'... ou None se não deu para saber (sem systemctl, sem permissão, unidade inexistente)."""
-    import subprocess
-    try:
-        r = subprocess.run(["systemctl", "show", unidade, "-p", "LoadState", "-p", "ActiveState"], capture_output=True, text=True, timeout=5, check=False)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    campos = dict(l.split("=", 1) for l in r.stdout.splitlines() if "=" in l)
-    if r.returncode != 0 or campos.get("LoadState") != "loaded":
-        return None
-    return campos.get("ActiveState")
-
-
-def _hermes_parado(con, agora: dt.datetime, novo, estado) -> None:
-    """H4: o canal (Hermes) caiu? Só 'failed' ou 'inactive' avisam; 'activating', 'reloading' e 'não sei' não. Um aviso por dia, sem texto de conversa.
-    O aviso sai pelo Telegram do próprio brain, que não depende do Hermes."""
-    if _parametro(con, "avisos.vigiar_hermes", True) is False:
-        return
-    unidade = _parametro(con, "avisos.hermes_unidade", UNIDADE_HERMES)
-    unidade = unidade if isinstance(unidade, str) and unidade.strip() else UNIDADE_HERMES
-    st = estado(unidade)
-    if st in ("failed", "inactive"):
-        novo("hermes_parado", unidade, {"unidade": unidade, "estado": st})
-
-
-def _google_parado(con, agora: dt.datetime, novo) -> None:
-    """Todas as fontes Google liberadas (correio e agenda) falhando E sem sincronizar há mais de `avisos.google_horas` (padrão 2): token revogado ou expirado
-    (app OAuth em modo Testing vence em 7 dias). Uma fonte funcionando basta para não avisar; recarga vazia não é falha. Um aviso por dia, só contas e contagem."""
-    if _parametro(con, "avisos.vigiar_google", True) is False:
-        return
-    horas = _parametro(con, "avisos.google_horas", 2)
-    if isinstance(horas, bool) or not isinstance(horas, (int, float)) or horas <= 0:
-        horas = 2
-    corte = (agora - dt.timedelta(hours=horas)).astimezone(dt.timezone.utc)
-    fontes = [r for t in ("email_fonte", "agenda_fonte") for r in con.execute(
-        f"select conta, sincronizada_em, ultimo_erro from {t} where provedor='google' and estado='sim'")]
-    if not fontes:
-        return
-    for f in fontes:
-        if not f["ultimo_erro"] or f["ultimo_erro"].startswith("recarga vazia"):
-            return
-        if f["sincronizada_em"]:
-            quando = dt.datetime.fromisoformat(f["sincronizada_em"])
-            if quando.tzinfo is None:
-                quando = quando.replace(tzinfo=dt.timezone.utc)
-            if quando >= corte:
-                return
-    novo("google_parado", "google", {"fontes": len(fontes), "contas": sorted({f["conta"] for f in fontes})})
-
-
-def _teams_sem_resposta(con, agora: dt.datetime, novo) -> None:
-    """Conversa do Teams (conta com teams_fonte 'sim') em que me chamaram (1:1) ou me mencionaram (grupo) e não respondi há N horas úteis. Sem texto de mensagem.
-    Ao criar o aviso grava `ultimo_aviso_em`: a mesma mensagem não avisa de novo; mensagem nova (ultima_para_mim_em maior) avisa outra vez."""
-    from gabi.teams import regra
-    horas, expediente = regra.ler_config(con)
-    local = agora.astimezone(regra.BRT)
-    if local.weekday() >= 5 or not expediente[0] <= local.time() < expediente[1]:
-        return  # fora do expediente (noite, fim de semana): nada nasce nem é enviado de madrugada
-    for c in con.execute("select c.* from teams_conversa c join teams_fonte f on f.conta=c.conta where f.estado='sim' order by c.conta, c.chat_id").fetchall():
-        if not regra.pendente(c, agora, horas, expediente):
-            continue
-        chave = f"{c['conta']}|{c['chat_id']}"
-        if novo("teams_sem_resposta", chave, {"conta": c["conta"], "chat_id": c["chat_id"], "tipo_chat": c["tipo"], "de_nome": c["de_nome"], "desde": c["ultima_para_mim_em"]}) is not None:
-            con.execute("update teams_conversa set ultimo_aviso_em=? where conta=? and chat_id=?", (agora.astimezone(dt.timezone.utc).isoformat(), c["conta"], c["chat_id"]))
-
-
 def _vence_em_breve(con, agora: dt.datetime, hoje: dt.date, novo) -> None:
     """Contas que vencem de amanhã até `avisos.antecedencia_dias` (padrão 3) à frente e ainda não foram avisadas, com o valor estimado marcado como tal.
     Cada conta entra num aviso uma única vez (as que entram na janela depois, como boleto emitido tarde, saem no aviso do dia); o do dia do vencimento é o `vence_hoje`."""
@@ -316,54 +211,6 @@ def _valor_diferente(con, agora: dt.datetime, novo) -> None:
                 novo("valor_diferente", i["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "estimado": formatar(est), "real": formatar(real)})
 
 
-AVISAR_DIAS_PADRAO = [60, 30, 7]
-DIAS_VENCIDO_SEM_AVISO = 30
-
-
-def _ultima_vence(con, documento_id: int) -> str | None:
-    from gabi.documentos.repositorio import DATAS_VENCE
-    return con.execute(f"select max(data) from documento_data where documento_id=? and tipo in ({','.join('?' * len(DATAS_VENCE))})",
-                       (documento_id, *DATAS_VENCE)).fetchone()[0]
-
-
-def _documento_vence_estado(con, payload: dict) -> str:
-    from gabi.documentos.repositorio import DATAS_VENCE
-    try:
-        documento_id = int(str(payload.get("chave")).split("|")[0])
-    except ValueError:
-        return RESOLVIDO
-    d = con.execute("select titular_tipo, titular_id, tipo from documento where id=? and excluido_em is null", (documento_id,)).fetchone()
-    if d is None or not con.execute(f"select 1 from {'pessoa' if d['titular_tipo'] == 'pessoa' else 'bem'} where id=? and excluido_em is null",
-                                    (d["titular_id"],)).fetchone():
-        return RESOLVIDO
-    if _ultima_vence(con, documento_id) != payload.get("data"):
-        return RESOLVIDO
-    mais_novo = con.execute(f"select 1 from documento x join documento_data y on y.documento_id=x.id where x.titular_tipo=? and x.titular_id=? and x.tipo=?"
-                            f" and x.id<>? and x.excluido_em is null and y.tipo in ({','.join('?' * len(DATAS_VENCE))}) and y.data>? limit 1",
-                            (d["titular_tipo"], d["titular_id"], d["tipo"], documento_id, *DATAS_VENCE, payload.get("data"))).fetchone()
-    return RESOLVIDO if mais_novo else VALE
-
-
-def _documento_vence(con, hoje: dt.date, novo) -> None:
-    """Documento aprovado com validade, fim de vigência ou vencimento (a última delas): um aviso por (documento, marco) de `documentos.avisar_dias`
-    (padrão 60, 30 e 7 dias), só o menor marco já alcançado (quem entra a 20 dias recebe o de 30, não o de 60). Vencido há mais de 30 dias não avisa
-    (o passaporte antigo aprovado agora não vira alerta). Data trocada no próprio documento (renovação no lugar) volta a avisar. Payload sem número."""
-    from gabi.documentos.repositorio import vencimentos
-    marcos = _parametro(con, "documentos.avisar_dias", AVISAR_DIAS_PADRAO)
-    if not (isinstance(marcos, list) and marcos and all(isinstance(m, int) and not isinstance(m, bool) and 1 <= m <= 365 for m in marcos)):
-        marcos = AVISAR_DIAS_PADRAO
-    for v in vencimentos(con, hoje, max(marcos) // 28 + 1):
-        dias = (dt.date.fromisoformat(v["data"]) - hoje).days
-        alcancados = [m for m in marcos if dias <= m]
-        if not alcancados or dias < -DIAS_VENCIDO_SEM_AVISO:
-            continue
-        chave = f"{v['documento_id']}|{min(alcancados)}"
-        if con.execute("select 1 from aviso where tipo='documento_vence' and json_extract(payload,'$.chave')=? and json_extract(payload,'$.data')=?",
-                       (chave, v["data"])).fetchone():
-            continue
-        novo("documento_vence", chave, {"titular_nome": v["titular_nome"], "tipo": v["tipo"], "data_tipo": v["data_tipo"], "data": v["data"], "dias": dias})
-
-
 def _bancos_desatualizados(con, agora: dt.datetime, novo) -> None:
     """Um aviso por banco por dia quando o provedor não atualiza o banco há mais de 24 h (regra única em `envelope.bancos_antigos`)."""
     for b in bancos_antigos(con, agora):
@@ -382,7 +229,7 @@ def _saldo_divergente(con, novo) -> None:
                                                  "detalhe": c["detalhe"]})
 
 
-def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
+def gerar_avisos(con, agora: dt.datetime) -> list[int]:
     criados: list[int] = []
     hoje = agora.astimezone(BRT).date()
     _fechar_obsoletos(con, agora)
@@ -408,10 +255,6 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo("exportacao_parada", "semanal", {"motivo": "sem pacote exportado há mais de 9 dias (falta /etc/gabi/backup.pub ou a exportação falhou)"})
 
     _bancos_desatualizados(con, agora, novo)
-    if estado_servico is not None:  # só o timer passa o leitor real (systemctl); nos testes ninguém consulta o systemd
-        _hermes_parado(con, agora, novo, estado_servico)
-    _google_parado(con, agora, novo)
-    _teams_sem_resposta(con, agora, novo)
 
     for c in con.execute("select id, nome, vencimento, valor_centavos from compromisso where estado='atrasado' and vencimento<? order by vencimento", (hoje.isoformat(),)):
         novo("conta_atrasada", c["id"], {"nome": c["nome"], "vencimento": c["vencimento"], "valor": _valor(c["valor_centavos"])})
@@ -428,19 +271,9 @@ def gerar_avisos(con, agora: dt.datetime, estado_servico=None) -> list[int]:
         novo("vence_hoje", hoje.isoformat(), {"itens": itens})
     _vence_em_breve(con, agora, hoje, novo)
     _valor_diferente(con, agora, novo)
-    _documento_vence(con, hoje, novo)
     n = con.execute("select count(*) from lancamento where convertido=0").fetchone()[0]
     if n:  # só a contagem: nunca valor nem descrição
         novo("lancamento_sem_conversao", hoje.isoformat(), {"quantidade": n})
-    for tipo, chave, p in atividades.avisos_devidos(con, agora):
-        novo(tipo, chave, p)
-    for p in projetos.parados(con, agora):
-        novo("projeto_parado", p["id"], p)
-    fuso = consulta_agenda.fuso_da_agenda(con)
-    for i in convites.pendentes(con, agora):  # série: uma chave por série (avisa uma vez); avulso: evento + início (remarcado avisa de novo)
-        novo("convite_agenda", f"serie:{i['serie_id']}" if i["serie_id"] else f"{i['evento_id']}:{i['inicio_utc']}",
-             {"evento_id": i["evento_id"], "conta": i["conta"], "serie_id": i["serie_id"], "titulo": i["titulo"], "inicio_utc": i["inicio_utc"],
-              "texto": convites.texto_aviso(i, fuso)})
     return criados
 
 
@@ -459,7 +292,7 @@ def main(argv=None) -> int:
     if a.falha:
         print("servico_falhou:", a.falha, "->", registrar_servico_falhou(con, a.falha, agora))
     else:
-        print("avisos criados:", gerar_avisos(con, agora, estado_servico=estado_do_servico))
+        print("avisos criados:", gerar_avisos(con, agora))
     return 0
 
 

@@ -41,6 +41,7 @@ FONTES_DA_FERRAMENTA: dict[str, tuple | None] = {
                          "agenda_financeira", "fechamento_dia", "financeiro_recorrentes", "financeiro_previsao", "resumo_manha", "financeiro_a_receber")},
     "financeiro_registrar_a_receber": (), "financeiro_cancelar_a_receber": (), "financeiro_marcar_gasto": (), "assinaturas_listar": (), "assinatura_marcar": (), "financeiro_indicar_gastador": (), "financeiro_marcar_reembolso": (),
     **{n: () for n in ferramentas_despesas.NOMES},  # cadastro do Ricardo: não envelhece
+    "olhar_a_frente": None,  # ADR-037: dados locais
     "avisos_abertos": (), "regras_listar": (), "decisoes_recentes": (), "empresas_listar": (), "decisoes_abertas": (), "decisao_responder": (),
     "regras_sugerir": (), "classificar_lancamento": (),
 }

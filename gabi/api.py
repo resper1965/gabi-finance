@@ -64,7 +64,7 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.state.permite_tcp_local = permite_tcp_local
     app.state.origens_confiaveis = frozenset(o.rstrip("/") for o in origens_confiaveis)
     from gabi.fontes.ambiente import fontes_do_ambiente
-    app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábricas de Nibo/Paperless (injetáveis nos testes)
+    app.state.fontes = fontes if fontes is not None else fontes_do_ambiente()  # fábrica do Nibo (injetável nos testes)
     app.state.relogio = relogio or (lambda: dt.datetime.now(ZoneInfo("America/Sao_Paulo")))  # injetável nos testes
 
     @app.exception_handler(HTTPException)

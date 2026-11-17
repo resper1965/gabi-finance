@@ -1,6 +1,6 @@
 """Entrega dos avisos ao Telegram (G15): DESLIGADA por padrão. Só envia se TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID estiverem no ambiente
 (/etc/gabi/telegram.env, colocado pelo Ricardo: é a exceção à R2). Envia o texto em pt-BR do aviso (só nome, valor e datas: nunca CPF, conta ou chave PIX),
-no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos (o `email_emergencial` vai primeiro); marca `telegram_em` somente depois do 200. Aviso obsoleto (condição já resolvida) não é enviado: fecha sem mandar. O token nunca entra na mensagem nem no log.
+no máximo 10 por rodada, só os dos últimos 2 dias e ainda não lidos, em ordem de criação; marca `telegram_em` somente depois do 200. Aviso obsoleto (condição já resolvida) não é enviado: fecha sem mandar. O token nunca entra na mensagem nem no log.
 Uso: python -m gabi.telegram (timer). Consome: aviso, rotas.avisos.descrever."""
 import datetime as dt
 import json
@@ -48,9 +48,8 @@ def enviar_avisos_contagem(con, env, agora: dt.datetime, http=_http_real) -> tup
     agora_utc = agora.astimezone(dt.timezone.utc).isoformat()
     consolidar_duplicados(con, agora)  # uma conta repetida vira um aviso só: o mais recente
     enviados = obsoletos = incertos = tentativas = 0
-    # email_emergencial vai na frente (respeita a janela de 2 dias)
     for r in con.execute("select id, tipo, payload from aviso where telegram_em is null and entregue_em is null "
-                         "and criado_em>=? order by tipo!='email_emergencial', id", (desde,)).fetchall():
+                         "and criado_em>=? order by id", (desde,)).fetchall():
         if tentativas >= MAX_POR_RODADA:
             break
         estado, payload = triar(con, r["id"], r["tipo"], json.loads(r["payload"]), agora)

@@ -42,6 +42,7 @@ mcp_servers:
       - financeiro_recorrentes
       - financeiro_registrar_a_receber
       - financeiro_saldo
+      - olhar_a_frente
       - regras_listar
       - regras_sugerir
       - resumo_manha

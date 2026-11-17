@@ -79,13 +79,13 @@ ROTAS = [
     "PUT /api/v1/cadastros/nibo",
 ]
 
-# as financeiras de hoje, com os mesmos nomes (F8); o resto (agenda, e-mail, Teams, contatos, família, documentos, projetos, atividades, assistente) saiu
+# as financeiras de hoje, com os mesmos nomes (F8); o resto (agenda, e-mail, Teams, contatos, família, documentos, projetos, atividades, promessas, preparar_reuniao, revisao_semana) saiu; `olhar_a_frente` volta só com o caixa e o a receber atrasado
 FERRAMENTAS = [
     "agenda_financeira", "assinatura_marcar", "assinaturas_listar", "avisos_abertos", "classificar_lancamento", "decisao_responder", "decisoes_abertas",
     "decisoes_recentes", "despesa_criar", "despesa_encerrar", "despesa_excluir", "despesa_mes", "despesa_mudar", "despesas_listar", "despesas_por_empresa",
     "empresas_listar", "fechamento_dia", "financeiro_a_receber", "financeiro_cancelar_a_receber", "financeiro_contas_a_pagar", "financeiro_indicar_gastador",
     "financeiro_lancamentos", "financeiro_marcar_gasto", "financeiro_marcar_reembolso", "financeiro_para_onde_vai", "financeiro_previsao",
-    "financeiro_recorrentes", "financeiro_registrar_a_receber", "financeiro_saldo", "regras_listar", "regras_sugerir", "resumo_manha",
+    "financeiro_recorrentes", "financeiro_registrar_a_receber", "financeiro_saldo", "olhar_a_frente", "regras_listar", "regras_sugerir", "resumo_manha",
 ]
 
 

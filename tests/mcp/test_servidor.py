@@ -16,7 +16,7 @@ HOST = "127.0.0.1:8081"
 LEITURA_FASE1 = {"financeiro_saldo", "financeiro_lancamentos", "financeiro_contas_a_pagar", "financeiro_para_onde_vai", "agenda_financeira",
                  "financeiro_recorrentes", "financeiro_previsao", "despesas_por_empresa", "fechamento_dia"}
 NOVAS_FASE2 = {"classificar_lancamento", "regras_sugerir"}
-NOVAS_FASE3 = {"resumo_manha"}  # só leitura do dia
+NOVAS_FASE3 = {"resumo_manha", "olhar_a_frente"}  # só leitura do dia
 NOVAS_DECISOES = {"decisoes_abertas", "decisao_responder"}  # a única escrita é gravar o número que o Ricardo escolheu
 NOVAS_VER = {"financeiro_a_receber", "avisos_abertos", "regras_listar", "decisoes_recentes", "empresas_listar"}  # Onda 2: só leitura
 NOVAS_AGIR = {"financeiro_registrar_a_receber", "financeiro_cancelar_a_receber", "financeiro_marcar_gasto", "assinaturas_listar", "assinatura_marcar",
@@ -110,8 +110,8 @@ def test_host_nao_permitido_e_recusado(banco, tokens):
 
 
 # ---------------- ferramentas ----------------
-def test_sobram_exatamente_as_32_ferramentas_financeiras_do_corte():
-    assert len(ESCOPOS_FERRAMENTAS) == 32
+def test_sobram_exatamente_as_33_ferramentas_financeiras_do_corte():
+    assert len(ESCOPOS_FERRAMENTAS) == 33
     assert sorted(ESCOPOS_FERRAMENTAS) == sorted(PERMITIDAS)
 
 
