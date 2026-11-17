@@ -12,7 +12,7 @@ Convenções que valem em todas as tabelas:
 
 ## De onde vieram as tabelas
 
-A base é a do `gabi-brain` na migração 0089. A **0090** derrubou as tabelas das áreas que saíram (agenda e e-mail sincronizados, Teams, contatos, envios, escuta, documentos e bens de família, projetos, atividades, anexos). A **0091** derrubou `pet`, `allowlist_vip` e `memoria` (minimização de dados: só o carregador as gravava). As listas explícitas do que fica e do que sai estão em `tests/test_migracao_corte.py`. A decisão está em [`adr/039-corte-gabi-finance.md`](adr/039-corte-gabi-finance.md).
+A base é a do `gabi-brain` na migração 0089. A **0090** derrubou as tabelas das áreas que saíram (agenda e e-mail sincronizados, Teams, contatos, envios, escuta, documentos e bens de família, projetos, atividades, anexos). A **0091** derrubou `pet`, `allowlist_vip` e `memoria` (minimização de dados: só o carregador as gravava). A **0092** não mexe em tabela: limpa as **linhas** que a cópia do brain traz e o gabi-finance não usa (avisos de tipos que ele não gera e `servico_falhou` de unidade do brain; perguntas abertas com efeito fora de `gabi.decisoes.EFEITOS`, que viram `expirada`; `pessoa.telefone` e tudo de `pessoa.dados` menos `responsavel_por` e `beneficiario`; eventos de agenda passados, privados, cancelados ou de calendário não liberado, e link, organizador e resposta dos que ficam; parâmetros dos módulos que saíram e o `mcp.url` do brain). As listas explícitas do que fica e do que sai estão em `tests/test_migracao_corte.py`. A decisão está em [`adr/039-corte-gabi-finance.md`](adr/039-corte-gabi-finance.md).
 
 
 ## Base: acesso, auditoria e controle
@@ -122,7 +122,7 @@ De-para da categoria do Open Finance (Pluggy) para a categoria do gabi-finance.
 - **Gravada por:** `gabi.rotas.cadastros`
 
 ### `pessoa`
-Pessoas (o Ricardo, a família, favorecidos que viraram "para quem"). Mantida inteira no corte; só as colunas de documentos saíram.
+Pessoas (o Ricardo, a família, favorecidos que viraram "para quem"). Todas as linhas ficam; desde a 0092 sem telefone e com `dados` reduzido a `responsavel_por` e `beneficiario` (o que o dinheiro lê).
 
 - **Colunas** (7): `id`*, `nome`, `papel`, `telefone`, `dados`, `origem`, `excluido_em` (`*` = chave primária)
 - **Lida por:** `gabi.decisoes`, `gabi.dinheiro.classificar`, `gabi.dinheiro.consultas`, `gabi.dinheiro.gastador`, `gabi.dinheiro.modelo`, `gabi.dinheiro.repositorio`, `gabi.dinheiro.sugestoes_dono`, `gabi.mcp.ferramentas_agir`, `gabi.rotas.cadastros`, `gabi.rotas.dinheiro`
@@ -307,7 +307,7 @@ Estado do staging da agenda financeira. Só o carregador grava.
 - **Gravada por:** `gabi.importar`
 
 ### `agenda_evento`
-Eventos de agenda. **Congelada**: `dinheiro.sugestoes_agenda` ainda lê, mas nada alimenta mais.
+Eventos de agenda. **Congelada**: `dinheiro.sugestoes_agenda` ainda lê, mas nada alimenta mais. A 0092 deixou só os futuros, não privados, não cancelados e de calendário liberado, sem `link_reuniao`, `organizador_nome` e `resposta`.
 
 - **Colunas** (20): `id`*, `fonte_id`, `externo_id`, `inicio_utc`, `fim_utc`, `dia_local`, `dia_fim_local`, `dia_inteiro`, `titulo`, `link_reuniao`, `participantes_qtd`, `status`, `etag`, `atualizado_origem`, `privado`, `ical_uid`, `livre`, `resposta`, `organizador_nome`, `serie_id` (`*` = chave primária)
 - **Referências:** `fonte_id` → `agenda_fonte`
