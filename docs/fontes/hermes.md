@@ -50,7 +50,7 @@ A lista é a **explícita** (sem `*`) e é testada: `tests/mcp/test_hermes.py` f
 Se o Streamable HTTP falhar no Hermes, usar `transport: sse` e registrar aqui.
 
 ## Rodadas (TC.3)
-- Avisos: o Hermes chama `avisos_pendentes`, entrega no Telegram e só então `avisos_confirmar_entrega(aviso_id)` (ler não tira da fila). Aviso já enviado pelo `gabi-finance-telegram` (G15) não volta.
+- Avisos: o Hermes lê `avisos_abertos` (só leitura; não há ferramenta de confirmar entrega). O envio dos avisos ao Telegram é do `gabi-finance-telegram` (timer de 5 em 5 minutos), não do Hermes.
 - 07:05: `resumo_manha` (até 5 linhas; a primeira é "⚠ Dados desatualizados…" quando for o caso) e, se quiser mais, `financeiro_contas_a_pagar`.
 
 ## Identidade (TC.4): ver `docs/adr/007-identidade-por-remetente.md`

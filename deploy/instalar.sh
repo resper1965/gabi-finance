@@ -50,8 +50,8 @@ fi
 rm -rf /opt/gabi-finance/.novo /opt/gabi-finance/.velho
 install -d /opt/gabi-finance/.novo /opt/gabi-finance/.velho
 cp -r "$AQUI/gabi" "$AQUI/migrations" "$AQUI/seeds" /opt/gabi-finance/.novo/
-# Utilitário de administração (seeds editáveis): carregadores de seeds, a correção de moeda, o comparador do G21, não o diretório tools inteiro.
-install -d /opt/gabi-finance/.novo/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" /opt/gabi-finance/.novo/tools/
+# Utilitários de administração (seeds editáveis): carregadores de seeds, a correção de moeda, o comparador do G21 e a conferência da virada, não o diretório tools inteiro.
+install -d /opt/gabi-finance/.novo/tools && install -m 644 "$AQUI/tools/semear_categorias.py" "$AQUI/tools/semear_donos.py" "$AQUI/tools/marcar_padroes.py" "$AQUI/tools/corrigir_moeda.py" "$AQUI/tools/comparar_agenda.py" "$AQUI/tools/conferir_virada.py" /opt/gabi-finance/.novo/tools/
 for d in gabi migrations seeds tools; do
   if [ -e "/opt/gabi-finance/$d" ]; then
     mv "/opt/gabi-finance/$d" /opt/gabi-finance/.velho/

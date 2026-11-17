@@ -1,5 +1,5 @@
 # Skill sugerida do Hermes: decidir pelo canal
-Colar como skill (`~/.hermes/skills/gabi-brain/decisoes.md`; com `skills.write_approval` ligado, instale você mesmo). Ferramentas: `decisoes_abertas`, `decisao_responder`.
+Colar como skill (`~/.hermes/skills/gabi-finance/decisoes.md`; com `skills.write_approval` ligado, instale você mesmo). Ferramentas: `decisoes_abertas`, `decisao_responder`.
 
 ## Quando usar
 - O Ricardo pergunta "o que está pendente?", "o que preciso decidir?" ou responde um número a uma pergunta que você acabou de mostrar.

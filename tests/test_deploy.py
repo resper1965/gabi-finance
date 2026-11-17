@@ -329,7 +329,8 @@ def test_telegram_so_envia_com_arquivo_de_ambiente_do_ricardo_e_nao_tem_o_token_
 
 def test_instalar_instala_corrigir_moeda_e_comparar_agenda():
     linha = next(l for l in INSTALAR.splitlines() if "marcar_padroes.py" in l and l.startswith("install -d /opt/gabi-finance/.novo/tools"))
-    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "carga_familia" not in linha and linha.rstrip().endswith("/opt/gabi-finance/.novo/tools/")
+    assert '"$AQUI/tools/corrigir_moeda.py"' in linha and '"$AQUI/tools/comparar_agenda.py"' in linha and "carga_familia" not in linha
+    assert '"$AQUI/tools/conferir_virada.py"' in linha  # a conferência de docs/virada.md roda de /opt/gabi-finance and linha.rstrip().endswith("/opt/gabi-finance/.novo/tools/")
 
 
 # ---------------- simplificação (ADR-023) ----------------

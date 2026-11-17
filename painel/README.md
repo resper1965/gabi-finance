@@ -1,4 +1,6 @@
-# painel (gabi.brain)
+# painel (gabi-finance)
+
+Documentação completa do painel (telas, rotas, como rodar): [`docs/painel.md`](../docs/painel.md).
 
 React + Vite. O build sai em `../gabi/painel/` e a API serve em `/` (com `/assets`). Sem build, `/` mostra a página de verificação da Fase 0.
 
