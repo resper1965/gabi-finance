@@ -107,9 +107,13 @@
 - [ ] **Step 2:** Renomear e ajustar. `instalar.sh` cria o usuário `gabifinance`, pastas e venv, instala as units **desligadas** (a virada liga).
 - [ ] **Step 3:** Suíte + ruff. Commit `chore(deploy): nomes e caminhos do gabi-finance`.
 
-### Task 9: Documentação e roteiro da virada
+### Task 9: Documentação farta e roteiro da virada
 
-**Files:** `docs/ARQUITETURA.md`, `docs/STATUS.md` (zerado para o gabi-finance), `docs/runbook.md` (seções que ficam), Create `docs/virada.md`.
+> Pedido do Ricardo (17/11): **documentar fartamente o repositório do gabi-finance no GitHub.** Quem abrir o repositório sem contexto precisa entender o que é, como funciona, como instalar, operar, recuperar e evoluir.
+
+**Files:** `README.md` (novo, completo), `docs/ARQUITETURA.md` (reescrito para o gabi-finance, com diagrama), `docs/STATUS.md` (zerado), `docs/runbook.md` (só seções financeiras, revisadas), Create `docs/virada.md`, Create `docs/modulos.md` (um verbete por módulo de `gabi/`: o que faz, tabelas que lê/escreve, quem chama, testes), Create `docs/dados.md` (cada tabela que fica: colunas, significado, quem escreve), Create `docs/mcp.md` (cada ferramenta: escopo, parâmetros, resposta, exemplo), Create `docs/painel.md` (cada tela: o que mostra, ações, rota da API), Create `docs/operacao.md` (timers e horários, logs, backup e restauração, rotação de tokens mcp.ai/Nibo, falhas comuns e como resolver), Create `docs/adr/039-corte-gabi-finance.md` (por que nasceu, o que saiu, decisões F1–F9), `docs/corte/` mantido como registro.
+
+- [ ] **Step 0:** Escrever os documentos acima a partir do código final (não do plano). `README.md` abre com: o que é, de onde veio (gabi-brain → etapa 2 do esper-brain), arquitetura em 1 parágrafo + diagrama, instalação, operação, links para cada doc. Teste `tests/test_docs.py`: todo módulo de `gabi/`, toda ferramenta MCP e toda tabela do banco migrado aparece em `docs/modulos.md`, `docs/mcp.md` e `docs/dados.md` respectivamente (falha se faltar).
 
 - [ ] **Step 1:** `docs/virada.md` com os comandos exatos dos 7 passos do spec e da volta, para o Ricardo rodar como root, incluindo: `sqlite3 .backup` (ou `python3 -c` com a API de backup) do banco do `gabi-brain` com os timers parados; aplicar migrações com o `migrar` do `gabi-finance`; mover tokens para `/etc/gabi-finance/` com permissão 600; `tailscale serve` do novo host; a conferência (script `tools/conferir_virada.py` que imprime saldos por conta, total A pagar do mês e projeção 30 dias de **um** banco — rodar contra os dois e comparar com `diff`); `config.yaml` do Hermes com backup e troca do servidor MCP; `/new`.
 - [ ] **Step 2:** `tools/conferir_virada.py` + teste (banco de teste → saída determinística). Suíte + ruff.
