@@ -6,7 +6,7 @@
 
 | Etapa | Estado |
 |---|---|
-| Corte do `gabi-brain` em `gabi-finance` (código, banco, painel, MCP, deploy, documentação) | **Pronto na branch `corte`**, falta o merge na `main` |
+| Corte do `gabi-brain` em `gabi-finance` (código, banco, painel, MCP, deploy, documentação) | **Pronto e na `main`** (merge 649c03a); falta a virada na VPS |
 | Instalação na VPS (usuários, pastas, código, unidades **desligadas**) | A fazer: [`virada.md`](virada.md), passo 1 |
 | Virada (cópia do banco, conferência lado a lado, ligar, Hermes) | **Pendente**: roteiro pronto em [`virada.md`](virada.md); o Ricardo roda, o Claude guia |
 | Etapa 3 do `esper-brain` (coletor, digestão, Hermes lendo o markdown) | Fora deste repositório |
