@@ -72,6 +72,15 @@ test("Evidencia mostra a cadeia de proveniência ao focar e fecha com Esc", () =
   expect(screen.queryByRole("tooltip")).toBeNull();
 });
 
+test("Evidencia abre no toque (foco + clique) e fecha no toque seguinte", () => {
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="E-06" rotulo="Menor saldo" fonte="open-finance" estado="projecao"><Valor valor="1.00" /></Evidencia></ProvContext.Provider>);
+  const gatilho = screen.getByRole("button", { name: /E-06/ });
+  fireEvent.pointerDown(gatilho); fireEvent.focus(gatilho); fireEvent.click(gatilho);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("projeção");
+  fireEvent.pointerDown(gatilho); fireEvent.click(gatilho);
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
 test("Evidencia de fonte parada fica a conferir", () => {
   render(<ProvContext.Provider value={prov}><Evidencia codigo="E-03" rotulo="A receber" fonte="notas-nibo"><Valor valor="5.00" /></Evidencia></ProvContext.Provider>);
   const gatilho = screen.getByRole("button", { name: /E-03/ });

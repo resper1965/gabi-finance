@@ -27,6 +27,7 @@ export function useEvidencia(info: InfoEvidencia) {
   const id = useId();
   const ref = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const abertaAntes = useRef(false); // estado no instante do toque: o foco que vem com o toque já abre, então o clique não pode fechar de novo
   const [pos, setPos] = useState<{ top: number; left: number; acima: boolean } | null>(null);
   const fontes = (prov?.fontes ?? []).filter((f) => !info.fonte || f.nome === info.fonte);
   const parada = fontes.find((f) => f.estado !== "ok");
@@ -76,7 +77,8 @@ export function useEvidencia(info: InfoEvidencia) {
       ref, type: "button" as const, className: "ev", "data-estado": estado, "data-aberta": aberta,
       "aria-describedby": aberta ? id : undefined,
       onFocus: () => abrir(0), onBlur: fechar,
-      onClick: () => (aberta ? fechar() : abrir(0)),
+      onPointerDown: () => { abertaAntes.current = aberta; },
+      onClick: () => { if (abertaAntes.current) fechar(); else abrir(0); abertaAntes.current = false; },
       onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Escape") fechar(); },
     },
     zona: { onMouseEnter: () => abrir(260), onMouseLeave: fechar },
