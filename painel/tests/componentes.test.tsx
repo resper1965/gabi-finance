@@ -66,13 +66,13 @@ test("Shell lembra a ultima aba", () => {
   expect(screen.getByText("aba:contas")).toBeInTheDocument();
 });
 
-test("Shell abre área e aba do link (#cadastros/documentos), mesmo com outra aba salva", () => {
-  localStorage.setItem("gabi.area", "cadastros");
-  localStorage.setItem("gabi.aba.cadastros", "agendas");
-  window.location.hash = "#cadastros/documentos";
+test("Shell abre área e aba do link (#cadastros/despesas), mesmo com outra aba salva", () => {
+  localStorage.setItem("gabi.area", "caixa");
+  localStorage.setItem("gabi.aba.cadastros", "cadastros");
+  window.location.hash = "#cadastros/despesas";
   const tela = (_a: unknown, aba: string) => <p>aba:{aba}</p>;
   render(<Shell tela={tela} />);
-  expect(screen.getByText("aba:documentos")).toBeInTheDocument();
+  expect(screen.getByText("aba:despesas")).toBeInTheDocument();
   window.location.hash = "";
 });
 
@@ -89,16 +89,14 @@ test("Shell vira barra inferior abaixo de 760px", () => {
   render(<Shell tela={() => null} />);
   expect(screen.queryByRole("navigation", { name: "Painéis" })).toBeNull();
   const barra = screen.getByRole("navigation", { name: "Barra inferior" });
-  for (const r of ["Hoje", "Agenda", "Mensagens", "Caixa", "Mais"]) expect(within(barra).getByText(r)).toBeInTheDocument();
+  for (const r of ["Caixa", "Gastos", "Cobrar", "Regras", "Mais"]) expect(within(barra).getByText(r)).toBeInTheDocument();
 });
 
-test("textos da navegacao iguais ao prototipo", () => {
+test("textos da navegacao (só áreas financeiras)", () => {
   const nav = Object.fromEntries(GRUPOS.map((g) => [g.titulo, g.areas.map((a) => a.rotulo)]));
   expect(nav).toEqual({
-    Dia: ["Hoje", "Envios", "Atividades", "Projetos"],
-    Trabalho: ["Agenda", "Mensagens"],
     Dinheiro: ["Caixa", "Gastos", "Cobrar", "Regras"],
-    Casa: ["Cadastros", "Gabi"],
+    Cadastros: ["Cadastros", "Gabi"],
   });
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Bell, Building2, Calendar, CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, FolderKanban, HeartPulse, LayoutDashboard, LayoutGrid, ListChecks, Mail, Menu, Send, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Building2, ChevronLeft, ChevronRight, Eye, EyeOff, LayoutDashboard, Menu, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
 import { AREAS, GRUPOS, type Area } from "../navegacao";
 import { useLocal, gravarLocal } from "../lib/local";
 import { IrContext, OcultarContext } from "../lib/ocultar";
@@ -7,11 +7,10 @@ import { FaixaSlot } from "./Faixa";
 import { CustoGabi } from "./CustoGabi";
 
 const ICONE: Record<string, LucideIcon> = {
-  hoje: CalendarDays, envios: Send, atividades: ListChecks, projetos: FolderKanban, temas: LayoutGrid, agenda: Calendar, msgs: Mail, tarefas: ListChecks,
   caixa: LayoutDashboard, gastos: Workflow, cobrar: Building2, regras: Tag,
-  familia: HeartPulse, cadastros: Users, gabi: Activity,
+  cadastros: Users, gabi: Activity,
 };
-const BARRA_CELULAR = ["hoje", "agenda", "msgs", "caixa"];
+const BARRA_CELULAR = ["caixa", "gastos", "cobrar", "regras"];
 
 export function useCelular(): boolean {
   const consulta = "(max-width: 759px)";
@@ -48,7 +47,7 @@ function Selo({ n }: { n?: number }) {
 
 const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-/** #envios ou #cadastros/documentos (área/aba) na URL abre essa tela na carga, p.ex. o link que o brain manda no WhatsApp. */
+/** #caixa/contas ou #cadastros/despesas (área/aba) na URL abre essa tela na carga, p.ex. um link que a Gabi manda no Telegram. */
 function gravarLinkDaUrl(): null {
   const [id, aba] = window.location.hash.replace(/^#/, "").split("/");
   const alvo = AREAS.find((a) => a.id === id);
@@ -62,7 +61,7 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const celular = useCelular();
   const [sinoAberto, setSinoAberto] = useState(false);
   useState(gravarLinkDaUrl); // antes dos useLocal abaixo, que já leem o que o link gravou
-  const [areaId, setAreaId] = useLocal("gabi.area", "hoje");
+  const [areaId, setAreaId] = useLocal("gabi.area", "caixa");
   const [recolhido, setRecolhido] = useLocal("gabi.menu", "0");
   const [tema, setTema] = useLocal("gabi.tema", "claro");
   const [oculto, setOculto] = useLocal("gabi.ocultar", "0");
@@ -88,7 +87,7 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
                     <Marca />
                     {!mini && (
                       <span style={{ flex: 1, display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-                        <span style={{ font: "600 19px/1 var(--font-heading)" }}>gabi<span style={{ color: "var(--ink2)" }}>.brain</span></span>
+                        <span style={{ font: "600 19px/1 var(--font-heading)" }}>gabi<span style={{ color: "var(--ink2)" }}>.finance</span></span>
                         <span style={{ font: "500 11px/1.2 var(--mono)", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ink2)" }}>ai agent</span>
                       </span>
                     )}
