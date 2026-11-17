@@ -359,7 +359,7 @@ def test_so_existem_units_gabi_finance_e_nenhuma_traz_o_nome_antigo():
 # `gabi_brain` (e o prefixo `mcp__gabi_brain__`). Nunca usuário, caminho, unidade ou segredo do brain: o resto da lista vale para eles também.
 CITAM_O_SERVIDOR_BRAIN = {"deploy/hermes/editar_soul.py", "tools/gerar_hermes.py", "tools/auditar_promessas.py"}
 SO_O_NOME_DO_SERVIDOR = ("gabi_brain", "mcp__gabi_brain")
-# O finance é servido pela MESMA máquina do tailnet (portas 8444 painel e 8445 MCP externo): o nome da máquina não é resto do brain.
+# O finance é servido pela MESMA máquina do tailnet (portas 8446 painel e 8447 MCP externo): o nome da máquina não é resto do brain.
 HOST_DA_MAQUINA = "gabi-brain.tail985643.ts.net"
 
 
@@ -396,8 +396,8 @@ def test_mcp_nao_disputa_a_porta_com_o_gabi_brain_durante_a_virada():
 
 
 def test_portas_da_tailnet_nao_disputam_com_o_brain():
-    """Mesma máquina do brain: 8443 é o MCP externo dele; o painel do finance fica na 8444 e o MCP externo na 8445."""
+    """Mesma máquina do brain: 8443 é o MCP externo dele; o painel do finance fica na 8446 e o MCP externo na 8447."""
     from gabi.agentes import URL_PADRAO
-    assert "Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8444\n" in API  # a origem leva a porta
-    assert URL_PADRAO == "https://gabi-brain.tail985643.ts.net:8445/mcp"
+    assert "Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8446\n" in API  # a origem leva a porta
+    assert URL_PADRAO == "https://gabi-brain.tail985643.ts.net:8447/mcp"
     assert "8443" not in API and ":8443" not in URL_PADRAO

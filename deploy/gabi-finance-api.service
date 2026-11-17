@@ -12,8 +12,8 @@ Group=gabifinance
 WorkingDirectory=/opt/gabi-finance
 Environment=GABI_BANCO=/var/lib/gabi-finance/gabi.db
 # Origem pública do painel (tailscale serve): o Host chega como o do upstream, então o guarda de CSRF precisa desta lista.
-# A origem inclui a porta (a API compara exatamente): o painel do finance é servido na 8444 do host do brain.
-Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8444
+# A origem inclui a porta (a API compara exatamente): o painel do finance é servido na 8446 do host do brain.
+Environment=GABI_ORIGENS_CONFIAVEIS=https://gabi-brain.tail985643.ts.net:8446
 # O Nibo vive no serviço gabi-finance-fontes (esta unidade não tem rede nem tokens).
 Environment=GABI_FONTES_SOCKET=/run/gabi-finance-fontes/fontes.sock
 # Socket em pasta 0700 do serviço: nenhum outro processo da VPS alcança a API (e não pode forjar a identidade).

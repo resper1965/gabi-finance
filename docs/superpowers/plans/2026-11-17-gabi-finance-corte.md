@@ -19,7 +19,7 @@
 - Ponte só com `mcpai` e `nibo` (F5). Regra R5 mantida: só o serviço de fontes tem rede e token.
 - MCP: nome do servidor `gabi_finance`; nomes das ferramentas financeiras **iguais** aos de hoje (F8).
 - Avisos no Telegram só financeiros; resumo da manhã só com o bloco dinheiro (F7).
-- Nomes na VPS (F9): usuário `gabifinance`; `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, `/run/gabi-finance/`; units `gabi-finance-*`; host `gabi-brain.tail985643.ts.net` com painel na 8444 e MCP externo na 8445 (revisão final; antes era `gabi-finance.tail985643.ts.net`).
+- Nomes na VPS (F9): usuário `gabifinance`; `/opt/gabi-finance`, `/var/lib/gabi-finance`, `/var/backups/gabi-finance`, `/etc/gabi-finance/`, `/run/gabi-finance/`; units `gabi-finance-*`; host `gabi-brain.tail985643.ts.net` com painel na 8446 e MCP externo na 8447 (revisão final; antes era `gabi-finance.tail985643.ts.net`).
 - Testes: `/tmp/gabi-venv/bin/python -m pytest -q` (venv com `requirements.lock` + pytest + ruff; criar com `python3 -m venv /tmp/gabi-venv && /tmp/gabi-venv/bin/pip install -q -r requirements.lock pytest ruff` se faltar). Lint: `/tmp/gabi-venv/bin/ruff check gabi tools tests`. Painel: `cd painel && npm ci && npx vitest run && npm run build`.
 - Falha pré-existente conhecida: `tests/test_obter_token_teams.py::test_main_gravar_falhando_nao_mostra_o_token` (roda como root). Sai junto com o módulo Teams na Task 5.
 - Commits terminam com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.

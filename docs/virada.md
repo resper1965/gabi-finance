@@ -16,8 +16,8 @@
 | Backups | `/var/backups/gabi-brain` | `/var/backups/gabi-finance` |
 | Segredos | `/etc/gabi/*.env` | `/etc/gabi-finance/*.env` |
 | Unidades | `gabi-brain-*` | `gabi-finance-*` |
-| Painel | `https://gabi-brain.tail985643.ts.net` | `https://gabi-brain.tail985643.ts.net:8444` (mesma máquina, porta própria) |
-| MCP para agentes externos | `https://gabi-brain.tail985643.ts.net:8443` | `https://gabi-brain.tail985643.ts.net:8445` (opcional; [runbook](runbook.md#servidor-mcp-e-tokens-de-agentes)) |
+| Painel | `https://gabi-brain.tail985643.ts.net` | `https://gabi-brain.tail985643.ts.net:8446` (mesma máquina, porta própria) |
+| MCP para agentes externos | `https://gabi-brain.tail985643.ts.net:8443` | `https://gabi-brain.tail985643.ts.net:8447` (opcional; [runbook](runbook.md#servidor-mcp-e-tokens-de-agentes)) |
 | MCP do Hermes | porta 8081, servidor `gabi_brain` | porta 8082, servidor `gabi_finance` |
 | Token do Hermes | `GABI_BRAIN_TOKEN` | `GABI_FINANCE_TOKEN` (token **novo**) |
 
@@ -59,10 +59,10 @@ echo "$HOME_H"                                                    # a pasta do u
 systemctl is-active gabi-brain-api gabi-brain-mcp hermes-gateway   # três "active"
 systemctl list-timers 'gabi-brain-*' --no-pager
 ls -l /etc/gabi/brain.env /etc/gabi/telegram.env /etc/gabi/backup.pub 2>&1 | cut -c1-80
-tailscale serve status                                            # anote: a 8443 é do brain; a 8444 e a 8445 NÃO podem aparecer
+tailscale serve status                                            # anote: a 8443 é do brain; a 8446 e a 8447 NÃO podem aparecer
 ```
 
-Se a 8444 ou a 8445 já aparecerem no `tailscale serve status`, **pare** e me diga o que está nelas.
+Se a 8446 ou a 8447 já aparecerem no `tailscale serve status`, **pare** e me diga o que está nelas.
 
 ## Passo 1: instalar (nada é ligado)
 
@@ -245,25 +245,25 @@ ss -ltnp | grep -E 'gabi-finance|uvicorn' | grep -v '127.0.0.1:8082' || echo "ne
 
 Se `/api/eu` não devolver `"nivel":"boss"`, o seu login não está em `acesso` na cópia: me diga o que saiu.
 
-## Passo 7: expor o painel no Tailscale (porta 8444)
+## Passo 7: expor o painel no Tailscale (porta 8446)
 
-Mesma máquina do brain, porta própria. A 8443 já é do MCP externo do brain e **não** é tocada. Primeiro confira que a 8444 está livre:
+Mesma máquina do brain, porta própria. A 8443 já é do MCP externo do brain e **não** é tocada. Primeiro confira que a 8446 está livre:
 
 ```bash
 tailscale serve status
-tailscale serve status | grep -q ':8444' && echo "PARE: a 8444 já está em uso" || echo "8444 livre"
+tailscale serve status | grep -q ':8446' && echo "PARE: a 8446 já está em uso" || echo "8446 livre"
 ```
 
 Se imprimir `PARE`, não siga: me cole o `tailscale serve status`. Com a porta livre:
 
 ```bash
-tailscale serve --bg --https=8444 unix:/run/gabi-finance/api.sock
-tailscale serve status        # aparece https://gabi-brain.tail985643.ts.net:8444 -> unix:/run/gabi-finance/api.sock; o que já existia continua igual
+tailscale serve --bg --https=8446 unix:/run/gabi-finance/api.sock
+tailscale serve status        # aparece https://gabi-brain.tail985643.ts.net:8446 -> unix:/run/gabi-finance/api.sock; o que já existia continua igual
 ```
 
-O `tailscale serve` termina o TLS e injeta o cabeçalho de identidade `Tailscale-User-Login`; a API só escuta no socket. A unidade da API já confia na origem `https://gabi-brain.tail985643.ts.net:8444` (com a porta: a API compara a origem exatamente).
+O `tailscale serve` termina o TLS e injeta o cabeçalho de identidade `Tailscale-User-Login`; a API só escuta no socket. A unidade da API já confia na origem `https://gabi-brain.tail985643.ts.net:8446` (com a porta: a API compara a origem exatamente).
 
-**Verificação (de outro aparelho na sua tailnet):** abrir `https://gabi-brain.tail985643.ts.net:8444/api/eu` mostra o **seu login** e `"nivel":"boss"`, e o painel em `https://gabi-brain.tail985643.ts.net:8444/` abre e carrega o Caixa, com o "dados até" da data da cópia. **Se a resposta vier sem o seu login (anônimo) ou 403, pare** e me avise: sem identidade o painel não deve ser usado (R3); desfaça com `tailscale serve --https=8444 off`. O painel do brain (`https://gabi-brain.tail985643.ts.net`, sem porta) continua igual.
+**Verificação (de outro aparelho na sua tailnet):** abrir `https://gabi-brain.tail985643.ts.net:8446/api/eu` mostra o **seu login** e `"nivel":"boss"`, e o painel em `https://gabi-brain.tail985643.ts.net:8446/` abre e carrega o Caixa, com o "dados até" da data da cópia. **Se a resposta vier sem o seu login (anônimo) ou 403, pare** e me avise: sem identidade o painel não deve ser usado (R3); desfaça com `tailscale serve --https=8446 off`. O painel do brain (`https://gabi-brain.tail985643.ts.net`, sem porta) continua igual.
 
 ## Passo 8: a primeira rodada de verdade e os timers
 
@@ -528,7 +528,7 @@ journalctl -u gabi-finance-telegram -n 20 --no-pager -o cat
 - `systemctl --failed | grep gabi-finance` vazio.
 - Amanhã, depois das 06:00 e 06:40: as rodadas de extratos e de notas do dia aparecem em `rodada` e a mais recente de extratos está conferida.
 - O resumo das 07:05 chega pelo Hermes, com o dinheiro do finance primeiro e o resto do brain depois.
-- No painel (`:8444`), Caixa › A pagar mostra "dados até" de hoje e o **mesmo A pagar do mês** do passo 5 (mais o que a rodada trouxe de novo).
+- No painel (`:8446`), Caixa › A pagar mostra "dados até" de hoje e o **mesmo A pagar do mês** do passo 5 (mais o que a rodada trouxe de novo).
 - `chamada_mcp` mostra chamadas `ok` do token do Hermes.
 - Os avisos de dinheiro chegam no Telegram **uma vez só** (do finance).
 - O backup das 03:30 gravou um arquivo novo em `/var/backups/gabi-finance/` e a rodada `backup` está `ok`.
@@ -548,10 +548,10 @@ systemctl disable --now gabi-finance-saldos.timer gabi-finance-extratos.timer ga
 systemctl stop 'gabi-finance-*.service'
 systemctl disable gabi-finance-fontes gabi-finance-api gabi-finance-mcp 2>/dev/null
 rm -f /etc/gabi-finance/telegram.env
-tailscale serve --https=8444 off
-tailscale serve --https=8445 off 2>/dev/null   # só se você expôs o MCP externo do finance
+tailscale serve --https=8446 off
+tailscale serve --https=8447 off 2>/dev/null   # só se você expôs o MCP externo do finance
 systemctl list-units 'gabi-finance-*' --state=active --no-pager      # vazio
-tailscale serve status                                                # sem 8444 nem 8445; o resto igual ao do passo 0
+tailscale serve status                                                # sem 8446 nem 8447; o resto igual ao do passo 0
 ```
 
 **2. Religar o dinheiro no brain** (passos 3 e 10):
