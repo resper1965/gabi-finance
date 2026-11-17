@@ -71,7 +71,7 @@ def test_grau_total_exigido_barra_o_parcial(banco):
 def test_nenhuma_rota_do_app_real_abre_para_familiar_ou_terceiro_alem_do_publico(banco):
     app = criar_app(banco, permite_tcp_local=True)
     rotas = [(m.upper(), p) for p, ops in app.openapi()["paths"].items() if p.startswith("/api") for m in ops]  # openapi enxerga as rotas dos routers incluídos
-    assert len(rotas) > 80, "varredura curta demais: as rotas dos routers sumiram do openapi"
+    assert len(rotas) > 60, "varredura curta demais: as rotas dos routers sumiram do openapi"  # 67 depois do corte (eram mais de 80 com as áreas que saíram)
     abertas = set()
     for metodo, caminho in rotas:
         url = re.sub(r"\{[^}]+\}", "1", caminho)

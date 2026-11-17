@@ -11,7 +11,6 @@ def test_hermes_so_ve_as_ferramentas_da_lista():
     bloco = re.search(r"include:\n((?:      - .*\n?)+)", DOC).group(1)
     assert [l.strip()[2:] for l in bloco.splitlines()] == ferramentas_do_hermes()
     assert "*" not in bloco
-    assert "projeto_ligar" in ferramentas_do_hermes() and "projeto_criar" not in ferramentas_do_hermes()  # ADR-038
 
 
 def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel():
@@ -19,7 +18,7 @@ def test_token_do_hermes_nunca_tem_o_escopo_sensivel_e_nao_alcanca_dado_sensivel
 
 
 def test_hermes_nao_tem_ferramenta_de_enviar_pagar_apagar_aprovar_ou_ligar_regra():
-    assert not [n for n in ferramentas_do_hermes() if PROIBIDAS.search(n) and n != "projeto_ligar"]  # projeto_ligar (ADR-038) só registra a pasta; o "ligar" proibido é o de regra
+    assert not [n for n in ferramentas_do_hermes() if PROIBIDAS.search(n)]
     assert {"resumo_manha", "financeiro_saldo", "despesas_por_empresa"} <= set(ferramentas_do_hermes())
 
 

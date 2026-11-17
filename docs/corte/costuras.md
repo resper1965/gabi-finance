@@ -47,3 +47,19 @@ estão em `saem.txt` (um por linha). As Tasks 2–5 executam as ações abaixo; 
 | `gabi.mcp.ferramentas_ver` | `teams.regra` | `gabi/mcp/ferramentas_ver.py:17` | Remover o uso: ferramentas ligadas a Teams saem (Task 3). |
 | `gabi.mcp.servidor` | `ferramentas_atividades`, `ferramentas_documentos`, `ferramentas_envios`, `ferramentas_familia`, `ferramentas_projetos` | `gabi/mcp/servidor.py:24` | Remover o uso: deixam de ser registradas (Task 3). |
 | `gabi.mcp.servidor` | `fontes.graph_ness` | `gabi/mcp/servidor.py:280` | Remover o uso: sem `PonteGraph` nem `ErroGraphNess` (Tasks 2-3). |
+
+## Decisões da Task 3 (API, rotas e MCP)
+
+| Item | Decisão | Motivo |
+|---|---|---|
+| `resumo_manha` (MCP) | FICA, reduzido ao bloco financeiro + contagem de decisões | F7: o resumo da manhã é só do dinheiro. Agenda, e-mail, "Prioridade" e o olhar à frente saíram de `resumo_da_manha`; o escopo continua `trabalho` (o token do Hermes não muda). `dia.py`/`avisos.py`/`telegram.py` seguem na Task 4. |
+| `olhar_a_frente`, `promessas_candidatas`, `preparar_reuniao`, `revisao_semana` | SAEM (`ferramentas_assistente` removido) | Dependem de `antecipar`, `reuniao`, `revisao` e do correio, todos fora. `olhar_a_frente` tinha escopo `fin`, mas lê documentos e atividades por dentro. |
+| `avisos_abertos` | FICA, sem os campos `evento_id`/`conta` do `convite_agenda` | Avisos financeiros ficam (F7); o convite de agenda sai. |
+| `decisoes_abertas`, `decisao_responder`, `decisoes_recentes` | FICAM | `gabi.decisoes` fica (canal de decisões financeiras). Os efeitos `adicionar_canal_email` e afins ainda tocam `contato_google_email`: conferir na Task 4/migração. |
+| Escopos de token | Saem `docs`, `envios`, `familia`, `contatos`, `atividades`, `projetos`; ficam `fin`, `trabalho`, `propostas`, `decisoes`, `pedidos`, `sensivel` | `pedidos` e `sensivel` já não serviam a nenhuma ferramenta antes do corte; não são deste corte. Token antigo com escopo removido segue válido (teste novo). `ESCOPOS_HERMES` = `fin, trabalho, propostas, pedidos, decisoes`. |
+| `GET /cadastros/pessoas/{pid}/cpf` | SAI | Lê `familia_documento` (ficha da família). O resto de `rotas/cadastros.py` é financeiro e ficou como estava (a tabela `pessoa`, com `telefone` e `dados`, fica até a migração). |
+| Arquivos `gabi/rotas/{agenda,atividades,contatos,correio,dia,documentos,envios,familia,projetos,qualidade,teams}.py` | Só desligados do `api.py` | Os arquivos e os testes deles saem na Task 5. |
+| Testes apagados na Task 3 | `tests/mcp/test_{assistente,atividades_mcp,documentos,envios,familia,projetos_mcp}.py` | Testam os módulos `ferramentas_*` removidos nesta task. Os demais testes de `tests/mcp` foram ajustados sem perder asserção financeira. |
+| `docs/fontes/hermes.md` | Lista `tools.include` regerada por `tools.gerar_hermes` (32 ferramentas) | O teste `test_hermes` compara a doc com o código. A chave `gabi_brain:` e o prefixo `mcp__gabi_brain__` no SOUL ficam para a task do Hermes (F8). |
+| `painel/tests/amostras/{qualidade,hoje,agenda,atividades,projetos}.json` e `tools/gerar_amostras.py` | Amostras e rotas dessas telas removidas | `tests/test_amostras_painel.py` exige uma amostra por rota; as telas dessas rotas saem na task do painel. |
+| `gabi.mcp.servidor` | `WWW-Authenticate: realm="gabi-brain"` e o caminho padrão `/var/lib/gabi-brain/gabi.db` não mudaram | Nomes de VPS/paths são do F9 (virada), não da superfície. |

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from gabi.db import conectar, migrar
-from gabi.mcp.tokens import ESCOPOS, Token, definir_escopos, emitir, listar, revogar, validar
+from gabi.mcp.tokens import ESCOPOS, Token, _hash, definir_escopos, emitir, listar, revogar, validar
 
 MIGRACOES = Path(__file__).parent.parent.parent / "migrations"
 
@@ -17,11 +17,11 @@ def con(tmp_path):
 
 
 def test_emitir_devolve_o_token_uma_vez_e_guarda_so_o_hash(con):
-    t = emitir(con, "hermes", ["fin", "docs"])
+    t = emitir(con, "hermes", ["fin", "trabalho"])
     assert t.startswith("gb_") and len(t) >= 40
     linha = con.execute("select * from token_agente").fetchone()
     assert linha["hash"] == hashlib.sha256(t.encode()).hexdigest() and t not in str(tuple(linha))
-    assert linha["nome"] == "hermes" and linha["escopo"] == "docs,fin" and linha["revogado_em"] is None
+    assert linha["nome"] == "hermes" and linha["escopo"] == "fin,trabalho" and linha["revogado_em"] is None
 
 
 def test_tokens_sao_unicos_e_aleatorios(con):
@@ -41,9 +41,9 @@ def test_nome_obrigatorio(con):
 
 
 def test_validar_token_valido(con):
-    t = emitir(con, "hermes", ["fin", "docs"])
+    t = emitir(con, "hermes", ["fin", "trabalho"])
     v = validar(con, t)
-    assert v == Token(id=1, nome="hermes", escopos=frozenset({"fin", "docs"}))
+    assert v == Token(id=1, nome="hermes", escopos=frozenset({"fin", "trabalho"}))
 
 
 @pytest.mark.parametrize("ruim", ["", "gb_nao_existe", "lixo", None])
@@ -74,14 +74,14 @@ def test_validar_nao_confunde_prefixo_do_token(con):
 
 def test_listar_nunca_expoe_hash_nem_token(con):
     t = emitir(con, "hermes", ["fin"])
-    revogar(con, emitir(con, "velho", ["docs"]) and 2)
+    revogar(con, emitir(con, "velho", ["propostas"]) and 2)
     itens = listar(con)
     assert [i["nome"] for i in itens] == ["hermes", "velho"] and itens[0]["ativo"] is True and itens[1]["ativo"] is False
     assert all("hash" not in i and t not in str(i) for i in itens)
 
 
 def test_escopos_do_plano():
-    assert ESCOPOS == {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel", "contatos", "atividades", "projetos"}
+    assert ESCOPOS == {"fin", "trabalho", "pedidos", "propostas", "decisoes", "sensivel"}  # docs, envios, familia, contatos, atividades e projetos saíram com as ferramentas (corte)
 
 
 def test_revogar_tudo_da_api_invalida_os_tokens(con):
@@ -93,8 +93,8 @@ def test_revogar_tudo_da_api_invalida_os_tokens(con):
 def test_definir_escopos(con):
     t = emitir(con, "hermes", ["fin"])
     h = con.execute("select hash from token_agente").fetchone()[0]
-    definir_escopos(con, 1, ["fin", "contatos"])
-    assert validar(con, t).escopos == {"fin", "contatos"} and con.execute("select hash from token_agente").fetchone()[0] == h
+    definir_escopos(con, 1, ["fin", "propostas"])
+    assert validar(con, t).escopos == {"fin", "propostas"} and con.execute("select hash from token_agente").fetchone()[0] == h
     with pytest.raises(ValueError):
         definir_escopos(con, 1, ["x"])
     with pytest.raises(ValueError):
@@ -104,3 +104,10 @@ def test_definir_escopos(con):
     revogar(con, 1)
     with pytest.raises(LookupError):
         definir_escopos(con, 1, ["fin"])
+
+
+def test_token_antigo_com_escopo_que_saiu_continua_valido(con):
+    """O escopo some, o token não: quem emitiu `familia` ou `docs` antes do corte segue autenticando; só não alcança mais nenhuma ferramenta por ele."""
+    con.execute("insert into token_agente(nome, escopo, hash, criado_em) values ('antigo', 'fin,familia,docs', ?, '2026-01-01T00:00:00+00:00')", (_hash("gb_antigo"),))
+    v = validar(con, "gb_antigo")
+    assert v is not None and v.escopos == frozenset({"fin", "familia", "docs"})

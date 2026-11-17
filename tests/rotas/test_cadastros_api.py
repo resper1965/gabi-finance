@@ -116,14 +116,6 @@ def test_busca_por_nome(cli):
     assert [i["id"] for i in itens(req(cli, "GET", "/api/v1/cadastros/pessoas?busca=ana"))] == ["ana-souza"]
 
 
-def test_cpf_so_devolve_mascarado_e_audita(cli, banco):
-    r = req(cli, "GET", "/api/v1/cadastros/pessoas/lia/cpf")
-    assert r.status_code == 200 and r.json()["dados"]["documentos"] == [{"tipo": "CPF", "numero": "***.***.***-09"}]
-    d = conectar(banco).execute("select quem, o_que from decisao where origem='cadastros' order by id desc limit 1").fetchone()
-    assert d["quem"] == "boss@x.com" and "lia" in d["o_que"] and "documento" in d["o_que"]
-    assert req(cli, "GET", "/api/v1/cadastros/pessoas/nada/cpf").status_code == 404
-
-
 # ---------------- contas (G5: o que entra no caixa único) ----------------
 def test_conta_liberar_no_caixa_unico(cli, banco):
     c = conectar(banco)

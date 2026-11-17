@@ -8,10 +8,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from gabi.db import conectar
-from gabi.fontes.paperless import Paperless
 from gabi.mcp.servidor import AVISO_VAZIO, criar_mcp
 from gabi.mcp.tokens import emitir
-from tests.cobrar.paperless_falso import PaperlessFalso
 from tests.mcp.test_servidor import AGORA, HOST, banco, chamar  # noqa: F401  (fixtures e helpers)
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
@@ -28,14 +26,14 @@ REGRAS = [
 @pytest.fixture
 def tok(banco):
     c = conectar(banco)
-    t = {"fin": emitir(c, "fin", ["fin"]), "docs": emitir(c, "docs", ["docs"])}
+    t = {"fin": emitir(c, "fin", ["fin"])}
     c.close()
     return t
 
 
 @pytest.fixture
 def cli(banco):
-    app = criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA, paperless=Paperless("http://p", "tok", http=PaperlessFalso(docs=[])))
+    app = criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA)
     with TestClient(app, base_url=f"http://{HOST}") as c:
         yield c
 
@@ -61,11 +59,6 @@ def test_lancamentos_com_resultado_nao_traz_vazio_nem_aviso(cli, tok, banco):
     c.close()
     d = chamar(cli, tok["fin"], "financeiro_lancamentos", texto="padaria")["dados"]
     assert d["itens"] and "vazio" not in d and "aviso" not in d
-
-
-def test_documentos_buscar_vazio_traz_aviso(cli, tok):
-    d = chamar(cli, tok["docs"], "documentos_buscar", texto="nada")["dados"]
-    assert d["itens"] == [] and d["vazio"] is True and d["aviso"] == TEXTO_AVISO
 
 
 def test_soul_do_repositorio_tem_as_tres_regras_e_nao_promete_fluxo_de_exames_nem_de_reembolso():

@@ -14,7 +14,7 @@ from tests.mcp.test_servidor import AGORA, HOST, banco, rpc  # noqa: F401  (fixt
 @pytest.fixture
 def cli_tok(banco):
     c = conectar(banco)
-    tok = {"fin": emitir(c, "hermes", ["fin"]), "docs": emitir(c, "docs", ["docs"])}
+    tok = {"fin": emitir(c, "hermes", ["fin"]), "sem_fin": emitir(c, "so-propostas", ["propostas"])}
     c.close()
     with TestClient(criar_mcp(banco, hosts=[HOST], relogio=lambda: AGORA), base_url=f"http://{HOST}") as cli:
         yield cli, tok
@@ -153,7 +153,7 @@ def test_encerrar_e_excluir(banco, cli_tok):
 def test_sem_escopo_fin_recusa(banco, cli_tok):
     cli, tok = cli_tok
     for ferramenta, args in (("despesas_listar", {}), ("despesa_criar", {"nome": "X", "valor": "1,00", "dia": 1})):
-        assert chamar(cli, tok["docs"], ferramenta, **args)["erro"] == "sem_escopo"
+        assert chamar(cli, tok["sem_fin"], ferramenta, **args)["erro"] == "sem_escopo"
     assert _decisoes(banco) == []
 
 

@@ -14,19 +14,10 @@ mcp_servers:
     tools:
       include:
       - agenda_financeira
-      - agenda_listar
-      - anexo_recentes
       - assinatura_marcar
       - assinaturas_listar
-      - atividade_adiar
-      - atividade_cancelar
-      - atividade_concluir
-      - atividade_criar
-      - atividade_listar
       - avisos_abertos
-      - bens_listar
       - classificar_lancamento
-      - contatos_buscar
       - decisao_responder
       - decisoes_abertas
       - decisoes_recentes
@@ -37,24 +28,7 @@ mcp_servers:
       - despesa_mudar
       - despesas_listar
       - despesas_por_empresa
-      - documentos_baixar
-      - documentos_buscar
-      - documentos_consultar
-      - documentos_texto
-      - documentos_vencimentos
-      - email_ler
-      - email_listar
-      - email_lixeira
-      - email_regra_lixo
-      - email_remover_regra_lixo
       - empresas_listar
-      - familia_atualizar_contato
-      - familia_consultar
-      - familia_listar
-      - familia_propor_documento
-      - familia_registrar_pessoa
-      - familia_registrar_pet
-      - familia_vencimentos
       - fechamento_dia
       - financeiro_a_receber
       - financeiro_cancelar_a_receber
@@ -68,26 +42,9 @@ mcp_servers:
       - financeiro_recorrentes
       - financeiro_registrar_a_receber
       - financeiro_saldo
-      - olhar_a_frente
-      - preparar_reuniao
-      - projeto_anexar
-      - projeto_atualizar
-      - projeto_fato
-      - projeto_fatos
-      - projeto_gasto
-      - projeto_ligar
-      - projeto_listar
-      - projeto_pessoa
-      - projeto_ver
-      - promessas_candidatas
-      - propor_evento
-      - propor_resposta_convite
-      - propor_teams
       - regras_listar
       - regras_sugerir
       - resumo_manha
-      - revisao_semana
-      - teams_pendentes
 ```
 A lista é a **explícita** (sem `*`) e é testada: `tests/mcp/test_hermes.py` falha se ela divergir das ferramentas dos escopos acima. Regerar: `python -m tools.gerar_hermes`.
 Se o Streamable HTTP falhar no Hermes, usar `transport: sse` e registrar aqui.

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-ESCOPOS = {"fin", "docs", "trabalho", "pedidos", "propostas", "decisoes", "envios", "familia", "sensivel", "contatos", "atividades", "projetos"}
+ESCOPOS = {"fin", "trabalho", "pedidos", "propostas", "decisoes", "sensivel"}  # docs, envios, familia, contatos, atividades e projetos saíram com as ferramentas deles (corte); token antigo com esses escopos continua válido
 
 
 @dataclass(frozen=True)

@@ -164,39 +164,16 @@ def criar_app(banco: Path, permite_tcp_local: bool = False, relogio=None, origen
     app.include_router(rotas_cadastros)
     from gabi.rotas.despesas import router as rotas_despesas
     app.include_router(rotas_despesas)
-    from gabi.rotas.atividades import router as rotas_atividades
-    app.include_router(rotas_atividades)
     from gabi.rotas.agentes import router as rotas_agentes
     app.include_router(rotas_agentes)
-    from gabi.rotas.projetos import router as rotas_projetos, router_anexos as rotas_anexos
-    app.include_router(rotas_projetos)
-    app.include_router(rotas_anexos)
     from gabi.rotas.contagens import router as rotas_contagens
     app.include_router(rotas_contagens)
     from gabi.rotas.cobrar import router as rotas_cobrar
     app.include_router(rotas_cobrar)
     from gabi.rotas.avisos import router as rotas_avisos
     app.include_router(rotas_avisos)
-    from gabi.rotas.contatos import router as rotas_contatos
-    app.include_router(rotas_contatos)
-    from gabi.rotas.envios import router as rotas_envios
-    app.include_router(rotas_envios)
-    from gabi.rotas.familia import router as rotas_familia
-    app.include_router(rotas_familia)
-    from gabi.rotas.documentos import router as rotas_documentos
-    app.include_router(rotas_documentos)
     from gabi.rotas.decisoes import router as rotas_decisoes
     app.include_router(rotas_decisoes)
-    from gabi.rotas.qualidade import router as rotas_qualidade
-    app.include_router(rotas_qualidade)
-    from gabi.rotas.agenda import router as rotas_agenda
-    app.include_router(rotas_agenda)
-    from gabi.rotas.teams import router as rotas_teams
-    app.include_router(rotas_teams)
-    from gabi.rotas.correio import router as rotas_correio
-    app.include_router(rotas_correio)
-    from gabi.rotas.dia import router as rotas_dia
-    app.include_router(rotas_dia)
     app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
     if (PAINEL / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=PAINEL / "assets"), name="assets")
