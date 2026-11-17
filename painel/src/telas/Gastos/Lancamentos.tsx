@@ -124,7 +124,7 @@ export function Lancamentos() {
                         <span className="linha-meta">
                           <span>{l.conta}</span><span aria-hidden="true">·</span><span>{l.categoria.nome ?? "sem categoria"}</span>
                           {l.empresa.nome && <><span aria-hidden="true">·</span><span>reembolso {l.empresa.nome}</span></>}
-                          {!sug && !l.para_quem.origem && <Etiqueta tipo="conferir" texto="sem dono" />}
+                          {filtro === "todos" && !sug && !l.para_quem.origem && <Etiqueta tipo="conferir" texto="sem dono" />}
                         </span>
                       </span>
                       <span className="lanc-valor num" style={{ color: despesa ? undefined : "var(--carimbo-verde)" }}>
@@ -161,8 +161,11 @@ export function Lancamentos() {
                       {despesa && (l.gasto || empresas.length > 0) && (
                         <span className="linha-meta lanc-secundario">
                           {l.gasto && <>
-                            <span>{l.gasto.valor ? "é gasto" : `não é gasto${l.gasto.origem ? ` (${POR_QUE[l.gasto.origem] ?? l.gasto.origem})` : ""}`}</span>
-                            <button className="link" onClick={() => marcarGasto(l, !l.gasto!.valor)}>{l.gasto.valor ? "não é gasto" : "é gasto"}</button>
+                            {!l.gasto.valor && l.gasto.origem && <span>não é gasto ({POR_QUE[l.gasto.origem] ?? l.gasto.origem})</span>}
+                            <span role="group" aria-label={`Conta como gasto: ${l.estabelecimento}`} className="seg seg-sm">
+                              <button className="seg-opt" aria-pressed={l.gasto.valor} onClick={() => !l.gasto!.valor && marcarGasto(l, true)}>é gasto</button>
+                              <button className="seg-opt" aria-pressed={!l.gasto.valor} onClick={() => l.gasto!.valor && marcarGasto(l, false)}>não é gasto</button>
+                            </span>
                             {l.gasto.origem === "voce" && <button className="link" onClick={() => marcarGasto(l, null)}>deixar a Gabi decidir</button>}
                           </>}
                           {empresas.length > 0 && (
