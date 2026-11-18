@@ -5,6 +5,8 @@
 # A API escuta em socket Unix (/run/gabi-finance/api.sock, pasta 0700): nenhuma porta TCP.
 # Uso (root): bash deploy/instalar.sh --confirmo-backup-exportado
 set -euo pipefail
+# um umask 077 herdado deixava o código ilegível para o usuário do serviço (18/11/2026)
+umask 022
 [ "$(id -u)" = 0 ] || { echo "rode como root (sudo)"; exit 1; }
 [ "${1:-}" = "--confirmo-backup-exportado" ] || {
   echo "Gate G1: confirme que o backup foi exportado e que existe snapshot da VPS."
