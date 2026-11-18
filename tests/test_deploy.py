@@ -67,6 +67,10 @@ def test_instalar_tem_sintaxe_valida():
     assert subprocess.run(["bash", "-n", str(DEPLOY / "instalar.sh")]).returncode == 0
 
 
+def test_instalar_define_umask_022():
+    assert "\numask 022\n" in INSTALAR
+
+
 def test_instalar_faz_backup_do_banco_antes_de_copiar():
     i_bkp = INSTALAR.index("gabi.db.antes-instalar-")
     assert i_bkp < INSTALAR.index("cp -r")

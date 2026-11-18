@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T20:15:56Z",
+  "title": "Design System: gabi.finance",
+  "extensions": {
+    "colorMeta": {
+      "papel": {
+        "role": "neutral",
+        "displayName": "Papel de Laudo",
+        "canonical": "oklch(0.962 0.008 170)",
+        "dark": "oklch(0.205 0.01 225)",
+        "tonalRamp": [
+          "oklch(0.15 0.006 170)",
+          "oklch(0.27 0.008 170)",
+          "oklch(0.39 0.010 170)",
+          "oklch(0.51 0.011 170)",
+          "oklch(0.63 0.011 170)",
+          "oklch(0.75 0.009 170)",
+          "oklch(0.86 0.007 170)",
+          "oklch(0.95 0.006 170)"
+        ]
+      },
+      "folha": {
+        "role": "neutral",
+        "displayName": "Folha",
+        "canonical": "oklch(0.985 0.004 170)",
+        "dark": "oklch(0.235 0.011 225)",
+        "tonalRamp": [
+          "oklch(0.15 0.005 170)",
+          "oklch(0.27 0.006 170)",
+          "oklch(0.39 0.008 170)",
+          "oklch(0.51 0.009 170)",
+          "oklch(0.63 0.009 170)",
+          "oklch(0.75 0.007 170)",
+          "oklch(0.86 0.006 170)",
+          "oklch(0.95 0.005 170)"
+        ]
+      },
+      "tinta": {
+        "role": "neutral",
+        "displayName": "Tinta Azul-Grafite",
+        "canonical": "oklch(0.27 0.032 255)",
+        "dark": "oklch(0.925 0.01 200)",
+        "tonalRamp": [
+          "oklch(0.15 0.017 255)",
+          "oklch(0.27 0.023 255)",
+          "oklch(0.39 0.028 255)",
+          "oklch(0.51 0.033 255)",
+          "oklch(0.63 0.031 255)",
+          "oklch(0.75 0.026 255)",
+          "oklch(0.86 0.021 255)",
+          "oklch(0.95 0.017 255)"
+        ]
+      },
+      "regra-forte": {
+        "role": "neutral",
+        "displayName": "Regra Forte",
+        "canonical": "oklch(0.7 0.016 220)",
+        "dark": "oklch(0.46 0.014 225)",
+        "tonalRamp": [
+          "oklch(0.15 0.010 220)",
+          "oklch(0.27 0.013 220)",
+          "oklch(0.39 0.016 220)",
+          "oklch(0.51 0.019 220)",
+          "oklch(0.63 0.018 220)",
+          "oklch(0.75 0.015 220)",
+          "oklch(0.86 0.012 220)",
+          "oklch(0.95 0.010 220)"
+        ]
+      },
+      "acento": {
+        "role": "primary",
+        "displayName": "Azul de Ação",
+        "canonical": "oklch(0.45 0.115 255)",
+        "dark": "oklch(0.77 0.1 248)",
+        "tonalRamp": [
+          "oklch(0.15 0.059 255)",
+          "oklch(0.27 0.077 255)",
+          "oklch(0.39 0.096 255)",
+          "oklch(0.51 0.114 255)",
+          "oklch(0.63 0.108 255)",
+          "oklch(0.75 0.089 255)",
+          "oklch(0.86 0.073 255)",
+          "oklch(0.95 0.059 255)"
+        ]
+      },
+      "trilho": {
+        "role": "neutral",
+        "displayName": "Grafite de Trilho",
+        "canonical": "oklch(0.235 0.014 240)",
+        "dark": "oklch(0.155 0.01 235)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 240)",
+          "oklch(0.27 0.010 240)",
+          "oklch(0.39 0.013 240)",
+          "oklch(0.51 0.015 240)",
+          "oklch(0.63 0.014 240)",
+          "oklch(0.75 0.012 240)",
+          "oklch(0.86 0.010 240)",
+          "oklch(0.95 0.008 240)"
+        ]
+      },
+      "carimbo-vermelho": {
+        "role": "tertiary",
+        "displayName": "Carimbo Vermelho",
+        "canonical": "oklch(0.5 0.17 25)",
+        "dark": "oklch(0.74 0.14 25)",
+        "tonalRamp": [
+          "oklch(0.15 0.083 25)",
+          "oklch(0.27 0.109 25)",
+          "oklch(0.39 0.135 25)",
+          "oklch(0.51 0.161 25)",
+          "oklch(0.63 0.153 25)",
+          "oklch(0.75 0.127 25)",
+          "oklch(0.86 0.103 25)",
+          "oklch(0.95 0.083 25)"
+        ]
+      },
+      "carimbo-verde": {
+        "role": "tertiary",
+        "displayName": "Carimbo Verde",
+        "canonical": "oklch(0.46 0.1 155)",
+        "dark": "oklch(0.78 0.12 155)",
+        "tonalRamp": [
+          "oklch(0.15 0.054 155)",
+          "oklch(0.27 0.071 155)",
+          "oklch(0.39 0.088 155)",
+          "oklch(0.51 0.104 155)",
+          "oklch(0.63 0.099 155)",
+          "oklch(0.75 0.082 155)",
+          "oklch(0.86 0.067 155)",
+          "oklch(0.95 0.054 155)"
+        ]
+      },
+      "carimbo-azul": {
+        "role": "tertiary",
+        "displayName": "Carimbo Azul",
+        "canonical": "oklch(0.46 0.13 255)",
+        "dark": "oklch(0.77 0.1 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.064 255)",
+          "oklch(0.27 0.084 255)",
+          "oklch(0.39 0.104 255)",
+          "oklch(0.51 0.123 255)",
+          "oklch(0.63 0.117 255)",
+          "oklch(0.75 0.097 255)",
+          "oklch(0.86 0.079 255)",
+          "oklch(0.95 0.064 255)"
+        ]
+      },
+      "carimbo-grafite": {
+        "role": "tertiary",
+        "displayName": "Carimbo Grafite",
+        "canonical": "oklch(0.42 0.025 250)",
+        "dark": "oklch(0.78 0.015 215)",
+        "tonalRamp": [
+          "oklch(0.15 0.015 250)",
+          "oklch(0.27 0.019 250)",
+          "oklch(0.39 0.024 250)",
+          "oklch(0.51 0.028 250)",
+          "oklch(0.63 0.027 250)",
+          "oklch(0.75 0.022 250)",
+          "oklch(0.86 0.018 250)",
+          "oklch(0.95 0.015 250)"
+        ]
+      },
+      "ambar": {
+        "role": "tertiary",
+        "displayName": "Âmbar de Etiqueta",
+        "canonical": "oklch(0.88 0.12 90)",
+        "dark": "oklch(0.8 0.13 85)",
+        "tonalRamp": [
+          "oklch(0.15 0.064 90)",
+          "oklch(0.27 0.084 90)",
+          "oklch(0.39 0.104 90)",
+          "oklch(0.51 0.123 90)",
+          "oklch(0.63 0.117 90)",
+          "oklch(0.75 0.097 90)",
+          "oklch(0.86 0.079 90)",
+          "oklch(0.95 0.064 90)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "conclusao": {
+        "displayName": "Conclusão",
+        "purpose": "Frase de conclusão do Resumo, até 36em."
+      },
+      "pergunta": {
+        "displayName": "Pergunta",
+        "purpose": "H1 de cada tela, escrito como pergunta."
+      },
+      "sentenca": {
+        "displayName": "Sentença",
+        "purpose": "Frase de conclusão das telas internas."
+      },
+      "secao": {
+        "displayName": "Seção",
+        "purpose": "Título de seção e valor de achado."
+      },
+      "valor": {
+        "displayName": "Valor",
+        "purpose": "Valor de linha e título de item, tabular."
+      },
+      "corpo": {
+        "displayName": "Corpo",
+        "purpose": "Texto, tabelas e botões."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Legenda, prova do achado, cabeçalho de tabela."
+      },
+      "carimbo": {
+        "displayName": "Carimbo",
+        "purpose": "Somente carimbos de estado, caixa alta."
+      },
+      "codigo": {
+        "displayName": "Código",
+        "purpose": "Código de item em JetBrains Mono."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sombra-camada",
+        "value": "0 6px 20px -6px oklch(0.25 0.03 250 / 0.28), 0 1px 3px oklch(0.25 0.03 250 / 0.12)",
+        "purpose": "Só para o que flutua: quadro de evidência, avisos, menu, toast. Escuro: 0 8px 24px -6px oklch(0 0 0 / 0.55), 0 1px 3px oklch(0 0 0 / 0.4)."
+      },
+      {
+        "name": "anel-foco-campo",
+        "value": "0 0 0 2px color-mix(in oklch, var(--foco) 35%, transparent)",
+        "purpose": "Foco de campo e busca."
+      }
+    ],
+    "motion": [
+      {
+        "name": "curva",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Easing único de estados e camadas."
+      },
+      {
+        "name": "dur-curta",
+        "value": "150ms",
+        "purpose": "Hover, cor, borda."
+      },
+      {
+        "name": "dur",
+        "value": "180ms",
+        "purpose": "Trilho, interruptor, entrada de camada (surge 3px)."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "prefers-reduced-motion zera animações e transições."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "celular",
+        "value": "759px (achados) / detecção data-celular (casca)"
+      },
+      {
+        "name": "laudo",
+        "value": "1180px (grade-laudo e Resumo viram coluna única)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão padrão",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Ação secundária: folha com regra forte, sem sombra.",
+      "html": "<button class=\"ds-btn\">Já paguei</button>",
+      "css": ".ds-btn{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border:1px solid var(--regra-forte);border-radius:2px;background:var(--folha);color:var(--tinta);font-size:.875rem;font-weight:600;line-height:1.2;cursor:pointer;transition:background-color 150ms,border-color 150ms}.ds-btn:hover{background:var(--papel-2);border-color:var(--tinta-3)}.ds-btn:active{background:var(--papel-3)}.ds-btn:focus-visible{outline:2px solid var(--foco);outline-offset:2px}"
+    },
+    {
+      "name": "Botão primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A ação primária de uma pendência; azul de ação, sem sombra.",
+      "html": "<button class=\"ds-btn-primary\">Nova despesa</button>",
+      "css": ".ds-btn-primary{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border:1px solid var(--acento);border-radius:2px;background:var(--acento);color:var(--sobre-acento);font-size:.875rem;font-weight:600;line-height:1.2;cursor:pointer;transition:background-color 150ms,border-color 150ms}.ds-btn-primary:hover{background:var(--acento-hover);border-color:var(--acento-hover)}.ds-btn-primary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}"
+    },
+    {
+      "name": "Botão ghost",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Ação de baixa ênfase na linha: texto no acento, fundo só no hover.",
+      "html": "<button class=\"ds-btn-ghost\">Ver prova</button>",
+      "css": ".ds-btn-ghost{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:inline-flex;align-items:center;min-height:34px;padding:0 8px;border:1px solid transparent;border-radius:2px;background:transparent;color:var(--acento);font-size:.875rem;font-weight:600;cursor:pointer;transition:background-color 150ms}.ds-btn-ghost:hover{background:var(--acento-fundo)}.ds-btn-ghost:focus-visible{outline:2px solid var(--foco);outline-offset:2px}"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Campo de folha com rótulo acima; foco troca a borda e abre anel de 2px.",
+      "html": "<label class=\"ds-campo\">Valor<input class=\"ds-input\" value=\"3.500,00\"></label>",
+      "css": ".ds-campo{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:flex;flex-direction:column;gap:4px;font-size:.75rem;font-weight:600;color:var(--tinta-2)}.ds-input{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;min-height:34px;padding:0 10px;border:1px solid var(--regra-forte);border-radius:2px;background:var(--folha);color:var(--tinta);font-size:.875rem;font-weight:400;font-variant-numeric:tabular-nums;transition:border-color 150ms,box-shadow 150ms}.ds-input:hover{border-color:var(--tinta-3)}.ds-input:focus-visible{outline:none;border-color:var(--foco);box-shadow:0 0 0 2px color-mix(in oklch,var(--foco) 35%,transparent)}"
+    },
+    {
+      "name": "Controle segmentado",
+      "kind": "chip",
+      "refersTo": "segmented-option-selected",
+      "description": "Período e filtros; a opção escolhida é preenchida em tinta.",
+      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-opt\" aria-pressed=\"false\">Semana</button><button class=\"ds-seg-opt\" aria-pressed=\"true\">Mês</button><button class=\"ds-seg-opt\" aria-pressed=\"false\">12 meses</button></div>",
+      "css": ".ds-seg{display:inline-flex;border:1px solid var(--regra-forte);border-radius:2px;background:var(--folha);overflow:hidden}.ds-seg-opt{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;min-height:32px;padding:0 12px;border:0;background:transparent;color:var(--tinta-2);font-size:.875rem;font-weight:500;cursor:pointer;transition:background-color 150ms,color 150ms}.ds-seg-opt+.ds-seg-opt{border-left:1px solid var(--regra)}.ds-seg-opt:hover{background:var(--papel-2);color:var(--tinta)}.ds-seg-opt[aria-pressed=true]{background:var(--tinta);color:var(--papel);font-weight:600}.ds-seg-opt:focus-visible{outline:2px solid var(--foco);outline-offset:-3px}"
+    },
+    {
+      "name": "Carimbos de estado",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Régua dupla, caixa alta, sem rotação; o texto diz o estado. A conferir é a etiqueta âmbar preenchida.",
+      "html": "<span class=\"ds-carimbo\" data-tipo=\"erro\">Atrasada</span> <span class=\"ds-carimbo\" data-tipo=\"ok\">Conferido</span> <span class=\"ds-carimbo\" data-tipo=\"nota\">Projeção</span> <span class=\"ds-carimbo\" data-tipo=\"conferir\">A conferir</span> <span class=\"ds-carimbo\" data-tipo=\"banco\">banco</span>",
+      "css": ".ds-carimbo{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;--c:var(--carimbo-grafite);display:inline-flex;align-items:center;padding:1px 6px 0;border:3px double var(--c);border-radius:1px;color:var(--c);font-size:.6875rem;font-weight:700;line-height:1.45;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}.ds-carimbo[data-tipo=erro]{--c:var(--carimbo-vermelho)}.ds-carimbo[data-tipo=ok]{--c:var(--carimbo-verde)}.ds-carimbo[data-tipo=nota]{--c:var(--carimbo-azul)}.ds-carimbo[data-tipo=conferir]{--c:var(--ambar-borda);background:var(--ambar);color:var(--ambar-tinta)}.ds-carimbo[data-tipo=banco]{border:1px solid var(--regra-forte);padding:0 5px;color:var(--tinta-2);font-weight:600;letter-spacing:.05em}"
+    },
+    {
+      "name": "Etiqueta de evidência",
+      "kind": "custom",
+      "refersTo": "evidence-code",
+      "description": "Código de item mono em caixa de 1px; inverte em tinta no hover, foco ou toque e abre o quadro de proveniência.",
+      "html": "<button class=\"ds-ev\"><span class=\"ds-ev-cod\">RS-02</span></button> <button class=\"ds-ev\" data-estado=\"a_conferir\"><span class=\"ds-ev-cod\">RS-06</span></button>",
+      "css": ".ds-ev{display:inline-flex;padding:0;border:0;background:none;cursor:help;border-radius:1px}.ds-ev-cod{display:inline-block;padding:0 4px;border:1px solid var(--regra-forte);border-radius:1px;font:500 .6875rem/1.5 'JetBrains Mono',ui-monospace,monospace;color:var(--tinta-2);white-space:nowrap;transition:background-color 150ms,color 150ms}.ds-ev:hover .ds-ev-cod,.ds-ev:focus-visible .ds-ev-cod{background:var(--tinta);color:var(--papel);border-color:var(--tinta)}.ds-ev[data-estado=a_conferir] .ds-ev-cod{background:var(--ambar);border-color:var(--ambar-borda);color:var(--ambar-tinta)}.ds-ev:focus-visible{outline:2px solid var(--foco);outline-offset:3px}"
+    },
+    {
+      "name": "Linha de achado",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Achado numerado: código, rótulo com prova, valor tabular à direita, carimbo de conferência.",
+      "html": "<table class=\"ds-achados\"><thead><tr><th></th><th>Achado</th><th class=\"d\">Valor</th><th>Conferência</th></tr></thead><tbody><tr><td class=\"c\">RS-02</td><td><b>A pagar vencido</b><div class=\"p\">planilha de compromissos · open-finance</div></td><td class=\"v\">R$ 3.500,00</td><td><span class=\"ds-carimbo ds-ok\">Conferido</span></td></tr></tbody></table>",
+      "css": ".ds-achados{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;width:100%;border-collapse:collapse;color:var(--tinta)}.ds-achados th{padding:6px 12px;font-size:.75rem;font-weight:600;color:var(--tinta-2);text-align:left;border-bottom:1px solid var(--tinta)}.ds-achados th.d{text-align:right}.ds-achados td{padding:10px 12px;border-bottom:1px solid var(--regra);vertical-align:baseline}.ds-achados td:first-child,.ds-achados th:first-child{padding-left:0}.ds-achados .c{font:500 .75rem/1 'JetBrains Mono',ui-monospace,monospace;color:var(--tinta-2)}.ds-achados .p{font-size:.75rem;color:var(--tinta-2);line-height:1.45}.ds-achados .v{font-size:1.125rem;font-weight:650;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.ds-achados tbody tr:hover{background:color-mix(in oklch,var(--papel-2) 70%,transparent)}.ds-carimbo{display:inline-flex;padding:1px 6px 0;border:3px double var(--carimbo-verde);border-radius:1px;color:var(--carimbo-verde);font-size:.6875rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}"
+    },
+    {
+      "name": "Item do trilho",
+      "kind": "nav",
+      "refersTo": "rail-item-current",
+      "description": "Navegação lateral grafite; o item atual vira aba de papel.",
+      "html": "<nav class=\"ds-trilho\"><button class=\"ds-ti\">Gastos</button><button class=\"ds-ti\" aria-current=\"page\">Caixa</button></nav>",
+      "css": ".ds-trilho{display:flex;flex-direction:column;width:232px;padding:8px 0;background:var(--trilho)}.ds-ti{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:flex;align-items:center;min-height:40px;padding:0 14px 0 18px;border:0;background:transparent;color:var(--trilho-tinta);font-size:.875rem;font-weight:500;text-align:left;cursor:pointer;transition:background-color 150ms}.ds-ti:hover{background:var(--trilho-2)}.ds-ti[aria-current=page]{background:var(--papel);color:var(--tinta);font-weight:650}.ds-ti:focus-visible{outline:2px solid var(--trilho-tinta);outline-offset:-3px}"
+    },
+    {
+      "name": "Quadro de aviso",
+      "kind": "card",
+      "refersTo": "notice",
+      "description": "Borda inteira e fundo suave do tom; nunca faixa lateral.",
+      "html": "<div class=\"ds-quadro\" data-tom=\"conferir\"><span>A Gabi só sugere. Revise antes de aceitar a regra.</span></div>",
+      "css": ".ds-quadro{font-family:'Public Sans Variable','Public Sans',system-ui,sans-serif;display:flex;gap:12px;padding:12px 14px;border:1px solid var(--regra-forte);border-radius:2px;background:var(--folha);color:var(--tinta);font-size:.875rem}.ds-quadro[data-tom=conferir]{border-color:var(--ambar-borda);background:var(--ambar-fundo)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "O Laudo Pericial",
+    "overview": "O painel é um laudo do dinheiro, não um app de banco. Cada número é evidência: carrega código de item, fonte, rodada e conferência, e cada estado é um carimbo com texto. O chão é papel de laudo frio (cinza-esverdeado claro), a tinta é azul-grafite, e o trilho de navegação é um grafite-toner profundo que ancora a página como a lombada de um processo.\n\nA densidade é de sessão de revisão no computador: tabelas pautadas por regras de 1px, listas com linhas finas, uma frase grande de conclusão no topo e achados numerados abaixo. Nada flutua e nada decora. A hierarquia vem de peso, tamanho e regra, não de cartões, sombras ou cor. A única cor que chama atenção é a que significa estado: vermelho, verde, azul de nota e o âmbar de \"a conferir\".\n\nO sistema funciona nos dois temas (claro por padrão, escuro pelo data-theme ou pela preferência do sistema) com os mesmos papéis de cor; texto com contraste mínimo de 4,5:1 nos dois, verificado por teste.",
+    "keyCharacteristics": [
+      "Papel frio, tinta azul-grafite, trilho grafite; acento azul único para ação.",
+      "Estados como carimbos de régua dupla, em caixa alta, sem rotação; o texto sempre diz o estado, a cor nunca vai sozinha.",
+      "Etiqueta de evidência (código de item + quadro de proveniência) em todo valor-chave.",
+      "Sans única de documentação técnica; mono só para códigos, horários, datas curtas e número de rodada.",
+      "Regras finas de 1px, cantos de 1px a 2px, sem sombra de cartão.",
+      "Algarismos tabulares em todo valor."
+    ],
+    "rules": [
+      {
+        "name": "A Regra do Âmbar Único",
+        "body": "O âmbar significa \"a conferir\" e nada mais. Não vira destaque, decoração nem aviso genérico.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Texto no Estado",
+        "body": "Cor nunca carrega estado sozinha: todo estado é um carimbo com palavra (ATRASADA, CONFERIDO, A CONFERIR, PROJEÇÃO).",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Acento Único",
+        "body": "O azul de ação é a única cor de interação. Estado e ação não compartilham matiz de significado.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Registro em Mono",
+        "body": "Mono é só para o que é registro: código de item, horário, data curta, rodada, chave. Valor monetário e prosa ficam em sans.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Tabular",
+        "body": "Todo valor usa tabular-nums lining-nums; coluna de número alinha à direita.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra da Caixa Alta de Carimbo",
+        "body": "Caixa alta com espaçamento é do carimbo de estado. Rótulo de seção, grupo e campo é frase em caixa normal, 600.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Plano em Repouso",
+        "body": "Superfícies em repouso são planas. Sombra só em camadas que flutuam, nunca em cartão, tabela ou botão.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do dar a todo valor-chave um código de item e a cadeia de proveniência (fonte, rodada, conferência), com código estável por tela.",
+      "Do expressar todo estado como carimbo com texto; use conferir (âmbar) para qualquer valor sem fonte ou ainda não conferido.",
+      "Do manter a tela como pergunta (H1) e uma frase de conclusão, seguida de achados com prova e ação primária.",
+      "Do usar regra de 1px e tom de papel para separar; hierarquia por peso e tamanho da escala fixa.",
+      "Do usar tabular-nums em todo valor e alinhar números à direita.",
+      "Do usar ícones lucide (SVG) e esconder valores quando o modo privacidade está ligado.",
+      "Do reservar a sombra de camada para o que flutua e respeitar prefers-reduced-motion."
+    ],
+    "donts": [
+      "Don't usar cartões com sombra, grades de cartões do mesmo tamanho ou número grande com gráfico decorativo; o painel recusa o app de banco digital.",
+      "Don't usar âmbar para destaque ou aviso genérico; ele é só \"a conferir\".",
+      "Don't deixar a cor sozinha no estado, nem usar glifos Unicode ou emoji no lugar de ícone ou texto.",
+      "Don't usar mono em valor monetário ou prosa.",
+      "Don't usar caixa alta espaçada como rótulo de seção, grupo ou campo; ela é do carimbo.",
+      "Don't usar borda lateral grossa, gradiente em texto, vidro ou sombra deslocada; nem girar carimbos.",
+      "Don't usar cantos arredondados grandes; o teto é 2px (1px para carimbo e código).",
+      "Don't repetir no título de grupo o estado que a linha já carimba."
+    ]
+  }
+}

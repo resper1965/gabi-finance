@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Bloco } from "../componentes/Bloco";
+import { Etiqueta } from "../componentes/Etiqueta";
 import { Vazio } from "../componentes/Estados";
 import { Painel } from "../componentes/Painel";
 import { Valor } from "../componentes/Valor";
@@ -23,8 +25,6 @@ const ABAS: [Aba, string, (d: Despesa) => boolean][] = [
 ];
 const VAZIO: Record<Aba, string> = { fixas: "Nenhuma despesa fixa ativa.", avulsas: "Nenhuma despesa avulsa por vir.", encerradas: "Nenhuma despesa encerrada." };
 const FORMA: Record<string, string> = { pix: "Pix", boleto: "boleto", debito_automatico: "débito automático" };
-const suave = { color: "var(--ink2)" } as const;
-const chip = (ativo: boolean) => ({ height: 32, padding: "0 12px", border: "1px solid var(--line3)", background: ativo ? "var(--sel-bg, var(--raised))" : "transparent", color: "var(--color-text)", font: "600 12.5px var(--font-body)", cursor: "pointer" }) as const;
 
 /** "dia:5" → "dia 5"; outra regra sai como veio. Avulsa: dia + mês → "18/11/26". */
 const quando = (d: { vencimento: string; valido_de: string }, avulsa: boolean) => {
@@ -57,55 +57,53 @@ function Linha({ d, recarregar }: { d: Despesa; recarregar: () => Promise<void> 
     return r.dados?.encerrada ? "Já teve pagamento: foi encerrada, não excluída." : `${d.nome} excluída.`;
   });
   return (
-    <li style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid var(--color-divider)", padding: "10px 0" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
-        <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-          <strong>{d.nome}</strong>
-          <span style={{ fontSize: 12.5, ...suave }}>
+    <li className="linha-item">
+        <span className="pilha-curta" style={{ gap: 3 }}>
+          <span className="linha-titulo">{d.nome}</span>
+          <span className="linha-meta">
             {quando(d, avulsa)}{FORMA[d.forma] ? ` · ${FORMA[d.forma]}` : ""}
             {ativa && d.proximo_vencimento ? ` · próximo ${dataCurta(d.proximo_vencimento)}` : ""}
             {d.valido_ate && !avulsa ? ` · ${ativa ? "termina" : "encerrada"} em ${mesCurto(d.valido_ate)}` : ""}
           </span>
         </span>
-        <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, whiteSpace: "nowrap" }}>{d.valor === null ? "sem valor" : <Valor valor={d.valor} />}</span>
+        <span className="linha-acoes">
+          <span className="linha-valor">{d.valor === null ? <Etiqueta tipo="conferir" texto="sem valor" /> : <Valor valor={d.valor} />}</span>
           {ativa && <>
-            <button className="btn btn-secondary" style={{ minHeight: 32 }} disabled={ocupado} aria-label={`Editar ${d.nome}`} onClick={() => setAberto("editar")}>Editar</button>
-            <button className="btn btn-secondary" style={{ minHeight: 32 }} disabled={ocupado} aria-label={`Encerrar ${d.nome}`} onClick={() => setAberto("encerrar")}>Encerrar</button>
-            <button className="btn btn-secondary" style={{ minHeight: 32 }} disabled={ocupado} aria-label={`Excluir ${d.nome}`} onClick={() => setAberto("excluir")}>Excluir</button>
+            <button className="btn btn-sm" disabled={ocupado} aria-label={`Editar ${d.nome}`} onClick={() => setAberto("editar")}>Editar</button>
+            <button className="btn btn-sm" disabled={ocupado} aria-label={`Encerrar ${d.nome}`} onClick={() => setAberto("encerrar")}>Encerrar</button>
+            <button className="btn btn-sm btn-ghost btn-perigo" disabled={ocupado} aria-label={`Excluir ${d.nome}`} onClick={() => setAberto("excluir")}>Excluir</button>
           </>}
         </span>
-      </div>
       {aberto === "encerrar" && (
-        <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <p style={{ margin: 0 }}>Encerrar {d.nome}? O que não foi pago sai de A Pagar; o que já foi pago fica no histórico.</p>
-          <span style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary" disabled={ocupado} aria-label={`Confirmar encerrar ${d.nome}`} onClick={encerrar}>Confirmar</button>
-            <button className="btn btn-secondary" disabled={ocupado} onClick={() => setAberto(null)}>Cancelar</button>
+        <div role="alert" className="linha-painel">
+          <p>Encerrar {d.nome}? O que não foi pago sai de A Pagar; o que já foi pago fica no histórico.</p>
+          <span className="fila">
+            <button className="btn btn-primary btn-sm" disabled={ocupado} aria-label={`Confirmar encerrar ${d.nome}`} onClick={encerrar}>Confirmar</button>
+            <button className="btn btn-sm" disabled={ocupado} onClick={() => setAberto(null)}>Cancelar</button>
           </span>
         </div>)}
       {aberto === "excluir" && (
-        <div role="alert" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <p style={{ margin: 0 }}>Excluir {d.nome}? Use só para cadastro errado. Se já teve pagamento, ela é encerrada em vez de excluída.</p>
-          <span style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary" disabled={ocupado} aria-label={`Confirmar excluir ${d.nome}`} onClick={excluir}>Confirmar</button>
-            <button className="btn btn-secondary" disabled={ocupado} onClick={() => setAberto(null)}>Cancelar</button>
+        <div role="alert" className="linha-painel">
+          <p>Excluir {d.nome}? Use só para cadastro errado. Se já teve pagamento, ela é encerrada em vez de excluída.</p>
+          <span className="fila">
+            <button className="btn btn-primary btn-sm" disabled={ocupado} aria-label={`Confirmar excluir ${d.nome}`} onClick={excluir}>Confirmar</button>
+            <button className="btn btn-sm" disabled={ocupado} onClick={() => setAberto(null)}>Cancelar</button>
           </span>
         </div>)}
       {aberto === "editar" && (
-        <DespesaForm modo="daqui" item={{ linha_id: d.id, nome: d.nome, valor: d.valor, vencimento: d.vencimento }}
-          aoCancelar={() => setAberto(null)} aoSalvar={() => { setAberto(null); void recarregar(); }} />)}
-      <Aviso erro={erro} />
-      <details style={{ fontSize: 12.5 }}>
-        <summary style={{ cursor: "pointer", ...suave }}>Histórico · {d.versoes.length} {d.versoes.length === 1 ? "versão" : "versões"}</summary>
-        <ul style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-          {d.versoes.map((v) => (
-            <li key={v.id} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: "var(--mono)" }}>{periodo(v)}</span>
-              <span>{v.valor === null ? "sem valor" : <Valor valor={v.valor} />}</span>
-              <span style={suave}>{quando(v, avulsa)}</span>
-            </li>))}
-        </ul>
+        <div className="linha-painel">
+          <DespesaForm modo="daqui" item={{ linha_id: d.id, nome: d.nome, valor: d.valor, vencimento: d.vencimento }}
+            aoCancelar={() => setAberto(null)} aoSalvar={() => { setAberto(null); void recarregar(); }} />
+        </div>)}
+      {erro && <span style={{ gridColumn: "1 / -1" }}><Aviso erro={erro} /></span>}
+      <details className="historico">
+        <summary>Histórico · {d.versoes.length} {d.versoes.length === 1 ? "versão" : "versões"}</summary>
+        <table className="tabela" style={{ marginTop: 6 }}>
+          <tbody>
+            {d.versoes.map((v) => (
+              <tr key={v.id}><td className="mono">{periodo(v)}</td><td className="num">{v.valor === null ? "sem valor" : <Valor valor={v.valor} />}</td><td className="suave">{quando(v, avulsa)}</td></tr>))}
+          </tbody>
+        </table>
       </details>
     </li>
   );
@@ -123,18 +121,16 @@ export function CadastrosDespesas() {
         const [, , filtro] = ABAS.find(([k]) => k === aba)!;
         const itens = dados.itens.filter(filtro);
         return (
-          <Bloco titulo="Despesas" nota="Mudar vale do mês em curso se ele não foi pago; se já foi, do próximo. Meses passados não mudam.">
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
-              <div role="tablist" aria-label="Despesas" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {ABAS.map(([k, rotulo, f]) => (
-                  <button key={k} role="tab" aria-selected={aba === k} onClick={() => setAba(k)} style={chip(aba === k)}>{rotulo} · {dados.itens.filter(f).length}</button>))}
-              </div>
-              {!nova && <button className="btn btn-secondary" style={{ minHeight: 32 }} onClick={() => setNova(true)}>+ despesa</button>}
+          <Bloco style={{ maxWidth: 1080 }} titulo="Despesas" nota="Mudar vale do mês em curso se ele não foi pago; se já foi, do próximo. Meses passados não mudam."
+            acao={!nova ? <button className="btn btn-sm" onClick={() => setNova(true)}><Plus size={14} strokeWidth={1.8} aria-hidden="true" />Nova despesa</button> : undefined}>
+            <div role="tablist" aria-label="Despesas" className="abas abas-secao">
+              {ABAS.map(([k, rotulo, f]) => (
+                <button key={k} role="tab" className="aba" aria-selected={aba === k} onClick={() => setAba(k)}>{rotulo} <span className="num suave">{dados.itens.filter(f).length}</span></button>))}
             </div>
-            {nova && <DespesaForm modo="nova" aoCancelar={() => setNova(false)} aoSalvar={() => { setNova(false); void leitura.recarregar(); }} />}
-            {aba === "encerradas" && <p style={{ margin: 0, fontSize: 12.5, ...suave }}>Só histórico. Para voltar a pagar uma delas, crie uma despesa nova.</p>}
+            {nova && <div className="folha"><DespesaForm modo="nova" aoCancelar={() => setNova(false)} aoSalvar={() => { setNova(false); void leitura.recarregar(); }} /></div>}
+            {aba === "encerradas" && <p className="miudo">Só histórico. Para voltar a pagar uma delas, crie uma despesa nova.</p>}
             {itens.length === 0 ? <Vazio frase={VAZIO[aba]} /> : (
-              <ul role="tabpanel" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              <ul role="tabpanel" className="pauta">
                 {itens.map((d) => <Linha key={d.id} d={d} recarregar={leitura.recarregar} />)}
               </ul>)}
           </Bloco>

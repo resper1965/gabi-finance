@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Bell, Building2, ChevronLeft, ChevronRight, Eye, EyeOff, LayoutDashboard, Menu, Moon, Sun, Tag, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Bell, Building2, ChevronsLeft, ChevronsRight, Eye, EyeOff, KeyRound, Landmark, Menu, Moon, ReceiptText, Sun, Tags, Users, type LucideIcon } from "lucide-react";
 import { AREAS, GRUPOS, type Area } from "../navegacao";
 import { useLocal, gravarLocal } from "../lib/local";
 import { IrContext, OcultarContext } from "../lib/ocultar";
@@ -7,10 +7,11 @@ import { FaixaSlot } from "./Faixa";
 import { CustoGabi } from "./CustoGabi";
 
 const ICONE: Record<string, LucideIcon> = {
-  caixa: LayoutDashboard, gastos: Workflow, cobrar: Building2, regras: Tag,
-  cadastros: Users, gabi: Activity,
+  caixa: Landmark, gastos: ReceiptText, cobrar: Building2, regras: Tags,
+  cadastros: Users, gabi: KeyRound,
 };
 const BARRA_CELULAR = ["caixa", "gastos", "cobrar", "regras"];
+const traco = { strokeWidth: 1.7 } as const;
 
 export function useCelular(): boolean {
   const consulta = "(max-width: 759px)";
@@ -42,10 +43,8 @@ export interface Contagens { sino: number; menu: Record<string, number> }
 /** Selo numérico (sino e menu); some quando não há nada a decidir. */
 function Selo({ n }: { n?: number }) {
   if (!n) return null;
-  return <span data-selo style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "var(--color-accent)", color: "#fff", font: "600 11px/18px var(--mono)", textAlign: "center" }}>{n > 99 ? "99+" : n}</span>;
+  return <span data-selo className="selo">{n > 99 ? "99+" : n}</span>;
 }
-
-const icone = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 /** #caixa/contas ou #cadastros/despesas (área/aba) na URL abre essa tela na carga, p.ex. um link que a Gabi manda no Telegram. */
 function gravarLinkDaUrl(): null {
@@ -57,13 +56,16 @@ function gravarLinkDaUrl(): null {
   return null;
 }
 
+/** Sem preferência gravada, o tema segue o sistema. */
+const temaDoSistema = () => (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "escuro" : "claro");
+
 export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const celular = useCelular();
   const [sinoAberto, setSinoAberto] = useState(false);
   useState(gravarLinkDaUrl); // antes dos useLocal abaixo, que já leem o que o link gravou
   const [areaId, setAreaId] = useLocal("gabi.area", "caixa");
   const [recolhido, setRecolhido] = useLocal("gabi.menu", "0");
-  const [tema, setTema] = useLocal("gabi.tema", "claro");
+  const [tema, setTema] = useLocal("gabi.tema", temaDoSistema());
   const [oculto, setOculto] = useLocal("gabi.ocultar", "0");
   const [mais, setMais] = useState(false);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -71,35 +73,42 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
   const [abaSalva, setAbaSalva] = useLocal(`gabi.aba.${area.id}`, area.abas[0][0]);
   const aba = area.abas.some(([id]) => id === abaSalva) ? abaSalva : area.abas[0][0];
   const mini = recolhido === "1" && !celular;
-  const pad = celular ? 14 : 28;
+  const escuro = tema === "escuro";
+  const pergunta = area.abas.find(([id]) => id === aba)?.[2] ?? area.pergunta;
+
+  // o tema vale para a página inteira (barras de rolagem, seleção e os quadros que saem por portal)
+  useEffect(() => { document.documentElement.dataset.theme = escuro ? "dark" : "light"; }, [escuro]);
+  useEffect(() => { window.history.replaceState?.(null, "", `#${area.id}/${aba}`); }, [area.id, aba]);
+  useEffect(() => {
+    if (!sinoAberto && !mais) return;
+    const f = (e: KeyboardEvent) => { if (e.key === "Escape") { setSinoAberto(false); setMais(false); } };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [sinoAberto, mais]);
 
   const ir = (id: string, aba?: string) => { if (aba) gravarLocal(`gabi.aba.${id}`, aba); setAreaId(id); setMais(false); };
+  const icone = celular ? 18 : 17;
 
   return (
     <OcultarContext.Provider value={oculto === "1"}>
       <IrContext.Provider value={ir}>
         <FaixaSlot.Provider value={slot}>
-          <div data-theme={tema === "escuro" ? "dark" : "light"} data-celular={celular} style={{ ["--pad" as string]: `${pad}px`, display: "flex", flexDirection: "column", height: "100dvh", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.45 }}>
-            <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+          <div className="app" data-theme={escuro ? "dark" : "light"} data-celular={celular}>
+            <div className="app-corpo">
               {!celular && (
-                <nav aria-label="Painéis" style={{ flex: "none", width: mini ? 60 : 236, borderRight: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 12px 8px 14px", flexWrap: "wrap" }}>
+                <nav aria-label="Painéis" className="trilho" data-mini={mini}>
+                  <div className="trilho-cabeca">
                     <Marca />
-                    {!mini && (
-                      <span style={{ flex: 1, display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-                        <span style={{ font: "600 19px/1 var(--font-heading)" }}>gabi<span style={{ color: "var(--ink2)" }}>.finance</span></span>
-                        <span style={{ font: "500 11px/1.2 var(--mono)", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ink2)" }}>ai agent</span>
-                      </span>
-                    )}
-                    <button className="btn btn-ghost btn-icon" aria-label={mini ? "Expandir menu" : "Recolher menu"} title={mini ? "Expandir menu" : "Recolher menu"} onClick={() => setRecolhido(mini ? "0" : "1")} style={{ width: 28, height: 28, color: "var(--ink2)" }}>
-                      {mini ? <ChevronRight size={16} {...icone} /> : <ChevronLeft size={16} {...icone} />}
+                    {!mini && <span className="marca-nome"><strong>gabi<span>.finance</span></strong><small>laudo do caixa</small></span>}
+                    <button className="trilho-botao" aria-label={mini ? "Expandir menu" : "Recolher menu"} title={mini ? "Expandir menu" : "Recolher menu"} onClick={() => setRecolhido(mini ? "0" : "1")}>
+                      {mini ? <ChevronsRight size={16} {...traco} /> : <ChevronsLeft size={16} {...traco} />}
                     </button>
                   </div>
-                  <div style={{ flex: 1, overflow: "auto", overflowX: "hidden", padding: "0 8px 12px", display: "flex", flexDirection: "column", gap: 1 }}>
-                    {GRUPOS.map((g) => (
-                      <div key={g.titulo} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                        {g.titulo && !mini && <span style={{ padding: "14px 10px 6px", font: "600 10.5px/1 var(--font-body)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink2)" }}>{g.titulo}</span>}
-                        {g.titulo && mini && <span style={{ display: "block", margin: "8px 8px", borderTop: "1px solid var(--line2)" }} />}
+                  <div className="trilho-lista">
+                    {GRUPOS.map((g, i) => (
+                      <div key={g.titulo} role="group" aria-label={g.titulo ?? undefined}>
+                        {g.titulo && !mini && <div className="trilho-grupo" aria-hidden="true">{g.titulo}</div>}
+                        {g.titulo && mini && i > 0 && <div className="trilho-divisor" />}
                         {g.areas.map((a) => <ItemNav key={a.id} area={a} atual={a.id === area.id} mini={mini} ir={ir} selo={contagens?.menu[a.id]} />)}
                       </div>
                     ))}
@@ -107,49 +116,58 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
                   {!mini && <CustoGabi />}
                 </nav>
               )}
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}>
-                <header style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: celular ? "10px 14px" : "12px 28px", borderBottom: "1px solid var(--color-divider)" }}>
-                  {celular && <Marca />}
-                  <div style={{ flex: "1 1 140px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ font: "600 10.5px/1.2 var(--font-body)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{area.abas.find(([id]) => id === aba)?.[2] ?? area.pergunta}</span>
-                    <h1 style={{ margin: 0, font: `600 ${celular ? 24 : 30}px/1.05 var(--font-heading)`, letterSpacing: "-.01em" }}>{area.rotulo}</h1>
+              <div className="principal">
+                <header className="topo">
+                  <div className="topo-linha">
+                    {celular && <span className="marca-celular"><Marca /></span>}
+                    <h1 className="topo-pergunta">{pergunta}</h1>
+                    {!celular && seletores?.(area, false)}
+                    <div className="topo-acoes">
+                      <button className="btn btn-icon" aria-label={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} title={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} aria-pressed={oculto === "1"} onClick={() => setOculto(oculto === "1" ? "0" : "1")}>
+                        {oculto === "1" ? <EyeOff size={icone} {...traco} /> : <Eye size={icone} {...traco} />}</button>
+                      <button className="btn btn-icon" aria-label={escuro ? "Tema claro" : "Tema escuro"} title={escuro ? "Tema claro" : "Tema escuro"} onClick={() => setTema(escuro ? "claro" : "escuro")}>
+                        {escuro ? <Sun size={icone} {...traco} /> : <Moon size={icone} {...traco} />}</button>
+                      <button className="btn btn-icon" aria-label="Alertas" title="Alertas" aria-expanded={sinoAberto} onClick={() => setSinoAberto((v) => !v)} style={{ position: "relative" }}>
+                        <Bell size={icone} {...traco} /><span className="sino-selo"><Selo n={contagens?.sino} /></span></button>
+                    </div>
                   </div>
-                  {!celular && seletores?.(area, false)}
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-secondary btn-icon" aria-label={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} title={oculto === "1" ? "Mostrar valores" : "Ocultar valores"} aria-pressed={oculto === "1"} onClick={() => setOculto(oculto === "1" ? "0" : "1")}>{oculto === "1" ? <EyeOff size={18} {...icone} /> : <Eye size={18} {...icone} />}</button>
-                    <button className="btn btn-secondary btn-icon" aria-label={tema === "escuro" ? "Tema claro" : "Tema escuro"} title={tema === "escuro" ? "Tema claro" : "Tema escuro"} onClick={() => setTema(tema === "escuro" ? "claro" : "escuro")}>{tema === "escuro" ? <Sun size={18} {...icone} /> : <Moon size={18} {...icone} />}</button>
-                    <button className="btn btn-secondary btn-icon" aria-label="Alertas" title="Alertas" aria-expanded={sinoAberto} onClick={() => setSinoAberto((v) => !v)} style={{ position: "relative" }}><Bell size={18} {...icone} /><span style={{ position: "absolute", top: -6, right: -6 }}><Selo n={contagens?.sino} /></span></button>
-                  </div>
-                  {sinoAberto && avisos && <div style={{ flex: "1 0 100%" }}>{avisos}</div>}
-                  {celular && <div style={{ flex: "1 0 100%" }}>{seletores?.(area, true)}</div>}
-                  {area.abas.length > 1 && (
-                    <div role="tablist" style={{ flex: "1 0 100%", display: "flex", overflowX: "auto", marginBottom: celular ? -10 : -12 }}>
+                  {celular && seletores?.(area, true)}
+                  {area.abas.length > 1 ? (
+                    <div role="tablist" aria-label={area.rotulo} className="abas">
                       {area.abas.map(([id, rotulo]) => (
-                        <button key={id} role="tab" aria-selected={id === aba} onClick={() => setAbaSalva(id)}
-                          style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 14px", border: 0, borderBottom: `2px solid ${id === aba ? "var(--color-accent)" : "transparent"}`, background: "transparent", color: id === aba ? "var(--color-text)" : "var(--ink2)", fontWeight: id === aba ? 700 : 500, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        <button key={id} role="tab" className="aba" aria-selected={id === aba} tabIndex={id === aba ? 0 : -1} onClick={() => setAbaSalva(id)}
+                          onKeyDown={(e) => {
+                            const i = area.abas.findIndex(([x]) => x === id);
+                            const passo = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+                            if (!passo) return;
+                            const proxima = area.abas[(i + passo + area.abas.length) % area.abas.length][0];
+                            setAbaSalva(proxima);
+                            (e.currentTarget.parentElement?.querySelector(`[data-aba="${proxima}"]`) as HTMLElement | null)?.focus();
+                          }} data-aba={id}>
                           {rotulo}
                         </button>
                       ))}
                     </div>
-                  )}
+                  ) : <div className="sem-abas" />}
+                  {sinoAberto && avisos && <div className="avisos-pop">{avisos}</div>}
                 </header>
-                <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-                  <div ref={setSlot} />
-                  <div style={{ padding: pad, paddingBottom: 40, display: "flex", flexDirection: "column", gap: 22, maxWidth: 1400 }}>{tela(area, aba)}</div>
+                <div ref={setSlot} />
+                <div className="conteudo">
+                  <main className="pagina">{tela(area, aba)}</main>
                 </div>
               </div>
             </div>
             {celular && (
-              <nav aria-label="Barra inferior" style={{ flex: "none", display: "flex", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+              <nav aria-label="Barra inferior" className="barra">
                 {BARRA_CELULAR.map((id) => {
                   const a = AREAS.find((x) => x.id === id)!;
-                  return <ItemBarra key={id} icone={ICONE[id]} rotulo={a.rotulo} atual={id === area.id} onClick={() => ir(id)} />;
+                  return <ItemBarra key={id} icone={ICONE[id]} rotulo={a.rotulo} atual={id === area.id && !mais} onClick={() => ir(id)} selo={contagens?.menu[id]} />;
                 })}
-                <ItemBarra icone={Menu} rotulo="Mais" atual={false} onClick={() => setMais(!mais)} />
+                <ItemBarra icone={Menu} rotulo="Mais" atual={false} expandido={mais} onClick={() => setMais(!mais)} />
               </nav>
             )}
             {celular && mais && (
-              <div role="dialog" aria-label="Mais áreas" style={{ position: "fixed", left: 0, right: 0, bottom: "calc(56px + env(safe-area-inset-bottom))", maxHeight: "calc(100dvh - 120px)", overflowY: "auto", padding: 14, background: "var(--color-bg)", borderTop: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}>
+              <div role="dialog" aria-label="Mais áreas" className="mais">
                 {AREAS.filter((a) => !BARRA_CELULAR.includes(a.id)).map((a) => <ItemNav key={a.id} area={a} atual={a.id === area.id} mini={false} ir={ir} />)}
               </div>
             )}
@@ -163,30 +181,30 @@ export function Shell({ tela, seletores, contagens, avisos }: ShellProps) {
 function ItemNav({ area, atual, mini, ir, selo }: { area: Area; atual: boolean; mini: boolean; ir: (id: string) => void; selo?: number }) {
   const I = ICONE[area.id];
   return (
-    <button onClick={() => ir(area.id)} aria-current={atual ? "page" : undefined} aria-label={area.rotulo} title={area.pergunta}
-      style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, width: "100%", minHeight: 40, padding: "0 8px", border: 0, borderLeft: `2px solid ${atual ? "var(--color-accent)" : "transparent"}`, background: atual ? "var(--sel)" : "transparent", color: "var(--color-text)", fontWeight: atual ? 700 : 500, fontSize: 14.5, textAlign: "left", cursor: "pointer" }}>
-      <I size={19} {...icone} style={{ flex: "none", marginLeft: mini ? 6 : 0 }} />
-      {!mini && <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{area.rotulo}</span>}
+    <button className="trilho-item" onClick={() => ir(area.id)} aria-current={atual ? "page" : undefined} aria-label={area.rotulo} title={mini ? area.rotulo : area.pergunta}>
+      <I size={18} {...traco} aria-hidden="true" />
+      {!mini && <span className="rotulo">{area.rotulo}</span>}
       <Selo n={selo} />
     </button>
   );
 }
 
-function ItemBarra({ icone: I, rotulo, atual, onClick }: { icone: LucideIcon; rotulo: string; atual: boolean; onClick: () => void }) {
+function ItemBarra({ icone: I, rotulo, atual, onClick, selo, expandido }: { icone: LucideIcon; rotulo: string; atual: boolean; onClick: () => void; selo?: number; expandido?: boolean }) {
   return (
-    <button onClick={onClick} aria-current={atual ? "page" : undefined}
-      style={{ flex: 1, minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, border: 0, background: "transparent", color: atual ? "var(--color-accent-700)" : "var(--ink2)", font: "500 11px var(--font-body)", cursor: "pointer" }}>
-      <I size={20} {...icone} />{rotulo}
+    <button className="barra-item" onClick={onClick} aria-current={atual ? "page" : undefined} aria-expanded={expandido}>
+      <I size={20} {...traco} aria-hidden="true" />{rotulo}
+      {selo ? <span style={{ position: "absolute", top: 6, left: "calc(50% + 6px)" }}><Selo n={selo} /></span> : null}
     </button>
   );
 }
 
-/** Marca da Gabi: quadro de 23px, círculo central, mira e ponto no acento (viewBox 0 0 32 32). */
+/** Marca da Gabi: folha de laudo com o canto dobrado e a etiqueta de evidência presa nela. */
 export function Marca() {
   return (
-    <svg aria-hidden="true" width="32" height="32" viewBox="0 0 32 32" style={{ flex: "none", fill: "none", stroke: "var(--color-accent-700)", strokeWidth: 1.25 }}>
-      <rect x="4.5" y="4.5" width="23" height="23" /><circle cx="16" cy="16" r="6.5" /><path d="M16 1v8M16 23v8M1 16h8M23 16h8" />
-      <circle cx="19.5" cy="12.5" r="2.2" style={{ fill: "var(--color-accent)", stroke: "none" }} />
+    <svg aria-hidden="true" width="26" height="26" viewBox="0 0 26 26" style={{ flex: "none", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinejoin: "round" }}>
+      <path d="M5 2.5h11l5 5v16H5z" /><path d="M16 2.5v5h5" />
+      <path d="M8.5 13h6M8.5 16.5h9M8.5 20h5" strokeLinecap="round" />
+      <rect x="14.5" y="17.5" width="7" height="5" style={{ fill: "var(--ambar)", stroke: "var(--ambar-borda)" }} />
     </svg>
   );
 }

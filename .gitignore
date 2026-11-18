@@ -9,3 +9,4 @@ painel/dist/
 *.db-shm
 gabi/painel/
 ouvinte/node_modules/
+.impeccable/review/

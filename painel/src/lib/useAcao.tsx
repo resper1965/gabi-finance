@@ -19,5 +19,5 @@ export function useAcao() {
   };
   return { ocupado, erros, agir };
 }
-export const Aviso = ({ erro, id }: { erro?: string; id?: string }) => (erro ? <p role="alert" id={id} style={{ margin: 0, color: "var(--danger)", flexBasis: "100%" }}>Erro: {erro}</p> : null);
+export const Aviso = ({ erro, id }: { erro?: string; id?: string }) => (erro ? <p role="alert" id={id} className="erro-linha">Erro: {erro}</p> : null);
 
