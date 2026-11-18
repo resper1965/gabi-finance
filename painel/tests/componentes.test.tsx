@@ -150,3 +150,16 @@ test("Shell sem pendencia nao mostra selo", () => {
   expect(screen.queryByText("0")).toBeNull();
   expect(document.querySelectorAll("[data-selo]").length).toBe(0);
 });
+
+test("Evidencia: rolar dentro do quadro não fecha; rolar a página fecha", () => {
+  render(<ProvContext.Provider value={prov}><Evidencia codigo="PV-06" rotulo="Menor saldo" fontes={[{ nome: "open-finance", papel: "saldos" }, { nome: "notas-nibo", papel: "notas" }]} estado="projecao"><Valor valor="1.00" /></Evidencia></ProvContext.Provider>);
+  const gatilho = screen.getByRole("button", { name: /PV-06/ });
+  fireEvent.focus(gatilho);
+  const quadro = screen.getByRole("tooltip");
+  fireEvent.scroll(quadro);
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  fireEvent.blur(gatilho, { relatedTarget: quadro });
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  fireEvent.scroll(window);
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});

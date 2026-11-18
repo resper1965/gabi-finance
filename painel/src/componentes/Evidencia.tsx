@@ -27,6 +27,7 @@ export function useEvidencia(info: InfoEvidencia) {
   const prov = useProveniencia();
   const id = useId();
   const ref = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abertaAntes = useRef(false); // estado no instante do toque: o foco que vem com o toque já abre, então o clique não pode fechar de novo
   const [pos, setPos] = useState<{ top: number; left: number; acima: boolean } | null>(null);
@@ -48,10 +49,13 @@ export function useEvidencia(info: InfoEvidencia) {
     if (atraso) timer.current = setTimeout(posicionar, atraso); else posicionar();
   };
   const fechar = () => { clearTimeout(timer.current); setPos(null); };
+  // sair do gatilho para dentro do quadro não fecha: o quadro pode ter rolagem (muitas fontes numa tela baixa)
+  const fecharLogo = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setPos(null), 150); };
+  const dentroDoQuadro = (n: EventTarget | Node | null) => !!(n && popRef.current && n instanceof Node && popRef.current.contains(n));
   useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => {
     if (!pos) return;
-    const f = () => fechar();
+    const f = (e: Event) => { if (!dentroDoQuadro(e.target)) fechar(); }; // rolar o próprio quadro não fecha
     window.addEventListener("scroll", f, true);
     window.addEventListener("resize", f);
     return () => { window.removeEventListener("scroll", f, true); window.removeEventListener("resize", f); };
@@ -60,7 +64,11 @@ export function useEvidencia(info: InfoEvidencia) {
   const aberta = pos !== null;
   const [tipo, texto] = ESTADO[estado];
   const quadro = pos && createPortal(
-    <div role="tooltip" id={id} className="ev-pop" style={{ top: pos.top, left: pos.left, transform: pos.acima ? "translateY(-100%)" : undefined }}>
+    <div role="tooltip" id={id} ref={popRef} tabIndex={-1} className="ev-pop"
+      onMouseEnter={() => clearTimeout(timer.current)} onMouseLeave={fechar}
+      onBlur={(e) => { if (e.relatedTarget !== ref.current && !dentroDoQuadro(e.relatedTarget)) fechar(); }}
+      onKeyDown={(e) => { if (e.key === "Escape") { fechar(); ref.current?.focus(); } }}
+      style={{ top: pos.top, left: pos.left, transform: pos.acima ? "translateY(-100%)" : undefined }}>
       <div className="ev-pop-cab"><strong>{info.rotulo}</strong><span className="mono">{info.codigo}</span></div>
       <ol className="ev-cadeia">
         <li><span className="ev-k">{info.fontes.length > 1 ? "Fontes" : "Fonte"}</span><span className="ev-passo ev-fontes">
@@ -88,12 +96,12 @@ export function useEvidencia(info: InfoEvidencia) {
     gatilho: {
       ref, type: "button" as const, className: "ev", "data-estado": estado, "data-aberta": aberta,
       "aria-describedby": aberta ? id : undefined,
-      onFocus: () => abrir(0), onBlur: fechar,
+      onFocus: () => abrir(0), onBlur: (e: React.FocusEvent) => { if (!dentroDoQuadro(e.relatedTarget)) fechar(); },
       onPointerDown: () => { abertaAntes.current = aberta; },
       onClick: () => { if (abertaAntes.current) fechar(); else abrir(0); abertaAntes.current = false; },
       onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Escape") fechar(); },
     },
-    zona: { onMouseEnter: () => abrir(260), onMouseLeave: fechar },
+    zona: { onMouseEnter: () => abrir(260), onMouseLeave: fecharLogo },
   };
 }
 

@@ -272,7 +272,7 @@ legend { padding: 0; margin-bottom: 4px; font-size: var(--t-1); font-weight: 600
   position: fixed; z-index: 60; width: 340px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto;
   padding: 12px 14px; background: var(--folha); color: var(--tinta);
   border: 1px solid var(--regra-forte); border-radius: var(--raio); box-shadow: var(--sombra-camada);
-  font: 400 var(--t-1)/1.45 var(--sans); pointer-events: none;
+  font: 400 var(--t-1)/1.45 var(--sans); overscroll-behavior: contain;
   animation: surge var(--dur-curta) var(--curva);
 }
 .ev-pop-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--regra); }

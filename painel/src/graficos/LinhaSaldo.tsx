@@ -36,7 +36,9 @@ export function LinhaSaldo({ pontos, oculto = false, largura = 680, altura = 230
   const k = W / Math.max(1, px); // unidades do desenho por pixel na tela
   const vs = pontos.map((p) => num(p.valor));
   const st = passo(Math.max(...vs) - Math.min(...vs));
-  const lo = Math.floor(Math.min(...vs) / st) * st, hi = Math.ceil(Math.max(...vs) / st) * st || lo + st;
+  const lo = Math.floor(Math.min(...vs) / st) * st;
+  const teto = Math.ceil(Math.max(...vs) / st) * st;
+  const hi = teto > lo ? teto : lo + st; // saldo igual todos os dias (ou zero): a faixa nunca fica com altura zero
   const d0 = dia(pontos[0].data), d1 = dia(pontos[pontos.length - 1].data);
   const x = (iso: string) => L + ((dia(iso) - d0) / Math.max(1, d1 - d0)) * (W - L - R);
   const y = (v: number) => T + ((hi - v) / (hi - lo || 1)) * (H - T - B);
