@@ -16,8 +16,8 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
-from gabi.db import conectar, migrar
-from gabi.dinheiro import agenda_financeira as agenda_fin, analise, despesas_empresa, fechamento, consultas, contas_pagar as cp
+from gabi.db import conectar, migrar, transacao
+from gabi.dinheiro import agenda_financeira as agenda_fin, analise, assinaturas as assinaturas_mod, despesas_empresa, fechamento, consultas, contas_pagar as cp
 from gabi.dinheiro.repositorio import FonteAnalise
 from gabi.dinheiro.valor import formatar
 from gabi.envelope import envelope
@@ -167,6 +167,8 @@ def criar_mcp(banco: Path, hosts: list[str], relogio=None):
         """Despesas de empresa (ness, IONIC...) pagas no PF no mês (AAAA-MM; padrão: o mês corrente), por empresa: o que o Ricardo pode cobrar ou lançar na PJ. Só leitura: nada é enviado."""
         def f(con, agora):
             alvo = mes or agora.date().isoformat()[:7]
+            with transacao(con):  # cobranças novas das assinaturas com "reembolso por"
+                assinaturas_mod.sincronizar_reembolso(con, agora.date())
             empresas = [{"empresa_id": e["empresa_id"], "empresa": e["empresa"], "total": formatar(e["total_centavos"]),
                          "itens": [{"lancamento_id": i["lancamento_id"], "data": i["data"], "descricao": i["descricao"], "valor": formatar(i["valor_centavos"])} for i in e["itens"]]}
                         for e in despesas_empresa.despesas_por_empresa(con, alvo)]

@@ -366,7 +366,7 @@
   },
   "/api/v1/assinaturas/{aid}": {
    "patch": {
-    "description": "Muda o status da assinatura e o lembrete até cancelar.",
+    "description": "Muda o status da assinatura, o lembrete até cancelar e o \"reembolso por\" (`empresa_id`; null = pessoal).",
     "operationId": "assinatura_patch_api_v1_assinaturas__aid__patch",
     "parameters": [
      {

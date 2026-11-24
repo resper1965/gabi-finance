@@ -14,6 +14,7 @@ import { useApi } from "../../lib/useApi";
 
 interface Ass {
   id: number; nome: string; mensal: string; anual: string; meses_vistos: number; status: string; no_rol?: boolean; lembrar_ate_cancelar: boolean; ativa?: boolean;
+  reembolso?: { id: string; nome: string } | null;
   serie_12m: { mes: string; total: string }[]; desde: string | null; ultimo: string | null; total_12m: string;
   sinais: { nova: boolean; reajustou: { antes: string; agora: string } | null; cobrada_depois_de_cancelar: boolean };
 }
@@ -31,6 +32,7 @@ function Barras({ serie, largura }: { serie: Ass["serie_12m"]; largura: number }
 export function Assinaturas() {
   const celular = useCelular();
   const leitura = useApi<{ itens: Ass[]; total_mensal: string; alerta_forte: boolean }>("/api/v1/assinaturas");
+  const empresas = useApi<{ itens: { id: string; nome: string }[] }>("/api/v1/cadastros/empresas").env?.dados.itens ?? [];
   const avisar = useToast();
   const [filtro, setFiltro] = useState("rol");
   const [marcadas, setMarcadas] = useState<number[]>([]);
@@ -59,6 +61,14 @@ export function Assinaturas() {
           <select aria-label={`Status de ${a.nome}`} value={a.status} data-status={a.status} className="status-assinatura" onChange={(e) => mudar([a.id], { status: e.target.value }, `Anotado: ${a.nome} marcada por você.`)}
             style={{ minHeight: alto }}>
             {STATUS.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+          </select>
+        );
+        const reembolso = (a: Ass, alto: number) => (
+          <select aria-label={`Reembolso de ${a.nome}`} value={a.reembolso?.id ?? ""} className="campo-sm" style={{ minHeight: alto }}
+            onChange={(e) => mudar([a.id], { empresa_id: e.target.value || null },
+              e.target.value ? `Anotado: as cobranças de ${a.nome} entram como reembolso da ${empresas.find((x) => String(x.id) === e.target.value)?.nome ?? e.target.value}.` : `Anotado: ${a.nome} volta a ser pessoal.`)}>
+            <option value="">pessoal</option>
+            {empresas.map((x) => <option key={x.id} value={String(x.id)}>reembolso: {x.nome}</option>)}
           </select>
         );
         const lembrar = (a: Ass) => a.status === "cancelar" && (
@@ -107,7 +117,7 @@ export function Assinaturas() {
             {!celular ? (
               <div className="tabela-rolagem">
               <table className="tabela">
-                <thead><tr><th style={{ width: 32 }}><span className="sr-only">Selecionar</span></th><th>Assinatura</th><th className="num">Valor atual</th><th>Desde · último</th><th>Débitos (12 meses)</th><th className="num">12 meses</th><th>Status</th></tr></thead>
+                <thead><tr><th style={{ width: 32 }}><span className="sr-only">Selecionar</span></th><th>Assinatura</th><th className="num">Valor atual</th><th>Desde · último</th><th>Débitos (12 meses)</th><th className="num">12 meses</th><th>Status</th><th>Reembolso por</th></tr></thead>
                 <tbody>{linhas.map((a) => (
                   <tr key={a.id} data-assinatura={a.id} data-marcado={marcadas.includes(a.id)}>
                     <td><input type="checkbox" aria-label={`Selecionar ${a.nome}`} checked={marcadas.includes(a.id)} onChange={(e) => setMarcadas(e.target.checked ? [...marcadas, a.id] : marcadas.filter((x) => x !== a.id))} /></td>
@@ -117,6 +127,7 @@ export function Assinaturas() {
                     <td><Barras serie={a.serie_12m} largura={7} /></td>
                     <td className="num"><Valor valor={a.total_12m} /></td>
                     <td><div className="pilha-curta" style={{ gap: 4, alignItems: "flex-start" }}>{status(a, 30)}{lembrar(a)}</div></td>
+                    <td>{reembolso(a, 30)}</td>
                   </tr>))}</tbody>
               </table>
               </div>
@@ -131,12 +142,12 @@ export function Assinaturas() {
                   </div>
                   {flags(a)}
                   <div className="fila-entre" style={{ alignItems: "flex-end" }}><Barras serie={a.serie_12m} largura={8} /><span className="miudo">12 meses <strong style={{ color: "var(--tinta)" }}><Valor valor={a.total_12m} /></strong></span></div>
-                  {status(a, 44)}{lembrar(a)}
+                  {status(a, 44)}{reembolso(a, 44)}{lembrar(a)}
                 </li>))}
               </ul>
             )}
             {linhas.length === 0 && <Vazio frase={filtro === "rol" ? "Nenhuma assinatura no rol. A Gabi lista aqui o que debita todo mês." : "Nenhuma assinatura com esse status."} />}
-            <p className="miudo">Barras: o total debitado em cada um dos últimos 12 meses.</p>
+            <p className="miudo">Barras: o total debitado em cada um dos últimos 12 meses. "Reembolso por": as cobranças dos últimos 12 meses e as novas entram nas despesas daquela empresa (o que você marcou à mão num lançamento não muda).</p>
             </section>
           </div>
         );

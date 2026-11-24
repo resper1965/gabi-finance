@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from gabi.dinheiro import analise, assinaturas as assinaturas_mod, consultas, contas_pagar as cp, repositorio
 from gabi.dinheiro.modelo import orcamento_do_banco
 from gabi.dinheiro.valor import formatar, para_centavos
+from gabi.db import transacao
 from gabi.envelope import envelope
 from gabi.identidade import exigir
 from gabi.rotas.dinheiro import _agora, _con, _corpo, _json, _m, erro
@@ -219,6 +220,13 @@ def parcelas(request: Request):
 
 
 # ---------------- assinaturas ----------------
+def _reembolso(con, eid) -> dict | None:
+    if not eid:
+        return None
+    e = con.execute("select id, nome from empresa where id=?", (eid,)).fetchone()
+    return {"id": eid, "nome": e["nome"] if e else eid}
+
+
 def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
     con.execute("insert or ignore into assinatura(estabelecimento) values (?)", (chave,))
     a = con.execute("select * from assinatura where estabelecimento=?", (chave,)).fetchone()
@@ -237,7 +245,7 @@ def _assinatura(con, chave: str, nome: str, r: dict, hoje: dt.date) -> dict:
     if r["mediana_anterior"] and r["ultimo"] > r["mediana_anterior"] * 1.10:
         reaj = {"antes": formatar(para_centavos(r["mediana_anterior"])), "agora": formatar(para_centavos(r["ultimo"]))}
     return {"id": a["id"], "nome": nome, "mensal": formatar(para_centavos(r["valor_medio"])), "anual": formatar(para_centavos(round(r["valor_medio"] * 12, 2))),
-            "meses_vistos": r["meses"], "status": a["status"], "no_rol": a["status"] not in FORA_DO_ROL, "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
+            "meses_vistos": r["meses"], "status": a["status"], "reembolso": _reembolso(con, a["empresa_id"]), "no_rol": a["status"] not in FORA_DO_ROL, "lembrar_ate_cancelar": bool(a["lembrar_ate_cancelar"]),
             "serie_12m": serie, "desde": deb[0]["data"] if deb else None, "ultimo": deb[-1]["data"] if deb else None, "total_12m": formatar(sum(por_mes.values())),
             "sinais": {"nova": r["meses"] == 3, "reajustou": reaj, "cobrada_depois_de_cancelar": cobrada}}
 
@@ -255,6 +263,7 @@ def calcular_assinaturas(con, hoje: dt.date) -> dict:
     todas = [{**r, "ativa": True} for r in recs] + extras
     con.execute("begin immediate")
     try:
+        assinaturas_mod.sincronizar_reembolso(con, hoje)  # cobranças novas das assinaturas com "reembolso por" entram na empresa
         itens = [{**_assinatura(con, r["chave"], r["descricao"], r, hoje), "ativa": r["ativa"]} for r in todas]
         con.execute("commit")
     except BaseException:
@@ -280,10 +289,12 @@ def assinaturas(request: Request):
 
 @router.patch("/assinaturas/{aid}")
 async def assinatura_patch(aid: int, request: Request):
-    """Muda o status da assinatura e o lembrete até cancelar."""
+    """Muda o status da assinatura, o lembrete até cancelar e o "reembolso por" (`empresa_id`; null = pessoal)."""
     corpo = _corpo(await _json(request))
-    if not corpo or set(corpo) - {"status", "lembrar_ate_cancelar"}:
-        raise erro(400, "requisicao_invalida", "informe status e/ou lembrar_ate_cancelar")
+    if not corpo or set(corpo) - {"status", "lembrar_ate_cancelar", "empresa_id"}:
+        raise erro(400, "requisicao_invalida", "informe status, lembrar_ate_cancelar e/ou empresa_id")
+    if "empresa_id" in corpo and corpo["empresa_id"] is not None and not (isinstance(corpo["empresa_id"], str) and corpo["empresa_id"].strip()):
+        raise erro(400, "requisicao_invalida", "empresa_id deve ser o id de uma empresa ou null (pessoal)")
     if "status" in corpo and corpo["status"] not in STATUS_ASSINATURA:
         raise erro(400, "requisicao_invalida", f"status deve ser um de {list(STATUS_ASSINATURA)}")
     if "lembrar_ate_cancelar" in corpo and not isinstance(corpo["lembrar_ate_cancelar"], bool):
@@ -293,11 +304,17 @@ async def assinatura_patch(aid: int, request: Request):
         a = con.execute("select * from assinatura where id=?", (aid,)).fetchone()
         if a is None:
             raise erro(404, "nao_encontrado", f"assinatura {aid} não existe")
+        eid = corpo.get("empresa_id", a["empresa_id"])
+        if eid is not None and con.execute("select 1 from empresa where id=? and excluido_em is null", (eid,)).fetchone() is None:
+            raise erro(404, "nao_encontrado", f"empresa {eid} não existe")
         status = corpo.get("status", a["status"])
         status_em = _agora(request).date().isoformat() if status == "cancelar" and a["status"] != "cancelar" else (a["status_em"] if status == "cancelar" else None)
-        con.execute("update assinatura set status=?, status_em=?, lembrar_ate_cancelar=? where id=?",
-                    (status, status_em, int(corpo.get("lembrar_ate_cancelar", bool(a["lembrar_ate_cancelar"]))), aid))
-        return envelope(con, {"id": aid, "nome": a["estabelecimento"], "status": status, "lembrar_ate_cancelar": bool(corpo.get("lembrar_ate_cancelar", a["lembrar_ate_cancelar"]))},
+        with transacao(con):
+            con.execute("update assinatura set status=?, status_em=?, lembrar_ate_cancelar=?, empresa_id=? where id=?",
+                        (status, status_em, int(corpo.get("lembrar_ate_cancelar", bool(a["lembrar_ate_cancelar"]))), eid, aid))
+            mudados = assinaturas_mod.sincronizar_reembolso(con, _agora(request).date())
+        return envelope(con, {"id": aid, "nome": a["estabelecimento"], "status": status, "lembrar_ate_cancelar": bool(corpo.get("lembrar_ate_cancelar", a["lembrar_ate_cancelar"])),
+                              "reembolso": _reembolso(con, eid), "lancamentos_mudados": mudados},
                         agora=_agora(request))
     finally:
         con.close()

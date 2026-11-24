@@ -1,6 +1,6 @@
 # Dados: as tabelas do banco
 
-O banco é um arquivo SQLite (`/var/lib/gabi-finance/gabi.db`, modo WAL, chaves estrangeiras ligadas). O esquema é criado e mantido só pelas migrações numeradas em `migrations/` (`python -m gabi.db` ou o `instalar.sh` as aplicam em ordem; `schema_versao` guarda as já aplicadas). **Esta página lista todas as 41 tabelas do banco migrado**, geradas do próprio esquema; `tests/test_docs.py` falha se uma tabela nova não for descrita aqui.
+O banco é um arquivo SQLite (`/var/lib/gabi-finance/gabi.db`, modo WAL, chaves estrangeiras ligadas). O esquema é criado e mantido só pelas migrações numeradas em `migrations/` (`python -m gabi.db` ou o `instalar.sh` as aplicam em ordem; `schema_versao` guarda as já aplicadas). **Esta página lista todas as 42 tabelas do banco migrado**, geradas do próprio esquema; `tests/test_docs.py` falha se uma tabela nova não for descrita aqui.
 
 Convenções que valem em todas as tabelas:
 
@@ -132,11 +132,19 @@ Pessoas (o Ricardo, a família, favorecidos que viraram "para quem"). Todas as l
 ## Dinheiro: contas, extrato, classificação
 
 ### `assinatura`
-Estado do rol de assinaturas por estabelecimento (`status`, `lembrar_ate_cancelar`).
+Estado do rol de assinaturas por estabelecimento (`status`, `lembrar_ate_cancelar`) e o "reembolso por" (`empresa_id`: a empresa que reembolsa as cobranças dela; vazio = pessoal).
 
-- **Colunas** (5): `id`*, `estabelecimento`, `status`, `lembrar_ate_cancelar`, `status_em` (`*` = chave primária)
-- **Lida por:** `gabi.avisos`
+- **Colunas** (6): `id`*, `estabelecimento`, `status`, `lembrar_ate_cancelar`, `status_em`, `empresa_id` (`*` = chave primária)
+- **Referências:** `empresa_id` → `empresa`
+- **Lida por:** `gabi.avisos`, `gabi.dinheiro.assinaturas`
 - **Gravada por:** `gabi.mcp.ferramentas_agir`, `gabi.rotas.gastos`
+
+### `assinatura_reembolso`
+Os lançamentos que uma assinatura com "reembolso por" marcou sozinha (origem `regra`), para desfazer só esses quando a empresa muda ou volta a pessoal.
+
+- **Colunas** (3): `lancamento_id`*, `assinatura_id`, `empresa_id` (`*` = chave primária)
+- **Referências:** `lancamento_id` → `lancamento`, `assinatura_id` → `assinatura`
+- **Lida e gravada por:** `gabi.dinheiro.assinaturas`
 
 ### `captura_conta`
 O que cada rodada leu de cada conta (`lidos`, `novos`, `concluida_em`).

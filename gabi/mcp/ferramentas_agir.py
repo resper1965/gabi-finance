@@ -5,7 +5,7 @@ import logging
 
 from gabi.cobrar import receber_manual
 from gabi.db import transacao
-from gabi.dinheiro import gastador, nao_gasto
+from gabi.dinheiro import assinaturas as assinaturas_mod, gastador, nao_gasto
 from gabi.dinheiro.valor import formatar
 from gabi.mcp.ferramentas_prop import ErroFerramenta
 
@@ -69,13 +69,35 @@ def financeiro_marcar_gasto(con, agora: dt.datetime, lancamento_ids, gasto) -> d
 
 def assinaturas_listar(con, agora: dt.datetime) -> dict:
     """Assinaturas que a Gabi já detectou, com o status que o Ricardo deu. `no_rol` false = fora do rol (não é assinatura ou encerrada)."""
-    return {"itens": [{"id": r["id"], "nome": r["estabelecimento"], "status": r["status"], "no_rol": r["status"] not in FORA_DO_ROL}
-                      for r in con.execute("select id, estabelecimento, status from assinatura order by estabelecimento")]}
+    return {"itens": [{"id": r["id"], "nome": r["estabelecimento"], "status": r["status"], "no_rol": r["status"] not in FORA_DO_ROL,
+                       "reembolso": r["empresa_nome"] or r["empresa_id"]}
+                      for r in con.execute("select a.id, a.estabelecimento, a.status, a.empresa_id, e.nome as empresa_nome from assinatura a "
+                                           "left join empresa e on e.id=a.empresa_id order by a.estabelecimento")]}
 
 
-def assinatura_marcar(con, agora: dt.datetime, assinatura, status) -> dict:
-    """Muda o status de uma assinatura pelo id ou pelo nome (trecho, sem diferenciar maiúsculas). Nome que casa com mais de uma → `ambiguo` com as opções."""
-    if status not in STATUS_ASSINATURA:
+def _achar_empresa(con, termo: str) -> tuple[str | None, str | None]:
+    """id ou nome (trecho serve) → (id, nome); "pessoal" → (None, None). Nenhuma ou mais de uma → ErroFerramenta."""
+    if termo.lower() in PESSOAL:
+        return None, None
+    esc = termo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    achadas = con.execute("select id, nome from empresa where excluido_em is null and id=?", (termo,)).fetchall() or \
+        con.execute("select id, nome from empresa where excluido_em is null and upper(nome)=upper(?)", (termo,)).fetchall() or \
+        con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", (esc + "%",)).fetchall() or \
+        con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", ("%" + esc + "%",)).fetchall()
+    if len(achadas) != 1:
+        raise ErroFerramenta("nao_encontrado" if not achadas else "ambiguo",
+                             f"empresa {termo!r}: " + ("não encontrada; veja empresas_listar" if not achadas else "mais de uma: " + ", ".join(f"{a[0]} ({a[1]})" for a in achadas)))
+    return achadas[0][0], achadas[0][1]
+
+
+def assinatura_marcar(con, agora: dt.datetime, assinatura, status=None, reembolso=None) -> dict:
+    """Muda o status e/ou o "reembolso por" de uma assinatura pelo id ou pelo nome (trecho, sem diferenciar maiúsculas).
+    `reembolso` = empresa (id ou nome) ou "pessoal". Nome que casa com mais de uma → `ambiguo` com as opções."""
+    status = status or None
+    reembolso = str(reembolso).strip() if reembolso not in (None, "") else None
+    if status is None and reembolso is None:
+        raise ValueError("informe o status e/ou o reembolso")
+    if status is not None and status not in STATUS_ASSINATURA:
         raise ValueError(f"status deve ser um de {list(STATUS_ASSINATURA)}")
     if isinstance(assinatura, int) and not isinstance(assinatura, bool):
         achadas = con.execute("select * from assinatura where id=?", (assinatura,)).fetchall()
@@ -90,12 +112,17 @@ def assinatura_marcar(con, agora: dt.datetime, assinatura, status) -> dict:
     if len(achadas) > 1:
         raise ErroFerramenta("ambiguo", "mais de uma: " + "; ".join(f"{a['id']} {a['estabelecimento']}" for a in achadas))
     a = achadas[0]
+    eid, enome = _achar_empresa(con, reembolso) if reembolso is not None else (a["empresa_id"], None)
+    status = status or a["status"]
     status_em = agora.date().isoformat() if status == "cancelar" and a["status"] != "cancelar" else (a["status_em"] if status == "cancelar" else None)
     with transacao(con):
-        con.execute("update assinatura set status=?, status_em=? where id=?", (status, status_em, a["id"]))
-        _decisao(con, agora, f"assinaturas: hermes marcou a assinatura {a['id']} como {status}")
+        con.execute("update assinatura set status=?, status_em=?, empresa_id=? where id=?", (status, status_em, eid, a["id"]))
+        mudados = assinaturas_mod.sincronizar_reembolso(con, agora.date())
+        _decisao(con, agora, f"assinaturas: hermes marcou a assinatura {a['id']} como {status}" + (f", reembolso {eid or 'pessoal'}" if reembolso is not None else ""))
+    antes_reemb = a["empresa_id"] or "pessoal"
     return {"id": a["id"], "nome": a["estabelecimento"], "status": status, "status_antes": a["status"], "no_rol": status not in FORA_DO_ROL,
-            "desfazer": f"assinatura_marcar({a['id']}, \"{a['status']}\") ou Gastos › Assinaturas"}
+            "reembolso": enome or eid, "reembolso_antes": a["empresa_id"], "lancamentos_mudados": mudados,
+            "desfazer": f"assinatura_marcar({a['id']}, \"{a['status']}\", \"{antes_reemb}\") ou Gastos › Assinaturas"}
 
 
 def financeiro_indicar_gastador(con, agora: dt.datetime, lancamento_ids, pessoa) -> dict:
@@ -137,17 +164,7 @@ def financeiro_marcar_reembolso(con, agora: dt.datetime, lancamento_ids, empresa
     termo = str(empresa or "").strip()
     if not termo:
         raise ValueError('informe a empresa (id ou nome) ou "pessoal"')
-    eid, nome = None, None
-    if termo.lower() not in PESSOAL:
-        esc = termo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        achadas = con.execute("select id, nome from empresa where excluido_em is null and id=?", (termo,)).fetchall() or \
-            con.execute("select id, nome from empresa where excluido_em is null and upper(nome)=upper(?)", (termo,)).fetchall() or \
-            con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", (esc + "%",)).fetchall() or \
-            con.execute("select id, nome from empresa where excluido_em is null and upper(nome) like upper(?) escape '\\'", ("%" + esc + "%",)).fetchall()
-        if len(achadas) != 1:
-            raise ErroFerramenta("nao_encontrado" if not achadas else "ambiguo",
-                                 f"empresa {termo!r}: " + ("não encontrada; veja empresas_listar" if not achadas else "mais de uma: " + ", ".join(f"{a[0]} ({a[1]})" for a in achadas)))
-        eid, nome = achadas[0]
+    eid, nome = _achar_empresa(con, termo)
     faltam = [i for i in lancamento_ids if con.execute("select 1 from lancamento where id=?", (i,)).fetchone() is None]
     if faltam:
         raise ErroFerramenta("nao_encontrado", f"lançamentos inexistentes: {faltam}")
@@ -190,10 +207,10 @@ def registrar(srv, executar) -> None:
         return executar("assinaturas_listar", assinaturas_listar_)
 
     @srv.tool()
-    def assinatura_marcar(assinatura: str, status: str) -> dict:
-        """Muda o status de uma assinatura pelo id ou pelo nome (trecho do nome serve). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (a Gabi avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`."""
+    def assinatura_marcar(assinatura: str, status: str = "", reembolso: str = "") -> dict:
+        """Muda o status e/ou o "reembolso por" de uma assinatura pelo id ou pelo nome (trecho do nome serve). `reembolso` = empresa que reembolsa as cobranças dela (id ou nome: "ness", "bekaa", "ionic-health-br") ou "pessoal"; as cobranças dos últimos 12 meses sem empresa e as novas passam a contar em `despesas_por_empresa` (marcação feita à mão não muda). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (a Gabi avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`."""
         alvo = int(assinatura) if str(assinatura).strip().isdigit() else assinatura
-        return executar("assinatura_marcar", lambda con, agora: assinatura_marcar_(con, agora, alvo, status))
+        return executar("assinatura_marcar", lambda con, agora: assinatura_marcar_(con, agora, alvo, status, reembolso))
 
     @srv.tool()
     def financeiro_indicar_gastador(lancamento_ids: list[int], pessoa: str) -> dict:

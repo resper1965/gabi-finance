@@ -55,3 +55,29 @@ def eh_habito(con, chave: str, categorias_habito: list[str]) -> bool:
         "where (l.estabelecimento=? or l.descricao_original like ?) and l.valor_centavos<0 group by ca.id order by n desc, ca.nome limit 1",
         (chave, f"{chave}%")).fetchone()
     return bool(r) and r["nome"] in categorias_habito
+
+
+DIAS_REEMBOLSO = 366  # ao preencher "reembolso por", as cobranças dos últimos 12 meses também entram
+
+
+def sincronizar_reembolso(con, hoje: dt.date) -> int:
+    """Põe nas cobranças de cada assinatura com "reembolso por" a empresa dela (origem `regra`): as dos últimos 12 meses e as novas.
+    Só preenche lançamento sem empresa; a marcação feita à mão (ou por outra regra) nunca muda. Quando a assinatura troca de empresa
+    ou volta a pessoal, desfaz só o que ela mesma marcou (e que ninguém mexeu depois). Devolve quantos lançamentos mudaram.
+    O chamador abre a transação."""
+    n = 0
+    for r in con.execute("select r.lancamento_id, r.empresa_id, a.empresa_id as atual from assinatura_reembolso r "
+                         "join assinatura a on a.id=r.assinatura_id").fetchall():
+        if r["atual"] != r["empresa_id"]:
+            n += con.execute("update lancamento set empresa_id=null, empresa_origem=null where id=? and empresa_id=? and empresa_origem='regra'",
+                             (r["lancamento_id"], r["empresa_id"])).rowcount
+            con.execute("delete from assinatura_reembolso where lancamento_id=?", (r["lancamento_id"],))
+    desde = (hoje - dt.timedelta(days=DIAS_REEMBOLSO)).isoformat()
+    for a in con.execute("select id, estabelecimento, empresa_id from assinatura where empresa_id is not null").fetchall():
+        for l in con.execute("select id from lancamento where (estabelecimento=? or descricao_original like ?) and valor_centavos<0 "
+                             "and data>=? and empresa_id is null", (a["estabelecimento"], f"{a['estabelecimento']}%", desde)).fetchall():
+            con.execute("update lancamento set empresa_id=?, empresa_origem='regra' where id=?", (a["empresa_id"], l["id"]))
+            con.execute("insert or replace into assinatura_reembolso(lancamento_id, assinatura_id, empresa_id) values (?,?,?)",
+                        (l["id"], a["id"], a["empresa_id"]))
+            n += 1
+    return n

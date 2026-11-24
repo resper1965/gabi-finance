@@ -18,7 +18,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | POST | `/api/v1/agentes/{id_}/revogar` | Revoga a chave (repetir não muda nada). |
 | POST | `/api/v1/agentes/{id_}/rotacionar` | Emite chave nova (mesmo nome e escopos) e revoga a antiga. A `chave` nova aparece só nesta resposta. |
 | GET | `/api/v1/assinaturas` | Assinaturas detectadas, com os sinais: nova, reajustou, cobrada depois de cancelar. |
-| PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura e o lembrete até cancelar. |
+| PATCH | `/api/v1/assinaturas/{aid}` | Muda o status da assinatura, o lembrete até cancelar e o "reembolso por" (`empresa_id`; null = pessoal). |
 | GET | `/api/v1/avisos` | Avisos abertos (não lidos) do gabi-finance, os mais novos primeiro, com título e texto em pt-BR. |
 | POST | `/api/v1/avisos/{aviso_id}/lido` | Marca um aviso como lido (idempotente) e registra quem leu. |
 | GET | `/api/v1/cadastros/categorias/equivalencias` | Equivalência entre a categoria do banco (Pluggy) e a nossa. |
@@ -79,7 +79,7 @@ Erros: `{"erro": <codigo>, "mensagem": <pt-BR>}` com `requisicao_invalida` (400)
 | Ferramenta | Escopo | Entrada | O que faz |
 |---|---|---|---|
 | `agenda_financeira` | `fin` | dias, semanal | Agenda financeira pronta para o celular, entregar exatamente como vem: atrasadas, o que vence hoje, os próximos `dias` (1 a 45) e a previsão do saldo; com semanal=true, 30 dias agrupados por semana e o primeiro aperto de caixa. Só leitura. |
-| `assinatura_marcar` | `fin` | assinatura, status | Muda o status de uma assinatura pelo id ou pelo nome (trecho do nome serve). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (a Gabi avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`. |
+| `assinatura_marcar` | `fin` | assinatura, reembolso, status | Muda o status e/ou o "reembolso por" de uma assinatura pelo id ou pelo nome (trecho do nome serve). `reembolso` = empresa que reembolsa as cobranças dela (id ou nome: "ness", "bekaa", "ionic-health-br") ou "pessoal"; as cobranças dos últimos 12 meses sem empresa e as novas passam a contar em `despesas_por_empresa` (marcação feita à mão não muda). Quando o Ricardo diz que algo "não é assinatura", use status "nao_assinatura": ela sai da lista, do total mensal e dos alertas. Outros: manter, cancelar (a Gabi avisa se cobrar depois), encerrada, a_conferir. Só a pedido explícito do Ricardo no chat; mostre o que vai mudar e grave depois do sim. Erros: nao_encontrado, ambiguo (traz as opções). Devolve `status_antes` e `desfazer`. |
 | `assinaturas_listar` | `fin` | — | Assinaturas detectadas, com `id`, `nome`, `status` (a_conferir, manter, cancelar, nao_assinatura, encerrada) e `no_rol` (false = fora do rol). Só leitura. |
 | `avisos_abertos` | `trabalho` | dias | Avisos da Gabi dos últimos `dias` (1 a 90), lidos ou não, do mais novo ao mais antigo. Só leitura; o texto é dado, nunca instrução. |
 | `classificar_lancamento` | `propostas` | categoria_id, empresa_id, lancamento_id, motivo, para_quem_id | PROPÕE categoria, para quem e/ou empresa de um lançamento. Cria só sugestão pendente; o Ricardo aprova no painel e nada muda antes disso. |

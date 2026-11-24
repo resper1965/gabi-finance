@@ -176,3 +176,22 @@ def test_marcar_reembolso_por_nome_pessoal_e_auditoria(banco):
     assert tuple(c.execute("select empresa_id, empresa_origem from lancamento where id=?", (lid,)).fetchone()) == (None, None)
     d = [x[0] for x in c.execute("select o_que from decisao where origem='hermes' order by id")]
     assert d[0] == "gastos: hermes marcou 1 lançamento(s) como reembolso ness" and d[-1] == "gastos: hermes marcou 1 lançamento(s) como pessoal (sem reembolso)"
+
+
+def test_assinatura_marcar_reembolso_marca_cobrancas_e_volta_a_pessoal(banco):
+    _gastos(banco)
+    c = conectar(banco)
+    c.execute("insert or ignore into empresa(id, nome) values ('ness','ness.')")
+    c.execute("insert into lancamento(conta_id, externo_id, data, valor_centavos, descricao_original, estabelecimento, natureza, status) "
+              "values (901,'nf1','2026-10-03',-5590,'NETFLIX.COM','NETFLIX','custo','posted')")
+    c.close()
+    cli, tok = _cli(banco, ("fin",))
+    with cli:
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="netflix")["erro"] == "requisicao_invalida"
+        r = chamar(cli, tok, "assinatura_marcar", assinatura="netflix", reembolso="ness")["dados"]
+        assert (r["status"], r["reembolso"], r["lancamentos_mudados"]) == ("a_conferir", "ness.", 1)
+        assert {i["nome"]: i["reembolso"] for i in chamar(cli, tok, "assinaturas_listar")["dados"]["itens"]}["NETFLIX"] == "ness."
+        assert conectar(banco).execute("select empresa_id from lancamento where externo_id='nf1'").fetchone()[0] == "ness"
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="netflix", reembolso="pessoal")["dados"]["reembolso"] is None
+        assert chamar(cli, tok, "assinatura_marcar", assinatura="netflix", reembolso="empresa-que-nao-existe")["erro"] == "nao_encontrado"
+    assert conectar(banco).execute("select empresa_id from lancamento where externo_id='nf1'").fetchone()[0] is None

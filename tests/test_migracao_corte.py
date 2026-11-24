@@ -15,6 +15,7 @@ RAIZ = Path(__file__).parent.parent
 # fica: finanças, base/auth/MCP (acesso, matriz_acesso, token_agente, chamada, chamada_mcp, aviso, rodada, parametro, decisao, pergunta, schema_versao)
 # e as que código que fica ainda usa: agenda_evento/agenda_fonte (dinheiro.sugestoes_agenda), agenda_estado/agenda_eventos/
 # compromisso_fixo/conta_estado (importar, o carregador do staging) e custo_modelo (dinheiro.modelo). `pessoa` fica com todas as linhas.
+DEPOIS = {"assinatura_reembolso"}  # criadas por migrações posteriores ao corte (0093+): existem no banco migrado inteiro
 KEEP = {
     "acesso", "agenda_estado", "agenda_evento", "agenda_eventos", "agenda_fonte", "assinatura", "aviso", "captura_conta", "categoria",
     "chamada", "chamada_mcp", "compromisso", "compromisso_fixo", "compromisso_linha", "compromisso_padrao", "conciliacao", "conferencia", "conta",
@@ -57,7 +58,7 @@ def test_depois_da_0090_so_ficam_as_que_ficam(tmp_path):
     con = conectar(tmp_path / "g.db")
     migrar(con, MIGR)
     assert "0090_corte_financeiro.sql" in {r[0] for r in con.execute("select nome from schema_versao")}
-    assert _nomes(con) == KEEP
+    assert _nomes(con) == KEEP | DEPOIS
     assert not _nomes(con) & DROP and OBRIGATORIAS <= _nomes(con)
 
 
@@ -120,7 +121,7 @@ def test_a_0090_e_idempotente_em_banco_parcial(tmp_path):
     sql = (MIGR / "0090_corte_financeiro.sql").read_text(encoding="utf-8")
     for instrucao in [i.strip() for i in sql.split(";") if re.search(r"^drop", i.strip(), re.M)]:
         con.execute(re.sub(r"(?s)^.*?(drop )", r"\1", instrucao, count=1))
-    assert _nomes(con) == KEEP
+    assert _nomes(con) == KEEP | DEPOIS
 
 
 @pytest.mark.parametrize("tabela", sorted(OBRIGATORIAS))
@@ -222,7 +223,7 @@ def test_a_0092_limpa_o_herdado_e_deixa_o_que_o_dinheiro_usa(tmp_path):
                     "privado, status) values (?,?,?,?,?,?, 'Aluguel', 'https://meet/x', 'Fulano', 'accepted', ?, ?)", (fonte, ext, dia, dia, dia, dia, privado, status))
     con.execute("insert into parametro(chave, valor) values ('email.vips', '[\"a@x.com\"]'), ('avisos.antecedencia_dias', '5'), ('mcp.url', '\"https://brain\"')")
 
-    assert migrar(con, MIGR) == ["0092_limpar_herdados.sql"]
+    assert migrar(con, MIGR)[:1] == ["0092_limpar_herdados.sql"]
 
     assert sorted((r[0], json.loads(r[1])["chave"]) for r in con.execute("select tipo, payload from aviso")) == [
         ("banco_desatualizado", "C6"), ("servico_falhou", "gabi-finance-api.service"), ("vence_hoje", "2026-11-17")]
@@ -235,7 +236,7 @@ def test_a_0092_limpa_o_herdado_e_deixa_o_que_o_dinheiro_usa(tmp_path):
     assert [tuple(r) for r in con.execute("select externo_id, link_reuniao, organizador_nome, resposta, titulo from agenda_evento")] == [
         ("ok", None, None, None, "Aluguel")]
     assert dict(con.execute("select chave, valor from parametro").fetchall()) == {"avisos.antecedencia_dias": "5"}
-    assert _nomes(con) == KEEP and con.execute("pragma foreign_key_check").fetchall() == []
+    assert _nomes(con) == KEEP | DEPOIS and con.execute("pragma foreign_key_check").fetchall() == []
 
     # o dinheiro continua lendo o que precisa: o responsável por uma filha ainda resolve o "para quem"
     from gabi.dinheiro.classificar import _responsavel
@@ -252,4 +253,4 @@ def test_a_0092_limpa_o_herdado_e_deixa_o_que_o_dinheiro_usa(tmp_path):
 def test_a_0092_em_banco_novo_nao_falha(tmp_path):
     con = conectar(tmp_path / "n.db")
     assert "0092_limpar_herdados.sql" in migrar(con, MIGR)
-    assert _nomes(con) == KEEP
+    assert _nomes(con) == KEEP | DEPOIS

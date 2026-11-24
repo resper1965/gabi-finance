@@ -104,6 +104,15 @@ test("Assinaturas troca status por PATCH", async () => {
   await waitFor(() => expect(chamadas.find((c) => c.metodo === "PATCH")?.corpo).toEqual({ status: "cancelar" }));
 });
 
+test("Assinaturas define o reembolso por PATCH", async () => {
+  const chamadas = apiFalsa();
+  montar(<Assinaturas />);
+  const campo = await screen.findByRole("combobox", { name: "Reembolso de NETFLIX" });
+  const opcao = await waitFor(() => { const o = [...campo.querySelectorAll("option")].find((x) => x.value); if (!o) throw new Error("sem empresas"); return o; });
+  fireEvent.change(campo, { target: { value: opcao.value } });
+  await waitFor(() => expect(chamadas.find((c) => c.metodo === "PATCH")?.corpo).toEqual({ empresa_id: opcao.value }));
+});
+
 test("erro de API mostra o estado de erro com os ultimos dados bons guardados", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ erro: "erro", mensagem: "falhou" }) }) as Response));
   montar(<Regras />);

@@ -379,3 +379,38 @@ def test_quem_gastou_separa_a_indicar_de_sem_portador(cli, banco):
     g = {i["nome"]: i["valor"] for i in get(cli, "/api/v1/destino/agrupado?periodo=mes&por=gastador").json()["dados"]["itens"]}
     assert g["(a indicar)"] == "120.00"  # as duas ZARA do cartão compartilhado
     assert "(sem portador)" in g  # os gastos da amostra, em conta sem portador cadastrado
+
+
+def test_assinatura_reembolso_marca_cobrancas_e_desfaz_so_as_suas(cli, banco):
+    aid = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["id"]
+    c = conectar(banco)
+    c.execute("update lancamento set empresa_id='e1', empresa_origem='voce' where externo_id='n4'")  # marcada à mão: nunca muda
+    c.close()
+    r = patch(cli, f"/api/v1/assinaturas/{aid}", {"empresa_id": "e1"})
+    assert r.status_code == 200 and r.json()["dados"]["reembolso"] == {"id": "e1", "nome": "Ness"} and r.json()["dados"]["lancamentos_mudados"] == 3
+    c = conectar(banco)
+    marcas = dict(c.execute("select externo_id, empresa_origem from lancamento where externo_id like 'n_' and empresa_id='e1'").fetchall())
+    assert marcas == {"n1": "regra", "n2": "regra", "n3": "regra", "n4": "voce"}
+    c.close()
+    assert get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["reembolso"]["nome"] == "Ness"
+    # cobrança nova entra sozinha ao abrir a tela
+    c = conectar(banco)
+    _l(c, 2, "n5", "2026-10-08", "NETFLIX", -5590, "custo", 4)
+    c.close()
+    get(cli, "/api/v1/assinaturas")
+    c = conectar(banco)
+    assert c.execute("select empresa_id from lancamento where externo_id='n5'").fetchone()[0] == "e1"
+    c.execute("update lancamento set empresa_origem='voce' where externo_id='n1'")  # ele mexeu depois: fica
+    c.close()
+    r = patch(cli, f"/api/v1/assinaturas/{aid}", {"empresa_id": None})
+    assert r.json()["dados"]["reembolso"] is None
+    c = conectar(banco)
+    ficou = {x[0] for x in c.execute("select externo_id from lancamento where externo_id like 'n_' and empresa_id='e1'")}
+    assert ficou == {"n1", "n4"}
+    assert c.execute("select count(*) from assinatura_reembolso").fetchone()[0] == 0
+
+
+def test_assinatura_reembolso_invalido(cli):
+    aid = get(cli, "/api/v1/assinaturas").json()["dados"]["itens"][0]["id"]
+    assert patch(cli, f"/api/v1/assinaturas/{aid}", {"empresa_id": "nao-existe"}).status_code == 404
+    assert patch(cli, f"/api/v1/assinaturas/{aid}", {"empresa_id": 3}).status_code == 400
